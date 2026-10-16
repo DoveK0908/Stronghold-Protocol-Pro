@@ -20,11 +20,11 @@ for (const mode of ['unavailable', 'denied']) test(`lobby feedback ${mode} does 
   assert.deepEqual(messages, [['复制失败，请手动复制', 'warn']]);
 });
 
-test('feedback remains visible outside optional announcements, with a number-only accessible button', () => {
+test('this deployment hides the lobby feedback chip (the maintainer, 2026-10-16); the copy path stays intact', () => {
   const lobby = source('../../public/js/screens/lobby.js'), feedback = source('../../public/js/ui/lobbyFeedback.js');
+  // 仍然挂在 hub-contact 里，只是组件本身不画东西 —— 要恢复，把 LobbyFeedback 的 return null 换回那个按钮即可
   assert.match(lobby, /<div class="hub-contact"><\$\{LobbyFeedback\} \/>/);
-  assert.match(feedback, /aria-label=\$\{t\('反馈 QQ 群：\{group\}，点击复制群号'/);
-  assert.match(feedback, />\$\{FEEDBACK_GROUP\}<\/\/>/);
+  assert.match(feedback, /export function LobbyFeedback\(\) \{\n  return null;\n\}/);
   assert.doesNotMatch(feedback, /href=|window\.open|2225664821|net\.request|localStorage/);
   assert.match(feedback, /copied \? 'success' : 'warn'/);
   const css = source('../../public/css/screens/lobby.css');

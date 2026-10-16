@@ -300,7 +300,7 @@ function NoticeCard({ value, unread, status, onOpen }) {
     </span>
     <span class="hub-notice__body">${top
       ? html`<b>${top.title}</b>${top.date ? html`<small class="num">${top.date}</small>` : null}`
-      : html`<span class="t-dim">${status === 'missing' ? t('暂无公告') : status === 'error' ? t('公告加载失败，点击重试') : t('正在加载公告…')}</span>`}</span>
+      : html`<span class="t-dim">${status === 'ready' || status === 'missing' ? t('暂无公告') : status === 'error' ? t('公告加载失败，点击重试') : t('正在加载公告…')}</span>`}</span>
   </button>`;
 }
 

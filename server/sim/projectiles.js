@@ -3,6 +3,12 @@
 // A projectile homes on `target` (a unit) or flies to a fixed point `to` ({x,y}). On arrival `onHit(ctx)` runs
 // with ctx = { battle, projectile, target (null if it died / point shot), x, y }. When a homing target dies
 // mid-flight the projectile fizzles, unless `hitDead: true` (then it lands at the last known position).
+//
+// `steer(p, dt) → boolean` hands ONE projectile's movement to its content: the system then calls it every step
+// instead of the straight-line move (returning true = the arrival, so `onHit` runs as usual). 丰川祥子's notes need
+// it — their flight is the official 自由移动 / 追踪移动 / 已命中 state machine with a 扩张正弦 drift and a turn
+// speed, none of which a plain straight-line move can express (server/sim/content/kits/ops/op-oblvns.js).
+// Everything else — id, age/maxAge, data, visual, target fizzle — stays the system's.
 
 import { PROJECTILE_SPEED } from './constants.js';
 import { hypot } from './detmath.js';
@@ -33,6 +39,7 @@ export class ProjectileSystem {
       ty: fin(p.to ? p.to.y : (target ? target.y : fy), fy),
       speed: p.speed > 0 ? p.speed : PROJECTILE_SPEED,
       onHit: p.onHit ?? null,
+      steer: typeof p.steer === 'function' ? p.steer : null,
       visual: p.visual ?? 'arrow',
       source: p.source ?? (p.from && p.from.id != null ? p.from : null),
       hitDead: !!p.hitDead,
@@ -50,6 +57,14 @@ export class ProjectileSystem {
     const arrived = [];
     for (const p of this.list) {
       p.age += dt;
+      if (p.steer) {
+        // content-owned flight (see the header): a throwing / non-boolean `steer` must not leak the projectile
+        let done = false;
+        try { done = !!p.steer(p, dt); } catch (e) { done = true; this.battle._handlerError('projectile.steer', p.source, e); }
+        if (done || p.age >= p.maxAge) arrived.push(p);
+        else keep.push(p);
+        continue;
+      }
       if (p.target) {
         if (p.target.alive && !p.target.hidden && p.target.deploySeq === p.tseq) { p.tx = fin(p.target.x, p.tx); p.ty = fin(p.target.y, p.ty); }
         else if (!p.hitDead) continue; // fizzle

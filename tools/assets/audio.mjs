@@ -64,10 +64,36 @@ export function bankMix(sounds, path) {
 }
 
 /**
+ * Skill-activation banks whose official name is NOT the `battle.ON_SKILL_START.<skillId>` shape the skill table
+ * (and plan.mjs) resolves — one entry per skill id, listing the bank names to read, in order.
+ *
+ * 丰川祥子 (`skchr_oblvns_1/2/3`, the Ave Mujica collaboration operator this repo adds locally as a 自选 pick) has no
+ * bank in that shape for any of her three skills:
+ *   S1 `battle.ON_ABILITY_START.skchr_oblvns_1`          — three takes of one cast cue (`p_skill_…_d1/d2/d3`);
+ *   S2 `battle.ON_SKILL_START.skchr_oblvns_2.1` / `.2`  — the two takes of one cast cue, split over two ability
+ *                                                          indices: `.1` carries `…_h2`, `.2` carries `…_h1` (ability
+ *                                                          order first, so `_h2` is the file the manifest plays);
+ *   S3 `battle.ON_CUSTOM_TRIGGER.skchr_oblvns_3[start]`  — her S3 casts on a custom trigger (the `[loop]` bank of the
+ *                                                          same skill, `ON_BUFF_START.oblvns_s_3[loop]`, is the sustained
+ *                                                          loop, not the cast, and is deliberately not listed).
+ * They are listed instead of derived from a bank-name pattern on purpose: 104 of the pool's 352 skills also carry a
+ * `battle.ON_ABILITY_START.<skillId>` bank (德克萨斯, 能天使, 银灰, 玛恩纳 … — the same-shape list is a known gap,
+ * deliberately NOT generalised here), so accepting that shape generally would add an activation sound to every one of
+ * those operators' manifests — a wider, engine-level decision than "she has no skill sound". skillStart() below only
+ * ever consults this table when the plain `ON_SKILL_START.<skillId>` bank is absent, and a test pins that invariant.
+ */
+export const SKILL_START_BANKS = Object.freeze({
+  skchr_oblvns_1: Object.freeze(['battle.ON_ABILITY_START.skchr_oblvns_1']),
+  skchr_oblvns_2: Object.freeze(['battle.ON_SKILL_START.skchr_oblvns_2.1', 'battle.ON_SKILL_START.skchr_oblvns_2.2']),
+  skchr_oblvns_3: Object.freeze(['battle.ON_CUSTOM_TRIGGER.skchr_oblvns_3[start]']),
+});
+
+/**
  * Index an audio_data.json object.
  * @param {any} audioData parsed excel/audio_data.json
  * @returns {{ bank: (name:string)=>string[], bgm: (name:string)=>({intro:string|null, loop:string}|null),
  *   unitBanks: Map<string, Map<string, string[]>>, skillBanks: Map<string, Map<string,string[]>>,
+ *   skillStart: (skillId:string)=>string[],
  *   mixOf: (paths: string[]|null|undefined) => ({ p?: number, vol?: number }|null) }}
  */
 export function indexAudio(audioData) {
@@ -119,7 +145,23 @@ export function indexAudio(audioData) {
   for (const [name, paths] of banks) if (paths.length) addUnit(name, paths);
   for (const name of Object.keys(alias)) if (!banks.has(name)) { const p = bank(name); if (p.length) addUnit(name, p); }
   const mixOf = (paths) => (paths && typeof paths === 'object' && mixes.get(paths)) || null;
-  return { bank, bgm, unitBanks, skillBanks, mixOf };
+  /**
+   * The sounds of a skill's activation, i.e. what the client plays when that skill starts: the plain
+   * `battle.ON_SKILL_START.<skillId>` bank when the official data has one (the convention every other planned skill
+   * follows), else the SKILL_START_BANKS exception of a skill whose banks are named differently. Every sound of every
+   * listed bank, in order — takes of the same cue, exactly like the several sounds of one bank — and [] when the
+   * official data carries no activation sound for `skillId` at all.
+   * @param {string} skillId e.g. 'skchr_oblvns_1'
+   * @returns {string[]} sound paths under sound_beta_2 (assetToPath form)
+   */
+  const skillStart = (skillId) => {
+    const plain = skillBanks.get(skillId)?.get('ON_SKILL_START');
+    if (plain?.length) return plain;
+    const out = [];
+    for (const name of SKILL_START_BANKS[skillId] || []) for (const p of bank(name)) if (!out.includes(p)) out.push(p);
+    return out;
+  };
+  return { bank, bgm, unitBanks, skillBanks, skillStart, mixOf };
 }
 
 /** Sort key for ability sub-keys: plain first, then numeric suffixes ascending. */
@@ -218,6 +260,226 @@ export const pickModeHits = (banks) => pickModeBanks(banks, ['ON_ABILITY_HIT']);
  * @param {Map<string,string[]>|undefined} banks unit bank table (from indexAudio().unitBanks)
  * @returns {{ attack?: string[], hit?: string[], die?: string[], born?: string[] }}
  */
+/**
+ * Unit SFX banks the conventions of pickUnitSfx() cannot name reliably, one entry per unit id: role → the official bank
+ * names to read, in order (`unitSfxBanks()` resolves them through the audio index; plan.mjs merges the result over the
+ * conventional pick, so a role listed here is pinned and the roles that are not keep their usual resolution).
+ *
+ * 丰川祥子 (`char_4182_oblvns`) — the Ave Mujica collaboration operator this repo adds locally as a 自选 (diy) pick, so
+ * her banks are the official ones while nothing else about her is special. Both of her roles are the files the 0.1.4
+ * tree's manifest carried (`attack` `p_atk_…slnt`, `hit` `p_imp_…dnt`), i.e. this table restores 0.1.4 and pins WHERE
+ * those two values came from — they were never unresolvable, but `attack` was reached by accident, see below:
+ *
+ *   attack `battle.ON_ABILITY_START.char_4182_oblvns.attack.4.1` → `Player/p_atk/p_atk_MJCkyrdslnt`
+ *     The ONLY bank of the official index (all 13,108 `soundFXBanks` of the 0.2.1 dump searched — the file appears in
+ *     exactly one) that carries it: her ten `ON_ABILITY_ON` banks (`…attack.0.1` … `.3.1`, `.5.1` and their `combat.*`
+ *     twins) all carry the other take `Player/p_atk/p_atk_MJCkyrdnt_h`. So both 0.1.4 and today's resolver reach this
+ *     file through the generic `firstMatching('ON_ABILITY_START', ['attack', 'combat'])` pass — which accepts a mode-4
+ *     bank only because `normalModeBank` does NOT read `_slnt` as a skill take (SKILL_MODE_FILE wants `_d` / `_h` / `_s`
+ *     + digits, and `p_atk_mjckyrdslnt.mp3` ends in `_slnt`). That is a name-luck, not a rule: the moment anyone teaches
+ *     the filter about `_slnt`-shaped names, or prefers the numbered default mode (`ON_ABILITY_ON.…attack.0.1` /
+ *     `combat.0`) the way ai.js reads a numbered-mode operator, her swing sound silently changes or disappears — hence
+ *     the pin.
+ *     Why NOT the default-mode take `p_atk_MJCkyrdnt_h`: `public/js/audio.js normalAttackSfx()` refuses an operator's
+ *     `_d` / `_h` / `_s` file for a NORMAL attack (user playtest #4 item 6: 纯烬艾雅法拉's S3 impact rang on every hit),
+ *     so a manifest pointing at it would be a field the client never plays — silence, not a different sound. Pinning the
+ *     take the client does play is what makes her 发出音符 audible again.
+ *   hit `battle.ON_PROJECTILE_HIT.projectile_chr_oblvns` and `…projectile_chr_oblvns_talent`
+ *     → both `Player/p_imp/p_imp_MJCkyrdnt` (one file after dedupe). Her ordinary attack IS the talent's homing note
+ *     (ai.js `noAttackVis` / `noAttackDamage`; the kit fires it), so its impact sound is this projectile's hit bank.
+ *
+ * Deliberately NOT consumed (kept out on purpose, not forgotten): the skill notes' own impact banks — S1
+ * `battle.ON_CUSTOM_TRIGGER.projectile_chr_oblvns_s1_hit` (`p_imp_MJCkyrdglsnt`), S2 `…projectile_chr_oblvns_s2` /
+ * `…_s2_slow` (`p_imp_MJCkyrdnt_r` / `…_p`), S3 `…projectile_chr_oblvns_s3_phy` / `…_s3_mag`
+ * (`p_imp_MJCkyrdslnt`). The manifest has ONE `hit` per unit and the client plays exactly that for every damage it can
+ * attribute to the unit (public/js/audio.js handleBattleEvents), so a per-skill hit needs a schema that does not exist;
+ * 0.1.4 shipped none of them either. (The LAUNCH sounds of those same projectiles are not left out any more: they live
+ * in PROJECTILE_SFX_BANKS / `audio.sfx.proj`, keyed by the projectile kind the snapshot carries — the manifest's
+ * `sfx.units[id].born` is the DEPLOYMENT sound (public/js/audio.js deploySfxUrl / ON_UNIT_BORN), which is why the note's
+ * launch could not go there.)
+ */
+export const UNIT_SFX_BANKS = Object.freeze({
+  char_4182_oblvns: Object.freeze({
+    attack: Object.freeze(['battle.ON_ABILITY_START.char_4182_oblvns.attack.4.1']),
+    hit: Object.freeze(['battle.ON_PROJECTILE_HIT.projectile_chr_oblvns', 'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_talent']),
+  }),
+});
+
+/**
+ * The pinned roles of one unit (UNIT_SFX_BANKS) as role → sound paths, resolved through the audio index: a projectile
+ * bank is not part of a unit's own bank table (indexAudio().unitBanks keys it by projectile, not by unit), so the plan
+ * cannot resolve these inside pickUnitSfx's `banks`. Deduped in bank order (her two hit banks are one file). null when
+ * the unit is not listed, or when the official data carries none of its banks (a missing bank is not an error here: the
+ * conventional pick then stays in charge of that role).
+ * @param {{ bank: (name:string)=>string[] }} audio from indexAudio()
+ * @param {string} id unit id (a manifest sfx.units key: charId / tokenId / enemyId)
+ * @returns {Record<string, string[]>|null}
+ */
+export function unitSfxBanks(audio, id) {
+  const banks = UNIT_SFX_BANKS[id];
+  if (!banks || !audio) return null;
+  /** @type {Record<string, string[]>} */
+  const out = {};
+  for (const [role, names] of Object.entries(banks)) {
+    const paths = [];
+    for (const name of names) for (const p of audio.bank(name)) if (!paths.includes(p)) paths.push(p);
+    if (paths.length) out[role] = paths;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * Content-owned projectiles' own sounds (`audio.sfx.proj`), one entry per projectile KIND the sim streams in
+ * `b.snap.proj` — the same "name the bank explicitly, derive the rest from the official index" shape as
+ * SKILL_START_BANKS / UNIT_SFX_BANKS above (plan.mjs merges the resolved leaves into the manifest).
+ *
+ * Why a table and not a convention: the official index names a projectile bank after the PROJECTILE
+ * (`battle.ON_PROJECTILE_BORN.projectile_<short unit id>[_<variant>]`), not after the unit that fires it, and one unit
+ * may own several of them (one per skill mode). Nothing in an operator's own bank table (`indexAudio().unitBanks`,
+ * keyed by unit) can name them, and the manifest's `sfx.units[id].born` is the DEPLOYMENT sound (`ON_UNIT_BORN`) — a
+ * field a note's launch must never be written into.
+ *
+ * The kinds:
+ *   note      the TALENT's projectile: `projectile_chr_oblvns_talent` → `Player/p_atk/p_atk_MJCkyrdnt` (its launch).
+ *             (Its impact is not listed here: the client plays a unit's `hit` for the damage the sim attributes, and
+ *             `UNIT_SFX_BANKS.char_4182_oblvns.hit` already pins that bank — see that table.)
+ *   noteSkill the SKILLS' projectiles: S2's `projectile_chr_oblvns_s2_t` carries `p_atk_MJCkyrdnt_r`, S3 uses the same
+ *             two files (`…_s3_phy` → `_r`, `…_s3_mag` → `_p`), and S2's slow variant `…_s2_slow_t` the other take
+ *             (`p_atk_MJCkyrdnt_p`). So the two SKILL takes are `_r` (S2/S3 physical) and `_p` (S2's slow / S3 magic);
+ *             the manifest keeps `_r` alone, because the `proj` snapshot distinguishes exactly two kinds ('note' /
+ *             'noteSkill', render/fx/notes.js) and a skill's variant is not in the tuple — a finer split is a schema
+ *             decision, not a resolution one (docs/ASSETS.md "投射物音效").
+ * A bank with several sounds (none of the six has) resolves to its first entry only: the manifest wants ONE file per
+ * role, not a list of takes to pick from silently.
+ *
+ * The set of kinds is closed on purpose: 'note' / 'noteSkill' are the two the sim emits today, and a kind no bank is
+ * listed for stays silent (`projSfx` returns no role) — exactly like a unit whose `attack` the conventions cannot name.
+ * The optional per-unit override in the manifest (`sfx.proj[kind].units[id]`) is not planned by this table: 丰川祥子's
+ * note IS her own `attack` cue, so a per-unit entry would only duplicate `sfx.units[id].attack`.
+ */
+export const PROJECTILE_SFX_BANKS = Object.freeze({
+  note: Object.freeze({
+    born: Object.freeze(['battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_talent']),
+  }),
+  noteSkill: Object.freeze({
+    born: Object.freeze([
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s2_t',
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s2_slow_t',
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s3_phy',
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s3_mag',
+    ]),
+  }),
+});
+
+/**
+ * The projectile sounds of one kind, role → sound path (the first sound of each listed bank, deduped in bank order).
+ * @param {{ bank: (name:string)=>string[] }} audio from indexAudio()
+ * @param {string} kind a `snap.proj` kind ('note' | 'noteSkill')
+ * @returns {Record<string, string>|null} null for an unknown kind, a kind without banks, or a missing index
+ */
+export function projSfx(audio, kind) {
+  const roles = PROJECTILE_SFX_BANKS[kind];
+  if (!roles || !audio) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const [role, names] of Object.entries(roles)) {
+    const paths = [];
+    for (const name of names) for (const p of audio.bank(name)) if (!paths.includes(p)) paths.push(p);
+    if (paths.length) out[role] = paths[0];
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/**
+ * PER-SKILL battle sounds (`audio.sfx.units[charId].skillSfx`, the manifest section this table plans), one entry per
+ * SKILL ID: role → the official bank names to read, in order, exactly like SKILL_START_BANKS / UNIT_SFX_BANKS.
+ *
+ * Why a table: the manifest's unit roles are per UNIT (`attack`, `hit`, `finish`, …) while the official banks are per
+ * SKILL — her three skills each carry their own impact sound, and the client plays a unit's ONE `hit` for every damage
+ * it can attribute to her. The skills' banks are also named after the PROJECTILE (`ON_PROJECTILE_HIT.projectile_…`) or
+ * the ABILITY (`ON_CUSTOM_TRIGGER.…`, `ON_SKILL_FINISH.…`), so nothing in a unit's own bank table (`unitBanks`) can
+ * name them. Roles:
+ *   born    the skill note's launch (bank `ON_PROJECTILE_BORN.projectile_…`). The manifest's `sfx.proj[kind].born`
+ *           already carries the launch of the SNAPSHOT KIND ('note' / 'noteSkill', PROJECTILE_SFX_BANKS) — this is the
+ *           per-SKILL split of the same sound for a client that knows which skill is running: `noteSkill` plays S2's
+ *           take `_r` for both S2 and S3 today, where S3's magic half is `_p` (and S3's physical half `_r`, i.e. the
+ *           same file). Bank order decides, exactly like every other table here.
+ *   hit     the note's impact (`ON_PROJECTILE_HIT.projectile_…`, or her S1's `ON_CUSTOM_TRIGGER.…_s1_hit` — S1's notes
+ *           have no `ON_PROJECTILE_*` bank of their own). THIS is what the section exists for: without it her S1 / S2 /
+ *           S3 impacts all play the unit's ordinary `hit` (`p_imp_mjckyrdnt`, the talent note's).
+ *   finish  the skill's end cue (`ON_SKILL_FINISH.<skillId>[.<n>]`). S2 carries two ability indices (`.1` → `_h2`,
+ *           `.2` → `_h1`), the same two takes its cast uses, read in index order first like SKILL_START_BANKS. S3 has
+ *           NO finish file at all: its `soundFXCtrlBanks` entry (`battle.ON_SKILL_FINISH.skchr_oblvns_3`) is
+ *           `{ targetBank: 'battle.ON_BUFF_START.oblvns_s_3[loop]', ctrlStop: true, ctrlStopFadetime: 0.2 }` — the
+ *           official end of S3 IS the stop of its loop, so there is nothing to list here and the client stops the loop
+ *           with that same 0.2 s fade (public/js/audio.js stopLoop).
+ *   loop    a bank the official data marks `loop: true` (`ON_BUFF_START.oblvns_s_3[loop]` → `p_atk_MJCkyrdslnt_lp`),
+ *           played while the skill runs and stopped by `finish` / the end event. A role whose bank is missing stays
+ *           silent; a skill with no `loop` keeps playing nothing between its cast and its end cue.
+ *
+ * A bank with several sounds resolves to the FIRST of the role's banks, one file — the manifest plays one sound per
+ * role, not a draw (the two `_t` banks of S2 are two takes of one cue, not two sounds; S2's 钢琴 / 风琴 timbres are
+ * one skill, and the snapshot's kind does not tell them apart either — see docs/ASSETS.md).
+ */
+export const SKILL_SFX_BANKS = Object.freeze({
+  skchr_oblvns_1: Object.freeze({
+    hit: Object.freeze(['battle.ON_CUSTOM_TRIGGER.projectile_chr_oblvns_s1_hit']),
+  }),
+  skchr_oblvns_2: Object.freeze({
+    born: Object.freeze([
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s2_t',
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s2_slow_t',
+    ]),
+    hit: Object.freeze([
+      'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s2',
+      'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s2_slow',
+    ]),
+    finish: Object.freeze([
+      'battle.ON_SKILL_FINISH.skchr_oblvns_2.1',
+      'battle.ON_SKILL_FINISH.skchr_oblvns_2.2',
+    ]),
+  }),
+  skchr_oblvns_3: Object.freeze({
+    born: Object.freeze([
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s3_phy',
+      'battle.ON_PROJECTILE_BORN.projectile_chr_oblvns_s3_mag',
+    ]),
+    // both halves resolve to the same file (`_phy` → `p_imp_MJCkyrdslnt`, `_mag` → the same): listed together so the
+    // table says out loud that S3's物理 / 法术 notes share one impact, and a future divergence needs no new entry
+    hit: Object.freeze([
+      'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s3_phy',
+      'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s3_mag',
+    ]),
+    loop: Object.freeze(['battle.ON_BUFF_START.oblvns_s_3[loop]']),
+  }),
+});
+
+/** The roles SKILL_SFX_BANKS may carry, in the order the plan writes them into the manifest. */
+export const SKILL_SFX_ROLES = Object.freeze(['born', 'hit', 'finish', 'loop']);
+
+/**
+ * The per-skill sounds of one skill (SKILL_SFX_BANKS) as role → ONE sound path, or null when the table does not name
+ * that skill / the official data carries none of its banks.
+ * @param {{ bank: (name:string)=>string[] }} audio from indexAudio()
+ * @param {string} skillId e.g. 'skchr_oblvns_2'
+ * @returns {Record<string, string>|null}
+ */
+export function skillSfx(audio, skillId) {
+  const roles = SKILL_SFX_BANKS[skillId];
+  if (!roles || !audio) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const role of SKILL_SFX_ROLES) {
+    const names = roles[role];
+    if (!names?.length) continue;
+    for (const name of names) {
+      const p = audio.bank(name)[0];
+      if (p) { out[role] = p; break; }   // the role's first bank that the official index carries
+    }
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 export function pickUnitSfx(banks, opts = {}) {
   const out = {};
   const proj = opts.projectile || {};

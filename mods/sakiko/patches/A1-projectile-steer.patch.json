@@ -1,0 +1,21 @@
+{
+  "file": "server/sim/projectiles.js",
+  "about": "A1 — 给 ProjectileSystem 一个「内容方自管飞行」的出口 `steer`。丰川祥子的音符弹道是官方的【自由移动】/【追踪移动】/【已命中】状态机 + 扩张正弦漂移 + 转向速度，直线飞向 tx,ty 表达不了；不补这个出口，她的音符会走直线并立刻炸在目标身上（静默变形）。",
+  "hunks": [
+    {
+      "id": "A1-header",
+      "find": "// mid-flight the projectile fizzles, unless `hitDead: true` (then it lands at the last known position).\n\nimport { PROJECTILE_SPEED } from './constants.js';",
+      "replace": "// mid-flight the projectile fizzles, unless `hitDead: true` (then it lands at the last known position).\n//\n// `steer(p, dt) → boolean` hands ONE projectile's movement to its content: the system then calls it every step\n// instead of the straight-line move (returning true = the arrival, so `onHit` runs as usual). 丰川祥子's notes need\n// it — their flight is the official 自由移动 / 追踪移动 / 已命中 state machine with a 扩张正弦 drift and a turn\n// speed, none of which a plain straight-line move can express (server/sim/content/kits/ops/op-oblvns.js).\n// Everything else — id, age/maxAge, data, visual, target fizzle — stays the system's.\n\nimport { PROJECTILE_SPEED } from './constants.js';"
+    },
+    {
+      "id": "A1-field",
+      "find": "      onHit: p.onHit ?? null,\n      visual: p.visual ?? 'arrow',",
+      "replace": "      onHit: p.onHit ?? null,\n      steer: typeof p.steer === 'function' ? p.steer : null,\n      visual: p.visual ?? 'arrow',"
+    },
+    {
+      "id": "A1-update-branch",
+      "find": "      p.age += dt;\n      if (p.target) {",
+      "replace": "      p.age += dt;\n      if (p.steer) {\n        // content-owned flight (see the header): a throwing / non-boolean `steer` must not leak the projectile\n        let done = false;\n        try { done = !!p.steer(p, dt); } catch (e) { done = true; this.battle._handlerError('projectile.steer', p.source, e); }\n        if (done || p.age >= p.maxAge) arrived.push(p);\n        else keep.push(p);\n        continue;\n      }\n      if (p.target) {"
+    }
+  ]
+}

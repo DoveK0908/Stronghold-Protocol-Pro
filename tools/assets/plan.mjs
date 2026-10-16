@@ -23,7 +23,7 @@
 
 import { RAW, joinUrl, safeName, urlBase, urlDir } from './sources.mjs';
 import { kindOf } from './formats.mjs';
-import { pickUnitSfx, pickModeAttacks, pickModeHits, skillModeLetter, SLOT_MODE_LETTER, UI_SFX, BATTLE_SFX, resolveSpec, indexVoice, nativeVoiceDirs, VOICE_DIRS, VOICE_CUSTOM_DIR, VOICE_BATTLE_SLOTS, normalizeVoiceLangs } from './audio.mjs';
+import { pickUnitSfx, unitSfxBanks, skillSfx, pickModeAttacks, pickModeHits, skillModeLetter, SLOT_MODE_LETTER, UI_SFX, BATTLE_SFX, resolveSpec, indexVoice, nativeVoiceDirs, VOICE_DIRS, VOICE_CUSTOM_DIR, VOICE_BATTLE_SLOTS, normalizeVoiceLangs, PROJECTILE_SFX_BANKS, projSfx } from './audio.mjs';
 import { literal } from './manifest.mjs';
 import { EMOTE_CATALOG } from '../../shared/constants.js';
 
@@ -41,6 +41,22 @@ const VOICE_ID_LANG = 'CN';
  * request of 2026-10-08 「全套的日配语音」: the JP dub of every line the game plays, beside the Chinese one.
  */
 export const VOICE_JP_LANG = 'jp';
+
+/**
+ * Operators whose battle lines have to come from a DIFFERENT dub than `--voice-lang`, because the dump that was
+ * asked for has no folder for them at all. 丰川祥子 (char_4182_oblvns) is the Ave Mujica collaboration operator this
+ * repo adds locally as a 自选 (diy) pick: the collaboration is Japanese-voiced only — `voice_cn/` has no
+ * `char_4182_oblvns/` (nor a folder for 祐天寺若麦 / 三角初华 / 若叶睦), every one of her fourteen battle lines answers
+ * 404 there, while the JP dump `voice/` carries all of them under the very same file names (checked 2026-10-07).
+ * Her `charword_table` rows are ordinary rows that DO carry a `voiceAsset`, so `indexVoice()` indexes her like any
+ * other operator and only the dump folder differs — which is what this map redirects, per operator, so a
+ * `--voice-lang` run keeps one language for everyone else. tools/fetch-voice-override.mjs downloads them
+ * (public/assets is git-ignored, so a fresh clone gets them from that script or from `npm run assets`).
+ * Invariant kept by the voice loop below: every operator's entry is one language, never a mix.
+ */
+export const VOICE_LANG_OVERRIDE = Object.freeze({ char_4182_oblvns: 'jp' });
+
+
 
 /**
  * The extra dub trees beside `audio.voiceJp` (`optionalVoice`, on by default in fetch-assets.mjs): the EN and KR
@@ -154,8 +170,12 @@ function leaf(...alts) {
   return list.length ? { alts: list } : null;
 }
 
-/** One operator voice line: charword voiceAsset ('char_263_skadi/CN_023') → `audio/voice/<lang>/<charId>/cn_023.mp3`. */
-function voiceAlt(asset, lang) {
+/**
+ * One operator voice line: charword voiceAsset ('char_263_skadi/CN_023') → `audio/voice/<lang>/<charId>/cn_023.mp3`
+ * (and the matching URL under the `<lang>` dump). Exported for tools/fetch-voice-override.mjs, which has to download
+ * exactly the file this plans for a VOICE_LANG_OVERRIDE operator — one definition, no drift.
+ */
+export function voiceAlt(asset, lang) {
   const [charId, voiceId] = String(asset).split('/');
   if (!charId || !voiceId || !/^[a-z0-9_]+$/i.test(charId) || !/^[a-z]{2}_\d+$/i.test(voiceId)) return null;
   const file = `${charId}/${voiceId.toLowerCase()}.mp3`;
@@ -170,14 +190,87 @@ function nativeVoiceAlt(asset, dir) {
   return alt(`audio/voice/native/${file}`, joinUrl(RAW.aa2voice, `${VOICE_CUSTOM_DIR}/${file}`));
 }
 
-/** Sound path under sound_beta_2 → alternative under public/assets/audio/<sub>. */
-function soundAlt(path, sub = 'sfx') {
+/**
+ * Sound path under sound_beta_2 → alternative under public/assets/audio/<sub>. Exported for
+ * tools/fetch-voice-override.mjs --sfx, which downloads exactly the file this plans for a skill sound (one definition
+ * of the local rel path — the plan's soundLeaf() goes through it too, so the two cannot drift).
+ */
+export function soundAlt(path, sub = 'sfx') {
   const rel = `audio/${sub}/` + path.split('/').map(safeName).join('/');
   return alt(rel, joinUrl(RAW.aa2voice, path));
 }
 
-function soundLeaf(paths, sub = 'sfx', max = 4) {
+/**
+ * How many sounds of one bank the plan keeps as alternatives of a single sound leaf (the first one on disk wins).
+ * Exported for tools/fetch-voice-override.mjs --sfx, which fetches exactly the alternatives this plans.
+ */
+export const SOUND_ALTS = 4;
+
+function soundLeaf(paths, sub = 'sfx', max = SOUND_ALTS) {
   return leaf((paths || []).slice(0, max).map((p) => soundAlt(p, sub)));
+}
+
+/**
+ * Where a manifest URL under `public/assets/audio/` comes from: the path under sound_beta_2 of its `audio/`-relative
+ * part (`/assets/audio/sfx/player/p_atk/x.mp3` → `player/p_atk/x.mp3`). The reverse of `soundAlt()`, kept next to it so
+ * a consumer that reads the committed manifest and one that reads the plan agree.
+ * @param {string} url e.g. `/assets/audio/sfx/player/p_atk/p_atk_x.mp3`
+ * @returns {string|null}
+ */
+export function soundPathOfUrl(url) {
+  const m = /^\/assets\/audio\/(?:sfx|bgm|voice)\/(.+\.mp3)$/i.exec(String(url));
+  return m ? m[1] : null;
+}
+
+/**
+ * A manifest URL under `public/assets/audio/sfx` → the download alternative of that exact file (the shape `soundAlt`
+ * returns for the same path). null when the URL is not one of ours.
+ * @param {string} url
+ * @returns {{rel:string, urls:string[], kind:string}|null}
+ */
+export function soundAltOfUrl(url) {
+  const path = soundPathOfUrl(url);
+  return path ? soundAlt(path) : null;
+}
+
+/**
+ * A unit's SFX roles (pickUnitSfx) → { roles: { attack?, hit?, die?, born? } sound leaves, mix: { [role]: { p?, vol? } }
+ * | null } — the official play chance / volume of each role's bank (audio.mjs bankMix; community report #30: 猎狗's
+ * attack bank is 80 % silence). The caller stores `mix` last in the unit's entry (sfx.units[id].mix).
+ */
+/**
+ * The content-owned projectiles' own sounds (`audio.sfx.proj`, docs/ASSETS.md "投射物音效") as manifest-template leaves,
+ * one entry per projectile kind of `audio.mjs PROJECTILE_SFX_BANKS` ('note', 'noteSkill' — the kinds `b.snap.proj`
+ * streams): `{ [kind]: { alts: [{ born: <leaf> }] } }` plus `{ urls: { [kind]: { born: '/assets/audio/sfx/…' } } }`,
+ * the same URLs resolved (what a test / the fetcher compares against, without having to resolve the template).
+ *
+ * Its own function (and not inlined into buildPlan) because TWO callers need exactly these files: the plan, which puts
+ * the leaves into the manifest, and tools/fetch-voice-override.mjs --sfx, which downloads them (a machine whose
+ * raw.githubusercontent.com is blocked cannot get them from a plain `npm run assets` — same reason that script exists
+ * for her voice and her skill cues). One definition, no drift.
+ * @param {ReturnType<import('./audio.mjs').indexAudio>} audio
+ * @returns {{ leaves: Record<string, any>, urls: Record<string, Record<string,string>>, notes: string[] }}
+ */
+export function projSfxLeaves(audio) {
+  const leaves = {};
+  const urls = {};
+  const notes = [];
+  for (const kind of Object.keys(PROJECTILE_SFX_BANKS)) {
+    const roles = projSfx(audio, kind);
+    if (!roles) { notes.push(`projectile SFX ${kind}: no bank in the official index`); continue; }
+    const entry = {};
+    const u = {};
+    for (const [role, path] of Object.entries(roles)) {
+      const a = soundAlt(path);
+      if (!a) { notes.push(`projectile SFX ${kind}.${role}: ${path} is not a sound path`); continue; }
+      entry[role] = leaf(a);                       // exactly one file per role: the manifest plays one sound, not a draw
+      u[role] = `/assets/${a.rel}`;
+    }
+    if (!Object.keys(entry).length) { notes.push(`projectile SFX ${kind}: no sound resolved`); continue; }
+    leaves[kind] = entry;
+    urls[kind] = u;
+  }
+  return { leaves, urls, notes };
 }
 
 /**
@@ -407,10 +500,46 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
     // skill icons (+ skill SFX) of every skill index; normal-mode attack / impact sounds only (a ranged operator's own
     // projectile banks projectile_chr_<name> as fallbacks — user playtest #4 item 6, audio.mjs pickUnitSfx)
     const short = id.replace(/^char_\d+_/, '');
-    const sfx = pickUnitSfx(audio.unitBanks.get(id), { operator: true, projectile: {
-      born: audio.bank(`battle.ON_PROJECTILE_BORN.projectile_chr_${short}`), hit: audio.bank(`battle.ON_PROJECTILE_HIT.projectile_chr_${short}`) } });
+    // The 自选 (diy) picks are ordinary operators here — extraOps joins this very loop above, so 丰川祥子 reaches
+    // pickUnitSfx exactly like a pool operator. Her two roles are nonetheless PINNED explicitly (audio.mjs
+    // UNIT_SFX_BANKS / unitSfxBanks) on top of the conventional pick, because the convention resolves her `attack`
+    // through a name-luck rather than a rule (the table's comment has the whole chain). The pin's values are the ones
+    // the convention produces today — the files the 0.1.4 tree's manifest carried — so this is insurance, not a change.
+    //
+    // Port regression this repairs (0.1.4 → 0.2.x, owner report 「祥子攻击敌人，敌人受击没有音效」/「发出音符也没声音」):
+    // her `attack` / `hit` were never unresolvable — 0.1.4's audio.mjs resolves them with this same code. What changed
+    // is the ASSETS. In 0.1.4 she was a normal chess, so a full `npm run assets` downloaded her two files with the rest
+    // of the pool. In 0.2.x she arrives as a 自选 pick into a public/assets folder that is SHARED between checkouts and
+    // already held thousands of files, and the port's manifest rebuilds ran `--offline --add-only` (which never
+    // downloads a file that is not there yet) plus `tools/fetch-voice-override.mjs --sfx` for her skill-activation
+    // banks. Those are exactly the three sounds that survived. `manifest.mjs resolveTemplate` then drops a leaf whose
+    // files are missing on disk — silently, in a list of hundreds of legitimate misses (`requiredMisses` only checks
+    // avatar / portrait / spine.front per char) — so a role the plan HAD resolved simply vanished from the manifest.
+    // Fix: the two files on disk (lower-case, the manifest's own path) + this pin + test/sfx-oblvns.test.js pinning the
+    // manifest, the disk and the client end.
+    const sfx = { ...pickUnitSfx(audio.unitBanks.get(id), { operator: true, projectile: {
+      born: audio.bank(`battle.ON_PROJECTILE_BORN.projectile_chr_${short}`), hit: audio.bank(`battle.ON_PROJECTILE_HIT.projectile_chr_${short}`) } }),
+      ...unitSfxBanks(audio, id) };
     const { roles: u, mix } = unitSounds(audio, sfx);
-    const skillSfx = {};
+    const skillCues = {};
+    // 按技能细分 (`sfx.units[id].skillSfx`, docs/ASSETS.md): the sounds of a skill's OWN cast — its note's impact, the
+    // end cue, the sustained loop — keyed by skill index, because the manifest's unit roles are per UNIT and a skill's
+    // banks are named after its projectile / ability (audio.mjs SKILL_SFX_BANKS). Generic: a skill the table does not
+    // name contributes nothing, so every other operator's entry is written exactly as before.
+    const perSkill = {};
+    for (const i of idx) {
+      const s = (o.skills || []).find((k) => k.index === i);
+      if (!s?.skillId) continue;
+      const resolved = skillSfx(audio, s.skillId);
+      if (!resolved) continue;
+      const entry = {};
+      for (const [role, path] of Object.entries(resolved)) {
+        const a = soundAlt(path);
+        if (!a) { notes.push(`${id} ${s.skillId}.${role}: ${path} is not a sound path`); continue; }
+        entry[role] = `/assets/${a.rel}`;
+      }
+      if (Object.keys(entry).length) perSkill[String(i)] = entry;
+    }
     // Per-skill ATTACK / IMPACT sound (audio.mjs pickModeAttacks / pickModeHits): a skill mode has its own swing and its
     // own hit sound, and neither may play as the unit's normal attack / impact (银灰, 纯烬艾雅法拉). An operator whose
     // every attack belongs to a skill mode has no normal bank at all (司霆惊蛰 — 解放者, she only attacks while a skill
@@ -430,8 +559,12 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       const iconId = s.iconId || s.skillId;
       if (s.icon?.url && !skills[iconId]) skills[iconId] = leaf(alt(`skill/${safeName(iconId)}.png`, s.icon.url, s.icon.bytes));
       if (s.skillId) skillsById[s.skillId] = iconId;
-      const ss = audio.skillBanks.get(s.skillId)?.get('ON_SKILL_START');
-      if (ss?.length) skillSfx[String(i)] = soundLeaf(ss);
+      // The skill's activation sound: its official `battle.ON_SKILL_START.<skillId>` bank, else the exception table of
+      // the skills whose bank is named differently (audio.mjs SKILL_START_BANKS / skillStart — 丰川祥子's three).
+      // Without a `skills[]` entry nothing is played when that skill starts (user report "放大招没音效"); the client
+      // plays `sfx.units[id].skills[skillIndex]` on its own 'skill' event, so no client change is involved.
+      const ss = audio.skillStart(s.skillId);
+      if (ss?.length) skillCues[String(i)] = soundLeaf(ss);
       // [ASSUMED] Without a named activation mode, infer d/h/s from slot 1/2/3; see DESIGN §28.17.
       const letter = skillModeLetter(ss?.[0]) ?? SLOT_MODE_LETTER[i];
       if (letter && modeAttacks[letter]) {
@@ -445,9 +578,18 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
         if (m) hitMix[String(i)] = m;
       }
     }
-    const primarySkill = skillSfx[String(idx[0])];
+    // A skill's OWN impact (SKILL_SFX_BANKS `hit`) is also that skill's `hits[i]`: the client plays a unit's
+    // `hits[skillIndex]` for damage attributed to the unit while that skill is active (public/js/audio.js unit()),
+    // and a skill's impact bank is named after its PROJECTILE (`battle.ON_CUSTOM_TRIGGER.projectile_chr_oblvns_s1_hit`),
+    // which the official `ON_ABILITY_HIT` convention pickModeHits reads cannot see. Fill only what it left empty, so
+    // every operator whose mode banks do resolve keeps exactly the entry it had before.
+    for (const [i, entry] of Object.entries(perSkill)) {
+      if (entry.hit && !hits[i]) hits[i] = entry.hit;
+    }
+    const primarySkill = skillCues[String(idx[0])];
     if (primarySkill) u.skill = primarySkill;
-    if (Object.keys(skillSfx).length > 1) u.skills = skillSfx;
+    if (Object.keys(skillCues).length > 1) u.skills = skillCues;
+    if (Object.keys(perSkill).length) u.skillSfx = perSkill;
     if (Object.keys(attacks).length) u.attacks = attacks;
     if (Object.keys(hits).length) u.hits = hits;
     if (Object.keys(attackMix).length) u.attackMix = attackMix;
@@ -666,6 +808,11 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
   for (const [name, spec] of Object.entries(UI_SFX)) { const l = soundLeaf(resolveSpec(spec, audio.bank)); if (l) sfxUi[name] = l; else notes.push(`UI SFX ${name}: no sound`); }
   const sfxBattle = {};
   for (const [name, spec] of Object.entries(BATTLE_SFX)) { const l = soundLeaf(resolveSpec(spec, audio.bank)); if (l) sfxBattle[name] = l; else notes.push(`battle SFX ${name}: no sound`); }
+  // Content-owned projectiles (`b.snap.proj`): a note's own launch sound, by projectile kind — its own section, because
+  // it is neither a unit role (`sfx.units[id].born` is the DEPLOYMENT sound) nor a battle cue. 丰川祥子's note is the
+  // only one the current content fires; the table is keyed by KIND so any content that streams a projectile gets one.
+  const proj = projSfxLeaves(audio);
+  for (const n of proj.notes) notes.push(n);
 
   // --- module type icons ----------------------------------------------------
   const modules = {};
@@ -698,11 +845,14 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       if (!chars[charId]) continue;          // only the operators this game can field (`chars`: the 138 pool charIds and the 自选 picks)
       const dir = dirOf ? dirOf(charId) : null;
       if (dirOf && !dir) continue;
+      // the dub this pass plans their lines in: the pass's own language, unless VOICE_LANG_OVERRIDE sends them
+      // elsewhere (丰川祥子: the collaboration has no Chinese dump upstream — every voice_cn file of hers is a 404)
+      const dub = VOICE_LANG_OVERRIDE[charId] ?? lang;
       const v = {};
       for (const [slot, assets] of Object.entries(slots)) {
         // one leaf per line (部署1 / 部署2 …): an array stays an array so the client can draw one — chaining them as
         // alternatives of a single leaf would keep only the first line that landed on disk.
-        const lines = assets.map((a) => leaf(dir ? nativeVoiceAlt(a, dir) : voiceAlt(a, lang))).filter(Boolean);
+        const lines = assets.map((a) => leaf(dir ? nativeVoiceAlt(a, dir) : voiceAlt(a, dub))).filter(Boolean);
         if (!lines.length) continue;
         v[slot] = lines.length === 1 ? lines[0] : lines;
       }
@@ -741,7 +891,7 @@ export function buildPlan({ assets07, ops03, enemies05, maps05, audio, modelsDat
       ...(voiceJp ? { voiceJp: voiceByLang[VOICE_JP_LANG] } : {}),
       ...(voiceLangs === null ? {} : { voiceByLang }),
       ...optionalTrees,
-      sfx: { ui: sfxUi, battle: sfxBattle, units: unitsSfx },
+      sfx: { ui: sfxUi, battle: sfxBattle, units: unitsSfx, ...(Object.keys(proj.leaves).length ? { proj: proj.leaves } : {}) },
     },
   };
   return { template, models, notes };

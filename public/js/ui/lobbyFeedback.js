@@ -12,9 +12,10 @@ export async function copyFeedbackGroup(copy = copyText, notify = toast) {
   return copied;
 }
 
+/**
+ * Hidden on this deployment (the maintainer's request of 2026-10-16): 243859707 is the upstream site's group, not ours.
+ * The copy helper, the constant and `lobby.js`'s mount stay untouched, so bringing the chip back is one line here.
+ */
 export function LobbyFeedback() {
-  return html`<${Button} class="lobby-feedback num selectable" variant="secondary" size="sm" icon="copy"
-    title=${t('反馈 QQ 群：{group}，点击复制群号', { group: FEEDBACK_GROUP })}
-    aria-label=${t('反馈 QQ 群：{group}，点击复制群号', { group: FEEDBACK_GROUP })}
-    onClick=${() => copyFeedbackGroup()}><span class="lobby-feedback__label">${t('反馈群')}</span>${FEEDBACK_GROUP}<//>`;
+  return null;
 }

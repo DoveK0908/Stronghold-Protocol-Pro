@@ -1,0 +1,31 @@
+{
+  "file": "public/js/render/fx/system.js",
+  "about": "FxSystem 容器层：构造函数建 notes/noteFree、clear() 与 destroy() 回收、update() 推进 _updateNotes、counts 加 notes。 C3 只接了 FX_PARTS 与 FX_METHOD_ORDER，缺了这 5 处 FxNotes 的池子就永远是 undefined。",
+  "hunks": [
+    {
+      "id": "C3b-ctor-note-pools",
+      "find": "    ctx.layers.fxAdd.addChild(this.projLayer);",
+      "replace": "    ctx.layers.fxAdd.addChild(this.projLayer);\n    this.notes = new Map();   // live content-owned notes (b.snap `proj`): projectile id → { core, halo, … }\n    this.noteFree = [];       // pooled note records (their sprites stay in projLayer)"
+    },
+    {
+      "id": "C3b-clear-note-pools",
+      "find": "    this.projs.length = 0;",
+      "replace": "    this.projs.length = 0;\n    for (const n of this.notes.values()) this._freeNote(n);\n    this.notes.clear();"
+    },
+    {
+      "id": "C3b-update-notes",
+      "find": "    this._updateProjs(dt);",
+      "replace": "    this._updateProjs(dt);\n    this._updateNotes(dt);"
+    },
+    {
+      "id": "C3b-counts-notes",
+      "find": "    return { particles: this.parts.length, projectiles: this.projs.length, numbers: this.nums.length, rings: this.rings.length, auras: this.auras.size, locks: this.locks.length, flames: this.flames.length, promotions: this.promotions || 0 };",
+      "replace": "    return { particles: this.parts.length, projectiles: this.projs.length, notes: this.notes.size, numbers: this.nums.length, rings: this.rings.length, auras: this.auras.size, locks: this.locks.length, flames: this.flames.length, promotions: this.promotions || 0 };"
+    },
+    {
+      "id": "C3b-destroy-notefree",
+      "find": "    this.projFree.length = 0;",
+      "replace": "    this.projFree.length = 0;\n    this.noteFree.length = 0;"
+    }
+  ]
+}

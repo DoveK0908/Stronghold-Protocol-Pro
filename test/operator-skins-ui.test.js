@@ -105,7 +105,8 @@ test('skin sync uses its own message and state, resends on welcome and keeps loc
 });
 test('installed catalogue has complete files, does not change the default operator assets', { skip: !existsSync(new URL(`../public/assets/skins/${id}/avatar.png`, import.meta.url)) && 'install ignored skin artwork first' }, () => {
   const manifest = JSON.parse(readFileSync(new URL('../data/assets.json', import.meta.url)));
-  assert.equal(Object.keys(manifest.chars).length, 210);
+  // 210 in the pure 0.2.5 catalogue; 211 with 丰川祥子 (char_4182_oblvns), the mod's 自选 collab pick, in the pool.
+  assert.equal(Object.keys(manifest.chars).length, 211);
   assert(manifest.chars.char_4231_clemnt, '0.2.3 includes Clementia alongside the unchanged skin catalogue');
   for (const skin of OPERATOR_SKINS) {
     const rec = manifest.skins[skin.id]; assert.equal(rec.charId, skin.charId);

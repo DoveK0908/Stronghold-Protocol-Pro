@@ -75,15 +75,31 @@ test('the committed manifest: her S3 swing and impact are the `_s` pair, her nor
 
 test('every manifest unit with a hits table agrees with the mode convention (d / h / s = 技能1 / 2 / 3)', () => {
   const units = manifest.audio.sfx.units;
+  // 丰川祥子 (char_4182_oblvns, the mod's own operator) is the single exception, and it is sourced from the official
+  // table rather than invented: `excel/audio_data.json` hangs each of her skills' impact on a bank whose NAME carries
+  // the skill index, and none of the files carries a mode letter —
+  //   S1  battle.ON_CUSTOM_TRIGGER.projectile_chr_oblvns_s1_hit          -> p_imp_MJCkyrdglsnt
+  //   S2  battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s2 (/_t/_slow)   -> p_imp_MJCkyrdnt_r
+  //   S3  battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_s3_phy / _s3_mag -> p_imp_MJCkyrdslnt
+  // `skillModeLetter()` reads the filename suffix, so it cannot see them; the assertion below pins her three files to
+  // exactly those banks instead, which is the same guarantee by a different (and official) route.
+  const HER_IMPACTS = ['p_imp_mjckyrdglsnt.mp3', 'p_imp_mjckyrdnt_r.mp3', 'p_imp_mjckyrdslnt.mp3'];   // manifests lowercase the paths
   let n = 0;
+  const loose = [];
   for (const [id, u] of Object.entries(units)) {
     for (const [i, url] of Object.entries(u?.hits || {})) {
       n++;
       const letter = skillModeLetter(url);
-      assert.ok(letter, `${id}: hits[${i}] is a skill-mode file (${url})`);
+      if (!letter) {
+        assert.equal(id, 'char_4182_oblvns', `${id}: hits[${i}] is a skill-mode file (${url})`);
+        assert.equal(url.split('/').pop(), HER_IMPACTS[Number(i)], `${id}: hits[${i}] is the official S${Number(i) + 1} impact bank`);
+        loose.push(`${id}:hits[${i}]`);
+        continue;
+      }
       assert.equal(letter, SLOT_MODE_LETTER[i], `${id}: hits[${i}] is 技能${Number(i) + 1} (the _${letter} mode)`);
     }
   }
+  assert.deepEqual(loose, ['char_4182_oblvns:hits[0]', 'char_4182_oblvns:hits[1]', 'char_4182_oblvns:hits[2]'], 'only her three official impact banks are mode-less');
   assert.ok(n >= 10, `some operators carry mode impacts (found ${n})`);
 });
 

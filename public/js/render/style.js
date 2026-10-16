@@ -132,10 +132,46 @@ export function dmgStyleKey(type) {
 export const HIT_TINT = Object.freeze({ phys: 0xffd9a0, arts: 0xc77dff, true: 0xffffff, heal: 0x62f08a, elem: 0xff7b3a });
 
 /**
- * Projectile visuals per b.ev 'atk' projKind (sim: none | arrow | bolt | bomb | lob | orb | drone | enemy | boomerang | droneBomb;
- * chain / chainHeal / beam are beams). Drawn by render/fx.js:
+ * 丰川祥子's notes — the ONE place to tune their size (owner feedback: they were too big). `head` / `width` are the drawn
+ * glyph in tiles (× the camera's px per tile, so a note reads the same at every zoom and on both boards), `halo` the
+ * diameter of the glow behind it, `haloA` that glow's alpha at high quality (halved at quality 'low').
+ * The skill's note is ~25 % bigger than the talent's and its halo a little brighter (PROJ.note / PROJ.noteSkill).
+ */
+export const NOTE_SIZE = Object.freeze({
+  talent: Object.freeze({ head: 0.42, width: 0.38, halo: 0.72, haloA: 0.75 }),
+  skill: Object.freeze({ head: 0.52, width: 0.47, halo: 0.95, haloA: 0.88 }),
+});
+/**
+ * The note's EFFECT colour, user-set: rgb(197, 62, 70) = 0xC53E46. The halo, the trail motes and the sparks of a note
+ * leaving the field are exactly this colour — one edit here re-tints all three.
+ */
+export const NOTE_FX = 0xc53e46;
+/**
+ * The note GLYPH's own colour: a pale tint of NOTE_FX (a glyph in the effect colour itself would sink into its own halo
+ * on the dark board). To draw the glyph in the exact effect colour too, set both entries to NOTE_FX.
+ */
+export const NOTE_INK = Object.freeze({ talent: 0xffe0e3, skill: 0xffeef1 });
+
+/**
+ * The Ave Mujica FEVER gauge's colour, per the official note (the icon sits at the lower right of an Ave Mujica member's
+ * model and its rose red fill reflects the charge): the icon's filling ring, its halo and the Fever-tinted SP bar are
+ * all this rose red. Deliberately NOT the notes' NOTE_FX red — the gauge is its own thing (render/units.js FEVER_ICON).
+ */
+export const FEVER_ROSE = 0xe8467c;
+/** The same rose while Fever is ON (the icon shows its remaining time and must read apart from plain charging). */
+export const FEVER_ROSE_HI = 0xff9ec4;
+/**
+ * The badge's ring TRACK while it is only charging: the rose darkened, so the empty part of the ring reads as part of
+ * the gauge. While Fever runs the track takes FEVER_ROSE instead.
+ */
+export const FEVER_ROSE_DIM = 0x6d2139;
+
+/**
+ * Projectile visuals per b.ev 'atk' projKind (sim: none | arrow | bolt | bomb | lob | orb | drone | enemy | boomerang |
+ * droneBomb | note | noteSkill; chain / chainHeal / beam are beams). Drawn by render/fx.js:
  *   look   tracer (bullet streak + muzzle flash) | orb (glowing ball, particle trail) | shell (lobbed on an arc with a
  *          ground shadow, smoke trail) | dart (small fast bolt) | boomerang (spins to the target and back to the thrower)
+ *          | note (a floating music glyph — 八分 / 十六分音符 or 高音谱号 — with a halo)
  *   speed  tiles per game second — a copy of the sim's PROJECTILE_SPEEDS (server/sim/constants.js; `back` of the
  *          boomerang = BOOMERANG_RETURN_SPEED, PRTS 跃跃: out 15, back 3.75). fx.js prefers the sim's own values, loaded
  *          from /sim/constants.js, so the visual flight ends with the sim's hit; this copy stands in until then (and in
@@ -159,6 +195,15 @@ export const PROJ = Object.freeze({
   // 暴鸰's bomb (sim content/enemies/fly.js kitBombd; official projectile_bombd, speed 5): dropped from the drone, it falls
   // onto its target with a low arc and bursts where the sim's 'explode' blast goes off
   droneBomb: { look: 'shell', speed: 5, once: true, tint: 0xffe2c8, glow: 0xff5a3a, len: 0.6, width: 0.3, head: 0.5, trail: 0xff7a4a, arc: 0.35, smoke: 0x2e2824, hit: 'boom' },
+  // 丰川祥子's talent note (op-oblvns.js fireNote, `hitTag` 'talent'): a floating music glyph — 八分音符 / 十六分音符 /
+  // 高音谱号, picked at random per note (notes.js NOTE_FRAMES) — with a halo in the effect colour. Sizes: NOTE_SIZE.talent,
+  // colours: NOTE_INK.talent (glyph) / NOTE_FX (halo, trail, sparks). `speed` copies the note's own flight (op-oblvns.js
+  // NOTE_TALENT, 【追踪移动】 2 tiles/s) and is only read if a note ever arrives as an 'atk' kind — the live path is
+  // `b.snap.proj` → notes.js syncNotes, which draws the sim's own positions instead.
+  note: { look: 'note', speed: 2, tint: NOTE_INK.talent, glow: NOTE_FX, trail: NOTE_FX, ...NOTE_SIZE.talent, hit: 'arts' },
+  // the same note fired by one of her skills (hitTag 'skill': S1's volley, S2's two timbres, S3's tracking pair):
+  // bigger and brighter (a paler glyph, a wider and stronger halo) so a skill's notes read as the stronger ones
+  noteSkill: { look: 'note', speed: 2, tint: NOTE_INK.skill, glow: NOTE_FX, trail: NOTE_FX, ...NOTE_SIZE.skill, hit: 'arts' },
 });
 
 /** Status keys (b.ev 'status' + UF flags) → icon atlas key (render/textures.js) and colour. */

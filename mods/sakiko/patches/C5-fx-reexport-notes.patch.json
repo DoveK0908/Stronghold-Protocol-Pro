@@ -1,0 +1,16 @@
+{
+  "file": "public/js/render/fx.js",
+  "about": "Sakiko's fx.js: a documentation block for the note path and the re-export of NOTE_FRAMES / pickNoteFrame. Purely additive — dust's 47 lines are all kept.",
+  "hunks": [
+    {
+      "id": "C5-notes-doc",
+      "find": "//   deploy       drop-in ring + pillar; death dissolve embers; crate splinters; element bursts; leak vignette;\n//                bond-layer glyph pops and bounty coins (screen space, near the top of the field)",
+      "replace": "//   deploy       drop-in ring + pillar; death dissolve embers; crate splinters; element bursts; leak vignette;\n//                bond-layer glyph pops and bounty coins (screen space, near the top of the field)\n//   notes        content-owned projectiles that have no 'atk' event to hang a visual on (丰川祥子's 音符: she fires them\n//                on her own — 【自由移动】 then 【追踪移动】 — so the sim streams their positions in b.snap `proj`) and\n//                syncNotes() keeps one floating, haloed music glyph per id (八分音符 / 十六分音符 / 高音谱号, drawn at\n//                random per note) — created with the id, moved to the snapshot's interpolated position (the same camera\n//                mapping every other projectile uses), flashed in NOTE_FX, faded out and pooled when the id leaves the\n//                list (render/fx/notes.js)"
+    },
+    {
+      "id": "C5-reexport-notes",
+      "find": "export { FX_KINDS, fxSpec, tilesAround, wallTiles } from './fx/kinds.js';",
+      "replace": "export { FX_KINDS, fxSpec, tilesAround, wallTiles } from './fx/kinds.js';\nexport { NOTE_FRAMES, pickNoteFrame } from './fx/notes.js';"
+    }
+  ]
+}

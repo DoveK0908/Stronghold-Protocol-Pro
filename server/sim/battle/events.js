@@ -52,6 +52,13 @@ export class BattleEvents {
    *         game time their respawn timer ends, its length (s), constants.js DOWN_STATE and the tile they lie on (and
    *         come back on: _layBody — where they fell, or their home);
    *   elem: [[id, element, fill, cooldownEnd, cooldown]] — the element gauge each unit shows (damage.js elementView);
+   *   proj: [[id, x, y, kind]] — content-owned COSMETIC projectiles, drawn by the client from this list instead of from an
+   *         'atk' event: 丰川祥子's notes fly on their own (自由移动 drift / 追踪移动, projectiles.js `steer`), so there is
+   *         no attack to hang a visual on and no target view to home on. Only `visual: 'note'` so far; `kind` is 'note'
+   *         (talent) or 'noteSkill' (a skill's), which picks the client's PROJ entry;
+   *   fever: [[id, pct]] — a gauge a KIT keeps on `unit.mem.gauges` (0..100, rounded and clamped here), forwarded so the
+   *         client can show it (丰川祥子's Fever: render/units.js FEVER_ICON). Deliberately generic — the engine does not
+   *         know a kit's gauge name, it only forwards what the kit wrote (`unit.mem` is the kit's own space);
    *   ammo: [[id, rounds left, rounds in the magazine]] — a running ammo skill, whole rounds (snapshot.js ammoView): the segmented bar;
    *   coins: [[id, balance, cap]] — a live Swire skill purse, zero included (snapshot.js coinView);
    *   wolves: [[id, 狼影 left, the talent's maximum]] — 伺夜's 狼群 (snapshot.js wolfView): the pips under the HP bar;
@@ -66,7 +73,7 @@ export class BattleEvents {
    *         feared or stunned) — display metadata (render/interp.js holds the position until then);
    *   standCut: [[id, at]] — the latest time each listed enemy's recovery was cut or ignored (_cutAttackStand), the
    *         dying ones in their death window included.
-   * ammo / coins / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them,
+   * ammo / coins / wolves / neg / energy / layers / charges / stand / standCut / proj / fever are display only: no sim state reads them,
    * and the nine-field unit tuples are unchanged.
    */
   snapshot({ includeUnitStats = false } = {}) {
@@ -131,6 +138,19 @@ export class BattleEvents {
     if (energy) snap.energy = energy;
     if (stand) snap.stand = stand;
     if (standCut) snap.standCut = standCut;
+    let proj = null;
+    for (const p of this.projectiles.list) {
+      if (p.visual !== 'note') continue;
+      (proj || (proj = [])).push([p.id, r2(p.x), r2(p.y), p.data && p.data.hitTag === 'skill' ? 'noteSkill' : 'note']);
+    }
+    if (proj) snap.proj = proj;
+    let fever = null;
+    for (const u of this.units) {
+      if (!u.alive || !u.deployed || u.hidden) continue;
+      const pct = u.mem && u.mem.gauges ? u.mem.gauges.fever : undefined;
+      if (Number.isFinite(pct)) (fever || (fever = [])).push([u.id, Math.max(0, Math.min(100, Math.round(pct)))]);
+    }
+    if (fever) snap.fever = fever;
     return snap;
   }
 

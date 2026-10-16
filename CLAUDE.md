@@ -27,6 +27,7 @@ Read [AGENTS.md](AGENTS.md) for the upstream document index and verification gui
 - Preserve server authority, room/session/actor generations, privacy and observer fences. Shared Boss HP/LP/end authority must not be split across independent Workers.
 - Skins are display-only; they must not replace character/skill/audio identity or alter stats, timings or RNG. Operator presets exclude identity, credentials, room rules and battle snapshots; legacy single-section imports keep their scope.
 - Rescue cancels the pending death without resetting operators, equipment, economy or other state. An eligible leak-free unite helper must have LP >=11, pays10, and the target returns at LP1 at most once per match.
+- Deployment presentation: the announcement board ships cleared (`data/announcements.json` = `[]`) and the lobby hides the feedback-group link. The maintainer set this as the default on 2026-10-16. It is carried by the sakiko mod (`replaces/data/announcements.json`, `patches/E3*`), not as a stray working-tree edit, so a new upstream baseline reapplies it instead of resurrecting upstream's notices.
 - Only the optional intro defaults off. Keep login assembly, success and entry transitions, password/CSRF checks, explicit skip and reduced-motion behavior.
 - Do not restore rolling updates, whole-page prerender or per-frame Worker IPC as an incidental cleanup.
 

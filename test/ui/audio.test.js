@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLine, VOICE_TREES } from '../../public/js/audio.js';
+import { SFX_PRI, bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLine, VOICE_TREES } from '../../public/js/audio.js';
 import { mediaUrl } from '../../public/js/media.js';
 import { pickedBgm, bgmChoiceKind, sanitizeBgmChoice, BGM_CHOICES, MAJOR_BGM_URL } from '../../public/js/bgmChoice.js';
 import { sanitizeSettings, DEFAULT_SETTINGS } from '../../public/js/ui/gameLogic.js';
@@ -160,6 +160,26 @@ describe('SfxLimiter', () => {
     assert.ok(l.tryAcquire(40, 'u2', 'x'));
     assert.ok(l.tryAcquire(120, 'u1', 'z'));
     assert.ok(l.tryAcquire(121, null, 'w'), 'no unit key ⇒ only url gap');
+  });
+  test('the per-url gap is GLOBAL, not per unit (dust 0.2.5 contract — a deliberate divergence)', () => {
+    // sakiko 0.1.4 keyed this map per unit (`${unitKey}\0${url}`), so two 丰川祥子 could each start the identical file
+    // in the same tick — the owner report 「场上有两只丰川祥子时，似乎只播放其中一只的音效」 was answered by that change.
+    // dust 0.2.5 spells the gap the other way: `SfxLimiter.lastByUrl` is ONE map for every caller, and dust's own
+    // `per-unit cooldown and per-url gap` test above pins that reading (`tryAcquire(10, 'u2', 'x') === false`).
+    // The mod keeps dust's contract — a second unit does NOT get its own copy inside the gap — because the hard
+    // requirement is that neither the official base nor this fork has to merge around us. See mods/sakiko/README.md.
+    const l = new SfxLimiter({ maxVoices: 99, unitCooldownMs: 160, urlGapMs: 45 });
+    assert.ok(l.tryAcquire(1000, '1:attack', 'her.mp3'), 'unit 1 starts it');
+    assert.equal(l.tryAcquire(1000, '5:attack', 'her.mp3'), false, 'unit 5, the very same timestamp: the global gap refuses it');
+    assert.equal(l.lastByUrl.get('her.mp3'), 1000, 'the gap is keyed by url alone');
+    assert.equal(l.lastByUnit.get('5:attack'), undefined, 'unit 5 was never admitted, so it has no per-unit state');
+    assert.equal(l.tryAcquire(1044, '5:attack', 'her.mp3'), false, '44 ms on: still inside the gap');
+    assert.ok(l.tryAcquire(1045, '5:attack', 'her.mp3'), '45 ms on: the file may start again');
+    assert.equal(l.lastByUnit.get('5:attack'), 1045);
+    // the per-unit cooldown is a separate, narrower rule: one unit never flams with itself
+    assert.ok(l.tryAcquire(1200, '1:attack', 'other.mp3'), 'unit 1, a different file, past its 160 ms cooldown');
+    assert.equal(l.tryAcquire(1250, '1:attack', 'third.mp3'), false, 'unit 1 again, its own cooldown not yet spent');
+    assert.ok(l.active <= l.maxVoices);
   });
   test('at most 2 overlapping copies of one sound (official banks: maxSoundAllowed 2)', () => {
     const l = new SfxLimiter({ maxVoices: 99, unitCooldownMs: 0, urlGapMs: 0 });
@@ -617,11 +637,11 @@ describe('operator battle voice', () => {
 
 function fakeWindow() {
   const listeners = new Map();
-  const made = { sources: 0, started: 0 };
+  const made = { sources: 0, started: 0, stopped: 0 };
   class Param { constructor() { this.value = 1; } setValueAtTime(v) { this.value = v; } linearRampToValueAtTime(v) { this.value = v; } setTargetAtTime(v) { this.value = v; } cancelScheduledValues() {} }
   class Node { connect() {} disconnect() {} }
   class Gain extends Node { constructor() { super(); this.gain = new Param(); } }
-  class Src extends Node { constructor() { super(); this.playbackRate = new Param(); made.sources++; } start() { made.started++; } stop() {} }
+  class Src extends Node { constructor() { super(); this.playbackRate = new Param(); made.sources++; } start() { made.started++; } stop() { made.stopped++; } }
   class Ctx {
     constructor() { this.currentTime = 0; this.state = 'running'; this.destination = new Node(); }
     createGain() { return new Gain(); }
@@ -654,6 +674,21 @@ describe('AudioManager', () => {
     a.setVolumes({ bgm: 5, sfx: -1, muted: true });
     assert.deepEqual(a.volumes, { bgm: 1, sfx: 0, voice: 0.8, muted: true });
     assert.equal(a.unlocked, false);
+  });
+  test('the manager has no `play`: the projectile entry point is `playProj` (render/fx/notes.js asks for it)', () => {
+    // The manager's battle surface is playProj / unit / battle / sfx / voice — `play` is NOT one of them. notes.js
+    // `_noteFired` used to call `api.play(k, …)` and bail on a `typeof api.play` guard, so every 音符 launch was silent
+    // in a real client while a `play`-only test fake kept the render suite green (owner report 「天赋发射的音符没有诞生音效」;
+    // measured in a browser: 21 talent notes born, 0 launch requests). Pin the surface: this test fails the moment
+    // someone renames/removes playProj or adds a `play` that would re-open the divergence.
+    assert.equal(typeof AudioManager.prototype.play, 'undefined', 'no generic `play` — notes.js must ask for playProj');
+    assert.equal(typeof AudioManager.prototype.playProj, 'function', 'the projectile launch entry point');
+    const a = new AudioManager({ win: null, getManifest: () => manifest });
+    a.ctx = {};
+    const played = [];
+    a._play = (url, o) => { played.push([url, o.unitKey]); };
+    assert.equal(a.playProj('note', { unitId: 1, unit: 'char_4182_oblvns' }), true);
+    assert.deepEqual(played, [[manifest.audio.sfx.proj.note.born, 'proj:note:1']], 'playProj is what the renderer must reach');
   });
   test('unlocks on the first gesture, then plays BGM and SFX from the manifest', async () => {
     const fw = fakeWindow();
@@ -1117,6 +1152,70 @@ describe('AudioManager', () => {
     a.handleBattleEvents(ev);
     assert.equal(played.filter((u) => u === url).length, 1, 'the cast of the deployment is heard, exactly once');
   });
+
+  /**
+   * Owner report 「场上有两只丰川祥子时，似乎只播放其中一只的音效」. Two units of one character share every sound FILE
+   * (`sfx.units[charId].attack`, and now `sfx.proj.note.born`), and one socket message carries both units' events — so
+   * both read the same `performance.now()`. A single global "one URL per 45 ms" stamp let the first unit's copy block
+   * the second unit's, every single time. `_play({ now })` is the batch's own reading (see audio.js); only that one
+   * number is faked here — the limiter, the manifest resolution and the manager are the real ones.
+   */
+
+  /**
+   * Owner report 「场上有两只丰川祥子时，似乎只播放其中一只的音效」. Two units of one character share every sound FILE
+   * (`sfx.units[charId].attack`, and `sfx.proj.note.born`), and one socket message carries both units' events — so
+   * both read the same `performance.now()`.
+   *
+   * sakiko 0.1.4 answered that report by keying the url gap per unit, so both copies played. dust 0.2.5 keeps the gap
+   * GLOBAL (`SfxLimiter.lastByUrl`, one map for every caller — see the `per-unit cooldown and per-url gap` test above,
+   * which pins `tryAcquire(10, 'u2', 'x') === false`). This test asserts dust's reading: the first copy rings, the
+   * second waits out the gap. That is a knowing divergence — see mods/sakiko/README.md §「与 sakiko 的分歧」.
+   *
+   * `_play` reads its own clock, so no timestamp is faked here: every call in one batch already shares one reading.
+   */
+  test('two 丰川祥子 on one field: the first copy rings, the second waits for the GLOBAL gap (dust contract)', async () => {
+    const CHAR = 'char_4182_oblvns';
+    const her = manifest.audio.sfx.units[CHAR];
+    const born = manifest.audio.sfx.proj?.note?.born;
+    assert.ok(her?.attack && born, '前提：清单里有她的 attack 与音符发射音');
+    const fw = fakeWindow();
+    const urls = [];
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => manifest, random: () => 0 });
+      a.install();
+      fw.fire('pointerdown');
+      assert.ok(a.unlocked, '前提：音频已解锁，下面的路径才是真实的播放路径');
+      a.setFieldUnits([
+        { id: 1, side: 'ally', kind: 'chess', spine: CHAR }, { id: 5, side: 'ally', kind: 'chess', spine: CHAR },
+        { id: 2, side: 'enemy', kind: 'enemy', spine: 'enemy_1007_slime' }, { id: 6, side: 'enemy', kind: 'enemy', spine: 'enemy_1007_slime' },
+      ]);
+      // both attacks arrive in ONE batch: 发出音符 — the same reading for both, exactly like one socket message
+      assert.equal(a.unit(CHAR, 'attack', 1), true);
+      // `unit()` answers "such a sound exists", not "it played" (see audio.js), so the start count is the evidence
+      assert.equal(a.unit(CHAR, 'attack', 5), true, '…and the manifest carries her attack cue for unit 5 too');
+      await settle();
+      assert.equal(fw.made.started, 1, 'only the FIRST copy started: the gap is global, not per unit');
+      assert.equal(askedCount(urls, her.attack), 1, '两只共用同一个文件：one fetch serves both calls (the buffer is cached)');
+      assert.equal(a.limiter.activeByUrl.get(her.attack), 1, 'one copy on air');
+      assert.ok(a.limiter.lastByUrl.get(her.attack) > 0, 'the copy that played stamped the shared map');
+      assert.ok(a.limiter.lastByUnit.get('1:attack') > 0, 'unit 1 also carries its own per-unit stamp');
+      assert.equal(a.limiter.lastByUnit.get('5:attack'), undefined, 'unit 5 never acquired, so it has no per-unit state');
+      // the same unit again at once: refused as well (a unit never flams with itself)
+      assert.equal(a.unit(CHAR, 'attack', 1), true, 'the manifest still carries her attack cue …');
+      await settle();
+      assert.equal(fw.made.started, 1, '… but no second copy started: its own cooldown holds it back');
+      // …and the very same rule for the note she fires: two units, one file, one launch
+      assert.equal(a.playProj('note', { unitId: 1, unit: CHAR }), true);
+      assert.equal(a.playProj('note', { unitId: 5, unit: CHAR }), true);
+      await settle();
+      assert.equal(fw.made.started, 2, 'two notes, one shared file, one global gap ⇒ one launch sound');
+      assert.ok(a.limiter.lastByUrl.get(born) > 0, 'the launch stamped the same global map');
+      assert.ok(a.limiter.active <= a.limiter.maxVoices);
+    } finally { globalThis.fetch = origFetch; }
+  });
 });
 
 // user playtest #4 item 6: 纯烬艾雅法拉's skill sound rang outside her skill — her manifest `hit` is her S3 impact
@@ -1402,6 +1501,607 @@ describe('漏怪 sound', () => {
       await settle();
       assert.equal(fw.made.started - before, 1, 'a later leak rings again');
       assert.ok(a.limiter.active <= a.limiter.maxVoices);
+    } finally { restore(); }
+  });
+});
+
+// 按技能细分 (`sfx.units[charId].skillSfx`, docs/ASSETS.md): her S1 / S2 / S3 are three different impact sounds while
+// the manifest carries ONE `hit` per unit, and the client plays exactly that for every damage it attributes to her. So
+// the skill the damage was dealt under has to pick the file — measured in a browser first (a real client played the
+// ordinary `p_imp_mjckyrdnt` for all three), pinned here on the real AudioManager.
+describe('per-skill sounds (sfx.units[id].skillSfx)', () => {
+  const CHAR = 'char_4182_oblvns';
+  const ENEMY = 'enemy_1007_slime';
+  const her = () => manifest.audio.sfx.units[CHAR];
+  /** The real manager, unlocked, with a field of her two units and one enemy; `_play` records what it asks for. */
+  async function perSkillRig(units = [
+    { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 0 },
+    { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+    { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+  ], getManifest = () => manifest) {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const a = new AudioManager({ win: fw.win, getManifest, random: () => 0 });
+    a.install();
+    a.setFieldUnits(units);
+    fw.fire('pointerdown');            // after setFieldUnits: unlock without fetching the prep BGM (keeps counts clean)
+    await new Promise((r) => setTimeout(r, 5));   // let the unlock's own work settle before anything is played
+    const played = [];
+    const real = a._play.bind(a);
+    a._play = (url, o) => { played.push([url, o]); return real(url, o); };
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    return { a, fw, urls, played, settle, restore: () => { globalThis.fetch = origFetch; } };
+  }
+  /** Did a sound really START (the `_play` calls, not the fetches: a cached buffer is fetched only once)? */
+  const playedUrl = (played, url, from = 0) => played.slice(from).some((p) => p[0] === url);
+
+  test('her three skills carry their own impact, and each one is a different file', { skip: !manifest?.audio?.sfx?.units?.[CHAR]?.skillSfx && 'manifest has no skillSfx yet (run npm run assets)' }, () => {
+    const s = her().skillSfx;
+    assert.ok(s?.['0']?.hit && s?.['1']?.hit && s?.['2']?.hit, 'all three skills have an impact of their own');
+    assert.notEqual(s['0'].hit, her().hit, 'S1 is not the unit’s ordinary hit');
+    assert.notEqual(s['1'].hit, her().hit, 'S2 is not either');
+    assert.notEqual(s['2'].hit, her().hit, 'S3 is not either');
+  });
+
+  test('an impact plays the sound of the skill it was dealt under, and falls back to `hit` without one', async () => {
+    const { a, played, settle, restore } = await perSkillRig([
+      { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+      { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+      { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+      { id: 3, side: 'enemy', kind: 'enemy', spine: ENEMY },
+    ]);
+    const s = her().skillSfx;
+    try {
+      // unit 1 casts S3, unit 5 casts it too: an 'atk' under a cast followed by the 'dmg' that lands plays S3's impact,
+      // never the unit's ordinary `hit`. (The 'atk' itself is her swing, played for both.)
+      a.handleBattleEvents([['skill', 1, 1], ['skill', 5, 1]]);
+      a.handleBattleEvents([['atk', 1, 2, 'none'], ['atk', 5, 3, 'none']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 2, 10, 'arts'], ['dmg', 3, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, s['2'].hit), `S3 ⇒ ${s['2'].hit}`);
+      assert.ok(!playedUrl(played, her().hit), 'the ordinary hit is NOT played for a hit made under S3');
+      assert.ok(!playedUrl(played, s['0'].hit) && !playedUrl(played, s['1'].hit), 'and no other skill’s impact is');
+      // …and a hit from a unit with NO cast of its own: the ordinary `hit` is the answer (the fallback that keeps every
+      // other operator — and every path whose unit entry carries no skillSfx — exactly as it was)
+      a.units.get(5).skillIndex = null;
+      a.activeSkill.delete(5);
+      const from = played.length;
+      a.handleBattleEvents([['atk', 5, 3, 'none']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 3, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, her().hit, from), 'no cast ⇒ the unit’s own `hit`');
+      assert.ok(!playedUrl(played, s['2'].hit, from), 'and not the skill’s');
+    } finally { restore(); }
+  });
+
+
+  test('a unit with no skillSfx at all still plays its ordinary hit (the fallback)', async () => {
+    // The enemy attacks her: the enemy's own `hit` is the answer (it has no skillSfx), and her S1 / S3 files are not.
+    const { a, urls, settle, restore } = await perSkillRig();
+    const enemyHit = manifest.audio.sfx.units[ENEMY]?.hit;
+    try {
+      assert.ok(enemyHit, '前提：敌人有 hit');
+      a.handleBattleEvents([['atk', 2, 1, 'arrow']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 1, 10, 'phys']]);
+      await settle();
+      assert.ok(asked(urls, enemyHit), 'the attacker’s own hit');
+      for (const i of ['0', '1', '2']) assert.ok(!asked(urls, her().skillSfx[i].hit), `her S${Number(i) + 1} impact is not borrowed`);
+    } finally { restore(); }
+  });
+
+
+  test('a cast plays the skill’s activation cue (never its `born`, which belongs to the projectile kind)', async () => {
+    // `skillSfx[i].born` is the NOTE's launch — the renderer asks for it as `playProj(kind)` (sfx.proj). The 'skill'
+    // event is the cast cue (`skills[i]`): reading the `born` role here would replace her 大招音 with the note's launch.
+    const { a, played, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 1, 1]]);
+      await settle();
+      assert.deepEqual(played.map((p) => p[0]), [her().skills['0']], 'S1’s activation cue, not `skillSfx[0]`');
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      assert.equal(played.at(-1)[0], her().skills['2'], 'S3’s activation cue (owner report 「三技能开大没有大招音效」)');
+    } finally { restore(); }
+  });
+
+  test('the skill’s end event plays `finish`; a unit without one is silent (never the ordinary hit)', async () => {
+    const { a, played, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 5, 0]]);          // S3 ends: its cue is the STOP of the loop, not a file
+      a.handleBattleEvents([['skill', 1, 0]]);          // S1 ends: no finish bank either
+      await settle();
+      assert.deepEqual(played.filter((p) => p[0] !== her().hit), [], 'no invented finish sound for S1 / S3');
+      assert.ok(!played.some((p) => p[0] === her().skills['2']), 'an end is not a cast');
+    } finally { restore(); }
+  });
+
+
+  test('a cast starts the sustained loop of the equipped skill, its end stops it (official ctrlStop)', async () => {
+    const { a, settle, restore } = await perSkillRig();
+    try {
+      assert.equal(a.loops.size, 0, 'nothing loops before the cast');
+      // S1 is an INSTANT skill (`durationType NONE`): it has no sustained section and therefore no `loop` role at all —
+      // a cast of it must not start anything. S3 is the sustained one (`duration` 25 s, `ON_BUFF_START.…[loop]`).
+      a.handleBattleEvents([['skill', 1, 1]]);
+      await settle();
+      assert.equal(a.loops.size, 0, 'S1 is not sustained: no loop');
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      assert.deepEqual([...a.loops.keys()], ['skill:5'], 'one loop, keyed by the unit that cast it');
+      assert.ok(a.loops.get('skill:5').src, 'the loop really started (its source is up)');
+      assert.equal(a.loops.get('skill:5').src.loop, true, 'and it is a LOOP (the official bank is `loop: true`)');
+      a.handleBattleEvents([['skill', 5, 0]]);           // S3 ends
+      await settle();
+      assert.equal(a.loops.size, 0, 'the end event stops it (S3 has no finish file: the stop IS the end cue)');
+    } finally { restore(); }
+  });
+
+
+  test('the end of a sustained skill FADES the loop out (official ctrlStop 0.2 s) instead of cutting it', async () => {
+    // `soundFXCtrlBanks` is 315/315 `ctrlStop: true`, 287 of them `ctrlStopFadetime: 0.2` — the official end of a
+    // sustained skill is that FADE, and for her S3 (no finish file) it is the only sound the skill ends with. The stop
+    // used to go through `startLoop(…, { on: false })`, which clears the key with `fadeS: 0`: a hard cut, so the fade the
+    // ctrl bank asks for was never heard.
+    const { a, fw, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      const rec = a.loops.get('skill:5');
+      assert.ok(rec?.src && rec.gain, '前提：S3 的循环在放');
+      const stopped = fw.made.stopped;
+      a.handleBattleEvents([['skill', 5, 0]]);           // S3 ends
+      await settle();
+      assert.equal(a.loops.size, 0, '结束就忘掉这个 key（同一个技能可以马上重放）');
+      assert.equal(rec.gain.gain.value, 0, '增益淡出到 0（官方 ctrlStopFadetime 0.2 s）');
+      assert.equal(fw.made.stopped, stopped, '不是硬切：结束时 source 还没有被 stop()');
+      await new Promise((r) => setTimeout(r, 300));       // 斜坡（0.2 s + 0.05 s）走完之后
+      assert.equal(fw.made.stopped, stopped + 1, '淡出走完才 src.stop() —— 这就是她 S3 的结束音');
+    } finally { restore(); }
+  });
+
+  test('startLoop / stopLoop are contained: same key replaces, an unknown key is a no-op, no context is silent', async () => {
+    const { a, restore } = await perSkillRig();
+    try {
+      const url = her().skillSfx['2'].loop;
+      assert.equal(a.startLoop('k', url), true);
+      const first = a.loops.get('k');
+      assert.equal(a.startLoop('k', url), true, 'a second start on the same key');
+      assert.notEqual(a.loops.get('k'), first, 'replaces the record (never two loops under one key)');
+      assert.equal(a.loops.size, 1);
+      a.stopLoop('k');
+      assert.equal(a.loops.size, 0);
+      a.stopLoop('k');
+      a.stopLoop('never-started');
+      assert.equal(a.stopLoop('nope', { fadeS: 0 }), undefined, 'a stop with no loop is a harmless no-op');
+      assert.equal(a.startLoop('k', url, { on: false }), false, '`on: false` starts nothing but still clears the key');
+      assert.equal(a.loops.size, 0);
+      assert.equal(a.startLoop('', url), false, 'no key, no loop');
+      assert.equal(a.startLoop('k', null), false, 'no url, no loop');
+      const b = new AudioManager({ win: null, getManifest: () => manifest });
+      assert.equal(b.startLoop('k', url), false, 'no AudioContext ⇒ silent (never a throw)');
+    } finally { restore(); }
+  });
+});
+
+// 按技能细分 (`sfx.units[charId].skillSfx`, docs/ASSETS.md): her S1 / S2 / S3 are three different impact sounds while
+// the manifest carries ONE `hit` per unit, and the client plays exactly that for every damage it attributes to her. So
+// the skill the damage was dealt under has to pick the file — measured in a browser first (a real client played the
+// ordinary `p_imp_mjckyrdnt` for all three), pinned here on the real AudioManager.
+describe('per-skill sounds (sfx.units[id].skillSfx)', () => {
+  const CHAR = 'char_4182_oblvns';
+  const ENEMY = 'enemy_1007_slime';
+  const her = () => manifest.audio.sfx.units[CHAR];
+  /** The real manager, unlocked, with a field of her two units and one enemy; `_play` records what it asks for. */
+  async function perSkillRig(units = [
+    { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 0 },
+    { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+    { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+  ], getManifest = () => manifest) {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const a = new AudioManager({ win: fw.win, getManifest, random: () => 0 });
+    a.install();
+    a.setFieldUnits(units);
+    fw.fire('pointerdown');            // after setFieldUnits: unlock without fetching the prep BGM (keeps counts clean)
+    await new Promise((r) => setTimeout(r, 5));   // let the unlock's own work settle before anything is played
+    const played = [];
+    const real = a._play.bind(a);
+    a._play = (url, o) => { played.push([url, o]); return real(url, o); };
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    return { a, fw, urls, played, settle, restore: () => { globalThis.fetch = origFetch; } };
+  }
+  /** Did a sound really START (the `_play` calls, not the fetches: a cached buffer is fetched only once)? */
+  const playedUrl = (played, url, from = 0) => played.slice(from).some((p) => p[0] === url);
+
+  test('her three skills carry their own impact, and each one is a different file', { skip: !manifest?.audio?.sfx?.units?.[CHAR]?.skillSfx && 'manifest has no skillSfx yet (run npm run assets)' }, () => {
+    const s = her().skillSfx;
+    assert.ok(s?.['0']?.hit && s?.['1']?.hit && s?.['2']?.hit, 'all three skills have an impact of their own');
+    assert.notEqual(s['0'].hit, her().hit, 'S1 is not the unit’s ordinary hit');
+    assert.notEqual(s['1'].hit, her().hit, 'S2 is not either');
+    assert.notEqual(s['2'].hit, her().hit, 'S3 is not either');
+  });
+
+  test('an impact plays the sound of the skill it was dealt under, and falls back to `hit` without one', async () => {
+    const { a, played, settle, restore } = await perSkillRig([
+      { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+      { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+      { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+      { id: 3, side: 'enemy', kind: 'enemy', spine: ENEMY },
+    ]);
+    const s = her().skillSfx;
+    try {
+      // unit 1 casts S3, unit 5 casts it too: an 'atk' under a cast followed by the 'dmg' that lands plays S3's impact,
+      // never the unit's ordinary `hit`. (The 'atk' itself is her swing, played for both.)
+      a.handleBattleEvents([['skill', 1, 1], ['skill', 5, 1]]);
+      a.handleBattleEvents([['atk', 1, 2, 'none'], ['atk', 5, 3, 'none']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 2, 10, 'arts'], ['dmg', 3, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, s['2'].hit), `S3 ⇒ ${s['2'].hit}`);
+      assert.ok(!playedUrl(played, her().hit), 'the ordinary hit is NOT played for a hit made under S3');
+      assert.ok(!playedUrl(played, s['0'].hit) && !playedUrl(played, s['1'].hit), 'and no other skill’s impact is');
+      // …and a hit from a unit with NO cast of its own: the ordinary `hit` is the answer (the fallback that keeps every
+      // other operator — and every path whose unit entry carries no skillSfx — exactly as it was)
+      a.units.get(5).skillIndex = null;
+      a.activeSkill.delete(5);
+      const from = played.length;
+      a.handleBattleEvents([['atk', 5, 3, 'none']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 3, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, her().hit, from), 'no cast ⇒ the unit’s own `hit`');
+      assert.ok(!playedUrl(played, s['2'].hit, from), 'and not the skill’s');
+    } finally { restore(); }
+  });
+
+  test('an INSTANT skill (her S1) ends in its own tick: the later landing is an ORDINARY hit (dust contract)', async () => {
+    // Measured in a browser (test/e2e/sakiko-note-sfx-probe.mjs --skill=0): S1 emits START and, in the SAME tick, the
+    // end tuple (`skills.js` ends an instant skill right after the cast), while the eight notes it fired land ~1 s later.
+    // sakiko 0.1.4 carried the cast across that gap with `recentSkill` + IMPACT_WINDOW_MS. dust 0.2.5 has no such
+    // memory: `['skill', id, 0]` clears `skillActive` and `activeSkill`, so by the time the damage is attributed the
+    // unit is back to its ordinary `hit`. A knowing divergence — see mods/sakiko/README.md §「与 sakiko 的分歧」②.
+    const { a, played, settle, restore } = await perSkillRig([
+      { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 0 },
+      { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+    ]);
+    const perf = globalThis.performance;
+    let now = 1000;
+    globalThis.performance = { now: () => now };
+    try {
+      a.handleBattleEvents([['skill', 1, 1], ['skill', 1, 0]]);   // cast + end, one batch (the instant-skill shape)
+      await settle();
+      assert.equal(a.activeSkill.has(1), false, '前提：瞬时技能结束时已不在施放中');
+      a.handleBattleEvents([['atk', 1, 2, 'none']]);
+      await settle();
+      const from = played.length;
+      now += 900;                                                 // her note lands ~0.9 s later
+      a.handleBattleEvents([['dmg', 2, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, her().hit, from), 'the cast is over ⇒ the unit’s ordinary hit');
+      assert.ok(!playedUrl(played, her().skillSfx['0'].hit, from), 'and NOT S1’s impact: dust keeps no recent-cast memory');
+      // an impact later than IMPACT_WINDOW_MS after its own attack is no impact at all (unchanged behaviour)
+      now += 3000;
+      a.handleBattleEvents([['atk', 1, 2, 'none']]);   // the swing itself plays (that is the 'attack' cue, not an impact)
+      await settle();
+      const quiet = played.length;
+      now += 2600;
+      a.handleBattleEvents([['dmg', 2, 10, 'arts']]);
+      await settle();
+      assert.equal(played.length, quiet, 'no impact sound: the window dropped it');
+    } finally {
+      globalThis.performance = perf;
+      restore();
+    }
+  });
+
+  test('a unit with no skillSfx at all still plays its ordinary hit (the fallback)', async () => {
+    // The enemy attacks her: the enemy's own `hit` is the answer (it has no skillSfx), and her S1 / S3 files are not.
+    const { a, urls, settle, restore } = await perSkillRig();
+    const enemyHit = manifest.audio.sfx.units[ENEMY]?.hit;
+    try {
+      assert.ok(enemyHit, '前提：敌人有 hit');
+      a.handleBattleEvents([['atk', 2, 1, 'arrow']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 1, 10, 'phys']]);
+      await settle();
+      assert.ok(asked(urls, enemyHit), 'the attacker’s own hit');
+      for (const i of ['0', '1', '2']) assert.ok(!asked(urls, her().skillSfx[i].hit), `her S${Number(i) + 1} impact is not borrowed`);
+    } finally { restore(); }
+  });
+
+  test('a `_d` / `_h` / `_s` skill-mode hit IS the skill’s sound (the normal-attack guard covers the unit’s own roles only)', async () => {
+    // `normalAttackSfx` keeps an operator's skill-mode file (`_d` / `_h` / `_s`) out of its ORDINARY attack, and the
+    // official bank of a SKILL is exactly such a file: 伊内丝's S1 impact is `ON_PROJECTILE_HIT.projectile_chr_ines_s1`
+    // → `p_imp_insasn_d`. dust 0.2.5 expresses that as `hits[skillIndex]` while the skill RUNS (audio.js `unit()`:
+    // `mode` bypasses the guard at the `typeof mode !== 'string'` clause). The fixture below swaps her S1 impact for
+    // such a file and drives BOTH paths on the real manager.
+    const skillFile = '/assets/audio/sfx/player/p_imp/p_imp_insasn_d.mp3';   // 伊内丝 S1's impact: a `_d` file
+    assert.equal(normalAttackSfx(CHAR, skillFile), false, '前提：技能形态文件会被普通攻击的闸门拒掉');
+    for (const i of ['0', '1', '2']) {
+      assert.equal(normalAttackSfx(CHAR, her().skillSfx[i].hit), true, `她的 S${Number(i) + 1} 命中不匹配该正则 ⇒ 这处回移对她零影响`);
+    }
+    const m = structuredClone(manifest);
+    m.audio.sfx.units[CHAR].hits['0'] = skillFile;      // S1's own impact, in dust's own slot
+    const { a, played, settle, restore } = await perSkillRig([
+      { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 0 },
+      { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+    ], () => m);
+    try {
+      // 1) 这次伤害算 S1 的：技能自己的命中音会响（施放仍在进行 ⇒ dust 读 `hits[0]`，闸门不作用于它）
+      a.handleBattleEvents([['skill', 1, 1]]);          // 施放保持进行中（不发结束事件）
+      await settle();
+      a.handleBattleEvents([['atk', 1, 2, 'none']]);
+      await settle();
+      a.handleBattleEvents([['dmg', 2, 10, 'arts']]);
+      await settle();
+      assert.ok(playedUrl(played, skillFile), '技能自己的命中音（_d）会响');
+      // 2) 同一个文件当作单位的普通命中：仍被拒（闸门没被拆掉）
+      m.audio.sfx.units[CHAR].hit = skillFile;          // 现在它同时是她的 `hit`
+      const from = played.length;
+      a.setFieldUnits([{ id: 7, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 0 }, { id: 3, side: 'enemy', kind: 'enemy', spine: ENEMY }]);
+      a.limiter.lastByUnit.clear(); a.limiter.lastByUrl.clear();   // 排除限流（同 URL 的 45 ms gap）造成的假阴性
+      a.handleBattleEvents([['atk', 7, 3, 'none']]);    // 没有任何施放：走单位自己的 `hit`
+      await settle();
+      a.handleBattleEvents([['dmg', 3, 10, 'phys']]);
+      await settle();
+      assert.ok(!playedUrl(played, skillFile, from), '作为普通命中仍被拒');
+    } finally { restore(); }
+  });
+
+  test('a cast plays the skill’s activation cue (never its `born`, which belongs to the projectile kind)', async () => {
+    // `skillSfx[i].born` is the NOTE's launch — the renderer asks for it as `playProj(kind)` (sfx.proj). The 'skill'
+    // event is the cast cue (`skills[i]`): reading the `born` role here would replace her 大招音 with the note's launch.
+    const { a, played, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 1, 1]]);
+      await settle();
+      assert.deepEqual(played.map((p) => p[0]), [her().skills['0']], 'S1’s activation cue, not `skillSfx[0]`');
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      assert.equal(played.at(-1)[0], her().skills['2'], 'S3’s activation cue (owner report 「三技能开大没有大招音效」)');
+    } finally { restore(); }
+  });
+
+  test('the skill’s end event plays `finish`; a unit without one is silent (never the ordinary hit)', async () => {
+    const { a, played, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 5, 0]]);          // S3 ends: its cue is the STOP of the loop, not a file
+      a.handleBattleEvents([['skill', 1, 0]]);          // S1 ends: no finish bank either
+      await settle();
+      assert.deepEqual(played.filter((p) => p[0] !== her().hit), [], 'no invented finish sound for S1 / S3');
+      assert.ok(!played.some((p) => p[0] === her().skills['2']), 'an end is not a cast');
+    } finally { restore(); }
+  });
+
+  test('the skill’s end event is silent: dust never consumes `skillSfx[i].finish` (deliberate divergence)', async () => {
+    // sakiko 0.1.4 played `skillSfx[i].finish` on the end tuple. dust 0.2.5 gives the end event no sound of its own:
+    // the activation cue belongs to the START (`skills[skillIndex]`) and a sustained skill's end is the STOP of its
+    // loop. Her S2 `finish` — the same take as its cast, `_h2` — therefore stays unused.
+    // See mods/sakiko/README.md §「与 sakiko 的分歧」③.
+    const { a, urls, played, settle, restore } = await perSkillRig([
+      { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 1 },
+      { id: 2, side: 'enemy', kind: 'enemy', spine: ENEMY },
+    ]);
+    try {
+      const url = her().skillSfx?.['1']?.finish;
+      assert.ok(url, '前提：清单里有 S2 的 finish');
+      const from = played.length;
+      a.handleBattleEvents([['skill', 5, 0]]);
+      await settle();
+      assert.equal(played.length, from, 'the end cue does not exist in dust’s event table');
+      assert.equal(asked(urls, url), false, 'and its file was never even fetched');
+      // the cast is where dust makes a sound: `skills[skillIndex]`, not `finish`
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      assert.equal(played.at(-1)[0], her().skills['1'], 'the activation cue carries the sound instead');
+      assert.equal(url, her().skills['1'], '…同一份录音（她的 finish 就是施放那一版 `_h2`），只是改在施放时响');
+    } finally { restore(); }
+  });
+
+  test('a cast starts the sustained loop of the equipped skill, its end stops it (official ctrlStop)', async () => {
+    const { a, settle, restore } = await perSkillRig();
+    try {
+      assert.equal(a.loops.size, 0, 'nothing loops before the cast');
+      // S1 is an INSTANT skill (`durationType NONE`): it has no sustained section and therefore no `loop` role at all —
+      // a cast of it must not start anything. S3 is the sustained one (`duration` 25 s, `ON_BUFF_START.…[loop]`).
+      a.handleBattleEvents([['skill', 1, 1]]);
+      await settle();
+      assert.equal(a.loops.size, 0, 'S1 is not sustained: no loop');
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      assert.deepEqual([...a.loops.keys()], ['skill:5'], 'one loop, keyed by the unit that cast it');
+      assert.ok(a.loops.get('skill:5').src, 'the loop really started (its source is up)');
+      assert.equal(a.loops.get('skill:5').src.loop, true, 'and it is a LOOP (the official bank is `loop: true`)');
+      a.handleBattleEvents([['skill', 5, 0]]);           // S3 ends
+      await settle();
+      assert.equal(a.loops.size, 0, 'the end event stops it (S3 has no finish file: the stop IS the end cue)');
+    } finally { restore(); }
+  });
+
+  test('two of her casting at once loop independently, and a death / a new field stops the loop', async () => {
+    // Two units BOTH on S3 (the 自选 slot can hand out a second piece — the two-of-her field the owner reported on).
+    const { a, settle, restore } = await perSkillRig([
+      { id: 1, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+      { id: 5, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 },
+    ]);
+    try {
+      a.handleBattleEvents([['skill', 1, 1], ['skill', 5, 1]]);
+      await settle();
+      assert.deepEqual([...a.loops.keys()].sort(), ['skill:1', 'skill:5'], '两只各响各的（各自的限流键与循环）');
+      const one = a.loops.get('skill:1');
+      const five = a.loops.get('skill:5');
+      assert.notEqual(one.src, five.src, 'two independent sources');
+      // unit 1's own end stops only unit 1's loop
+      a.handleBattleEvents([['skill', 1, 0]]);
+      await settle();
+      assert.deepEqual([...a.loops.keys()], ['skill:5'], 'unit 1’s loop is gone, unit 5 keeps hers');
+      // a new field (the next battle) stops everything: no loop may ring across a battle
+      a.setFieldUnits([{ id: 9, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 }]);
+      assert.equal(a.loops.size, 0, 'a new field is a new battle');
+      assert.equal(a.activeSkill.size, 0, 'and the cast scopes go with it');
+      assert.equal(a.pendingSkill.size, 0, 'and so do casts held for a unit that never spawned');
+      // (dust 0.2.5 has no `recentSkill` — sakiko 0.1.4's impact memory — so there is nothing else to clear here)
+    } finally { restore(); }
+  });
+
+  test('the end of a sustained skill FADES the loop out (official ctrlStop 0.2 s) instead of cutting it', async () => {
+    // `soundFXCtrlBanks` is 315/315 `ctrlStop: true`, 287 of them `ctrlStopFadetime: 0.2` — the official end of a
+    // sustained skill is that FADE, and for her S3 (no finish file) it is the only sound the skill ends with. The stop
+    // used to go through `startLoop(…, { on: false })`, which clears the key with `fadeS: 0`: a hard cut, so the fade the
+    // ctrl bank asks for was never heard.
+    const { a, fw, settle, restore } = await perSkillRig();
+    try {
+      a.handleBattleEvents([['skill', 5, 1]]);
+      await settle();
+      const rec = a.loops.get('skill:5');
+      assert.ok(rec?.src && rec.gain, '前提：S3 的循环在放');
+      const stopped = fw.made.stopped;
+      a.handleBattleEvents([['skill', 5, 0]]);           // S3 ends
+      await settle();
+      assert.equal(a.loops.size, 0, '结束就忘掉这个 key（同一个技能可以马上重放）');
+      assert.equal(rec.gain.gain.value, 0, '增益淡出到 0（官方 ctrlStopFadetime 0.2 s）');
+      assert.equal(fw.made.stopped, stopped, '不是硬切：结束时 source 还没有被 stop()');
+      await new Promise((r) => setTimeout(r, 300));       // 斜坡（0.2 s + 0.05 s）走完之后
+      assert.equal(fw.made.stopped, stopped + 1, '淡出走完才 src.stop() —— 这就是她 S3 的结束音');
+    } finally { restore(); }
+  });
+
+  test('startLoop / stopLoop are contained: same key replaces, an unknown key is a no-op, no context is silent', async () => {
+    const { a, restore } = await perSkillRig();
+    try {
+      const url = her().skillSfx['2'].loop;
+      assert.equal(a.startLoop('k', url), true);
+      const first = a.loops.get('k');
+      assert.equal(a.startLoop('k', url), true, 'a second start on the same key');
+      assert.notEqual(a.loops.get('k'), first, 'replaces the record (never two loops under one key)');
+      assert.equal(a.loops.size, 1);
+      a.stopLoop('k');
+      assert.equal(a.loops.size, 0);
+      a.stopLoop('k');
+      a.stopLoop('never-started');
+      assert.equal(a.stopLoop('nope', { fadeS: 0 }), undefined, 'a stop with no loop is a harmless no-op');
+      assert.equal(a.startLoop('k', url, { on: false }), false, '`on: false` starts nothing but still clears the key');
+      assert.equal(a.loops.size, 0);
+      assert.equal(a.startLoop('', url), false, 'no key, no loop');
+      assert.equal(a.startLoop('k', null), false, 'no url, no loop');
+      const b = new AudioManager({ win: null, getManifest: () => manifest });
+      assert.equal(b.startLoop('k', url), false, 'no AudioContext ⇒ silent (never a throw)');
+    } finally { restore(); }
+  });
+});
+
+// SFX_PRI (audio.js): the note storm of two 丰川祥子 is three sounds per attack — 挥击 + 音符诞生 + 音符命中 — against ONE
+// global MAX_VOICES budget, so an event sound arriving on a full limiter used to be refused outright. Owner report
+// 「现在三技能开大没有大招音效了」. Measured in a browser first (see docs/ASSETS.md): the skill cue was playable and
+// reachable, and the sounds being refused were the decorations.
+describe('SFX priority: an event sound is never starved by the decorations', () => {
+  const CHAR = 'char_4182_oblvns';
+  const ENEMY = 'enemy_1007_slime';
+  /** n units whose `attack` files are all different (one per unit ⇒ the per-url cap never fires first). */
+  const spreadUnits = (n) => Object.entries(manifest.audio.sfx.units)
+    .filter(([id, u]) => id !== CHAR && typeof u.attack === 'string' && normalAttackSfx(id, u.attack))
+    .slice(0, n)
+    .map(([id], i) => ({ id: i + 1, side: 'ally', kind: 'chess', spine: id }));
+
+  async function storm() {
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(u); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    const a = new AudioManager({ win: fw.win, getManifest: () => manifest, random: () => 0 });
+    a.install();
+    const units = spreadUnits(a.limiter.maxVoices);
+    units.push({ id: 99, side: 'ally', kind: 'chess', spine: CHAR, skillIndex: 2 });
+    units.push({ id: 100, side: 'enemy', kind: 'enemy', spine: ENEMY });
+    a.setFieldUnits(units);
+    fw.fire('pointerdown');
+    const played = [];
+    const real = a._play.bind(a);
+    a._play = (url, o) => { played.push([url, o]); return real(url, o); };
+    const settle = () => new Promise((r) => setTimeout(r, 5));
+    return { a, fw, urls, played, units, settle, restore: () => { globalThis.fetch = origFetch; } };
+  }
+
+  test('a full voice budget: the skill’s cast cue still plays (popOldest displaces a decoration)', async () => {
+    const { a, played, units, settle, restore } = await storm();
+    try {
+      assert.equal(units.length, a.limiter.maxVoices + 2, `前提：${a.limiter.maxVoices} 个单位占满声道`);
+      // one batch: every unit attacks at once — the same `performance.now()`, exactly like one socket message
+      a.handleBattleEvents(units.slice(0, a.limiter.maxVoices).map((u) => ['atk', u.id, 100, 'arrow']));
+      await settle();
+      assert.equal(a.limiter.active, a.limiter.maxVoices, `前提：限流器已满 (${a.limiter.active}/${a.limiter.maxVoices})`);
+      const before = played.length;
+      a.handleBattleEvents([['skill', 99, 1]]);
+      await settle();
+      const skillUrl = manifest.audio.sfx.units[CHAR].skills['2'];
+      assert.ok(played.slice(before).some(([url]) => url === skillUrl),
+        '技能发动音播放了（它在满声道时挤掉了一条装饰音，而不是被拒绝）');
+      assert.equal(a.limiter.active, a.limiter.maxVoices, '一个位置换一个位置：并发上限没有被突破');
+      assert.ok(a.limiter.active <= a.limiter.maxVoices, '混战响度不失控');
+    } finally { restore(); }
+  });
+
+  test('low priority is not muted: with room to spare, every decoration still plays', async () => {
+    // The tiers must not turn into "only events are heard": an idle limiter plays the decorations as before.
+    const { a, played, settle, restore } = await storm();
+    try {
+      const born = manifest.audio.sfx.proj.note.born;
+      assert.equal(a.playProj('note', { unitId: 99, unit: CHAR }), true);
+      await settle();
+      assert.deepEqual(played.map((p) => p[0]), [born], '音符诞生 still plays');
+      assert.equal(played[0][1].pri, SFX_PRI.deco, 'at the decoration tier');
+      assert.equal(a.limiter.active, 1);
+    } finally { restore(); }
+  });
+
+  test('SFX_PRI: events < units < decorations, and an omitted tier is an event', () => {
+    assert.ok(SFX_PRI.event < SFX_PRI.unit && SFX_PRI.unit < SFX_PRI.deco, 'the ordering the popOldest rule reads');
+    const l = new SfxLimiter({ maxVoices: 1, unitCooldownMs: 0, urlGapMs: 0 });
+    assert.ok(l.tryAcquire(0, 'a', 'old.mp3', SFX_PRI.deco));
+    assert.equal(l.tryAcquire(0, 'b', 'new.mp3', SFX_PRI.deco), false, 'equal tier: no eviction, the cap holds');
+    assert.ok(l.tryAcquire(0, 'b', 'new.mp3', SFX_PRI.event), 'a better tier takes the slot');
+    assert.equal(l.alive(l.lastToken), true);
+    assert.equal(l.active, 1, 'still exactly one voice');
+    assert.equal(l.activeByUrl.get('old.mp3'), undefined, 'the displaced sound released its copy');
+    assert.equal(l.activeByUrl.get('new.mp3'), 1);
+    // the token contract: a displaced token may not start (and its late release cannot free the new owner's slot)
+    const displaced = 1;
+    assert.equal(l.alive(displaced), false);
+    l.release('new.mp3', displaced);
+    assert.equal(l.active, 1, 'a stale release is a no-op');
+    // 2 overlapping copies of one file is the official cap: only a STRICTLY better tier may break it
+    const l2 = new SfxLimiter({ maxVoices: 9, unitCooldownMs: 0, urlGapMs: 0 });
+    assert.ok(l2.tryAcquire(0, 'a', 'x.mp3', SFX_PRI.unit));
+    assert.ok(l2.tryAcquire(0, 'b', 'x.mp3', SFX_PRI.unit));
+    assert.equal(l2.tryAcquire(0, 'c', 'x.mp3', SFX_PRI.unit), false, 'a third copy of one file waits');
+    assert.ok(l2.tryAcquire(0, 'c', 'x.mp3', SFX_PRI.event), '…unless it is an event sound');
+    assert.equal(l2.activeByUrl.get('x.mp3'), 2, 'never more than one copy over the official cap');
+  });
+
+  test('a 60-unit brawl stays bounded, and the events of it are all heard', async () => {
+    const { a, played, settle, restore } = await storm();
+    try {
+      const ids = a.units ? [...a.units.keys()] : [];
+      assert.ok(ids.length >= 10);
+      for (let round = 0; round < 12; round++) {
+        const ev = [];
+        for (const id of ids) if (typeof id === 'number' && id < 90) ev.push(['atk', id, 100, 'arrow'], ['dmg', 100, 10, 'phys']);
+        ev.push(['skill', 99, 1]);
+        a.handleBattleEvents(ev);
+        await settle();
+        assert.ok(a.limiter.active <= a.limiter.maxVoices, `round ${round}: ${a.limiter.active} ≤ ${a.limiter.maxVoices}`);
+        assert.ok(a.limiter.activeByUrl.get(manifest.audio.sfx.units[CHAR].skills['2']) === undefined
+          || a.limiter.activeByUrl.get(manifest.audio.sfx.units[CHAR].skills['2']) <= 2);
+      }
+      const skillUrl = manifest.audio.sfx.units[CHAR].skills['2'];
+      assert.ok(played.filter(([url]) => url === skillUrl).length > 0, '每一次开大都有声音');
     } finally { restore(); }
   });
 });

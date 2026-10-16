@@ -1,0 +1,46 @@
+{
+  "file": "src/server-patch.mjs",
+  "about": "L2 —— 服务端实现「调度中心 · 直接设置等级」（g.modShopLevel { level }）。上游明确把「调度中心等级限制」列为没改的东西；升级方向走游戏自己的 `levelUp()`（只临时补价钱），降级方向才直接写回 shop.level。",
+  "hunks": [
+    {
+      "id": "L2-type",
+      "find": "export const PLACE_TYPE = 'g.modPlace';",
+      "replace": "export const PLACE_TYPE = 'g.modPlace';\nexport const SHOPLEVEL_TYPE = 'g.modShopLevel';"
+    },
+    {
+      "id": "L2-state",
+      "find": "    sandbox: { place: false, cap: null },",
+      "replace": "    sandbox: { place: false, cap: null },\n    // 调度中心：最近一次设过的等级（见 handleShopLevel）。整局进程一份，和 `sandbox` 一样。\n    shopLevel: { level: 1 },"
+    },
+    {
+      "id": "L2-c2s",
+      "find": "  if (!Object.hasOwn(C2S, PLACE_TYPE)) {\n    C2S[PLACE_TYPE] = { on: isBool, cap: isDeployCap };\n    log.info(`registered intent ${PLACE_TYPE}`);\n  }\n  if (!Object.hasOwn(C2S, UNIT_TYPE)) {",
+      "replace": "  if (!Object.hasOwn(C2S, PLACE_TYPE)) {\n    C2S[PLACE_TYPE] = { on: isBool, cap: isDeployCap };\n    log.info(`registered intent ${PLACE_TYPE}`);\n  }\n  if (!Object.hasOwn(C2S, SHOPLEVEL_TYPE)) {\n    // level 是 1..6 的整数；不合法就让 handleShopLevel 再兜一次（它自己 clamp）。\n    C2S[SHOPLEVEL_TYPE] = { level: (v) => Number.isInteger(v) && v >= 1 && v <= 6 };\n    log.info(`registered intent ${SHOPLEVEL_TYPE}`);\n  }\n  if (!Object.hasOwn(C2S, UNIT_TYPE)) {"
+    },
+    {
+      "id": "L2-dispatch",
+      "find": "      else if (msg && msg.t === PLACE_TYPE) res = handlePlace(this, playerId, msg, state, ERR);",
+      "replace": "      else if (msg && msg.t === PLACE_TYPE) res = handlePlace(this, playerId, msg, state, ERR);\n      else if (msg && msg.t === SHOPLEVEL_TYPE) res = handleShopLevel(this, playerId, msg, state, ERR);"
+    },
+    {
+      "id": "L2-view",
+      "find": "    place: !!state.sandbox.place,\n    cap: state.sandbox.cap,",
+      "replace": "    place: !!state.sandbox.place,\n    cap: state.sandbox.cap,\n    shopLevel: { level: state.shopLevel.level },"
+    },
+    {
+      "id": "L2-reset",
+      "find": "  } else if (key === 'sandboxPlace') {",
+      "replace": "  } else if (key === 'shopLevel') {\n    // 只是把「上次设过几级」的记账清掉；本座当前等级本来就在 `ps.shop.level` 上，由游戏自己管。\n    state.shopLevel.level = 1;\n  } else if (key === 'sandboxPlace') {"
+    },
+    {
+      "id": "L2-handler",
+      "find": "/** g.modPlace { on, cap } — the deploy unlock and the deploy cap (cap null = the game's own number). */\n",
+      "replace": "/**\n * `g.modShopLevel { level }` —— 直接把本座的调度中心（商店）等级设成 `level`（1..gamedata.maxShopLevel，即 6）。\n *\n * 维护者实测反馈：原来那版「升级不花钱」不好用 —— 它只是把价钱拿掉，仍然要自己点、仍然受每回合节奏约束，\n * 测起来还是绕。改成**直接设等级**，一步到位。两个方向都支持：\n *\n *   want > 现在：**走游戏自己的 `levelUp()`**（只在调用前把价钱临时补上、返回后收回去），所以等级上限、\n *              开槽（`_openLevelSlots`）、审计（`server/match/audit.js` 的 `level → level+1`）与 `SHOP_LEVEL`\n *              事件全部照原样逐步发生 —— 引擎看到的就是「连着升了几级」，不是被硬写一个数。\n *   want < 现在：游戏自己没有「降级」路径，才直接写回 `shop.level`，并把 `upgradePrice` 用游戏自己的\n *              `gd.upgradeBase()` 重算、调一次 `_openLevelSlots()`。\n *\n * 上游 Luck 的 README 把「调度中心等级限制」列进「没改的」第一条，代码里也确实只读不写（`ps.shop.level` 出现 11 次\n * 全是读；`levelUp` 只出现在对局记录器的 `PS_ACTIONS` 表里）—— 所以这是 StrongholdPro 加的一件，不碰上游行为。\n */\nfunction handleShopLevel(match, playerId, msg, state, ERR) {\n  if (!state.enable.shopLevel) return fail(ERR.BAD_TARGET, '调度中心·设置等级已关闭（总开关）');\n  const seat = seatFor(match, playerId);\n  if (seat.error) return seat.error;\n  const ps = seat.ps;\n  if (!ps.shop || !Number.isInteger(ps.shop.level)) return fail(ERR.BAD_TARGET, '这一局还没到有商店的阶段');\n  const gd = ps.gd;\n  const max = Number.isInteger(gd && gd.maxShopLevel) ? gd.maxShopLevel : 6;\n  const want = Number.isInteger(msg.level) ? Math.max(1, Math.min(max, msg.level)) : ps.shop.level;\n  const from = ps.shop.level;\n  if (want === from) return OK;\n  try {\n    if (want < from) {\n      ps.shop.level = want;\n      ps.shop.upgradePrice = (gd && typeof gd.upgradeBase === 'function' ? gd.upgradeBase(want) : null) || 0;\n      ps._openLevelSlots?.();\n    } else {\n      const before = ps.funds;\n      let guard = 0;\n      while (ps.shop.level < want && guard++ < 64) {\n        const price = Math.max(0, Number(ps.shop.upgradePrice) || 0);\n        if (Number.isFinite(before)) ps.funds = before + price;   // 临时补上，让游戏自己那道 `funds < price` 通过\n        const res = ps.levelUp();\n        if (res && res.error) {\n          if (Number.isFinite(before)) ps.funds = before;\n          return fail(ERR.BAD_TARGET, `升级被拒：${res.error}`);\n        }\n      }\n      if (Number.isFinite(before)) ps.funds = before;\n    }\n    ps.dirty?.();\n    match.flush?.();\n  } catch (e) {\n    match.reportError?.('modShopLevel', e);\n    return fail(ERR.BAD_TARGET, '设置调度中心等级失败');\n  }\n  return OK;\n}\n/** g.modPlace { on, cap } — the deploy unlock and the deploy cap (cap null = the game's own number). */\n"
+    },
+    {
+      "id": "L2-features",
+      "find": "export const FEATURE_KEYS = Object.freeze([\n  'shop',          // 自选商店 + 直购 + 每回合额度 (g.modPick / g.modBuy / g.modConfig)\n  'sandboxBands',  // 沙盒：策略叠加 (g.modBands)\n  'sandboxPlace',  // 沙盒：地块解锁 + 布阵上限 (g.modPlace)\n  'sandboxUnit',   // 沙盒：单位（技能 / 技力 / 属性）(g.modUnit)\n  'diy',           // 自选位：盟约 / 特质 / 数值 (g.modDiy.slots)\n  'diyExtra',      // 自造位子 (g.modDiy.extra)\n  'shopFilter',    // 阵营锁 (g.modShopFilter)\n]);",
+      "replace": "export const FEATURE_KEYS = Object.freeze([\n  'shop',          // 自选商店 + 直购 + 每回合额度 (g.modPick / g.modBuy / g.modConfig)\n  'sandboxBands',  // 沙盒：策略叠加 (g.modBands)\n  'sandboxPlace',  // 沙盒：地块解锁 + 布阵上限 (g.modPlace)\n  'sandboxUnit',   // 沙盒：单位（技能 / 技力 / 属性）(g.modUnit)\n  'diy',           // 自选位：盟约 / 特质 / 数值 (g.modDiy.slots)\n  'diyExtra',      // 自造位子 (g.modDiy.extra)\n  'shopFilter',    // 阵营锁 (g.modShopFilter)\n  'shopLevel',     // 调度中心：直接设置等级 (g.modShopLevel)\n  'testFunds',    // 测试 · 设置资金\n  'testRound',    // 测试 · 设置当前回合\n  'testRoundCap', // 测试 · 设置回合上限\n  'testEnemy',    // 测试 · 设置敌人\n  'testMap',      // 测试 · 更换地图\n  'testBond',     // 测试 · 设置盟约层数\n]);"
+    }
+  ]
+}

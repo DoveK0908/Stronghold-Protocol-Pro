@@ -1,0 +1,16 @@
+{
+  "file": "public/js/render/app.js",
+  "about": "Sakiko's three app.js additions, and ONLY those: the FxSystem ctx gains `rangedOf` (so a ranged kit that draws its own attack visual skips the melee slash) and `units` (the by-position owner lookup notes.js needs), and the battle frame calls fx.syncNotes(). Everything else in her app.js is her older baseline and must NOT be taken — dust 0.2.5's own app.js work (AbortSignal cancellation, officialDamageNumbers, zoom/pan, board3d packs, syncView, refreshDownLabels) stays exactly as it is.",
+  "hunks": [
+    {
+      "id": "C6-ctx-rangedof-units",
+      "find": "    subProfOf: (defId, info = null) => ((info && info.standInFor && data.standIn(defId)) || (info && info.diy && data.diy(defId, info.diy)) || data.chess(defId))?.subProfessionId || null,\n    view: (id) => views.get(id) || null,",
+      "replace": "    subProfOf: (defId, info = null) => ((info && info.standInFor && data.standIn(defId)) || (info && info.diy && data.diy(defId, info.diy)) || data.chess(defId))?.subProfessionId || null,\n    // fx attack(): a 'none' attack from a RANGED profile is not a melee slash (data/chess.json `attackKind`, the field\n    // the sim's own profile resolution reads) — 丰川祥子's note-carrying normal attack reports 'none' with no projectile\n    // visual of its own (kits/ops/op-oblvns.js `noAttackVis`). Unknown defs keep the slash.\n    rangedOf: (defId, info = null) => (((info && info.standInFor && data.standIn(defId)) || (info && info.diy && data.diy(defId, info.diy)) || data.chess(defId))?.attackKind === 'ranged'),\n    view: (id) => views.get(id) || null,\n    // every view of the field, for the one lookup that goes by POSITION: a note is born at its caster, and the launch\n    // sound's limiter key wants to know which unit that was (render/fx/notes.js `_noteOwner` — two 丰川祥子 must each\n    // be heard). Presentation only: the positions are the sim's own.\n    units: () => views,"
+    },
+    {
+      "id": "C6-frame-syncnotes",
+      "find": "          processEvents(renderT);\n          syncBattle(renderT);\n          windUpAttacks(renderT);",
+      "replace": "          processEvents(renderT);\n          syncBattle(renderT);\n          windUpAttacks(renderT);\n          // content-owned projectiles (丰川祥子's notes) have no 'atk' event: they are drawn from the snapshot's\n          // `proj` list instead (render/fx/notes.js syncNotes — an empty list fades them all out)\n          fx.syncNotes(interp.projAt(renderT));"
+    }
+  ]
+}

@@ -19,6 +19,12 @@
 //   chain {count, falloff, radius, sluggish}              heal {mode:'single'|'multi'|'chain', count, falloff, farMul, elementHealRatio}
 //   priority 'fly'|'lowDef'|'ranged'|'lowestHp'|'highestHp'|'nearest'|'farthest'|'notBurst'|null
 //   noAttack bool (never attacks)   noAttackUnlessSkill bool (attacks only while its skill is active)
+//   noAttackVis bool (the attack has no projectile VISUAL of its own: the 'atk' event reports 'none' — 丰川祥子's
+//                             ordinary attack plays a note the kit adds itself, so the generic 'arrow' would be a second,
+//                             wrong projectile on screen; ai.js performAttack)
+//   noAttackDamage bool (the attack deals none of its own damage AND is not completed by the engine: the content's own
+//                             projectile carries both — 丰川祥子's note settles the damage and the attack-type SP
+//                             recovery when IT reaches the enemy; ai.js performAttack / resolveHit)
 //   noHeal bool (cannot be healed by others)   blockFly bool   onHitStatus {key, duration, value}
 //   dmgMul(battle, unit, target) → number      afterHit(battle, unit, target, {dealt,x,y})
 //   funnelMul(battle, unit, target) → number (drone ramp, separate from the caster's attack multiplier)

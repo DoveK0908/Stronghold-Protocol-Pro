@@ -34,6 +34,17 @@
 //   * `down` [[id, respawnAt, respawnTime, state, row?, col?]] — knocked-out operators waiting to redeploy (they are no
 //     longer in `units`) and the tile they lie on (where they fell, or their home — sim Battle._layBody; kept only when
 //     both are integers): downAt(time) returns the list of the snapshot at `time`;
+//   * `proj` [[id, x, y, kind]] — content-owned projectiles drawn from their own positions instead of from an 'atk'
+//     event (丰川祥子's notes — she fires them on her own, so there is no attack to hang a visual on; render/fx/notes.js
+//     syncNotes): board coordinates like a unit tuple (column x, row y) and the projectile's stable id — an id missing
+//     from a snapshot is a note that is gone. projAt(time) returns the list shown at `time` with x/y interpolated
+//     between the two snapshots bracketing it (like a unit's), so a note lands with the damage it deals. `kind` is
+//     'note' (her talent's) or 'noteSkill' (her skills').
+//   * `fever` [[id, pct]] — the Fever gauge of a unit that carries one (丰川祥子: her talent 2 charges it per damage
+//     instance, 蓄满 plus any skill activation enters the 20 s Fever — sim content/kits/ops/op-oblvns.js): 0..100, and
+//     only the units with a gauge are listed. sample() hands each of them its own `fever` (null: no gauge, i.e. draw
+//     nothing) from the older snapshot, like the other flags; render/units.js FEVER_ICON draws the badge from it. There
+//     is no "Fever is on" field in it — the state itself arrives as the sim's visible 'sakiko:fever' status event.
 //   * three HP-bar readouts, kept per snapshot beside the tuples (the tuple layout is unchanged) and handed out by sample()
 //     from the older snapshot like flags, so they step with the skill flag instead of sliding:
 //       `ammo`   [[id, rounds left, rounds in the magazine]]  → sample().ammo   [left, magazine] | null (whole numbers only)
@@ -49,8 +60,8 @@
 //     snapshot without it interpolates linearly;
 //   * `standCut` [[id, at]] — the latest time that enemy's recovery was cut or ignored: an interval with a cut inside
 //     it stays linear.
-// Game times in all of them (`cooldownEnd`, `respawnAt`, `until`, `at`) are on the snapshots' clock, so a view compares
-// them with renderT.
+// Game times in the first two (`cooldownEnd`, `respawnAt`) are on the snapshots' clock, so a view compares them with
+// renderT (`proj` / `fever` carry no time: their entries live exactly as long as the snapshot lists them).
 
 import { fxForm } from '../../../shared/protocol.js';
 import { ANIM, UF } from '../../../shared/constants.js';
@@ -97,11 +108,11 @@ export function frameTime(msg) {
 
 /**
  * Validate & normalise a b.snap payload. Returns `{ t, units: Map<id, tuple>, down: [[id, respawnAt, respawnTime,
- * state, row?, col?]] | null, ammo, wolves: Map id → [left, max] | null, neg: Map id → fill | null, stand: Map<id, until> | null,
- * standCut: Map<id, at> | null, raw }` or null when unusable. Tuples with a non-finite id/x/y are skipped; other numbers
- * default to 0; a unit's `elem` entry (see header) is appended to its tuple; malformed `elem` / `down` / `ammo` / `wolves` /
- * `neg` entries are dropped. `stand` keeps finite end times after `t` of units in the snapshot; `standCut` keeps finite
- * times in [0, t] of units in it.
+ * state, row?, col?]] | null, proj: [[id, x, y, kind]] | null, fever: Map<id, pct> | null, ammo, wolves: Map id → [left, max] | null,
+ * neg: Map id → fill | null, stand: Map<id, until> | null, standCut: Map<id, at> | null, raw }` or null when unusable. Tuples with a
+ * non-finite id/x/y are skipped; other numbers default to 0; a unit's `elem` entry (see header) is appended to its tuple; malformed
+ * `elem` / `down` / `proj` / `fever` / `ammo` / `wolves` / `neg` entries are dropped (a `fever` pct is clamped to 0..100). `stand` keeps
+ * finite end times after `t` of units in the snapshot; `standCut` keeps finite times in [0, t] of units in it.
  */
 export function normalizeSnapshot(snap) {
   if (!snap || typeof snap !== 'object') return null;
@@ -163,7 +174,23 @@ export function normalizeSnapshot(snap) {
       (standCut || (standCut = new Map())).set(e[0], e[1]);
     }
   }
-  return { t, units, down, ammo, wolves, coins, energy, charges, layers, neg, stand, standCut, raw: snap };
+  let proj = null;
+  if (Array.isArray(snap.proj)) {
+    for (const p of snap.proj) {
+      if (!Array.isArray(p) || !(typeof p[0] === 'number' || typeof p[0] === 'string')) continue;
+      if (typeof p[1] !== 'number' || typeof p[2] !== 'number' || !Number.isFinite(p[1]) || !Number.isFinite(p[2])) continue;
+      (proj || (proj = [])).push([p[0], p[1], p[2], typeof p[3] === 'string' ? p[3] : 'note']);
+    }
+  }
+  let fever = null;
+  if (Array.isArray(snap.fever)) {
+    for (const f of snap.fever) {
+      if (!Array.isArray(f) || !(typeof f[0] === 'number' || typeof f[0] === 'string')) continue;
+      if (typeof f[1] !== 'number' || !Number.isFinite(f[1])) continue;
+      (fever || (fever = new Map())).set(f[0], clamp(f[1], 0, 100));
+    }
+  }
+  return { t, units, down, proj, fever, ammo, wolves, coins, energy, charges, layers, neg, stand, standCut, raw: snap };
 }
 
 /**
@@ -382,10 +409,47 @@ export class SnapshotBuffer {
   }
 
   /**
+   * The `proj` list (content-owned projectiles — 丰川祥子's notes — see header) at `time` (default renderT): the entries
+   * of the snapshot sample() reads flags from, each `[id, x, y, kind]` with x/y lerped towards the newer snapshot's
+   * entry of the same id — the way unit positions are, so a note reaches its target with the damage it deals. An id
+   * only in the newer snapshot is not shown yet (a note fired between two snapshots appears when the clock reaches it);
+   * one only in the older keeps its last position until the clock passes the newer (a note the sim dropped mid-buffer).
+   * A jump longer than `teleport` tiles snaps (never slides across the field). null when the snapshots carry none.
+   */
+  projAt(time = this.renderT) {
+    const s = this.snaps;
+    if (!s.length || !Number.isFinite(time)) return null;
+    let ia = this._indexAt(time);
+    if (ia < 0) ia = 0;
+    const A = s[ia];
+    const a = A.proj;
+    if (!a || !a.length) return null;
+    const B = ia + 1 < s.length ? s[ia + 1] : null;
+    const b = B && B.proj && B.proj.length ? B.proj : null;
+    const span = B ? B.t - A.t : 0;
+    const alpha = b && span > 0 ? clamp((time - A.t) / span, 0, 1) : 0;
+    if (!b || alpha <= 0) return a;
+    if (alpha >= 1) return b;
+    const map = this._projIdx || (this._projIdx = new Map());
+    map.clear();
+    for (const p of b) map.set(p[0], p);
+    const out = [];
+    for (const p of a) {
+      const q = map.get(p[0]);
+      if (!q) { out.push(p); continue; }
+      const dx = q[1] - p[1], dy = q[2] - p[2];
+      if (dx * dx + dy * dy > this.teleport * this.teleport) { out.push(q); continue; }
+      out.push([p[0], p[1] + dx * alpha, p[2] + dy * alpha, q[3]]);
+    }
+    return out;
+  }
+
+  /**
    * Interpolated state at `time` (default renderT). Fills and returns `out` (a Map id → sample object reused
    * across calls: `{ id, x, y, hp, maxHp, sp, spMax, flags, anim, vx, vy, seen, el, elFill, elUntil, elDur, ammo, wolves,
-   * neg }` — `el` = the shown element gauge (null: none), `ammo` / `wolves` / `neg` the HP-bar readouts (null / null / 0:
-   * none), see header). Samples of units no longer present are deleted from `out`.
+   * neg, fever }` — `el` = the shown element gauge (null: none), `ammo` / `wolves` / `neg` the HP-bar readouts (null /
+   * null / 0: none), `fever` = the unit's Fever gauge 0..100 (null: none), see header). Samples of units no longer
+   * present are deleted from `out`.
    */
   sample(time = this.renderT, out = new Map()) {
     const s = this.snaps;
@@ -399,9 +463,10 @@ export class SnapshotBuffer {
     const P = !B && ia > 0 ? s[ia - 1] : null; // for extrapolation
     const ext = !B ? clamp(time - A.t, 0, this.maxExtrapolate * this.rate) : 0;
     const stamp = A.t;
+    const fever = A.fever || null;   // b.snap `fever`: flags come from the older snapshot, so does the gauge
     for (const [id, a] of A.units) {
       let o = out.get(id);
-      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0 }; out.set(id, o); }
+      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0, fever: null }; out.set(id, o); }
       const b = B ? B.units.get(id) : null;
       if (b) {
         const dx = b[1] - a[1], dy = b[2] - a[2];
@@ -452,6 +517,7 @@ export class SnapshotBuffer {
       o.charges = A.charges?.get(id) ?? null;
       o.layers = A.layers?.get(id) ?? 0;
       o.neg = A.neg ? A.neg.get(id) || 0 : 0;
+      o.fever = fever ? (fever.get(id) ?? null) : null;
       o.seen = stamp;
     }
     for (const id of out.keys()) if (!A.units.has(id)) out.delete(id);

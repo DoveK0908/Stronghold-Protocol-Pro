@@ -376,12 +376,20 @@ test('覆盖锁定（补位 / 自选）: 每个补位干员和每个自选组合
   // the engine rule: their lines are either absent or owned by their kits (黑键 / 维伊 MSC-Y, 赤刃明霄陈 AFT, 重岳 / 贝洛内
   // FGT-Y, 止颂 DRE-Y → 'kit'); a module of another game mode is not a legal pick (isDiyModule, validateDiyPicks).
   const applied = [];
+  const appliedHers = [];
   const reasons = {};
   const tally = { standIn: 0, diy: 0 };
   const see = (kind, tag, d) => {
     tally[kind]++;
     const r = traitAttackSpeedRule(d);
     if (!r) return;
+    // 丰川祥子 (char_4182_oblvns, the mod's 自选 collab pick) is the one legal pick whose LP-Y module really does
+    // reach the engine rule (see the note at the end). Her combinations go to their own bucket so the guard below
+    // still pins every OTHER line to a kit-owned shape.
+    if (tag.includes('|char_4182_oblvns|') && tag.endsWith('|uniequip_002_oblvns')) {
+      if (r.condition) appliedHers.push(`${kind} ${tag}`);
+      return;
+    }
     if (r.condition) applied.push(`${kind} ${tag}`);
     reasons[r.reason] = (reasons[r.reason] ?? 0) + 1;
   };
@@ -411,6 +419,16 @@ test('覆盖锁定（补位 / 自选）: 每个补位干员和每个自选组合
   }
   assert.ok(tally.standIn > 100, `every stand-in was scanned (${tally.standIn})`);
   assert.ok(tally.diy > 1000, `every 自选 combination was scanned (${tally.diy})`);
+  // The one exception is 丰川祥子 (char_4182_oblvns, the mod's 自选 collab pick). Her LP-Y module
+  // (uniequip_002_oblvns) states the REA-Y sentence verbatim — 「攻击范围内存在2名及以上敌人时攻击速度+12」 on
+  // `trait.bb` — and her own kit hands that line to the engine, exactly as 圣约送葬人 REA-Y and 隐德来希 REA-Y do:
+  // `server/sim/content/kits/ops/op-oblvns.js:71` reads "「攻击范围内存在2名及以上敌人时攻击速度+12」 (trait bb
+  // `attack_speed`) is NOT this kit's business any more — the [engine owns it] … Implementing it here as well would
+  // apply the stat twice". So `reason: 'ok'` here is the official behaviour, not the double-application this guard
+  // exists to catch. Every other 自选 combination stays clean.
+  const isHers = (t) => t.includes('|char_4182_oblvns|') && t.endsWith('|uniequip_002_oblvns');
+  assert.ok(appliedHers.length > 0, `her module is actually reached (${appliedHers.length} combinations)`);
+  assert.deepEqual(appliedHers.filter((t) => !isHers(t)), [], 'and nothing else lands in her bucket');
   assert.deepEqual(applied, [], 'no stand-in or 自选 pick gains the engine rule');
   assert.deepEqual(Object.keys(reasons).sort(), ['kit'], 'every line they carry is a kit-owned shape (no unknown, no other mode)');
 });

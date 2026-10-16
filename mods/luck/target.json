@@ -1,0 +1,6 @@
+{
+  "_comment": "这个 overlay 打的不是本仓库，而是工作区里那份 Stronghold-Luck 上游克隆（source/luck）。apply.mjs 把补丁里的 file 都相对于这里解析；没有这个文件时默认是仓库根（StrongholdPro/）。",
+  "_example": "{ \"root\": \"../source/luck\" }  ← 相对本目录（mods/luck/）解析",
+
+  "root": "../../../source/luck"
+}

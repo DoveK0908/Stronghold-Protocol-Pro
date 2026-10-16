@@ -4,6 +4,7 @@
 import { PROJ } from '../style.js';
 import { SHOT_HEIGHT, bodyZ, feetZ } from './camera.js';
 import { clamp } from './limits.js';
+import { pickNoteFrame } from './notes.js';
 import { projSpeed } from './speeds.js';
 
 const MAX_PROJ = 260;
@@ -49,7 +50,17 @@ export class FxProjectiles {
 
   // ---- projectiles -----------------------------------------------------------------------------------------
 
-  /** b.ev 'atk' visual. src/tgt are views (tgt may be null). */
+  /**
+   * b.ev 'atk' visual. src/tgt are views (tgt may be null).
+   *
+   * `'none'` (and a missing kind) means MELEE: the blow is drawn as the slash that `damage()` sweeps across the
+   * victim. A RANGED attacker may legitimately have no projectile of its own — the sim's own instant-hit profiles
+   * (要塞's 近距离 attack, `beam`) and a content kit whose attack visual is its own (kits/ops/op-oblvns.js 丰川祥子:
+   * her normal attack plays a note the kit adds, ai.js `noAttackVis`) all report 'none' — and a slash from those would
+   * be a blade effect at range; the attacker's own notes / beams are the whole visual instead. `ctx.rangedOf` is the
+   * renderer's own "this def attacks at range" lookup (app.js `data.chess(defId).attackKind`, render/units.js poses);
+   * without it (a harness that has no data) every 'none' keeps its slash, which is the old behaviour.
+   */
   attack(src, tgt, kind) {
     if (!src) return;
     // chain: the source is the previous target of the bounce (sim ai.js), so the arc hops unit to unit
@@ -57,7 +68,7 @@ export class FxProjectiles {
     if (kind === 'beam') { if (tgt && tgt !== src) this._beam(src, tgt, src.isEnemy ? 0xff7a5a : 0xffe6a8, 0.18, 0.15); return; }
     const spec = PROJ[kind];
     if (!spec || !tgt) {
-      if (kind === 'none' || !kind) this._slashAt = src.id;
+      if ((kind === 'none' || !kind) && this.ctx.rangedOf?.(src.info?.defId, src.info) !== true) this._slashAt = src.id;
       return;
     }
     const pr = this._takeProj();
@@ -115,11 +126,14 @@ export class FxProjectiles {
     const { trail, halo, core, shadow } = pr;
     trail.texture = this.tex[thin ? 'tracer' : 'streak'];
     trail.tint = thin ? spec.tint : pr.trailTint;
-    trail.visible = look !== 'boomerang';
+    // a note drifts on its own (2 tiles/s): no streak behind it — its glyph and halo are the whole visual (notes.js
+    // syncNotes draws the same glyphs for the live path; a note reaching here came in as an 'atk' kind)
+    trail.visible = look !== 'boomerang' && look !== 'note';
     halo.texture = this.tex.glow;
     halo.tint = pr.glow;
     halo.visible = true;
-    core.texture = this.tex[look === 'boomerang' ? 'boomerang' : thin ? 'dot' : 'orb'];
+    // its own glyph, picked at random per shot as syncNotes does per note (八分 / 十六分 / 高音谱号)
+    core.texture = this.tex[look === 'boomerang' ? 'boomerang' : look === 'note' ? pickNoteFrame() : thin ? 'dot' : 'orb'];
     core.tint = spec.tint;
     core.rotation = 0;
     core.visible = true;

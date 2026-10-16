@@ -869,7 +869,67 @@ const FX_DRAW = {
     g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)');
     c.fillStyle = g; c.fillRect(x + 1, y, w - 2, h);
   }],
+  // 丰川祥子's note projectiles (b.snap `proj`, drawn by fx/notes.js syncNotes): one glyph per note, picked at random when
+  // it appears (notes.js NOTE_FRAMES) — 八分音符 `note`, 十六分音符 `note16`, 高音谱号 `treble`. All three are drawn white
+  // (the sprite is tinted: NOTE_INK for the glyph, a halo from the `glow` frame in NOTE_FX behind it) with their ink
+  // centred in the cell and ~2/3 of it tall, so one sprite scale (glyph size in px ÷ 128, style.js NOTE_SIZE) fits all.
+  note: [128, 256, 128, 128, (c, x, y, w) => drawNote(c, x, y, w, 1)],
+  note16: [256, 256, 128, 128, (c, x, y, w) => drawNote(c, x, y, w, 2)],
+  treble: [384, 256, 128, 128, (c, x, y, w) => drawTreble(c, x, y, w)],
 };
+
+/** A notehead + stem + `flags` flags (1 = 八分音符, 2 = 十六分音符) — one cell of the FX atlas, centred on its middle. */
+function drawNote(c, x, y, w, flags) {
+  const cx = x + w / 2, cy = y + w / 2;
+  radial(c, cx, cy, w * 0.42, [[0, 'rgba(255,255,255,0.42)'], [0.5, 'rgba(255,255,255,0.14)'], [1, 'rgba(255,255,255,0)']]);
+  c.save(); c.translate(cx, cy);
+  c.fillStyle = 'rgba(255,255,255,0.97)';
+  // notehead: a fat ellipse leaning up to the right, at the foot of the stem
+  c.save(); c.translate(-12, 27); c.rotate(-0.36); c.beginPath(); c.ellipse(0, 0, 24, 17, 0, 0, Math.PI * 2); c.fill(); c.restore();
+  // stem up the right side of the head
+  c.lineCap = 'round'; c.lineWidth = 7; c.strokeStyle = 'rgba(255,255,255,0.97)';
+  c.beginPath(); c.moveTo(10, 26); c.lineTo(10, -36); c.stroke();
+  // flags curling right and down off the stem's top, one under the other (each: outer edge, then back to the stem)
+  for (let k = 0; k < flags; k++) {
+    const drop = k * 19;
+    c.beginPath(); c.moveTo(13, -37 + drop); c.quadraticCurveTo(40, -28 + drop, 45, -1 + drop);
+    c.quadraticCurveTo(33, -21 + drop, 13, -14 + drop); c.closePath(); c.fill();
+  }
+  // hot centre of the head, so the glyph keeps a bright core at any tint
+  radial(c, -14, 29, 12, [[0, 'rgba(255,255,255,1)'], [1, 'rgba(255,255,255,0)']]);
+  c.restore();
+}
+
+/**
+ * 高音谱号 (treble / G clef) — one cell of the FX atlas. A stroked drawing, as the hex / reticle frames are: the stem
+ * (with its bottom-left tail and the tip that leans right at the top), the slim loop hanging off that tip, and the big
+ * bowl below, whose two ends meet at the crossing — the point where a real clef's line crosses itself.
+ */
+function drawTreble(c, x, y, w) {
+  const cx = x + w / 2, cy = y + w / 2;
+  radial(c, cx, cy, w * 0.42, [[0, 'rgba(255,255,255,0.42)'], [0.5, 'rgba(255,255,255,0.14)'], [1, 'rgba(255,255,255,0)']]);
+  c.save(); c.translate(cx, cy);
+  c.strokeStyle = 'rgba(255,255,255,0.97)'; c.lineCap = 'round'; c.lineJoin = 'round';
+  // the stem: up from the bottom-left tail, past the crossing, to the tip at the top
+  c.lineWidth = 6;
+  c.beginPath();
+  c.moveTo(-18, 46);
+  c.quadraticCurveTo(-8, 46, -4, 38);
+  c.quadraticCurveTo(2, 12, 3, -20);
+  c.quadraticCurveTo(4, -36, 3, -44);
+  c.stroke();
+  // the slim loop off the top tip, down to the crossing
+  c.lineWidth = 7;
+  c.beginPath();
+  c.moveTo(3, -44);
+  c.bezierCurveTo(22, -40, 24, -18, 6, -8);
+  // the big bowl: out to the right of the crossing, around the bottom, up the left, closing at the crossing
+  c.bezierCurveTo(26, -2, 30, 22, 10, 34);
+  c.bezierCurveTo(-10, 45, -26, 30, -22, 12);
+  c.bezierCurveTo(-19, 2, -8, -6, 2, -8);
+  c.stroke();
+  c.restore();
+}
 
 function radial(c, cx, cy, r, stops) {
   const g = c.createRadialGradient(cx, cy, 0, cx, cy, r);

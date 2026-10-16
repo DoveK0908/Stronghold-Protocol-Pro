@@ -1,0 +1,6 @@
+# overlay 的 .js 源文件用 .overlay 后缀，不会被根 .gitattributes 的 `*.js text eol=lf` 命中。
+# 仓库的 `* text=auto` + Windows 的 core.autocrlf=true 会在检出时把它们写成 CRLF，
+# 而 apply 是逐字节落盘的 —— CRLF 会直接变成 E3a 那个 bug（写出来的文件与提交的 LF 版本不同）。
+# 所以这里显式钉成 LF。
+*.overlay text eol=lf
+.gitattributes text eol=lf

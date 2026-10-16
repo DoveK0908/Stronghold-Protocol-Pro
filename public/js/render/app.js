@@ -384,7 +384,15 @@ export async function createFieldView(host, options = {}) {
     loadLevel: () => loadLevel,
     fieldRect: () => (mode === 'battle' && battleMeta ? battleMeta.rect : null),
     subProfOf: (defId, info = null) => ((info && info.standInFor && data.standIn(defId)) || (info && info.diy && data.diy(defId, info.diy)) || data.chess(defId))?.subProfessionId || null,
+    // fx attack(): a 'none' attack from a RANGED profile is not a melee slash (data/chess.json `attackKind`, the field
+    // the sim's own profile resolution reads) — 丰川祥子's note-carrying normal attack reports 'none' with no projectile
+    // visual of its own (kits/ops/op-oblvns.js `noAttackVis`). Unknown defs keep the slash.
+    rangedOf: (defId, info = null) => (((info && info.standInFor && data.standIn(defId)) || (info && info.diy && data.diy(defId, info.diy)) || data.chess(defId))?.attackKind === 'ranged'),
     view: (id) => views.get(id) || null,
+    // every view of the field, for the one lookup that goes by POSITION: a note is born at its caster, and the launch
+    // sound's limiter key wants to know which unit that was (render/fx/notes.js `_noteOwner` — two 丰川祥子 must each
+    // be heard). Presentation only: the positions are the sim's own.
+    units: () => views,
     screenSize: size,
     fieldTop: () => {
       const R = camRect();
@@ -1982,6 +1990,9 @@ export async function createFieldView(host, options = {}) {
           processEvents(renderT);
           syncBattle(renderT);
           windUpAttacks(renderT);
+          // content-owned projectiles (丰川祥子's notes) have no 'atk' event: they are drawn from the snapshot's
+          // `proj` list instead (render/fx/notes.js syncNotes — an empty list fades them all out)
+          fx.syncNotes(interp.projAt(renderT));
           // the official effects run on the battle clock (render time of the snapshots: 1× / 2×, still while paused); the
           // skill effects' per-frame part reads the views' fresh sample (render/vfx/skillfx.js sync)
           const gdt = ofxPrevT == null ? 0 : Math.min(0.25, Math.max(0, renderT - ofxPrevT));

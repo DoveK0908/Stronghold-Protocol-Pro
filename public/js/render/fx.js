@@ -25,6 +25,12 @@
 //                meanwhile; 'bombard' is the big explosion at the impact
 //   deploy       drop-in ring + pillar; death dissolve embers; crate splinters; element bursts; leak vignette;
 //                bond-layer glyph pops and bounty coins (screen space, near the top of the field)
+//   notes        content-owned projectiles that have no 'atk' event to hang a visual on (丰川祥子's 音符: she fires them
+//                on her own — 【自由移动】 then 【追踪移动】 — so the sim streams their positions in b.snap `proj`) and
+//                syncNotes() keeps one floating, haloed music glyph per id (八分音符 / 十六分音符 / 高音谱号, drawn at
+//                random per note) — created with the id, moved to the snapshot's interpolated position (the same camera
+//                mapping every other projectile uses), flashed in NOTE_FX, faded out and pooled when the id leaves the
+//                list (render/fx/notes.js)
 // Sizes are in tiles × the camera's px per tile at the spot, so effects read alike at every resolution and zoom (3D
 // board or 2D fallback: both project through the same camera). An fx anchored on a unit (extra.id) follows that
 // unit's rendered position when the event happens on it, else it happens at the event's (x, y) (_where).
@@ -43,4 +49,5 @@ export { setSimProjectileSpeeds, projSpeed } from './fx/speeds.js';
 export { SHOT_HEIGHT, bodyZ } from './fx/camera.js';
 export { ensureDamageFonts } from './fx/fonts.js';
 export { FX_KINDS, fxSpec, tilesAround, wallTiles } from './fx/kinds.js';
+export { NOTE_FRAMES, pickNoteFrame } from './fx/notes.js';
 export { FxSystem } from './fx/system.js';

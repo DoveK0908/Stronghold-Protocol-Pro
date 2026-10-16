@@ -1,0 +1,31 @@
+{
+  "file": "public/js/render/fx/projectiles.js",
+  "about": "Sakiko's note support in the projectile pool: import pickNoteFrame, skip the melee slash for a ranged attacker whose kit draws its own visual (ctx.rangedOf), and dress a 'note' look with its glyph and no trail. Three independent edits; dust's own code is otherwise untouched.",
+  "hunks": [
+    {
+      "id": "C4-import-picknoteframe",
+      "find": "import { clamp } from './limits.js';",
+      "replace": "import { clamp } from './limits.js';\nimport { pickNoteFrame } from './notes.js';"
+    },
+    {
+      "id": "C4-attack-doc-ranged",
+      "find": "  /** b.ev 'atk' visual. src/tgt are views (tgt may be null). */",
+      "replace": "  /**\n   * b.ev 'atk' visual. src/tgt are views (tgt may be null).\n   *\n   * `'none'` (and a missing kind) means MELEE: the blow is drawn as the slash that `damage()` sweeps across the\n   * victim. A RANGED attacker may legitimately have no projectile of its own — the sim's own instant-hit profiles\n   * (要塞's 近距离 attack, `beam`) and a content kit whose attack visual is its own (kits/ops/op-oblvns.js 丰川祥子:\n   * her normal attack plays a note the kit adds, ai.js `noAttackVis`) all report 'none' — and a slash from those would\n   * be a blade effect at range; the attacker's own notes / beams are the whole visual instead. `ctx.rangedOf` is the\n   * renderer's own \"this def attacks at range\" lookup (app.js `data.chess(defId).attackKind`, render/units.js poses);\n   * without it (a harness that has no data) every 'none' keeps its slash, which is the old behaviour.\n   */"
+    },
+    {
+      "id": "C4-slash-skip-for-ranged",
+      "find": "      if (kind === 'none' || !kind) this._slashAt = src.id;",
+      "replace": "      if ((kind === 'none' || !kind) && this.ctx.rangedOf?.(src.info?.defId, src.info) !== true) this._slashAt = src.id;"
+    },
+    {
+      "id": "C4-note-no-trail",
+      "find": "    trail.visible = look !== 'boomerang';",
+      "replace": "    // a note drifts on its own (2 tiles/s): no streak behind it — its glyph and halo are the whole visual (notes.js\n    // syncNotes draws the same glyphs for the live path; a note reaching here came in as an 'atk' kind)\n    trail.visible = look !== 'boomerang' && look !== 'note';"
+    },
+    {
+      "id": "C4-note-glyph-frame",
+      "find": "    core.texture = this.tex[look === 'boomerang' ? 'boomerang' : thin ? 'dot' : 'orb'];",
+      "replace": "    // its own glyph, picked at random per shot as syncNotes does per note (八分 / 十六分 / 高音谱号)\n    core.texture = this.tex[look === 'boomerang' ? 'boomerang' : look === 'note' ? pickNoteFrame() : thin ? 'dot' : 'orb'];"
+    }
+  ]
+}

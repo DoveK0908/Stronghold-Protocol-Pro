@@ -1,0 +1,11 @@
+{
+  "file": "server/sim/content/kits/index.js",
+  "about": "B1 — 把 op-oblvns.js 登记进 OPERATOR_KIT_FILES。这是**手工冻结数组、没有目录扫描**（装配下游 KITTED_CHARS / OPERATOR_KITS 全靠它），所以漏了这一行她根本不存在，而且**不会有任何报错**。dust 的名单末尾是 'op-clemnt.js'（克莱门莎是 0.2.3 之后才有的），sakiko 那边对应位置是 'op-monstr.js','op-oblvns.js'——她基线还没有 clemnt，所以别误以为 sakiko 替换了 clemnt，两处都要保留。",
+  "hunks": [
+    {
+      "id": "B1-register-kit-file",
+      "find": "  'op-monstr.js',\n  'op-clemnt.js',\n]);",
+      "replace": "  'op-monstr.js',\n  'op-clemnt.js',\n  'op-oblvns.js',\n]);"
+    }
+  ]
+}

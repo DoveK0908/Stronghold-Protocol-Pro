@@ -64,6 +64,12 @@
 // the next operator's tier chip and bars (drawn under them) and read as that operator's gauge, a shrinking ring reads
 // like a filling progress ring, and its refill was the same white as the 元素值 left. The disc comes from the hudRings
 // atlas, the bars are tinted Texture.WHITE sprites; built on first use and hidden when idle.
+// Fever gauges (b.snap `fever` → sample `fever`, only the units that carry one — every Ave Mujica member on the field
+// shares one gauge, so each of them shows it): the official badge, 「以图标显示于在场 Ave Mujica 成员模型右下，其中的玫红
+// 色填充反映累积进度，蓄满时出现光效提示」 — a round rose gauge pinned to the model's bottom-right, out of the way of the
+// bars and the status icons; 蓄满 (100 %) adds the ready light effect, and while Fever is ON the same icon counts the
+// state down (the sim sends the remaining time as a percentage). The sim's Fever status also turns the unit's SP bar
+// rose (「Fever 状态期间…技力消耗条变为玫红色」). No `fever` field in the feed (an older server, a recording): nothing.
 //
 // ItemView renders hand items as a floating icon plate; DeviceView renders battle devices (crates) as 3D boxes
 // with an HP bar once damaged.
@@ -84,7 +90,7 @@
 import { UF, ANIM } from '../../../shared/constants.js';
 import { SpineActor } from './spine.js';
 import { diamondTexture, shadowTexture, fxAtlas, tierChip, statusTexture, itemTexture, hudRings, ringArc, downLabel, HUD_DISC, ELEMENT_RING } from './textures.js';
-import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, statusIconKey, statusIconSuppressed } from './style.js';
+import { COLORS, TIER_COLORS, ENEMY_FRAME, UNIT, PROJ, FEVER_ROSE, FEVER_ROSE_HI, FEVER_ROSE_DIM, statusIconKey, statusIconSuppressed } from './style.js';
 import { drawCrate, rowDepthKey, ROW_KEY, deviceBoxOf, DEVICE_BOX } from './tiles.js';
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
@@ -249,6 +255,35 @@ export const ALIAS_TINT = Object.freeze({ enemy_1305_mhslim: 0xffc48a, enemy_130
  * between `pulse` and 1 at `pulseHz` (real time).
  */
 export const EL_BAR = Object.freeze({ icon: 0.15, min: 8, max: 15, enemy: 0.8, gap: 1, pulse: 0.45, pulseHz: 1.5 });
+/**
+ * The Ave Mujica FEVER badge (b.snap `fever` = [[id, pct], …]; official: 「Fever 值以图标显示于在场 Ave Mujica 成员
+ * 模型右下，其中的玫红色填充反映累积进度，蓄满时出现光效提示」). A round rose gauge pinned to the unit's model's
+ * bottom-right — outside the HP / SP bars and outside the status-icon row, so nothing else is covered — whose rose ring
+ * fills with `pct` % (style.js FEVER_ROSE). At 100 % (蓄满) a light effect marks it as ready to trigger; while the sim's
+ * Fever is ON (the 'sakiko:fever' status) the icon instead shows its remaining time (the sim sends 100 → 0) and reads
+ * apart from plain charging: a paler rose fill, a rose-hot track and a breathing halo. `cell` is the badge's size in
+ * tiles (× the camera's px per tile, so it zooms with the board), clamped to `min`…`max` px; `dx` / `dy` place its
+ * centre from the unit's feet, in tiles (right of, and just above, the model's bottom-right corner).
+ *
+ * INNER RING ONLY (owner, 2026-10-08: 「fever 状态条不要外面的大圈，只保留里面的小圈就行」): the badge is a TRACK +
+ * an ARC and nothing else. The disc that used to sit behind them (`hudRings().downDisc` — a dark radial-gradient disc
+ * whose radius fills its half-cell: 29.5 of 32 px, against the ring's 26, i.e. visibly wider than the ring) and the
+ * seventh step of the arc atlas (`arcs[last]`, a full bright circle laid over the track) are BOTH gone: two concentric
+ * circles around one small ring was the "大圈". The two official requirements still hold without them —
+ *   * 蓄满的光效: the arc reaches 100 % and the halo breathes (see below), and the track takes the rose so the empty
+ *     part of the ring reads as part of the gauge rather than a grey outline;
+ *   * Fever 状态可区分: the arc switches to FEVER_ROSE_HI, the track with it, and the halo breathes harder — the
+ *     whole badge is the state's colour, not an outline around it (and the unit's SP bar goes rose as well).
+ * quality 'low' keeps the track, the arc and their colours: only the halo is dropped and the pulses become static.
+ * No `fever` field in the feed (an older server, a recording): nothing is drawn at all.
+ */
+export const FEVER_ICON = Object.freeze({
+  cell: 0.40, min: 11, max: 20, dx: 0.34, dy: 0.10,
+  full: 100, glow: 2.0, glowA: 0.7, pulseHz: 0.85, readyA: 0.95, readyGlow: 1.8,
+});
+
+/** Status keys that mean "Fever is on" (the sim's visible Fever buff: kits/ops/op-oblvns.js `sakiko:fever`). */
+const FEVER_STATUS = /(^|:)fever$/i;
 
 /** The share of a model's height a bar is placed above (the head is not the very top of the silhouette). */
 export const HEAD_TOP_K = 0.92;
@@ -695,7 +730,9 @@ export class UnitView {
     this.down = null;             // knocked out, waiting to redeploy: { until, total, state } (setDown) — no fade meanwhile
     this.gameT = 0;               // battle game time of the frame (render clock), for the redeploy ring's countdown and the element bar's refill
     this.el = null; this.elFill = 0; this.elUntil = 0; this.elDur = 0;   // shown element gauge (sync)
+    this.fever = null;            // shown Fever gauge 0..100 (sync); null = this unit has none — nothing is drawn
     this._elBar = null;           // { root, disc, bg, fill } sprites of the element gauge row, built on first use
+    this._feverIcon = null;       // { root, glow, track, arc } sprites of the Fever badge, built on first use
     this._wolfPips = null;        // { root, back[], lit[] } diamonds of the 狼影 row, built on first use
     this.ammoCuts = [];           // the thin separators between the ammo bar's cells (_updateAmmoCuts)
     this._downRing = null;        // { disc, track, arc, text } sprites (text: the shared label, textures.js downLabel), built on first use
@@ -1097,6 +1134,8 @@ export class UnitView {
     // the element gauge shown (b.snap `elem`): element, fill 0..1, cooldown end (game s) and length
     this.el = typeof s.el === 'string' ? s.el : null;
     this.elFill = this.el ? s.elFill || 0 : 0; this.elUntil = this.el ? s.elUntil || 0 : 0; this.elDur = this.el ? s.elDur || 0 : 0;
+    // the Fever gauge shown (b.snap `fever`, 0..100): null without the field — an older server / recording draws nothing
+    this.fever = typeof s.fever === 'number' && Number.isFinite(s.fever) ? clamp(s.fever, 0, 100) : null;
     this.followSample(s, t);
     this.flying = !!(s.flags & UF.FLYING) || this.info.motion === 'FLY';
     // enemies keep to the road plane: ground enemies only ever walk low tiles (a rounding step onto a block edge must not
@@ -1757,6 +1796,9 @@ export class UnitView {
       sy = cy + bh / 2 + spH / 2 + 1.5;
       this.spBg.position.set(x0 - 1, sy); this.spBg.width = bw + 2; this.spBg.height = spH + 2;
       this.spFill.position.set(x0, sy); this.spFill.width = bw * k; this.spFill.height = spH;
+      // 「Fever 状态期间…技力消耗条变为玫红色」: while Fever is ON the SP bar takes the gauge's rose (it does not fill
+      // meanwhile — the sim stops SP gain); the moment Fever ends the bar is back to its own colours
+      this.spFill.tint = this.feverActive() ? FEVER_ROSE : active ? COLORS.spActive : ready ? COLORS.spReady : COLORS.sp;
       this.spFill.tint = ammo ? COLORS.ammo : active ? COLORS.spActive : ready ? COLORS.spReady : COLORS.sp;
       this._spY = sy;
     }
@@ -1803,6 +1845,8 @@ export class UnitView {
     const energyH = this._updateEnergy(showBars && !this.isEnemy && !!this.energy && this.ctx.settings?.mysticEnergy === true, x0, rowsTop + wolfH + coinH, s);
     this._updateElementBar(showBars && !!this.el, x0, bw, rowsTop + wolfH + coinH + energyH + 1, spH, s, t);
     this._updateDownRing(!prep && !!this.down && !this.alive, x, this.screen.y - DOWN_LOOK.height * s, s, t);
+    // the Fever badge rides the model's own bottom-right corner (b.snap `fever`), not the bars row
+    this._updateFeverIcon(showBars && this.fever !== null, s, t);
     // blocked marker at the feet (enemies held by a blocker)
     const blocked = !prep && this.alive && this.isEnemy && (this.flags & UF.BLOCKED);
     this.blockIcon.visible = !!blocked;
@@ -2048,6 +2092,76 @@ export class UnitView {
     r.root.visible = true;
   }
 
+  /** True while the sim's Fever state is on this unit (its visible 'sakiko:fever' buff → a b.ev 'status' event). */
+  feverActive() {
+    if (!this.statuses || !this.statuses.size) return false;
+    for (const k of this.statuses) if (FEVER_STATUS.test(k)) return true;
+    return false;
+  }
+
+  /**
+   * The Fever badge (see FEVER_ICON): an inner ring at the unit's model's bottom-right, `cell` px wide (from the
+   * camera's px per tile `s`, so it follows zoom and movement) — a ring track and the arc filling it with `this.fever` %
+   * (the sim's charging gauge, or its remaining time while Fever is ON). No disc behind it and no outer circle over it:
+   * the badge IS the ring. 蓄满 (100 %) and the Fever state read from the ring itself plus the breathing halo — the arc
+   * goes to FEVER_ROSE_HI and the track turns rose while Fever runs, and both the arc's brightness and the halo's
+   * breathing mark 蓄满 (quality 'low' keeps every colour and drops only the halo). Built on the first gauge, hidden
+   * while the unit has none (an older feed without the `fever` field draws nothing at all).
+   */
+  _updateFeverIcon(show, s, t = 0) {
+    let r = this._feverIcon;
+    if (!show) { if (r) r.root.visible = false; return; }
+    const P = this.P;
+    const rings = hudRings();
+    if (!r) {
+      const root = new P.Container();
+      // no `plate`: the dark disc (atlas radius 29.5 of the 32 px half-cell, against the ring's 26) filled the whole
+      // sprite and read as a second, outer circle around the small ring
+      const glow = new P.Sprite(fxAtlas().tex.glow);
+      glow.anchor.set(0.5);
+      glow.blendMode = P.BLEND_MODES.ADD;
+      root.addChild(glow);
+      const track = new P.Sprite(rings.track);
+      track.anchor.set(0.5);
+      root.addChild(track);
+      const arc = new P.Sprite(rings.arcs[0]);
+      arc.anchor.set(0.5);
+      root.addChild(arc);
+      r = this._feverIcon = { root, glow, track, arc };
+      this.hud.addChild(root);
+    }
+    const size = clamp(s * FEVER_ICON.cell, FEVER_ICON.min, FEVER_ICON.max);
+    const pct = clamp(this.fever || 0, 0, 100) / 100;
+    const active = this.feverActive();
+    const full = !active && (this.fever || 0) >= FEVER_ICON.full;   // 蓄满: ready to trigger Fever
+    const rich = (this.ctx.settings?.quality || 'high') !== 'low';
+    const pulse = 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * FEVER_ICON.pulseHz);
+    // the model's bottom-right corner: right of the body, its bottom edge on the feet line
+    const feet = this.screen;
+    r.root.position.set(feet.x + FEVER_ICON.dx * s + size * 0.3, feet.y - FEVER_ICON.dy * s - size * 0.3);
+    for (const sp of [r.track, r.arc]) sp.width = sp.height = size;
+    // the track: the plain atlas ring while charging; the whole badge takes the state's colour while Fever runs, so
+    // the empty part of the ring carries the state instead of the removed outline
+    r.track.visible = true;
+    r.track.tint = active ? FEVER_ROSE : FEVER_ROSE_DIM;
+    r.track.alpha = active ? 0.9 : 0.85;
+    // 蓄满的光效 without an outer ring: the arc itself reads as lit, and the halo breathes around the badge
+    const readyLit = full ? FEVER_ICON.readyGlow * (0.85 + 0.15 * pulse) : 1;
+    // the filling ring: the charge, or the state's remaining time while Fever is ON
+    r.arc.texture = ringArc(pct);
+    r.arc.tint = active ? FEVER_ROSE_HI : FEVER_ROSE;
+    r.arc.alpha = clamp((active ? 1 : 0.95) * readyLit, 0, 1.5);
+    r.arc.visible = pct > 0;
+    // the halo: the 蓄满 light effect and the Fever state's breathing (dropped at quality 'low')
+    r.glow.visible = rich && (active || full);
+    if (r.glow.visible) {
+      r.glow.tint = active ? FEVER_ROSE_HI : FEVER_ROSE;
+      const scale = FEVER_ICON.glow * (full ? 1 + 0.12 * pulse : 1);
+      r.glow.scale.set((size * scale) / 128, (size * scale) / 128);
+      r.glow.alpha = (active ? 1 : FEVER_ICON.glowA) * (0.45 + 0.55 * pulse);
+    }
+    r.root.visible = true;
+  }
   // ---- impostor mode (crowded fields, clipped skeletons): the skeleton is rendered into a slot of the shared
   // impostor atlas (render/impostor.js) every `interval` frames (staggered per unit; every frame for clipped
   // skeletons, whose stencil masks must stay out of the main pass) and shown as one sprite. Without a free atlas
