@@ -9,6 +9,11 @@
       "replace": "  // 测试页·设置敌人用游戏自己的波次构建器（`buildNormalWave`）。\n  // ESM 按 URL 缓存 ⇒ 这里 import 到的是和游戏自己那棵树里的**同一个模块实例**。\n  // ⚠️ 赋给**模块级**的 `wavesMod`（在 L4-handler 那段声明）—— 处理器是模块级函数，\n  //    它们看不到 `installServerPatch` 里的局部变量（第一版就是栽在这个作用域上）。\n  wavesMod = await imp('server/match/waves.js');\n  // 测试页·设置盟约层数的上限：按游戏自己的 `shared/constants.js` BOND_LAYER_CAP（999）夹取。\n  // 同样赋给模块级（处理器看不到这里的局部变量）。\n  bondCap = Number.isFinite(constants.BOND_LAYER_CAP) && constants.BOND_LAYER_CAP > 0 ? constants.BOND_LAYER_CAP : 999;\n  const { C2S } = protocol;"
     },
     {
+      "id": "L4-gate",
+      "find": "      let res;\n      if (msg && msg.t === PICK_TYPE) res = handlePick(this, playerId, msg, state, ERR);",
+      "replace": "      let res;\n      if (msg && typeof msg.t === 'string' && msg.t.startsWith('g.mod')\n        && !(this.experimental && this.experimental.luckConsole === true)) {\n        const denied = fail(ERR.BAD_TARGET, '这一局没有开启 Luck 测试插件（房间的实验性选项）');\n        recordIntent(state, log, this, playerId, msg, denied);\n        return denied;\n      }\n      if (msg && msg.t === PICK_TYPE) res = handlePick(this, playerId, msg, state, ERR);"
+    },
+    {
       "id": "L4-type",
       "find": "export const UNIT_TYPE = 'g.modUnit';",
       "replace": "export const UNIT_TYPE = 'g.modUnit';\nexport const TESTFUNDS_TYPE = 'g.modTestFunds';\nexport const TESTROUND_TYPE = 'g.modTestRound';\nexport const TESTCAP_TYPE = 'g.modTestRoundCap';\nexport const TESTENEMY_TYPE = 'g.modTestEnemy';\nexport const TESTMAP_TYPE = 'g.modTestMap';\nexport const TESTBOND_TYPE = 'g.modTestBond';\nexport const TESTCOMBOS_TYPE = 'g.modTestCombos';\nexport const TESTBOSS_TYPE = 'g.modTestBoss';\nexport const TESTTIMER_TYPE = 'g.modTestTimer';"

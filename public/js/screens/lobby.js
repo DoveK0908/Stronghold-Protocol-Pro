@@ -608,7 +608,8 @@ function HubFoot() {
 function MeChip({ me }) {
   const card = useMyCard();
   useData('assets');
-  const face = cardAvatarUrl(card.avatar);
+  // 项目 5: the chip follows the avatar's 精一/精二/皮肤 变体 too (room.card avatar + room.face)
+  const face = cardAvatarUrl(card.avatar, undefined, card.face);
   const label = t('统计数据');
   return html`<button type="button" class="me-chip me-chip--btn stats-entry" onClick=${openStats} title=${label} aria-label=${label}>
     <${AvatarFrame} size="sm" name=${me.name} src=${face} seat=${0} self=${true} />

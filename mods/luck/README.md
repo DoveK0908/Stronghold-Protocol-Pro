@@ -19,6 +19,33 @@
 |---|---|---|---|
 | **L2** | `L2-shop-level-server.patch.json` | `src/server-patch.mjs` | 服务端实现 **「调度中心 · 直接设置等级」**（新意图 `g.modShopLevel { level }`）。 |
 | **L3** | `L3-shop-level-ui.patch.json` | `public/overlay.js` | 面板上的 **调度控件**：沙盒条上一个 1..6 的数字框 + 「设置调度」按钮 + 总开关页新增一行「调度中心 · 直接设置等级」。 |
+| **L4** | `L4-test-server.patch.json` | `src/server-patch.mjs` | **测试页的服务端**：资金 / 当前回合 / 回合上限 / 两个时限 / 设置敌人 / 更换地图 / 盟约层数 / 自选 boss / 出怪组合全集，以及下面的 **L4-gate**。 |
+| **L5** | `L5-test-page.patch.json` | `public/overlay.js` | **测试页的面板**：页签与页本体、搜索框的焦点与输入法、布局注入、沙盒条入口，以及下面的 **L5-gate / L5-gate2**。 |
+
+（L4/L5 由 `_build/gen-luck-test.mjs` 生成 —— 那是它们唯一的真源，别手改这两个 JSON。）
+
+### 开局前的实验性开关「Luck 测试插件」（L4-gate / L5-gate）
+
+维护者 2026-10-16 定：这个控制台是**开局前可选的实验性选项** —— 房间没勾就整体休眠，普通房间碰不到它。
+
+- 开关本体在游戏侧：`shared/experimental.js` 的 `EXPERIMENTAL_OPTIONAL`（键名 `luckConsole`）+ 房间界面
+  的「实验性选项」弹窗（`public/js/ui/experimental.js`，复选框 `#experimental-luck-console`）。服务端把它经
+  `m.public.experimental` 发给客户端。
+- **L5-gate**（`public/overlay.js`）：`view()` 在这一局没勾时返回 `null` ⇒ 入口按钮与面板都不出现，每局
+  推给服务端的 `g.modEnable` 也根本发不出去（`view()` 返回 null 本来就是上游支持的「这局用不上」状态）。
+- **L5-gate2**（`public/overlay.js`）：`store` 的订阅里除了 `render()` 还会**直接**调 `renderUnits()` /
+  `renderDiy()` / `renderEnable()`，它们内部的 `sendUnits()` / `sendDiy()` / `sendEnable()` 不经过 `view()`。
+  实测（2026-10-16）只加 L5-gate 时，**关着开关的一局仍然发出** `g.modUnit` / `g.modDiy` / `g.modEnable`
+  三条意图（服务端拒掉，但客户端不该发）⇒ 订阅开头补一句 `if (!view()) { root.hidden = true; lastSig = null; return; }`。
+- **L4-gate**（`src/server-patch.mjs`）：`Match.prototype.handle` 里先把 `g.mod*` 意图一律拒掉（理由
+  「这一局没有开启 Luck 测试插件（房间的实验性选项）」）⇒ 就算有人手改客户端也做不了什么。
+- 实测（2026-10-16）：**没勾**的房间 —— 根节点 `hidden`、入口不可见、服务端日志里**一条 `[luck] … refused`
+  都没有**（只有启动时那批 `[luck] hooked …` 安装行）；**勾了**的房间 —— 面板 23 pass / 0 fail。
+- **装进进程的 hook 在没人推送时是惰性的**（同一份证据脚本 `_build\_chk-luck-inert.mjs`）：同一个 node 进程里
+  先跑仓库的 `matches` golden（21 局）再 `installServerPatch()`（`ok=true missing=[]`）重跑一遍 —— 两遍都与
+  `test/golden/matches.json` 逐字节相同，且两遍互相相同 ⇒ 「不开 luck 的对局结果不变」有对局侧证据。
+- 只勾另一个新开关 `briefingSpecialEnemies`（策略阶段看特训敌人）时 Luck 依旧休眠 ⇒ 两个开关互相独立。
+- 只勾另一个新开关 `briefingSpecialEnemies`（策略阶段看特训敌人）时 Luck 依旧休眠 ⇒ 两个开关互相独立。
 
 （补丁编号 `L1` 留空 —— 那是已删除的「试验台」按钮，编号不回收，免得和旧记录对不上。）
 
