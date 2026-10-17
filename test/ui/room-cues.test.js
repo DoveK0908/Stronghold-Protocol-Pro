@@ -1,53 +1,49 @@
-// 项目 6 房间音效 (2026-10-16): the pure transition logic behind the room's 准备 / 开始 / 玩家加入 / 退出 cues
-// (public/js/ui/roomCues.js). The hook that plays them is a one-liner over this function.
-import test from 'node:test';
+// Waiting-room sounds (feedback #10 / #14): ui/roomCues.js picks the official cue for a room-state change.
+
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { roomCues, roomPeople, roomSnapshot } from '../../public/js/ui/roomCues.js';
+import { readFileSync } from 'node:fs';
+import { roomCue, cueGate, seatedHumans } from '../../public/js/ui/roomCues.js';
 
-const seat = (id, o = {}) => ({ playerId: id, name: `P${id}`, seat: 0, ready: false, connected: true, ...o });
-const snap = (seats, o = {}) => roomSnapshot({ seats, ...o });
+const seat = (playerId, extra = {}) => ({ playerId, name: playerId, isBot: false, ready: false, connected: true, ...extra });
+const room = (seats, extra = {}) => ({ code: 'ABCD', inMatch: false, seats, ...extra });
 
-test('房间音效: the first snapshot is silent, a join and a leave are one cue each', () => {
-  const a = snap([seat('p1')]);
-  assert.deepEqual(roomCues(null, a), []);
-  const b = snap([seat('p1'), seat('p2')]);
-  assert.deepEqual(roomCues(a, b), ['joinRoom']);
-  assert.deepEqual(roomCues(b, snap([seat('p2')])), ['disconnect']);
+test('seatedHumans leaves out bots and empty seats', () => {
+  assert.deepEqual([...seatedHumans(room([seat('me'), null, seat('b1', { isBot: true }), seat('p2')]))], ['me', 'p2']);
 });
 
-test('房间音效: 准备 sounds on a false → true flip, once per transition, never repeated', () => {
-  const a = snap([seat('p1'), seat('p2')]);
-  const b = snap([seat('p1', { ready: true }), seat('p2', { ready: true })]);
-  assert.deepEqual(roomCues(a, b), ['ready']);                      // a burst of readies is one sound
-  assert.deepEqual(roomCues(b, b), []);                             // still ready: nothing
-  assert.deepEqual(roomCues(b, snap([seat('p1', { ready: true }), seat('p2')])), []); // un-ready is silent
+test('entering a room, another doctor joining or leaving', () => {
+  const r1 = room([seat('me')]);
+  assert.equal(roomCue(null, r1, 'me'), 'joinRoom', 'I enter a room');
+  assert.equal(roomCue(r1, room([seat('me'), seat('p2')]), 'me'), 'joinRoom', 'a doctor joins');
+  assert.equal(roomCue(room([seat('me'), seat('p2')]), r1, 'me'), 'disconnect', 'a doctor leaves');
+  assert.equal(roomCue(room([seat('me'), seat('p2')]), room([seat('me'), seat('p3')]), 'me'), 'joinRoom', 'a swap: the join wins');
+  assert.equal(roomCue(room([seat('me')], { code: 'OLD1' }), r1, 'me'), 'joinRoom', 'another room');
 });
 
-test('房间音效: join / leave / ready keep their fixed order (the 开始 cue lives in screens/game.js)', () => {
-  const a = snap([seat('p1', { ready: true }), seat('p2'), seat('p4')]);
-  const b = snap([seat('p1', { ready: true }), seat('p2', { ready: true }), seat('p3')], { inMatch: true });
-  assert.deepEqual(roomCues(a, b), ['joinRoom', 'disconnect', 'ready']);
-  // the same room again: nothing re-fires (no repeated 准备)
-  assert.deepEqual(roomCues(b, snap([seat('p1', { ready: true }), seat('p2', { ready: true }), seat('p3')], { inMatch: true })), []);
+test('no cue for bots, flips, matches, a restored room or a room I only watch', () => {
+  const r1 = room([seat('me'), seat('p2')]);
+  assert.equal(roomCue(r1, room([seat('me'), seat('p2'), seat('b1', { isBot: true })]), 'me'), null, 'a bot added');
+  assert.equal(roomCue(r1, room([seat('me', { ready: true }), seat('p2', { connected: false })]), 'me'), null, 'ready / connected flips');
+  assert.equal(roomCue(r1, { ...r1, inMatch: true }, 'me'), null, 'the match starts');
+  assert.equal(roomCue({ ...r1, inMatch: true }, room([seat('me')]), 'me'), null, 'back from a match with a seat gone');
+  assert.equal(roomCue(null, r1, 'me', { quiet: true }), null, 'the first state after a welcome');
+  assert.equal(roomCue(null, room([seat('p2')]), 'me'), null, 'a room I watch');
+  assert.equal(roomCue(r1, null, 'me'), null);
 });
 
-test('房间音效: empty seats, bots, offline players stay out; spectators join and leave like players', () => {
-  const empty = snap([]);
-  const room = {
-    seats: [null, seat('p1', { bot: true }), seat('p2', { connected: false }), seat('p3')],
-    spectators: [{ playerId: 's1', name: 'S', connected: true }, { playerId: 's2', name: 'S2', connected: false }],
-  };
-  const withPeople = snap(room.seats, { spectators: room.spectators });
-  assert.deepEqual([...roomPeople(room).keys()], ['p3', 's1']);      // only a connected human + a connected spectator
-  assert.deepEqual(roomCues(empty, withPeople), ['joinRoom']);
-  assert.deepEqual(roomCues(withPeople, snap([seat('p3')], { spectators: [{ playerId: 's1', connected: false }] })),
-    ['disconnect']);                                                 // the spectator went offline
-  assert.deepEqual(roomCues(withPeople, withPeople), []);
+test('cueGate: one cue of a kind a second', () => {
+  const gate = cueGate(1000);
+  assert.equal(gate('joinRoom', 0), true);
+  assert.equal(gate('joinRoom', 500), false);
+  assert.equal(gate('disconnect', 500), true, 'another kind');
+  assert.equal(gate('joinRoom', 1000), true);
 });
 
-test('房间音效: a disconnected player looks like a leave and a reconnect like a join', () => {
-  const on = snap([seat('p1', { ready: true })]);
-  const off = snap([seat('p1', { ready: true, connected: false })]);
-  assert.deepEqual(roomCues(on, off), ['disconnect']);
-  assert.deepEqual(roomCues(off, on), ['joinRoom']);
+test('main.js plays the cue from onRoomState; the room screen plays 准备', () => {
+  const main = readFileSync(new URL('../../public/js/main.js', import.meta.url), 'utf8');
+  assert.match(main, /roomCue\(prevRoom, room, myId, \{ quiet: roomCueQuiet \}\)/);
+  assert.match(main, /function onWelcome\(msg\) \{\n  roomCueQuiet = true;/);
+  const roomJs = readFileSync(new URL('../../public/js/screens/room.js', import.meta.url), 'utf8');
+  assert.match(roomJs, /audio\.sfx\(ready \? 'ready' : 'back'/);
 });

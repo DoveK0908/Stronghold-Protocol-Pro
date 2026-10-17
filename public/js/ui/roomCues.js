@@ -1,78 +1,47 @@
-// 项目 6 (房间音效, 2026-10-16): the room's cues — 准备 (ready), 玩家加入 (joinRoom) and 退出 (disconnect). The 开始
-// (start) cue is not here: the room screen is gone by the time a match begins, so public/js/main.js plays it on the first
-// snapshot of a fresh match. The transition logic is a pure function so it can be tested without a browser; the hook only
-// remembers the previous snapshot and hands each *new* cue to the audio manager (the first snapshot is always silent).
-import { useEffect, useRef } from '../../vendor/hooks.module.js';
+// Waiting-room sounds (feedback #10 / #14, 2026-10-16: 「希望有准备音效，进入房间音效」「玩家加入和退出的音效」): the official
+// 卫戍协议 UI banks the manifest already maps (tools/assets/audio.mjs) — PLAYER_JOINROOM when I enter a room or another
+// doctor takes a seat, DISCONNECT when one leaves (the official mode has no own "left" sound), PLAYER_READY on my own
+// 准备 (screens/room.js). Only between two room states of the same waiting room: nothing in a match (a leave there has
+// its ticker line), nothing for bots, for my own seat, for connected/ready flips, or for the first state after a
+// welcome (a reconnect or a restored page re-sends the room as it is). main.js plays at most one cue of a kind a second.
+
+/** The human players seated in a room state (bots and empty seats left out). */
+export function seatedHumans(room) {
+  const out = new Set();
+  for (const s of Array.isArray(room?.seats) ? room.seats : []) if (s && !s.isBot && typeof s.playerId === 'string') out.add(s.playerId);
+  return out;
+}
 
 /**
- * 项目 6 的总开关（维护者 2026-10-16：「先去掉这些音效，保留这个项目」）⇒ 实现完整留着，但默认不发声。想听回来把这个
- * 常量改成 true 即可：房间的三个音由 useRoomCues 播，`开始` 那个音由 public/js/main.js 的 m.public 处理器播，两处都看它。
+ * The cue for a room-state change: 'joinRoom' | 'disconnect' | null.
+ * @param {any} prev the room before (null when I was in none) @param {any} next the new room state
+ * @param {string|null} myId @param {{ quiet?: boolean }} [o] quiet: the first state after a welcome
+ */
+export function roomCue(prev, next, myId, { quiet = false } = {}) {
+  if (quiet || !next || next.inMatch) return null;
+  if (!prev || prev.code !== next.code) return seatedHumans(next).has(myId) ? 'joinRoom' : null;
+  if (prev.inMatch) return null; // back from a match: the room is not newly joined
+  const before = seatedHumans(prev), after = seatedHumans(next);
+  before.delete(myId); after.delete(myId);
+  for (const id of after) if (!before.has(id)) return 'joinRoom';
+  for (const id of before) if (!after.has(id)) return 'disconnect';
+  return null;
+}
+
+/** Rate limit: true when `kind` may play now (one per kind per `gapMs`). */
+export function cueGate(gapMs = 1000) {
+  const last = new Map();
+  return (kind, now = Date.now()) => {
+    if (now - (last.get(kind) ?? -Infinity) < gapMs) return false;
+    last.set(kind, now);
+    return true;
+  };
+}
+
+
+/**
+ * 项目 6 的总开关（维护者 2026-10-16：「先去掉这些音效，保留这个项目」）。
+ * 上游 10-17 自己实现了同款房间音（本文件，feedback #10/#14），我们沿用上游实现、只把它默认关掉：
+ * 想听回官方行为把这里改成 true 即可 —— main.js 的 roomCue 播放与对局首帧的 start 音都看它。
  */
 export const ROOM_CUES_ENABLED = false;
-
-/**
- * The people a room's state shows: every occupied, connected human and spectator seat — spectators count as players
- * joining and leaving the room (they are never counted for ready / start).
- * @param {any} room room.state
- * @returns {Map<string, boolean>} playerId → ready (spectators always false)
- */
-export function roomPeople(room) {
-  const out = new Map();
-  const seats = Array.isArray(room?.seats) ? room.seats : [];
-  const spectators = Array.isArray(room?.spectators) ? room.spectators : [];
-  for (const s of seats) {
-    if (!s || s.playerId == null || s.connected === false || s.bot || s.isBot) continue;
-    out.set(String(s.playerId), s.ready === true);
-  }
-  for (const s of spectators) {
-    if (!s || s.playerId == null || s.connected === false) continue;
-    out.set(String(s.playerId), false);
-  }
-  return out;
-}
-
-/** The snapshot the cue logic compares: who is in the room, and who of them is ready. */
-export function roomSnapshot(room) {
-  return { people: roomPeople(room) };
-}
-
-/**
- * The cues a room transitioned into: 'joinRoom' for a player that appeared, 'disconnect' for one that left (or went
- * offline), 'ready' for a player that turned ready. Each cue appears at most once per transition (a four-player ready
- * burst plays one 准备 sound), in that fixed order; a null `prev` is silent.
- * @param {{ people: Map<string, boolean> } | null} prev
- * @param {{ people: Map<string, boolean> }} next
- * @returns {string[]} cue names for audio.sfx (audio.js sfx.ui)
- */
-export function roomCues(prev, next) {
-  if (!prev || !next) return [];
-  let join = false, leave = false, ready = false;
-  for (const [id, r] of next.people) {
-    if (!prev.people.has(id)) join = true;
-    else if (r && !prev.people.get(id)) ready = true;
-  }
-  for (const id of prev.people.keys()) if (!next.people.has(id)) leave = true;
-  const out = [];
-  if (join) out.push('joinRoom');
-  if (leave) out.push('disconnect');
-  if (ready) out.push('ready');
-  return out;
-}
-
-/**
- * Play the room's cues as its state changes (ignores the first snapshot). Never throws: a missing audio manager or an
- * unknown sound name is the manager's own business (audio.js sfx() ignores unknown names).
- * @param {any} room room.state @param {{ sfx: (name: string) => void } | null} [audio] the audio manager
- */
-export function useRoomCues(room, audio) {
-  const prev = useRef(null);
-  const snap = roomSnapshot(room);
-  const key = [...snap.people].map(([id, r]) => `${id}:${r ? 1 : 0}`).join(',');
-  useEffect(() => {
-    const last = prev.current;
-    prev.current = snap;
-    if (!last || !audio || !ROOM_CUES_ENABLED) return;
-    for (const cue of roomCues(last, snap)) { try { audio.sfx(cue); } catch { /* audio never breaks the room */ } }
-    // `key` is the snapshot's identity: the effect re-runs when the people or their ready flags change
-  }, [key]);
-}
