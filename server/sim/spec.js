@@ -91,7 +91,7 @@ export function buildBattleSpec(o = {}) {
     // the content set the battle runs on and the art it was drawn with (header): not read by the sim
     ...(isContentHash(o.cs) ? { cs: o.cs } : {}),
     ...(isContentHash(o.vs) ? { vs: o.vs } : {}),
-    // experimental room option (项目 7): 限伤 caps at BOSS_HIT_LIMIT − 1 instead of cancelling the hit
+    // experimental room option (项目 5): 限伤 caps at BOSS_HIT_LIMIT − 1 instead of cancelling the hit
     ...(o.bossHitSoftCap === true ? { bossHitSoftCap: true } : {}),
   };
   const out = JSON.parse(JSON.stringify(spec, specReplacer));

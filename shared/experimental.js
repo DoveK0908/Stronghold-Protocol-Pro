@@ -10,7 +10,7 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 //   briefingSpecialEnemies  the strategy draft also shows 本局特训敌人 — **on by default** (the owner, 2026-10-16);
 //                           a room that wants the old behaviour stores an explicit `false`
 //   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
-//   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 7,
+//   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 5,
 //                           off by default: the official rule stays the default)
 export const EXPERIMENTAL_OPTIONAL = Object.freeze(['briefingSpecialEnemies', 'luckConsole', 'bossHitSoftCap']);
 export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ briefingSpecialEnemies: true, luckConsole: false, bossHitSoftCap: false });

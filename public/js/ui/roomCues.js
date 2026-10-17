@@ -37,11 +37,3 @@ export function cueGate(gapMs = 1000) {
     return true;
   };
 }
-
-
-/**
- * 项目 6 的总开关（维护者 2026-10-16：「先去掉这些音效，保留这个项目」）。
- * 上游 10-17 自己实现了同款房间音（本文件，feedback #10/#14），我们沿用上游实现、只把它默认关掉：
- * 想听回官方行为把这里改成 true 即可 —— main.js 的 roomCue 播放与对局首帧的 start 音都看它。
- */
-export const ROOM_CUES_ENABLED = false;

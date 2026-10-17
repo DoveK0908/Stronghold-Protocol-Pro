@@ -157,7 +157,7 @@ test('限伤: a leader\'s hit of 299999 lands, 300000 deals 0 — nothing credit
   assert.equal(pool.hp, 5e6 - (LIMIT - 1));
 });
 
-test('限伤 soft cap (项目 7, `bossHitSoftCap`): the same hit lands at 299999 instead of being cancelled', () => {
+test('限伤 soft cap (项目 5, `bossHitSoftCap`): the same hit lands at 299999 instead of being cancelled', () => {
   const pool = new SharedBossPool(5e6);
   const { h, b, leader, op } = hitField({ pool });
   // the room option reaches the battle through the spec (buildBattleSpec / createBattleFromSpec)

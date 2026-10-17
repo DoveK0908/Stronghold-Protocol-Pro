@@ -39,7 +39,6 @@ import { html, UiHosts, Button, MicroLabel, closeAllDialogs, confirmDialog } fro
 import { ConnectionBanner } from './ui/connBanner.js';
 import { MatchNotice, matchNoticeText, replayingRound, MATCH_NOTICE_REFRESH_MS } from './ui/matchNotice.js';
 import { ToastHost, toast, toastError, describeError } from './ui/toasts.js';
-import { ROOM_CUES_ENABLED } from './ui/roomCues.js';
 import { net, identity, NetError } from './net.js';
 import { createAuthProbe } from './authProbe.js';
 import './queueCancellation.js';
@@ -247,7 +246,7 @@ function onRoomState(msg) {
   const prevRoom = store.get().room;
   const cue = roomCue(prevRoom, room, myId, { quiet: roomCueQuiet });
   roomCueQuiet = false;
-  if (ROOM_CUES_ENABLED && cue && roomCueGate(cue)) audio.sfx(cue, { volume: 0.7 });
+  if (cue && roomCueGate(cue)) audio.sfx(cue, { volume: 0.7 });
   // A (new) match starts: forget the previous match's state so stale results never show.
   if (room.inMatch && !(prevRoom && prevRoom.inMatch && prevRoom.code === room.code)) store.set({ match: emptyMatch() });
   store.set({ room });
@@ -328,19 +327,11 @@ function wireNet() {
     const known = Object.hasOwn(CLOSE_REASON, String(msg.reason)) ? CLOSE_REASON[msg.reason] : null;
     toast(known ? t(known) : typeof msg.reason === 'string' && msg.reason.length < 60 ? t('同盟已关闭：{reason}', { reason: msg.reason }) : t('同盟已关闭'), 'warn');
   });
-  // 项目 6 (房间音效, 2026-10-16): the 开始模拟 sound. The room screen is already gone when a match begins, so the first
-  // snapshot of a fresh match plays it — once per match id (a reconnect restores the same id and stays silent).
-  // 2026-10-16: 维护者要求先去掉这些音效（保留实现）⇒ 走 ui/roomCues.js 的总开关。
-  let startCuedMatch = null;
   net.on('m.public', (msg) => {
     matchAt = Date.now();
     store.patch('match', { public: payload(msg) });
     if (store.get().ui.resumed) store.patch('ui', { resumed: false });
     maybeFinishRestore();
-    if (ROOM_CUES_ENABLED && (msg?.round ?? 1) <= 1 && msg?.matchId && msg.matchId !== startCuedMatch) {
-      startCuedMatch = msg.matchId;
-      audio.sfx('start');
-    }
   });
   net.on('m.private', (msg) => { matchAt = Date.now(); store.patch('match', { private: payload(msg) }); });
   net.on('m.layer', (msg) => {

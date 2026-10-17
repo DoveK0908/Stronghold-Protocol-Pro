@@ -229,7 +229,7 @@ export function leaderHitCancelled(battle, target, amount) {
 }
 
 /**
- * 限伤, the room's experimental soft cap (`bossHitSoftCap`, 项目 7): a hit the official rules above would cancel lands
+ * 限伤, the room's experimental soft cap (`bossHitSoftCap`, 项目 5): a hit the official rules above would cancel lands
  * capped at BOSS_HIT_LIMIT − 1 (299999) instead of disappearing — the `hitCap` fx is still emitted (the client learned
  * the 限伤 happened), the damage number is the capped one. The official behaviour is untouched while the option is off.
  */

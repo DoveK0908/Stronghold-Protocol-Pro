@@ -16,7 +16,7 @@ export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
   newBattle(opts, { preview = false } = {}) {
     const full = { data: this.ds, content: this.battleContent, logger: this.log, ...opts,
-      // room experiment (项目 7): 限伤 caps at 299999 instead of cancelling the hit
+      // room experiment (项目 5): 限伤 caps at 299999 instead of cancelling the hit
       ...(this.experimental?.bossHitSoftCap === true ? { bossHitSoftCap: true } : {}),
       ...(preview ? { logger: {}, quiet: true } : {}) };
     try {
