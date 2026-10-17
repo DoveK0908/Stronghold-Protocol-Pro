@@ -21,6 +21,7 @@ import { GEO } from '../../shared/constants.js';
 import { getData } from '../../server/data.js';
 import { leaderHitCancelled } from '../../server/sim/damage.js';
 import { abOf } from '../../server/sim/content/enemies.js';
+import { getDefaultSource } from '../../server/sim/simdata.js';
 
 const DATA = getData({ log: { warn() {}, error() {}, info() {} } });
 const LIMIT = BOSS_HIT_LIMIT;
@@ -154,6 +155,34 @@ test('限伤: a leader\'s hit of 299999 lands, 300000 deals 0 — nothing credit
   assert.equal(b.dealDamage(op, leader, { amount: 5e6, type: 'true' }), 0, 'a whole pool in one hit is cancelled too');
   assert.ok(leader.alive);
   assert.equal(pool.hp, 5e6 - (LIMIT - 1));
+});
+
+test('限伤 soft cap (项目 7, `bossHitSoftCap`): the same hit lands at 299999 instead of being cancelled', () => {
+  const pool = new SharedBossPool(5e6);
+  const { h, b, leader, op } = hitField({ pool });
+  // the room option reaches the battle through the spec (buildBattleSpec / createBattleFromSpec)
+  const spec = buildBattleSpec({ kind: 'boss', seed: 7, bossHitSoftCap: true });
+  assert.equal(spec.bossHitSoftCap, true);
+  assert.equal(buildBattleSpec({ kind: 'boss', seed: 7 }).bossHitSoftCap, undefined, 'the flag stays off the wire by default');
+  const capped = createBattleFromSpec(spec, getDefaultSource(), { quiet: true, recordEvents: false });
+  assert.equal(capped.bossHitSoftCap, true);
+  // the pipeline itself
+  b.bossHitSoftCap = true;
+  const hp0 = leader.hp;
+  assert.equal(b.dealDamage(op, leader, { amount: LIMIT, type: 'true' }), LIMIT - 1, 'capped at 299999, not 0');
+  assert.equal(leader.hp, hp0 - (LIMIT - 1), 'the leader lost exactly the cap');
+  assert.equal(pool.hp, 5e6 - (LIMIT - 1), 'the shared pool took the capped hit');
+  assert.equal(pool.byPlayer.get('P'), LIMIT - 1);
+  assert.equal(op.stats.dmg, LIMIT - 1, 'the damage stat counts the capped hit');
+  assert.equal(b._pp('P').bossDamage, LIMIT - 1);
+  const ev = capEvents(h);
+  assert.equal(ev.length, 1, 'the 限伤 still fires (the client learns it happened)');
+  assert.deepEqual([ev[0][4].id, ev[0][4].n], [leader.id, LIMIT], 'the fx still reports the original amount');
+  assert.equal(b.dealDamage(op, leader, { amount: 5e6, type: 'true' }), LIMIT - 1, 'a whole-pool hit is capped too');
+  // a hit below the line is untouched by the cap, and cancelling is still what the default does
+  assert.equal(b.dealDamage(op, leader, { amount: 1234, type: 'true' }), 1234);
+  b.bossHitSoftCap = false;
+  assert.equal(b.dealDamage(op, leader, { amount: LIMIT, type: 'true' }), 0, 'off = the official cancel');
 });
 
 test('限伤: the check is ceil(final damage) — 299999.2 rounds up to the line and is cancelled, 299999 exactly lands', () => {

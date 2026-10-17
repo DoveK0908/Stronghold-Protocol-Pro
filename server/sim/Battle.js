@@ -111,6 +111,8 @@ export class Battle {
       this.flags[k] = this.flags[k] != null && Number.isFinite(v) && v >= 0 ? v : DP_DEFAULTS[k];
     }
     this.sharedBoss = opts.sharedBoss ?? null;
+    /** 限伤 soft cap (experimental `bossHitSoftCap`): a hit the official rules would cancel lands at BOSS_HIT_LIMIT − 1. */
+    this.bossHitSoftCap = opts.bossHitSoftCap === true;
     this.routes = (opts.routes ?? []).map((r) => normalizeRoute(r));
     /** Per-template enemy overrides `{ [enemyKey]: { stats: {…partial} } }` (waves.json `overrides`). */
     this.enemyOverrides = opts.enemyOverrides ?? {};

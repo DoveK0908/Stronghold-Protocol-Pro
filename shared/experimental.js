@@ -5,14 +5,16 @@ import { isPlayerCapacity, roomCapacity } from './playerCapacity.js';
 export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disableSharedPool: false });
 
 // Optional rules with their own defaults: a room that never mentions one keeps the ordinary two-flag wire shape
-// (legacy DTOs, matchmaking offers and stored rooms are unaffected). Unlike the two rules above they are
-// presentation/runtime switches, not combat rules:
+// (legacy DTOs, matchmaking offers and stored rooms are unaffected). Mostly presentation/runtime switches, plus one
+// combat rule the owner asked to keep explicit:
 //   briefingSpecialEnemies  the strategy draft also shows 本局特训敌人 — **on by default** (the owner, 2026-10-16);
 //                           a room that wants the old behaviour stores an explicit `false`
 //   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
-export const EXPERIMENTAL_OPTIONAL = Object.freeze(['briefingSpecialEnemies', 'luckConsole']);
-export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ briefingSpecialEnemies: true, luckConsole: false });
-const OPTIONAL_TAGS = Object.freeze({ briefingSpecialEnemies: 'brief', luckConsole: 'luck' });
+//   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 7,
+//                           off by default: the official rule stays the default)
+export const EXPERIMENTAL_OPTIONAL = Object.freeze(['briefingSpecialEnemies', 'luckConsole', 'bossHitSoftCap']);
+export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ briefingSpecialEnemies: true, luckConsole: false, bossHitSoftCap: false });
+const OPTIONAL_TAGS = Object.freeze({ briefingSpecialEnemies: 'brief', luckConsole: 'luck', bossHitSoftCap: 'cap' });
 
 /** The switch's value as the game reads it: the stored boolean, or the option's own default when absent. */
 export function optionalValue(value, key) {
@@ -40,7 +42,7 @@ export function isExperimental(value) {
   });
 }
 
-/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, briefingSpecialEnemies?: boolean, luckConsole?: boolean }} [value] */
+/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, briefingSpecialEnemies?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean }} [value] */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);

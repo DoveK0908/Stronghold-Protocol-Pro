@@ -831,6 +831,14 @@ passed the shields; a handler may only lower `amount` — the 伤判效果 that 
 (boss units: routed to `sharedBoss.damage(playerId, amount)`; a pool left under 1 HP is emptied) → if HP ≤ 0: **`fatal`** (`ctx.prevented = true` keeps the
 unit at ≥ 1 HP) → **`damaged`** → SP-on-hurt / TAKE_DAMAGE → `kill` + `death`.
 
+**限伤 soft cap** (the room option `bossHitSoftCap`, 项目 7, `leaderHitCapped`): a room may replace that cancel with a cap —
+the very same hit then lands at `BOSS_HIT_LIMIT − 1` (299999), so HP / pool loss, credit, stats, the `dmg` event, the
+shields after it and the `damaged` / `fatal` / kill chain all happen with the capped amount; the `hitCap` fx still fires
+(it reports the original `ceil(final)`). Off by default — the official cancel stays the default, and every golden scenario
+is unchanged. The switch travels in the battle spec (`buildBattleSpec` reads `bossHitSoftCap: true`;
+`createBattleFromSpec` hands it to `Battle.bossHitSoftCap`), so a browser-run boss field (`_ccField`) and a server-run one
+(`MatchCombat.newBattle`) behave the same.
+
 `battle.heal(source, target, amount, { overheal=false, self, silent, regen, ignoreHealFree })`: no-op on `noHeal` targets
 (unless self — 禁疗 / 孤立 summons carry the flag, §3) and on `healFree` ones, self included (史尔特尔's 余烬), unless `regen`
 (an HP-regen attribute tick) or `ignoreHealFree` (a heal that "无视禁疗"); a healer whose profile names the target in

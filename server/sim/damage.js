@@ -217,11 +217,26 @@ export function mitigate(amount, type, target, ign = {}) {
  * Battle.loseHp, except the 胄 drone link's pool share: `noHitLimit`, DESIGN §25.13.4); element 损伤 (gauge fill,
  * 'element') removes no HP and is never checked. Deterministic (Math.ceil of the same double on every engine).
  */
-export function leaderHitCancelled(battle, target, amount) {
+export function leaderHitLimited(battle, target, amount) {
   if (!(BOSS_HIT_LIMIT > 0) || !target || !target.isBoss || (battle.kind !== 'boss' && battle.kind !== 'hidden')) return false;
-  if (!(Math.ceil(amount) >= BOSS_HIT_LIMIT)) return false;
+  return Math.ceil(amount) >= BOSS_HIT_LIMIT;
+}
+
+export function leaderHitCancelled(battle, target, amount) {
+  if (!leaderHitLimited(battle, target, amount)) return false;
   battle.fx('hitCap', { x: target.x, y: target.y, id: target.id, n: Math.ceil(amount) });
   return true;
+}
+
+/**
+ * 限伤, the room's experimental soft cap (`bossHitSoftCap`, 项目 7): a hit the official rules above would cancel lands
+ * capped at BOSS_HIT_LIMIT − 1 (299999) instead of disappearing — the `hitCap` fx is still emitted (the client learned
+ * the 限伤 happened), the damage number is the capped one. The official behaviour is untouched while the option is off.
+ */
+export function leaderHitCapped(battle, target, amount) {
+  if (!leaderHitLimited(battle, target, amount)) return amount;
+  battle.fx('hitCap', { x: target.x, y: target.y, id: target.id, n: Math.ceil(amount) });
+  return BOSS_HIT_LIMIT - 1;
 }
 
 /**
@@ -370,8 +385,12 @@ export function dealDamage(battle, source, target, dmgIn) {
   // hpDamage (PRTS can show a number that differs from the HP delta; [ASSUMED] the shown value stays that integer).
   const mark = officialDamageMark(final, officialExpectedAmount(dmg, type, ts, target));
   // 限伤: a leader's hit of ≥ BOSS_HIT_LIMIT in a boss / hidden battle is cancelled before it reaches shields / HP — what
-  // ran before it (the attack, its SP, `hit` hook effects, separate element 损伤) stays; nothing after it happens
-  if (final > 0 && leaderHitCancelled(battle, target, final)) return 0;
+  // ran before it (the attack, its SP, `hit` hook effects, separate element 损伤) stays; nothing after it happens.
+  // The room's experimental soft cap (`bossHitSoftCap`) caps such a hit at BOSS_HIT_LIMIT − 1 instead of dropping it.
+  if (final > 0) {
+    if (battle.bossHitSoftCap === true) final = leaderHitCapped(battle, target, final);
+    else if (leaderHitCancelled(battle, target, final)) return 0;
+  }
   final = absorbShields(battle, target, final, type);
   // 伤判效果 after the barriers (header): a handler may lower what reaches the HP — never raise it (a 流失 skips this)
   if (final > 0 && battle._hooks.hpDamage) {

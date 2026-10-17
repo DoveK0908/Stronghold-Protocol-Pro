@@ -30,6 +30,7 @@ export function experimentalSummary(input) {
   let rules = options.disableDuckLord ? `${summary} · ${t('禁用鸭爵策略')}` : summary;
   if (options.briefingSpecialEnemies === false) rules = `${rules} · ${t('策略阶段不看特训敌人')}`;
   if (options.luckConsole) rules = `${rules} · ${t('测试插件')}`;
+  if (options.bossHitSoftCap === true) rules = `${rules} · ${t('限伤改为封顶')}`;
   return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
 }
 
@@ -90,6 +91,11 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <span><strong>${t('Luck 测试插件')}</strong><small>${t('开局后允许打开 Luck 测试面板（改资金、回合、地图、盟约层数等）；不勾选则完全不加载。')}</small></span>
         <input id="experimental-luck-console" type="checkbox" role="switch" checked=${options.luckConsole === true}
           disabled=${!editable || busy} onChange=${e => change('luckConsole', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-hit-softcap">
+        <span><strong>${t('限伤改为封顶')}</strong><small>${t('默认关闭：开着时，本会被限伤取消的那一下不再掉 0，而是按 29 万 9999 结算（打首领的大伤害不再白打）。')}</small></span>
+        <input id="experimental-hit-softcap" type="checkbox" role="switch" checked=${options.bossHitSoftCap === true}
+          disabled=${!editable || busy} onChange=${e => change('bossHitSoftCap', e.currentTarget.checked)} />
       </label>` : null}
     </div>
     <p class="experimental-options__note">${editable ? t('开局后不可更改') : t('由房间创建者设置')}</p>
