@@ -85,7 +85,7 @@ test('shipped announcement data validates; optional board is mounted from the lo
   assert.match(board, /ariaLabel=\$\{t\('大厅公告板'\)\} trapFocus=\$\{true\}/);
 });
 
-test('this deployment ships no notices (the maintainer cleared the board on 2026-10-16); an empty board never auto-opens', () => {
+test('this deployment ships no notices (the maintainer cleared the board on 2026-10-16); the boards entry is hidden with it and an empty board never auto-opens', () => {
   const entries = parseAnnouncements(JSON.parse(source('../../data/announcements.json')));
   assert.deepEqual(entries, []);
   const lobby = source('../../public/js/screens/lobby.js'), board = source('../../public/js/ui/announcements.js');
@@ -94,13 +94,14 @@ test('this deployment ships no notices (the maintainer cleared the board on 2026
   assert.match(lobby, /if \(online && !queued && !busy && !pendingJoin && overlay == null && announcements\.revision/);
 });
 
+
 test('announcements omit contacts and infrastructure; the lobby owns the copyable group number', () => {
   const entries = parseAnnouncements(JSON.parse(source('../../data/announcements.json')));
   const text = entries.flatMap(entry => entry.paragraphs).join('\n');
-  // 维护者 2026-10-16 清空了本服的公告内容，所以这里没有联系人；不变的是：群号只属于大厅那个常量
+  // 本部署不发布公告（维护者 2026-10-16 清空），所以公告里既没有联系人也没有基础设施；
+  // 群号只属于大厅那个常量，不随公告出现。
   assert.deepEqual([...text.matchAll(/QQ\s*(\d+)/g)].map(m => m[1]), []);
   assert.doesNotMatch(text, /QQ|群号|243859707|815818430|2225664821|coordinator|ingress|Worker|WireGuard|ModelScope|OpenI|\b\d{1,3}(?:\.\d{1,3}){3}\b/);
-
   assert.match(source('../../public/js/ui/lobbyFeedback.js'), /FEEDBACK_GROUP = '243859707'/);
 });
 

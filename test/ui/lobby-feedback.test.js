@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { FEEDBACK_GROUP, copyFeedbackGroup } from '../../public/js/ui/lobbyFeedback.js';
+import { FEEDBACK_BOARD, STATUS_BOARD } from '../../public/js/ui/siteBoards.js';
 
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
@@ -20,13 +21,22 @@ for (const mode of ['unavailable', 'denied']) test(`lobby feedback ${mode} does 
   assert.deepEqual(messages, [['复制失败，请手动复制', 'warn']]);
 });
 
-test('this deployment hides the lobby feedback chip (the maintainer, 2026-10-16); the copy path stays intact', () => {
+test('this deployment hides the feedback group (243859707 is the upstream site\'s) and keeps the copy path', () => {
   const lobby = source('../../public/js/screens/lobby.js'), feedback = source('../../public/js/ui/lobbyFeedback.js');
-  // 仍然挂在 hub-contact 里，只是组件本身不画东西 —— 要恢复，把 LobbyFeedback 的 return null 换回那个按钮即可
-  assert.match(lobby, /<div class="hub-contact"><\$\{LobbyFeedback\} \/>/);
-  assert.match(feedback, /export function LobbyFeedback\(\) \{\n  return null;\n\}/);
-  assert.doesNotMatch(feedback, /href=|window\.open|2225664821|net\.request|localStorage/);
+  assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\} \/><\$\{SiteBoards\} \/><\/div>/);
+  assert.match(feedback, /export function LobbyFeedback\(\) \{\n\s*return null;\n\}/);
+  assert.match(feedback, /FEEDBACK_GROUP = '243859707'/);
   assert.match(feedback, /copied \? 'success' : 'warn'/);
+  assert.doesNotMatch(feedback, /href=|window\.open|2225664821|net\.request|localStorage/);
   const css = source('../../public/css/screens/lobby.css');
   assert.match(css, /\.lobby-feedback \{[^}]*min-height: 40px/);
+});
+
+test('this deployment hides the feedback board and the status page (the maintainer, 2026-10-17); the entry points stay in the module', () => {
+  assert.equal(FEEDBACK_BOARD, '/feedback/');
+  assert.equal(STATUS_BOARD, '/monitor/');
+  const boards = source('../../public/js/ui/siteBoards.js');
+  assert.match(boards, /export function SiteBoards\(\) \{\n\s*return null;\n\}/);
+  assert.doesNotMatch(boards, /<a class="btn/);
+  assert.match(source('../../public/css/screens/lobby.css'), /\.hub-board \{[^}]*min-height: 40px/);
 });
