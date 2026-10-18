@@ -145,7 +145,8 @@ export function copyAssignmentSpec(input, fallbackAssignmentId) {
       }
       seat.diy = diy;
     }
-    if (s.skins !== undefined) {
+    // null is the lobby's "this seat has no skin selection" (docs/SKINS.md), not a map to admit
+    if (s.skins !== undefined && s.skins !== null) {
       // isSkinSelection takes plain objects only (shared/protocol.js isPlain, docs/SKINS.md), so the copied
       // assignment DTO always carries a plain map even when the admitted input had a null prototype.
       const skins = { ...dataRecord(s.skins, undefined, SKIN_LIMITS.entries) };

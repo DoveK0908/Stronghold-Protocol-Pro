@@ -143,6 +143,9 @@ export class MatchViews {
         bandId: ps.bandId,
         // the core bond the player announced it means to build (g.bondPlan; display only, kept the whole match), else null
         bondPlan: ps.bondPlan ?? null,
+        // 皮肤 (docs/SKINS.md): the choice is PUBLIC (a teammate sees your skin, PlayerState.skins); omitted when empty
+        // so a payload without appearances stays byte-identical to a vanilla one
+        ...(Object.keys(ps.skins).length ? { skins: { ...ps.skins } } : {}),
         shopLevel: ps.shop.level,
         boardCount: ps.deployCount,
         ready: this.phase === PHASE.INFO_CHECK ? ps.infoReady : ps.ready,

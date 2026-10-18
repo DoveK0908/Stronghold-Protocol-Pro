@@ -192,7 +192,7 @@ export async function createFieldView(host, options = {}) {
   signal?.throwIfAborted();
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);
-  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoCount: false, mysticEnergy: false, quality: 'high', officialFx: 'auto', ...(opts.settings || {}) };
+  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoCount: false, mysticEnergy: false, quality: 'high', officialFx: 'auto', otherSkins: true, ...(opts.settings || {}) };
   // the 3D board (three.js + the official art) loads in parallel with everything else
   const boardPref = boardPreference(opts.board);
   const want3d = boardPref !== '2d' && webgl2Available(boardPref === '3d');
@@ -347,7 +347,6 @@ export async function createFieldView(host, options = {}) {
   let ownPen = null;          // the own m.private.nextEnemies (fallback composition of a scouted teammate's pen)
   let standInList = [];       // the own m.private.standIns (0.2.0 补位): pieces of these chess draw the stand-in
   let diyPicks = {};          // the own m.private.diy (0.2.0 自选编队): pieces of these DIY slots draw the operator
-  let skinChoices = {};      // the match's admitted own appearances, never the viewer's browser preferences
   let camBeforePen = null;    // { kind, opts } the camera the pen returns to
   let leader = null;          // { key, view, stand, area } the round leader standing on the boss field in the prep (setLeader)
   let leaderHidden = true;    // shown only by the boss-field prep camera (leaderShown)
@@ -356,6 +355,7 @@ export async function createFieldView(host, options = {}) {
   const ctx = {
     P, layers, assets, settings, fx: null, shadowTex: shadowTexture(),
     audio: opts.audio || null,   // the prep landings' sound (UnitView.land → audio.deployCue)
+    myPlayerId: null,            // set by the field host (view.setMe): whose pieces this page's viewer owns
     cam: () => cam, heightAt,
     animRate: () => (mode === 'battle' ? interp.rate : 1),
     timeScale: () => (mode === 'battle' ? interp.rate : 1),
@@ -797,9 +797,10 @@ export async function createFieldView(host, options = {}) {
     const pick = chess && chess.isDiy ? diyPicks[chess.baseId || chess.chessId] : null;
     const dr = pick ? data.diy(piece.id, pick) : null;
     const rec = si || dr || chess;
-    const skin = skinChoices[rec?.charId || rec?.assets?.spine] || null;
     return {
-      ...(skin ? { skin } : null),
+      // display only (docs/SKINS.md): the appearance the server resolved for this piece (pieceView's `skin`), so the own
+      // board / hand / 临时整备区 draw it before the first battle
+      skin: piece.skin || null,
       kind: 'op', side: 'ally', defId: piece.id,
       spine: rec?.assets?.spine || rec?.charId || null, avatar: rec?.assets?.avatar || rec?.charId || null,
       tier: chess?.tier || piece.tier || 1, golden: !!(piece.golden || chess?.isGolden), dir,
@@ -855,7 +856,6 @@ export async function createFieldView(host, options = {}) {
     const src = ps && typeof ps === 'object' ? ps : {};
     standInList = Array.isArray(src.standIns) ? src.standIns.filter((x) => typeof x === 'string') : [];
     diyPicks = src.diy && typeof src.diy === 'object' ? src.diy : {};
-    skinChoices = src.skins && typeof src.skins === 'object' ? src.skins : {};
     ownPen = Array.isArray(src.nextEnemies) ? src.nextEnemies : null;
     setPenList(ownPen);
     addList(src.hand, 'hand');
@@ -887,7 +887,7 @@ export async function createFieldView(host, options = {}) {
       e.key = key;
       const info = pieceInfo(e.piece, e.area);
       // (the model is part of it: a piece whose body changes — a merge, an own 补位 / 自选 setting arriving — is rebuilt)
-      const sig = `${info.kind}|${info.defId}|${info.golden ? 1 : 0}|${info.spine || ''}|${info.skin || ''}`;
+      const sig = `${info.kind}|${info.defId}|${info.golden ? 1 : 0}|${info.spine || ''}` + (info.skin ? `|${info.skin}` : '');
       let v = views.get(key);
       if (v && v._sig !== sig) { dropView(key); v = null; }
       const w = slotWorld(e);
@@ -1013,6 +1013,13 @@ export async function createFieldView(host, options = {}) {
     for (const u of units) {
       const info = u && Number.isInteger(u.uid) ? renderInfo({ ...u, id: `m:${u.uid}` }) : null;
       if (!info) continue;
+      // 设置「显示其他玩家的皮肤」 (docs/SKINS.md): these are another seat's pieces (a boss pair's partner half) or this
+      // player's own reserve medic, so the switch clears the skin of the ones this page does not own — the same rule
+      // applyInfo applies to a battle unit, and without it the partner's pieces kept their appearance while the switch
+      // was off. `skin` is part of the signature for the same reason it is in setPrep's: a view already up draws the
+      // model its info named when it was built (render/units.js `_modelEntry` reads it once). Unlike that one this
+      // signature is not pinned by a test, so the skin sits inside the template.
+      info.skin = shownSkin(info);
       keep.add(info.id);
       const sig = `${info.defId}|${info.golden ? 1 : 0}|${info.spine || ''}|${info.skin || ''}|${info.x},${info.y}|${info.dir || ''}|${(info.items || []).join(',')}`;
       let v = views.get(info.id);
@@ -1534,7 +1541,7 @@ export async function createFieldView(host, options = {}) {
     tiles.setBattleRect(rect);
     board3d?.setBattleRect(rect);
     for (const u of Array.isArray(meta.units) ? meta.units : []) {
-      const info = addInfo(u);
+      const info = applyInfo(u);
       if (info && battleMeta.prep) info._look = scoutLook(u);
     }
     // the official effects of this battle's units load now (the prep → battle switch), the board's heights for their
@@ -1546,10 +1553,73 @@ export async function createFieldView(host, options = {}) {
     return true;
   }
 
-  function addInfo(u) {
+  /**
+   * The appearance a view of this unit draws (docs/SKINS.md), from a given preference.
+   *
+   * 设置「显示其他玩家的皮肤」 (off = this client draws every other player's piece on the operator's own model): a unit
+   * another seat owns loses its skin — `ownerId` is on every UnitInfo, and a unit of no owner (a stage device, an
+   * enemy) has none to lose. The asymmetry is deliberate: what you draw is your choice, what others draw is theirs, so
+   * turning it off hides THEIR appearance from YOU and never changes what they see.
+   */
+  const skinOf = (info, myId, otherSkins) => {
+    // Keep the received choice intact across settings changes. A running battle's metadata may predate room.skins;
+    // [ASSUMED] the latest public choice wins for operator bodies (including stand-ins / DIY), purely in this view.
+    let skin = info.sourceSkin === undefined ? info.skin : info.sourceSkin;
+    if (info.kind === 'op' && playerSkins.has(info.ownerId)) {
+      skin = playerSkins.get(info.ownerId)[info.diy?.charId || info.spine] || null;
+    }
+    if (!skin) return null;
+    if (info.ownerId == null || !myId || info.ownerId === myId) return skin;
+    return otherSkins ? skin : null;
+  };
+  const playerSkins = new Map();
+  let skinSelectionKey = null;
+  const shownSkin = (info) => skinOf(info, ctx.myPlayerId, settings.otherSkins);
+
+  /**
+   * Register a battle unit's info (a 'spawn' event, `m.field` / fieldMeta units) and keep its view honest: a changed
+   * appearance (the owner switched skin mid-match, or the preference above was toggled) drops the view, so the next
+   * battleView builds it on the model the info now names — the skin is part of a view's model, its picture and its
+   * Front/Back pair, none of which changes under a view that is already up (render/units.js `_wantsBack` /
+   * `_pictureUrl` read `info` once per view).
+   */
+  function applyInfo(u) {
     const info = renderInfo(u);
-    if (info) infos.set(info.id, info);
+    if (!info) return null;
+    info.sourceSkin = u.sourceSkin === undefined ? info.skin : u.sourceSkin;
+    const skin = shownSkin(info);
+    const prev = infos.get(info.id);
+    if (prev && prev.skin !== skin) dropView(info.id);
+    info.skin = skin;
+    infos.set(info.id, info);
     return info;
+  }
+
+  /** The player whose pieces are this page's own (docs/SKINS.md): late (the view may be built before `welcome`). */
+  function setMe(playerId) {
+    const id = typeof playerId === 'string' && playerId ? playerId : null;
+    if (ctx.myPlayerId === id) return;
+    ctx.myPlayerId = id;
+    refreshSkins();
+  }
+
+  /** Apply public choices to existing and future units without changing the battle or restarting its playback. */
+  function setSkins(players) {
+    const key = JSON.stringify((players || []).map((p) => [p.playerId, p.skins || {}]));
+    if (key === skinSelectionKey) return;
+    skinSelectionKey = key;
+    playerSkins.clear();
+    for (const p of players || []) if (p?.playerId) playerSkins.set(p.playerId, p.skins || {});
+    refreshSkins();
+  }
+
+  function refreshSkins() {
+    for (const [id, info] of infos) {
+      const next = shownSkin(info);
+      if (next !== info.skin) { dropView(id); info.skin = next; }
+    }
+    // Boss partners use read-only prep views rather than infos. Reapply their signatures immediately too.
+    if (mode === 'prep' && lastPrep) setPrep(lastPrep.ps, lastPrep.o);
   }
 
   /** A scouted board's UnitInfo without its tile: equal ⇒ the piece's view is kept when the board is sent again. */
@@ -1607,7 +1677,7 @@ export async function createFieldView(host, options = {}) {
     let fresh = null;
     for (const e of list) {
       if (!Array.isArray(e) || e[0] !== 'spawn') continue;
-      const info = addInfo(e[1]);
+      const info = applyInfo(e[1]);
       if (info && views.get(info.id)?._unknown) dropView(info.id);
       if (info && ofx.active) (fresh || (fresh = [])).push({ id: info.id, info });
     }
@@ -1656,7 +1726,7 @@ export async function createFieldView(host, options = {}) {
   function handleEvent(e, now) {
     switch (e[0]) {
       case 'spawn': {
-        const info = addInfo(e[1]);
+        const info = applyInfo(e[1]);
         if (!info) break;
         gone.delete(info.id);
         const v = battleView(info.id);
@@ -1896,7 +1966,7 @@ export async function createFieldView(host, options = {}) {
 
   function createUnknown(id, s) {
     if (infos.has(id)) return null;
-    addInfo({ id, kind: 'enemy', side: 'enemy', defId: null, x: s.x, y: s.y, maxHp: s.maxHp });
+    applyInfo({ id, kind: 'enemy', side: 'enemy', defId: null, x: s.x, y: s.y, maxHp: s.maxHp });
     infos.get(id)._unknown = true;
     const v = battleView(id);
     if (v) v._unknown = true;
@@ -2103,6 +2173,8 @@ export async function createFieldView(host, options = {}) {
     setStage,
     setCamera,
     setPrep,
+    setMe,
+    setSkins,
     replayDeploys,
     /** Enemy preview pen: a list in m.private.nextEnemies shape, or null to empty it (setPrep does this itself). */
     setPen(list) { if (destroyed) return false; setPenList(Array.isArray(list) ? list : null); return true; },
@@ -2220,6 +2292,7 @@ export async function createFieldView(host, options = {}) {
       if (typeof s.mysticEnergy === 'boolean') settings.mysticEnergy = s.mysticEnergy;   // likewise
       if (s.quality === 'high' || s.quality === 'medium' || s.quality === 'low') settings.quality = s.quality;
       if (typeof s.officialFx === 'string' && s.officialFx !== settings.officialFx) { settings.officialFx = s.officialFx; syncOfficialFx(); }
+      if (typeof s.otherSkins === 'boolean' && s.otherSkins !== settings.otherSkins) { settings.otherSkins = s.otherSkins; refreshSkins(); }
       if (q !== settings.quality) { board3d?.setQuality?.(settings.quality); resize(); }
     },
     resize,

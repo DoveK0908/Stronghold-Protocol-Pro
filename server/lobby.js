@@ -2010,7 +2010,9 @@ export class Lobby {
         notOwned: own ? own.notOwned : null,
         // 0.2.0 自选编队: the human's checked DIY picks (bots field no 自选 piece [ASSUMED])
         diy: own ? own.diy : null,
-        skins: Object.freeze({ ...(s.isBot ? {} : s.skins || {}) }),
+        // 干员皮肤 (docs/SKINS.md): the appearances the human wears, keyed by operator charId (a bot fields every
+        // operator on its default model, and `null` is what the match reads as "nothing chosen")
+        skins: s.isBot ? null : Object.freeze({ ...(s.skins || {}) }),
         // room.setBotBand: an AI seat's designated strategy (absent when it picks by itself)
         ...(s.isBot && s.band ? { band: s.band } : {}),
       };

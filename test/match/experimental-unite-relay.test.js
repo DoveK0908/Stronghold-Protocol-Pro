@@ -255,7 +255,9 @@ test('second-round downed/HP/SP carry and skins are original helper-owned, never
   assert.equal(inputs.get('p_3').skin, skins[0].id); assert.equal(inputs.get('p_4').skin, skins[1].id);
   const uidBefore = m.uidSeq; m.addSpectator('observer'); m.onReconnect('p_0');
   assert.equal(m.uidSeq, uidBefore);
-  assert.equal(JSON.stringify(m.publicView()).includes('skins'), false);
+  // 皮肤 (docs/SKINS.md): a seat's appearance is PUBLIC on purpose (a teammate draws it); an observer carries none
+  assert.equal(m.publicView().players.find(p => p.playerId === 'p_3').skins.char_103_angel, skins[0].id);
+  assert.equal(m.publicView().players.some(p => p.playerId === 'observer'), false);
   const observer = h.lastTo('observer', 'b.start');
   assert.equal(observer.spec.players.find(p => p.playerId === 'p_3').units[0].skin, skins[0].id);
   assert.equal(observer.authoritative, false); assert.equal(h.lastTo('observer', 'm.private'), null);
