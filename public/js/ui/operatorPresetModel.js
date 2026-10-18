@@ -3,7 +3,7 @@ import { parseImport, parseStored, parseStoredOps, sanitizeEntries, sanitizeOps,
 import { parseOwnershipImport, cleanIds, sanitizeNotOwned, OWNERSHIP_EXPORT_KIND } from './ownershipModel.js';
 import { parseDiyImport, cleanPicks, sanitizeDiyPicks, DIY_EXPORT_KIND } from './diyModel.js';
 import { parseSkinImport, SKINS_EXPORT_KIND } from './skinsModel.js';
-import { cleanSkinChoices } from '../../../shared/skins.js';
+import { parseStoredSkins } from './skins.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds } from '../../../shared/protocol.js';
 import { N_ } from '../../../shared/i18n.js';
 
@@ -19,7 +19,7 @@ export function operatorPresetPayload(state, { now = Date.now() } = {}) {
   return { kind: OPERATOR_PRESET_KIND, v: OPERATOR_PRESET_VERSION,
     exportedAt: new Date(Number.isFinite(now) ? now : Date.now()).toISOString(),
     entries: parseStored(state?.entries), notOwned: cleanIds(state?.notOwned),
-    diy: cleanPicks(state?.diy), skins: cleanSkinChoices(state?.skins),
+    diy: cleanPicks(state?.diy), skins: parseStoredSkins(state?.skins),
     ...(own(state || {}, 'ops') ? { ops: parseStoredOps({ ops: state.ops }) } : {}) };
 }
 export const serializeOperatorPreset = (state, opts) => JSON.stringify(operatorPresetPayload(state, opts), null, 2);
@@ -97,7 +97,7 @@ export function prepareOperatorPreset(parsed, { lookup, data, kitted } = {}) {
       const legal = Object.entries(raw).some(([id, value]) => checkLoadoutOps({ [id]: value }, isOperator).ok);
       if (asked && !kept && !legal) return fail(N_('这份预设包含当前版本不可用的配置，未做任何改动'));
     } else {
-      asked = Object.keys(raw).length; clean = cleanSkinChoices(raw); kept = Object.keys(clean).length;
+      asked = Object.keys(raw).length; clean = parseStoredSkins(raw); kept = Object.keys(clean).length;
     }
     if (key !== 'entries' && key !== 'ops' && asked && !kept) return fail(N_('这份预设包含当前版本不可用的配置，未做任何改动'));
     patch[key] = clean; counts[key] = kept; dropped += Math.max(0, asked - kept);

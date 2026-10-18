@@ -206,8 +206,8 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
           const items = mb.granted && Array.isArray(mb.items) ? mb.items : null;
           const record = si || (mb.diy ? mb.rec : getChess(mb.id));
           const visible = [...(priv?.board || []), ...(priv?.hand || []), ...(priv?.temp || [])].find(p => p && (p.id === mb.id || rawChess(p.id)?.baseId === mb.id));
-          const art = visible?.skinId ? appearanceRecord(record, visible.skinId) : ownAppearance(record, priv);
-          const openMember = () => art?.skinId ? onMember?.(mb.id, items, si?.standInFor || null, mb.pick || null, art.skinId)
+          const art = visible?.skin ? appearanceRecord(record, visible.skin) : ownAppearance(record, priv);
+          const openMember = () => art?.skin ? onMember?.(mb.id, items, si?.standInFor || null, mb.pick || null, art.skin)
             : si ? onMember?.(mb.id, items, si.standInFor) : mb.pick ? onMember?.(mb.id, items, null, mb.pick) : onMember?.(mb.id, items);
           return html`<button key=${mb.id} type="button" class=${cx('bpop__member', mb.onBoard && 'is-on', mb.owned && !mb.onBoard && 'is-owned', mb.banned && 'is-banned', mb.granted && 'is-granted', si && 'is-standin')}
               onClick=${openMember}

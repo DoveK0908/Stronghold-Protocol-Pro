@@ -39,7 +39,7 @@
 // 领主's ranged-kind 'atk' on the enemy it blocks is its Combat blow (`_combatKind`); a sim-melee attack whose official
 // ability shoots flies its projectile for show (蒂比: `attack`); a chain's line stays CHAIN_LINE_S (`chain`).
 // Skins (feedback #22, index.json `skins[<catalogue id>]`, DESIGN §33.12): a unit whose info names a skin of its
-// operator (`info.skinId`) takes that skin's points (skinOf), plays its `replace` keys instead of the defaults — on itself
+// operator (`info.skin`) takes that skin's points (skinOf), plays its `replace` keys instead of the defaults — on itself
 // and, for its hits, on its targets (swap: the effect's owner, `o.by` / `o.flipFrom`) — and flies its fake projectiles'
 // graphic shot from the skin's muzzle point for the origin projectile (_fakeShot) [ASSUMED from the field names, as
 // the format says]; an index without them draws every skin with the default effects.
@@ -320,7 +320,7 @@ export class FxWiring {
    */
   skinOf(u, v = null) {
     if (!u || !this.idx) return null;
-    const id = v?.info?.skinId;
+    const id = v?.info?.skin;
     const s = typeof id === 'string' && id && Object.hasOwn(this.idx.skins, id) ? this.idx.skins[id] : null;
     if (s && s.char && this.idx.units[s.char] === u) return s;
     return u.skin ? this.idx.skins[u.skin] || null : null;

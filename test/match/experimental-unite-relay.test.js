@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
-import { OPERATOR_SKINS } from '../../shared/skins.js';
+import { MANIFEST_SKINS as OPERATOR_SKINS } from '../helpers/manifestSkins.js';
 import { Battle } from '../../server/sim/Battle.js';
 import { planUnite, planUniteRelay, uniteSurvivors } from '../../server/match/unite.js';
 import { FakeBattle } from './fakeBattle.js';
@@ -252,12 +252,14 @@ test('second-round downed/HP/SP carry and skins are original helper-owned, never
   const inputs = new Map(f.spec.players.map(p => [p.playerId, p.units[0]]));
   assert.deepEqual(inputs.get('p_3').carryState, { down: true });
   assert.deepEqual(inputs.get('p_4').carryState, { hpPct: 0.5, sp: 3 });
-  assert.equal(inputs.get('p_3').skinId, skins[0].id); assert.equal(inputs.get('p_4').skinId, skins[1].id);
+  assert.equal(inputs.get('p_3').skin, skins[0].id); assert.equal(inputs.get('p_4').skin, skins[1].id);
   const uidBefore = m.uidSeq; m.addSpectator('observer'); m.onReconnect('p_0');
   assert.equal(m.uidSeq, uidBefore);
-  assert.equal(JSON.stringify(m.publicView()).includes('skins'), false);
+  // 皮肤 (docs/SKINS.md): a seat's appearance is PUBLIC on purpose (a teammate draws it); an observer carries none
+  assert.equal(m.publicView().players.find(p => p.playerId === 'p_3').skins.char_103_angel, skins[0].id);
+  assert.equal(m.publicView().players.some(p => p.playerId === 'observer'), false);
   const observer = h.lastTo('observer', 'b.start');
-  assert.equal(observer.spec.players.find(p => p.playerId === 'p_3').units[0].skinId, skins[0].id);
+  assert.equal(observer.spec.players.find(p => p.playerId === 'p_3').units[0].skin, skins[0].id);
   assert.equal(observer.authoritative, false); assert.equal(h.lastTo('observer', 'm.private'), null);
   settle(h); assert.equal(m.uidSeq, uidBefore);
 });
@@ -342,7 +344,9 @@ test('sim unite leak ownership is helper-half pp, with original source attributi
   const opts = m._uniteOpts(m.unitePlan, 10);
   const b = new Battle({ ...opts, data: m.ds, content: 'none', logger: m.log, spawns: [] });
   const source = m.unitePlan.leakers[0].playerId;
-  const e = b.spawnEnemy(enemyKey, { pos: [9, 17], sourcePlayerId: source, ownerPlayerId: 'p_1' });
+  // _scheduled: this is a wave-sent enemy of the escaped field, not a runtime spawn (spawns.js:160 tags those
+  // uniteRuntime, which uniteSurvivors filters — a split child never crossed the source's goal).
+  const e = b.spawnEnemy(enemyKey, { pos: [9, 17], sourcePlayerId: source, ownerPlayerId: 'p_1', _scheduled: true });
   b._recordLeak(e, true); b.forceEnd('forced');
   const r = b.result();
   assert.equal(r.perPlayer.p_1.perfect, false);

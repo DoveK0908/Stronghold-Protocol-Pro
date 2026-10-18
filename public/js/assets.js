@@ -77,7 +77,7 @@ export function baseCharId(id) {
 export function avatarUrl(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const skin = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const skin = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (str(skin?.avatar)) return skin.avatar;
   const direct = get(get(m, 'chars'), s);
   let rec = direct, e2 = !!(opts && opts.e2);
@@ -90,12 +90,13 @@ export function avatarUrl(m, id, opts) {
   return null;
 }
 
-/** Operator half-body portrait (`_1` base, `_2` E2). */
+/** Operator half-body portrait (`_1` base, `_2` E2), a skin's own portrait when asked for (else its illustration). */
 export function portraitUrl(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const skin = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const skin = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (str(skin?.portrait)) return skin.portrait;
+  if (str(skin?.illustration)) return skin.illustration;
   let rec = get(get(m, 'chars'), s), e2 = !!(opts && opts.e2);
   if (!rec) {
     rec = get(get(m, 'chars'), baseCharId(s));
@@ -104,6 +105,28 @@ export function portraitUrl(m, id, opts) {
   if (!rec) return null;
   return str(e2 && rec.portraitE2) || str(rec.portrait) || null;
 }
+
+/** The illustration (立绘) of an operator or of one of its appearances (docs/SKINS.md). */
+export function illustUrl(m, id, opts) {
+  const s = str(id);
+  if (!s) return null;
+  const skin = appearanceEntry(m, baseCharId(s), opts?.skin);
+  if (str(skin?.illustration)) return skin.illustration;
+  const rec = get(get(m, 'chars'), s) || get(get(m, 'chars'), baseCharId(s));
+  return rec ? str(rec.illust) || null : null;
+}
+
+/** The manifest's shared empty skins map (one object, so callers can compare identity). */
+export const EMPTY_SKINS = Object.freeze({});
+
+/** The appearances of an operator the manifest holds (docs/SKINS.md, the picker's source), or EMPTY_SKINS. */
+export function skinsOf(m, charId) {
+  const rec = get(get(m, 'chars'), str(charId) || '');
+  return rec && isObj(rec.skins) ? rec.skins : EMPTY_SKINS;
+}
+
+/** Whether a skin record can be worn: it has a Spine model the client resolves (docs/SKINS.md). */
+export const skinHasModel = (skin) => !!skin && isObj(skin.spine) && typeof skin.spine.front === 'object' && skin.spine.front !== null && typeof skin.spine.front.skel === 'string';
 
 export function enemyIconUrl(m, enemyId) {
   const rec = get(get(m, 'enemies'), str(enemyId) || '');
@@ -171,11 +194,11 @@ const appearanceSpines = new WeakMap();
 export function spineEntry(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const appearance = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const appearance = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (appearance?.spine) {
     const sp = opts?.back && validSpine(appearance.spine.back) ? appearance.spine.back : appearance.spine.front;
     if (validSpine(sp)) {
-      const fallback = spineEntry(m, s, { ...opts, skinId: null });
+      const fallback = spineEntry(m, s, { ...opts, skin: null });
       const cached = appearanceSpines.get(sp);
       if (cached?.fallback === fallback) return cached.entry;
       const entry = { ...sp, fallback };
@@ -231,9 +254,10 @@ export function localSpineEntry(sl, local, web) {
   return entry;
 }
 
-/** Whether an operator/token/enemy has a Back model. */
+/** Whether an operator/token/enemy has a Back model; `opts` may name a skin (`{ skin }`) or be the skin id itself. */
 export function hasBackSpine(m, id, opts) {
-  const skin = appearanceEntry(m, baseCharId(id), opts?.skinId);
+  const skinId = typeof opts === 'string' ? opts : opts?.skin;
+  const skin = appearanceEntry(m, baseCharId(id), skinId);
   if (validSpine(skin?.spine?.front)) return validSpine(skin.spine.back);
   const ch = get(get(m, 'chars'), str(id) || '') || get(get(m, 'chars'), baseCharId(id) || '');
   return !!(ch && isObj(ch.spine) && validSpine(ch.spine.back));

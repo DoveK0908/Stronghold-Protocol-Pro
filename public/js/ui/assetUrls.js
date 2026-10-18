@@ -19,7 +19,7 @@ export function uiUrl(m, key) {
  * @param {any} chess chess.json record (or { assets: { avatar } })
  */
 export function chessAvatarUrl(m, chess) {
-  const appearance = appearanceEntry(m, chess?.charId || chess?.assets?.spine, chess?.skinId);
+  const appearance = appearanceEntry(m, chess?.charId || chess?.assets?.spine, chess?.skin);
   if (str(appearance?.avatar)) return appearance.avatar;
   const chars = obj(obj(m)?.chars);
   const id = str(chess?.assets?.avatar) || str(chess?.charId);
@@ -42,7 +42,7 @@ export function chessAvatarUrl(m, chess) {
  * @param {any} chess
  */
 export function chessPortraitUrl(m, chess) {
-  const appearance = appearanceEntry(m, chess?.charId || chess?.assets?.spine, chess?.skinId);
+  const appearance = appearanceEntry(m, chess?.charId || chess?.assets?.spine, chess?.skin);
   if (str(appearance?.portrait)) return appearance.portrait;
   const chars = obj(obj(m)?.chars);
   const id = str(chess?.assets?.portrait);

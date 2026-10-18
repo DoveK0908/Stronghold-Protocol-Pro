@@ -45,6 +45,7 @@ import { OwnerKeySection } from './ownerName.js';
 import { AssetSection } from './assetSection.js';
 import { catalog, loadCatalog, cosmeticPlugins, installedCount, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
 import { setUiPlugin, uiPluginEntries, uiPlugins } from './uiPlugins.js';
+import { hasAnySkinChoices } from './skins.js';
 import { UI_LIMITS } from '../../../shared/plugins/ui.js';
 import { toast, describeError } from './toasts.js';
 import { pluginMicro } from './pluginTag.js';
@@ -299,9 +300,22 @@ function CosmeticSection() {
   const cat = useStore((s) => s, Object.is, catalog);
   const ids = useStore((s) => s.ids, Object.is, personal);
   const installed = useStore(installedCount);
+  const s = useSettings();
   useEffect(() => { if (installed) loadCatalog({ force: true }); }, [installed]);
   const list = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
-  if (!list.length) return null;
+  // The 显示其他玩家的皮肤 switch is on screen with or without a PERSONAL plugin — the appearance can also come from
+  // the manifest's own catalogue (this fork ships one, docs/SKINS.md), and a switch that appears only when a plugin
+  // happens to be installed would look like a bug. It follows the same rule the 皮肤 section does (ui/skins.js
+  // hasAnySkinChoices: at least one operator of the composed manifest has a wear-able skin), so an installation with no
+  // such appearance keeps exactly the settings it had (test/ui/plugins.e2e.test.js asserts the section is absent on a
+  // server without plugins). The list below is NOT gated: it is where a switched-off plugin is switched back on.
+  if (!list.length) {
+    if (!hasAnySkinChoices()) return null;
+    return html`<section class="set-plugins" aria-labelledby="set-skins-title" data-testid="personal-plugins">
+      <div class="set-keys__head"><span class="set-row__label" id="set-skins-title">${t('外观插件')}<${MicroLabel}>COSMETIC PLUGINS<//></span></div>
+      <${OtherSkinsRow} value=${s.otherSkins !== false} onSet=${(v) => updateSettings({ otherSkins: v })} />
+    </section>`;
+  }
   const set = personalSet(ids, list.filter((p) => typeof p.vs === 'string'));
   const applied = new Set(set.order);
   const auto = new Set(set.auto);
@@ -311,6 +325,7 @@ function CosmeticSection() {
       <span class="set-row__label" id="set-plugins-title">${t('外观插件')}<${MicroLabel}>COSMETIC PLUGINS<//></span>
     </div>
     <p class="set-hint">${t('只改变你自己看到的画面和声音，不影响其他博士，也不影响战斗；插件为非官方制作。')}</p>
+    <${OtherSkinsRow} value=${s.otherSkins !== false} onSet=${(v) => updateSettings({ otherSkins: v })} />
     ${list.map((p) => {
       // on: applied (chosen, or 「自动」: another one needs it) — or chosen but left out now (a conflict): switch it off
       const skipped = set.skipped.includes(p.id);
@@ -324,6 +339,21 @@ function CosmeticSection() {
       </div>`;
     })}
   </section>`;
+}
+
+/**
+ * 设置「显示其他玩家的皮肤」 (docs/SKINS.md): whether this browser draws the appearance another player chose
+ * (`UnitInfo.skin`, published by the match — `Match.publicView().players[].skins`).
+ *
+ * Pure client preference, never sent: turning it off makes every OTHER seat's piece draw the operator's own model,
+ * 干员调配 its own choice alone. The asymmetry is deliberate and documented — their screen keeps showing their skin, so
+ * a co-op's players may see different models for the same piece. On by default: the appearance is what its owner chose
+ * it for, and this is the switch for a player who prefers the official model of everyone else.
+ * @param {{ value: boolean, onSet: (v: boolean) => void }} props
+ */
+function OtherSkinsRow({ value, onSet }) {
+  return html`<${Toggle} label=${t('显示其他玩家的皮肤')} micro="OTHER SKINS"
+    value=${value} onChange=${(v) => onSet(v)} />`;
 }
 
 /**

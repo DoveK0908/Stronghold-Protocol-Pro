@@ -40,7 +40,7 @@ function matchDTO(room, seed, snapshotHz) {
       isBot: s.isBot, connected: s.connected, loadout: structuredClone(s.isBot ? null : s.loadout || null),
       ops: structuredClone(s.isBot ? null : s.ops || null),
       notOwned: structuredClone(s.isBot ? null : s.notOwned || null), diy: structuredClone(s.isBot ? null : s.diy || null),
-      skins: Object.freeze({ ...(s.isBot ? {} : s.skins || {}) }), ...(s.isBot && s.band ? { band: s.band } : {}) })),
+      skins: s.isBot ? null : Object.freeze({ ...(s.skins || {}) }), ...(s.isBot && s.band ? { band: s.band } : {}) })),
     spectators: room.spectators.map(s => s.playerId), ...(snapshotHz === undefined ? {} : { snapshotHz }),
   };
 }

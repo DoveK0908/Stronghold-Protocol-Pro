@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { createFallbackView } from './fallbackField.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
+import { store } from '../store.js';
 import { settingsStore } from './settings.js';
 
 const LOAD_TIMEOUT_MS = 12000;
@@ -20,7 +21,7 @@ const METHODS = ['setStage', 'setCamera', 'setPrep', 'enterBattle', 'pushSnapsho
 // setPen (enemy preview pen list), prepField ({ kind, side, mirror } of the Final Assault prep), stripesUnder (the view
 // stripes range previews under the units itself), replayDeploys (the round start's Start-clip replay, PR #416) —
 // render/app.js; the DOM fallback lacks them (→ null)
-const OPTIONAL = ['pieceScreenRect', 'pieceAtClientPoint', 'setSettings', 'off', 'tileScreen', 'holdPiece', 'setPieceDir', 'setPen', 'prepField', 'stripesUnder', 'replayDeploys'];
+const OPTIONAL = ['pieceScreenRect', 'pieceAtClientPoint', 'setSettings', 'setMe', 'setSkins', 'off', 'tileScreen', 'holdPiece', 'setPieceDir', 'setPen', 'prepField', 'stripesUnder', 'replayDeploys'];
 
 /**
  * Camera padding (px) that keeps the field clear of the DOM HUD (top bar + bond strip, team panel, shop bar /
@@ -291,10 +292,17 @@ export function useFieldView(hostRef) {
     mountFieldView(host, { signal: controller.signal }).then((view) => {
       if (dead) { view.destroy(); return; }
       viewRef.current = view;
+      // identity and the match's public skin choices (docs/SKINS.md): the view may mount before `welcome` / m.public
+      view.setMe?.(store.get().me?.playerId || null);
+      view.setSkins?.(store.get().match?.public?.players);
       if (view.kind === 'engine') retries.current = 0;
       globalThis.__SP_VIEW__ = view; // dev / E2E introspection (view.raw.stats?.())
       setState({ view, kind: view.kind });
     }, (err) => { if (!dead && !controller.signal.aborted) console.error('[field] mount failed', err); });
+    const unsubSkins = store.subscribe((s, prev) => {
+      if (s.me?.playerId !== prev.me?.playerId) viewRef.current?.setMe?.(s.me?.playerId || null);
+      if (s.match?.public?.players !== prev.match?.public?.players) viewRef.current?.setSkins?.(s.match?.public?.players);
+    });
     const unsub = settingsStore.subscribe((s) => viewRef.current?.setSettings?.(s));
     const onResize = () => viewRef.current?.resize();
     // A temporary network/vendor failure must not pin this mounted match to fallback forever. Retry on a useful
@@ -311,6 +319,7 @@ export function useFieldView(hostRef) {
       dead = true;
       controller.abort();
       unsub();
+      unsubSkins();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('online', onRetry);
       document.removeEventListener('visibilitychange', onRetry);

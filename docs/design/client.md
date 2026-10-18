@@ -64,9 +64,7 @@ view.on('pieceDragStart'|'pieceDrop'|'pieceDragEnd'|'pieceClick'|'pieceHover'|'t
    // area 'outside' lets the DOM UI decide: released off the grid or over DOM covering the canvas (the shop bar), mouse
    //   and touch alike — there is no drag-to-sell, the piece goes back
    // the drop target, its highlight and tileHover while dragging = the tile under the POINTER; an item dropped on a
-   //   tile equips the unit standing on it (§18.1); a dragged unit is drawn standing on that tile while it is a legal
-   //   target — a board tile or a bench slot (render/drag.js dragStandTile), the official deploy drag — and held under
-   //   the pointer elsewhere (DRAG_HOLD_TILES), an item plate on the pointer (§27.62)
+   //   tile equips the unit standing on it (§18.1); a dragged unit follows the pointer smoothly and is never snapped to a tile (the free deploy drag, 2026-10-15, in place of §27.62's standing drag), an item plate on the pointer
 view.pieceScreenRect(uid)                    // the drawn body's rect { left, top, right, bottom, width, height, x, y } (tooltips / overlays)
 view.tileScreen(row, col)                    // { x, y, s, poly } client px of a tile top (direction wheel geometry)
 view.holdPiece(uid, {row,col}|null)          // keep a dropped piece on a tile while its direction is chosen

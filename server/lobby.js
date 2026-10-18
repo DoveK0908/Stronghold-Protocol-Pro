@@ -190,7 +190,7 @@
 import { randomBytes, randomInt } from 'node:crypto';
 import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, MATCHMAKING_VERSION, modeIdFor } from '../shared/constants.js';
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges } from '../shared/protocol.js';
-import { isSkinChoices, skinFor } from '../shared/skins.js';
+import { checkSkinSelection, isSkinId, operatorCharIds } from '../shared/protocol.js';
 import { EXPERIMENTAL_DEFAULTS, experimentalOptions, isExperimental, sameExperimental } from '../shared/experimental.js';
 import { MAX_PLAYER_CAPACITY, PLAYER_CAPACITY_VERSION, roomCapacity } from '../shared/playerCapacity.js';
 import { encode, isErrCode, sendEncodedMany, sendMessage, sendRaw, sendSession, TokenBucket } from './net.js';
@@ -316,7 +316,31 @@ function cardCharIds(data) {
 const sameCard = (a, b) => (a?.charId ?? '') === (b?.charId ?? '') && (a?.avatar ?? '') === (b?.avatar ?? '') && (a?.bg ?? '') === (b?.bg ?? '')
   && (a?.trophies ?? 0) === (b?.trophies ?? 0) && (a?.look ?? '') === (b?.look ?? '') && (a?.avatarLook ?? '') === (b?.avatarLook ?? '');
 /** A card look ('' / 'e1' / a skin id) that `charId` can wear. */
-const lookFits = (charId, look) => !look || look === 'e1' || (!!charId && !!skinFor(charId, look));
+/**
+ * Frozen copy of a skin selection (docs/SKINS.md), keyed by operator charId.
+ *
+ * A non-plain object, a key that is not a charId, a value that is not a skinId, or a map over the wire cap is refused
+ * (`null` — the caller answers BAD_MSG and does not clear what is already stored). A charId `hasOperator` rejects is
+ * dropped. The stored copy is then at most the operator count of the room's content, and ≤ 256 [ASSUMED].
+ * @param {Record<string, string>} skins `{ [charId]: skinId }`
+ * @param {(charId: string) => boolean} hasOperator
+ * @returns {Readonly<Record<string, string>>|null}
+ */
+function freezeSkins(skins, hasOperator) {
+  const res = checkSkinSelection(skins, hasOperator);
+  if (!res.ok) return null;
+  return Object.freeze({ ...res.skins });
+}
+
+// a look (feedback #9 / #24) is '' (the 精二 art), 'e1', or a skin key the operator's OWN record carries
+// (data/assets.json chars[<charId>].skins, docs/SKINS.md) — never another operator's
+const lookFits = (data, charId, look) => {
+  if (!look) return true;
+  if (look === 'e1') return true;
+  if (!charId || !isSkinId(look)) return false;
+  const skins = data?.assets?.chars?.[charId]?.skins;
+  return !!skins && Object.hasOwn(skins, look);
+};
 
 /**
  * The GameData a room's next match builds (Match: mode, difficulty and the expanded-room 鸭爵 switch), per data object —
@@ -1807,12 +1831,20 @@ export class Lobby {
     return OK;
   }
 
-  /** Display-only choices follow loadout's INFO_CHECK contract, not ownership / DIY's start-time lock. */
-  skins(session, { choices }) {
-    if (!isSkinChoices(choices)) return fail(ERR.BAD_MSG, 'invalid skin choices');
-    const kept = Object.freeze({ ...choices });
-    session.skins = kept;
+  /**
+   * room.skins (docs/SKINS.md): store the appearances this player chose for their operators, on the session and the
+   * seat, and hand them to a running match.
+   *
+   * Unlike room.loadout there is no phase gate. The loadout is frozen at INFO_CHECK because it changes what a unit
+   * *does*; a skin changes only what it looks like, and it is public — a teammate switching model mid-match is
+   * harmless, and the next `m.public` broadcast carries it to everyone.
+   */
+  skins(session, { skins }) {
     const room = this.roomOf(session);
+    const ids = operatorCharIds(this.dataFor(room));
+    const kept = freezeSkins(skins, (id) => ids.has(id));
+    if (!kept) return fail(ERR.BAD_MSG, 'bad skin selection');
+    session.skins = kept;
     if (!room) return OK;
     const seat = room.seatOf(session.playerId);
     if (seat) seat.skins = kept;
@@ -1844,9 +1876,10 @@ export class Lobby {
     const face = avatar === undefined ? prev.avatar : avatar;
     const count = trophies === undefined ? prev.trophies : trophies;
     // a look sent must fit its operator; a stored one the operator change no longer fits is dropped
-    if ((look && !lookFits(id, look)) || (avatarLook && !lookFits(face, avatarLook))) return fail(ERR.BAD_MSG, 'skin of another operator');
-    const art = look === undefined ? (lookFits(id, prev.look) ? prev.look : '') : look;
-    const faceArt = avatarLook === undefined ? (lookFits(face, prev.avatarLook) ? prev.avatarLook : '') : avatarLook;
+    const data = this.safeData();
+    if ((look && !lookFits(data, id, look)) || (avatarLook && !lookFits(data, face, avatarLook))) return fail(ERR.BAD_MSG, 'skin of another operator');
+    const art = look === undefined ? (lookFits(data, id, prev.look) ? prev.look : '') : look;
+    const faceArt = avatarLook === undefined ? (lookFits(data, face, prev.avatarLook) ? prev.avatarLook : '') : avatarLook;
     if (id) next.charId = id;
     if (face) next.avatar = face;
     if (id && art) next.look = art;
@@ -1977,7 +2010,9 @@ export class Lobby {
         notOwned: own ? own.notOwned : null,
         // 0.2.0 自选编队: the human's checked DIY picks (bots field no 自选 piece [ASSUMED])
         diy: own ? own.diy : null,
-        skins: Object.freeze({ ...(s.isBot ? {} : s.skins || {}) }),
+        // 干员皮肤 (docs/SKINS.md): the appearances the human wears, keyed by operator charId (a bot fields every
+        // operator on its default model, and `null` is what the match reads as "nothing chosen")
+        skins: s.isBot ? null : Object.freeze({ ...(s.skins || {}) }),
         // room.setBotBand: an AI seat's designated strategy (absent when it picks by itself)
         ...(s.isBot && s.band ? { band: s.band } : {}),
       };

@@ -43,7 +43,6 @@ import { toDataSource, withUnitLoadouts } from './simdata.js';
 import { isPotential, isCultivate } from '../../shared/potential.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
-import { OPERATOR_SKINS } from '../../shared/skins.js';
 
 export const SPEC_VERSION = 1;
 
@@ -102,12 +101,6 @@ export function buildBattleSpec(o = {}) {
 }
 
 const LOADOUT_ID = /^[A-Za-z0-9_\-]{1,64}$/;
-const SKIN_IDS = new Set(OPERATOR_SKINS.map(s => s.id));
-
-// Admission here checks the manifest key only. The actual resolved operator def checks its charId in BattlePlayers.
-function sanitizeUnitSkin(u) {
-  if ('skinId' in u && (u.kind === 'token' || !SKIN_IDS.has(u.skinId))) delete u.skinId;
-}
 
 /**
  * A well-formed 自选 pick `{ charId, skillIndex?, uniEquipId? }` reduced to those fields (skill 0–9 or null, module a
@@ -133,7 +126,6 @@ function cleanDiyPick(d) {
  * well-formed and not on a stand-in. Mutates `u`.
  */
 export function sanitizeUnitLoadout(u) {
-  sanitizeUnitSkin(u);
   if ('skillIndex' in u && !(Number.isInteger(u.skillIndex) && u.skillIndex >= 0 && u.skillIndex <= 9)) delete u.skillIndex;
   if ('moduleId' in u && !(typeof u.moduleId === 'string' && LOADOUT_ID.test(u.moduleId))) delete u.moduleId;
   if ('standIn' in u && u.standIn !== true) delete u.standIn;
@@ -161,7 +153,6 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
   if (!spec || typeof spec !== 'object') throw new TypeError('createBattleFromSpec: spec required');
   const s = jsonClone(spec);
   for (const p of (Array.isArray(s.players) ? s.players : [])) for (const u of (p && Array.isArray(p.units) ? p.units : [])) {
-    if (u && typeof u === 'object') sanitizeUnitSkin(u);
   }
   const bossLike = s.kind === 'boss' || s.kind === 'hidden';
   let sharedBoss = opts.sharedBoss ?? null;

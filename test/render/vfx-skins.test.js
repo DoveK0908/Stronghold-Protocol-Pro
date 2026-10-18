@@ -26,7 +26,7 @@ function wiring() {
   w.idx = IDX;
   return w;
 }
-const view = (id, def, skinId) => ({ id, info: { id, spine: def, defId: def, ...(skinId ? { skinId } : {}) } });
+const view = (id, def, skin) => ({ id, info: { id, spine: def, defId: def, ...(skin ? { skin } : {}) } });
 
 test('skinOf: the catalogue skin only for its own operator, else the default skin', () => {
   const w = wiring();

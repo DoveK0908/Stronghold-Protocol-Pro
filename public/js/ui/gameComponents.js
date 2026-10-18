@@ -110,7 +110,7 @@ export const isGoldenPiece = (piece, chess) => !!(piece?.golden || chess?.isGold
  *   `rec`: the chess record to draw instead of the data's (a 自选 piece's composed record — 0.2.0, gameLogic/diy.js; a
  *   补位 stand-in's — gameLogic/standIn.js: drawn with a small 「替补」 mark in the corner)
  */
-export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showTier = true, class: cls, dim = false, badge = null, title, rec = null, skinId = null }) {
+export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showTier = true, class: cls, dim = false, badge = null, title, rec = null, skin = null }) {
   const m = data.get('assets');
   let src = null;
   let fallbackSrc = null;
@@ -119,10 +119,10 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
   let si = null;
   if (kind === 'chess') {
     const c0 = rec || data.lookup('chess', id);
-    const c = appearanceRecord(c0, skinId || c0?.skinId);
+    const c = appearanceRecord(c0, skin || c0?.skin);
     si = rec && typeof rec.standInFor === 'string' && rec.standInFor ? rec : null;
     src = chessAvatarUrl(m, c);
-    fallbackSrc = c?.skinId ? chessAvatarUrl(m, { ...c, skinId: null }) : null;
+    fallbackSrc = c?.skin ? chessAvatarUrl(m, { ...c, skin: null }) : null;
     name = c?.name || '';
     t = t ?? c?.tier;
     golden = golden ?? !!c?.isGolden;
@@ -158,7 +158,7 @@ export function UnitThumb({ kind = 'chess', id, golden, size = 'md', tier, showT
 export function PieceThumb({ piece, size = 'md', class: cls, badge }) {
   if (!piece) return null;
   return html`<${UnitThumb} kind=${piece.kind === 'item' ? 'item' : piece.kind === 'token' ? 'token' : 'chess'} id=${piece.id}
-    golden=${!!piece.golden} tier=${piece.tier} skinId=${piece.skinId} size=${size} class=${cls} badge=${badge} />`;
+    golden=${!!piece.golden} tier=${piece.tier} skin=${piece.skin} size=${size} class=${cls} badge=${badge} />`;
 }
 
 /**

@@ -151,8 +151,9 @@ export class PlayerRound {
           u.skillIndex = lo.skillIndex;
           u.moduleId = lo.moduleId;
         }
-        const skinId = this.skinIdFor(this.gd.chess(piece.id));
-        if (skinId) u.skinId = skinId;
+        // display only (docs/SKINS.md): the operator's own appearance, the pick's for a filled 自选 slot
+        const skinId = this.skinFor(this.gd.chess(piece.id), pick ? pick.charId : null);
+        if (skinId) u.skin = skinId;
         // 0.2.2: the potential / 练度 of an operator the player owns (the chess as itself, an owned 自选 pick — the player's
         // 干员调配 settings, 潜能 6 / 精英2 Lv.60 by default and for bots; never a stand-in's nor a prototype pick's)
         const cv = u.standIn ? null : this.cultivationFor(this.gd.chess(piece.id));

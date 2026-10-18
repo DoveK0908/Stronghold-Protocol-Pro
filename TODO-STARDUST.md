@@ -28,7 +28,7 @@ These items are independent scopes, not instructions to automatically resume arc
 ### Client and content
 
 - [x] Unified operator presets for skill/module, ownership/stand-in, DIY/support and skins, with pure preparation, coherent memory update and legacy scoped imports. See [operator presets](docs/OPERATOR-PRESETS.md).
-- [x] Skin selection/model loading and display-only fallback. Artwork, declarations, actual dynamic support and full effect parity remain distinct. See [operator skins](docs/OPERATOR-SKINS.md).
+- [x] Skin selection/model loading and display-only fallback. Artwork, declarations, actual dynamic support and full effect parity remain distinct. See [operator skins](docs/SKINS.md).
 - [x] Independent UI and CN/JP/EN voice preferences shared by lobby and in-game settings; missing/failed voice falls back to CN. See [voice languages](docs/VOICE-LANGUAGES.md).
 - [x] Optional intro off by default while retaining login assembly, success and entry transitions; reduced motion and gate security remain.
 - [x] Lobby announcements and feedback UI; matched-version content updates rather than an unauthenticated hot-update API.
