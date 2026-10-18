@@ -36,7 +36,8 @@ export function isExperimental(value) {
     if (Object.hasOwn(EXPERIMENTAL_DEFAULTS, key)) return true;
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor?.enumerable !== true) return false;
-    if (EXPERIMENTAL_OPTIONAL.includes(key)) return typeof descriptor.value === 'boolean';
+    // Reflect.ownKeys also yields symbols; the optional switches are named by strings only.
+    if (typeof key === 'string' && EXPERIMENTAL_OPTIONAL.includes(key)) return typeof descriptor.value === 'boolean';
     return key === 'playerCapacity' ? isPlayerCapacity(descriptor.value)
       : key === 'disableDuckLord' && typeof descriptor.value === 'boolean';
   });
