@@ -7,8 +7,12 @@ import { serializeExport } from '../../public/js/ui/loadoutModel.js';
 import { serializeSkins } from '../../public/js/ui/skinsModel.js';
 import { serializeOwnership } from '../../public/js/ui/ownershipModel.js';
 import { serializeDiy, defaultPick } from '../../public/js/ui/diyModel.js';
-import { OPERATOR_SKINS } from '../../shared/skins.js';
+import { MANIFEST_SKINS as OPERATOR_SKINS } from '../helpers/manifestSkins.js';
+import { SKINS_KEY, parseStoredSkins, skinsStore } from '../../public/js/ui/skins.js';
 import { createStore } from '../../public/js/store.js';
+
+/** The skins store as a plain map (ui/skins.js keeps a JSON string under SKINS_KEY, docs/SKINS.md). */
+const storedSkins = () => parseStoredSkins(skinsStore.get()[SKINS_KEY]);
 
 const read = p => JSON.parse(readFileSync(new URL('../../data/'+p+'.json', import.meta.url)));
 const chess = read('chess'), backups = read('backups');
@@ -30,36 +34,48 @@ test('one portable preset round-trips gameplay, support and appearance without s
 });
 
 test('a complete import validates all sections before one coherent store update and persistence', () => {
-  const target=createStore({entries:{old:{skill:1}},notOwned:['old'],diy:{},skins:{},open:true});
+  const target=createStore({entries:{old:{skill:1}},notOwned:['old'],diy:{},open:true});
   const updates=[],saved=[];target.subscribe(s=>updates.push(structuredClone(s)));
   const result=applyOperatorPreset(parseOperatorPreset(serializeOperatorPreset(settings())),deps,{target,persist:(key,value)=>saved.push({key,value})});
   assert.equal(result.ok,true);assert.equal(updates.length,1);assert.equal(saved.length,4);
   assert.deepEqual(saved.map(x=>x.key),['loadout','ownership','diy','skins']);
-  assert.deepEqual(target.get().entries,settings().entries);assert.deepEqual(target.get().skins,settings().skins);
+  assert.deepEqual(target.get().entries,settings().entries);assert.deepEqual(storedSkins(),settings().skins);
   assert.equal(target.get().open,true);
 });
 
-for(const section of ['entries','notOwned','diy','skins']) test('an unavailable '+section+' section aborts the entire preset without persistence or mutation',()=>{
+for(const section of ['entries','notOwned','diy']) test('an unavailable '+section+' section aborts the entire preset without persistence or mutation',()=>{
   const before=settings(), target=createStore(structuredClone(before));const saved=[];
   const raw=operatorPresetPayload(settings());
-  raw[section]=section==='notOwned'?['missing']:section==='entries'?{missing:{skill:0}}:section==='diy'?{missing:{charId:'missing'}}:{missing:'missing'};
+  raw[section]=section==='notOwned'?['missing']:section==='entries'?{missing:{skill:0}}:{missing:{charId:'missing'}};
   const r=applyOperatorPreset(parseOperatorPreset(raw),deps,{target,persist:(...x)=>saved.push(x)});
   assert.equal(r.ok,false);assert.deepEqual(target.get(),before);assert.deepEqual(saved,[]);
+});
+
+test('a skins section is display-only: an unknown key is kept, never a reason to refuse the preset (docs/SKINS.md)',()=>{
+  const before=settings(), target=createStore(structuredClone(before));const saved=[];
+  const raw=operatorPresetPayload(settings());raw.skins={[skin.charId]:'char_003_kalts_ghost_1'};
+  const r=applyOperatorPreset(parseOperatorPreset(raw),deps,{target,persist:(...x)=>saved.push(x)});
+  assert.equal(r.ok,true);assert.deepEqual(storedSkins(),{[skin.charId]:'char_003_kalts_ghost_1'});
+  assert.deepEqual(target.get().entries,before.entries);
+  assert.equal(saved.length,4);assert.equal(saved[3][0],'skins');
 });
 
 test('an explicit empty complete preset restores all defaults, while empty old loadout is still rejected',()=>{
   const empty={entries:{},notOwned:[],diy:{},skins:{}}, target=createStore(settings());
   assert.equal(applyOperatorPreset(parseOperatorPreset(serializeOperatorPreset(empty)),deps,{target,persist(){}}).ok,true);
-  assert.deepEqual(target.get(),empty);
+  assert.deepEqual({entries:target.get().entries,notOwned:target.get().notOwned,diy:target.get().diy},{entries:empty.entries,notOwned:empty.notOwned,diy:empty.diy});
+  assert.deepEqual(storedSkins(),{});
   assert.equal(parseOperatorPreset(serializeExport({})).ok,false);
 });
 
 for(const [name,encode,key] of [['loadout',s=>serializeExport(s.entries),'entries'],['ownership',s=>serializeOwnership(s.notOwned),'notOwned'],
   ['diy',s=>serializeDiy(s.diy),'diy'],['skins',s=>serializeSkins(s.skins),'skins']]) test('legacy '+name+' imports update only their original section',()=>{
-  const target=createStore(settings()),before=structuredClone(target.get());const saved=[];
+  const target=createStore(settings()),before=structuredClone(target.get()),skinsBefore=storedSkins();const saved=[];
   const parsed=parseOperatorPreset(encode(settings()));assert.equal(parsed.ok,true);
   const result=applyOperatorPreset(parsed,deps,{target,persist:(k,v)=>saved.push([k,v])});assert.equal(result.ok,true);assert.equal(saved.length,1);
-  for(const other of ['entries','notOwned','diy','skins'].filter(x=>x!==key))assert.deepEqual(target.get()[other],before[other]);
+  for(const other of ['entries','notOwned','diy'].filter(x=>x!==key))assert.deepEqual(target.get()[other],before[other]);
+  assert.deepEqual(storedSkins(),key==='skins'?settings().skins:skinsBefore);
+  assert.equal(saved.length,1);assert.equal(saved[0][0],{entries:'loadout',notOwned:'ownership',diy:'diy',skins:'skins'}[key]);
 });
 
 test('file scope parsing is pure and does not sanitise or change the supplied preset',()=>{
@@ -82,7 +98,9 @@ test('legacy skins can be imported without game data and leave all gameplay sect
   const before=settings(),target=createStore(structuredClone(before));const saved=[],updates=[];
   target.subscribe(s=>updates.push(structuredClone(s)));
   const result=applyOperatorPreset(parseOperatorPreset(serializeSkins({})),{}, {target,persist:(...args)=>saved.push(args)});
-  assert.equal(result.ok,true);assert.equal(result.scope,'skins');assert.deepEqual(target.get(),{...before,skins:{}});
+  assert.equal(result.ok,true);assert.equal(result.scope,'skins');
+  assert.deepEqual({entries:target.get().entries,notOwned:target.get().notOwned,diy:target.get().diy},{entries:before.entries,notOwned:before.notOwned,diy:before.diy});
+  assert.deepEqual(storedSkins(),{});
   assert.equal(updates.length,1);assert.equal(saved.length,1);assert.equal(saved[0][0],'skins');
 });
 
@@ -103,5 +121,5 @@ test('hostile, missing, oversized and newer envelopes are rejected without proto
 test('blocked browser storage still leaves one coherent in-memory preset',()=>{
   const target=createStore({entries:{},notOwned:[],diy:{},skins:{}});
   const result=applyOperatorPreset(parseOperatorPreset(serializeOperatorPreset(settings())),deps,{target,persist(){throw Error('blocked')}});
-  assert.equal(result.ok,true);assert.deepEqual(target.get().skins,settings().skins);assert.deepEqual(target.get().entries,settings().entries);
+  assert.equal(result.ok,true);assert.deepEqual(storedSkins(),settings().skins);assert.deepEqual(target.get().entries,settings().entries);
 });

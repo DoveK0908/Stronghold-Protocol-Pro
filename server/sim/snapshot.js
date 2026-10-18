@@ -21,7 +21,6 @@
 import { UF, ANIM } from '../../shared/constants.js';
 import { DIE_ANIM_TIME, ATTACK_ANIM_TIME, DEPLOY_ANIM_TIME } from './constants.js';
 import { enemyStealthed } from './targeting.js';
-import { skinFor } from '../../shared/skins.js';
 import { unitStatsEntry } from '../../shared/protocol.js';
 
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -45,7 +44,6 @@ export function unitInfo(u, stats = null) {
     // only appears where a skin is actually in play.
     skin: u.skin ?? undefined,
     avatar: d.avatar ?? d.charId ?? u.defId,
-    ...(u.side === 'ally' && u.kind === 'op' && skinFor(d.charId, u.skinId) ? { skinId: u.skinId } : {}),
     ...(d.voice ? { voice: d.voice } : {}),
     x: r2(u.x),
     y: r2(u.y),

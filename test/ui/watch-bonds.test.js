@@ -396,7 +396,7 @@ test('§20.15 wiring: the game screen feeds the strip, the popup and the detail 
   assert.match(src, /onOpen=\$\{\(id\) => openBond\(id, strip\.ownerId, 'strip'\)\}/, 'the strip opens its owner\'s bond');
   assert.match(src, /const detailOwner = detailBondOwner\(detailTarget, \{ pub, myId, stripOwnerId: strip\.ownerId \}\)/);
   assert.match(src, /onBond=\$\{\(id\) => openBond\(id, detailOwner, 'detail'\)\}/, 'a card\'s chip opens the same owner\'s bond as its chips show');
-  assert.match(src, /onMember=\$\{\(id, items, standInFor, diy, skinId\) => setDetail\(\{ kind: 'chess', id, owner: bondPop\.ownerId, items: items \|\| null, standInFor: standInFor \|\| null, diy: diy \|\| null, \.\.\.\(skinId \? \{ skinId \} : null\) \}\)\}/,
+  assert.match(src, /onMember=\$\{\(id, items, standInFor, diy, skin\) => setDetail\(\{ kind: 'chess', id, owner: bondPop\.ownerId, items: items \|\| null, standInFor: standInFor \|\| null, diy: diy \|\| null, \.\.\.\(skin \? \{ skin \} : null\) \}\)\}/,
     'a member card keeps the popup\'s player, items, stand-in, DIY pick and visible unit appearance');
   assert.match(src, /openId=\$\{bondPop && bondPop\.ownerId === strip\.ownerId \? bondPop\.bondId : null\}/, 'the strip marks only its own owner\'s popup');
   assert.match(src, /setBondOpen\(\(b\) => \(b && b\.from === 'strip' \? null : b\)\)/, 'a strip popup closes when the strip changes hands');

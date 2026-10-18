@@ -811,7 +811,7 @@ export class UnitView {
    *  owner's face — assets.js tokenAvatarUrl). */
   _pictureUrl() {
     const a = this.ctx.assets;
-    return ICE_TOKENS.has(this.info.defId) ? null : a && (a.picture ? a.picture(this.info.avatar, { skinId: this.info.skinId }) || a.picture(this.info.defId) || a.picture(this.info.spine) : null) || null;
+    return ICE_TOKENS.has(this.info.defId) ? null : a && (a.picture ? a.picture(this.info.avatar, { skin: this.info.skin }) || a.picture(this.info.defId) || a.picture(this.info.spine) : null) || null;
   }
 
   /** @param {boolean} [replace] another picture replaces a shown one: the old one stays on the diamond until it is there */
@@ -822,7 +822,7 @@ export class UnitView {
     const defaultUrl = a?.picture ? a.picture(this.info.avatar) || a.picture(this.info.spine) : null;
     const old = replace && this._pic && this._pic.state === 'img' ? this._pic : null;
     const baseKey = String(this.info.avatar || this.info.defId || 'unknown');
-    this._pic = { key: this.info.skinId ? `${baseKey}|${this.info.skinId}` : baseKey, color: this._frameColor(), img: null, state: 'none', shown: null, t0: nowMs(), url, prev: !!old };
+    this._pic = { key: this.info.skin ? `${baseKey}|${this.info.skin}` : baseKey, color: this._frameColor(), img: null, state: 'none', shown: null, t0: nowMs(), url, prev: !!old };
     if (!url || !a.image) return;
     const cached = typeof a.imageNow === 'function' ? a.imageNow(url) : null;
     if (cached) { this._pic.img = cached; this._pic.state = 'img'; return; }
@@ -885,7 +885,7 @@ export class UnitView {
   _modelEntry(back = this._wantsBack()) {
     const a = this.ctx.assets;
     const id = this.info.spine || this.info.defId;
-    return a && a.spineEntry && id ? a.spineEntry(id, { back, skinId: this.info.skinId }) || null : null;
+    return a && a.spineEntry && id ? a.spineEntry(id, { back, skin: this.info.skin }) || null : null;
   }
 
   /** @param {boolean} [retry] load again even after a remembered failure (assets.js acquire `{ retry }`) */
@@ -1248,8 +1248,8 @@ export class UnitView {
   _wantsBack() {
     const a = this.ctx.assets;
     const id = this.info.spine || this.info.defId;
-    if (this.isEnemy || this.dir !== 'UP' || !id || !a || typeof a.hasBack !== 'function' || !a.hasBack(id, { skinId: this.info.skinId })) return false;
-    return this.alive || dieClipDur(typeof a.spineEntry === 'function' ? a.spineEntry(id, { back: true, skinId: this.info.skinId }) : null) > 0;
+    if (this.isEnemy || this.dir !== 'UP' || !id || !a || typeof a.hasBack !== 'function' || !a.hasBack(id, { skin: this.info.skin })) return false;
+    return this.alive || dieClipDur(typeof a.spineEntry === 'function' ? a.spineEntry(id, { back: true, skin: this.info.skin }) : null) > 0;
   }
 
   /**
@@ -1479,7 +1479,7 @@ export class UnitView {
   _fallDur() {
     const a = this.ctx.assets;
     const id = this.info.spine || this.info.defId;
-    return a && typeof a.spineEntry === 'function' && id ? dieClipDur(a.spineEntry(id, { back: this._wantsBack(), skinId: this.info.skinId })) : 0;
+    return a && typeof a.spineEntry === 'function' && id ? dieClipDur(a.spineEntry(id, { back: this._wantsBack(), skin: this.info.skin })) : 0;
   }
 
   /** Standing again (a redeploy, a revive): an operator facing UP gets its Back model back (this frame's update). */

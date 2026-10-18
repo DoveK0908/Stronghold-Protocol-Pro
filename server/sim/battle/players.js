@@ -13,7 +13,6 @@ import { isPotential, isCultivate } from '../../../shared/potential.js';
 import { setupUnitKit } from '../content/index.js';
 import { installTraitAttackSpeed } from '../content/traitMods.js';
 import { clone } from './util.js';
-import { skinFor } from '../../../shared/skins.js';
 
 export class BattlePlayers {
   _addPlayer(p) {
@@ -160,9 +159,8 @@ export class BattlePlayers {
     if (!def) { this.log(`unknown chess ${inp.chessId}${lo.diy ? ' (illegal 自选 pick)' : ''}`); return null; }
     // a DIY slot has no body of its own (甄选干员): it fights only as a 自选 piece (its `diy` pick)
     if (def.raw?.isDiy && !def.diyFor) { this.log(`自选 slot ${inp.chessId} without a pick`); return null; }
-    const u = this._makeAlly(ps, def, 'op', r, c, { uid: inp.uid, dir });
-    const skin = skinFor(def.charId, inp.skinId);
-    if (skin) u.skinId = skin.id; // per-instance display only: never mutate shared defs / attack timing / skill identity
+    // 皮肤 (docs/SKINS.md): display only — no rule reads Unit.skin and Battle.result() omits it
+    const u = this._makeAlly(ps, def, 'op', r, c, { uid: inp.uid, dir, skin: inp.skin });
     u.items = [...(inp.items ?? [])];
     u.carry = inp.carryState ?? null;
     // 练度 (自持有, 0.2.2): the owned operator's ×ATK / ×DEF / ×max HP (units.js Πmul) — never a 补位 stand-in's nor a

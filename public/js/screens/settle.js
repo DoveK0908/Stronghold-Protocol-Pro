@@ -288,7 +288,7 @@ function unitView(u, gd) {
   const chess = u.kind === 'token' ? null : gd.chess(u.id);
   const dr = u.diy && chess ? diyRecordFor(chess, u.diy, { chess: data.get('chess'), backups: data.get('backups') }) : null;
   const si = !dr && chess ? cardStandIn(chess, { unit: u, backups: gd.backups }) : null;
-  const rec = appearanceRecord(dr || si || chess, u.skinId);
+  const rec = appearanceRecord(dr || si || chess, u.skin);
   const tier = Math.max(0, Math.min(6, Number(u.tier) || Number(rec?.tier) || 0));
   return {
     si,

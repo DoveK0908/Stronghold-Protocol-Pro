@@ -10,7 +10,8 @@ import { startGameNode } from '../server/cluster/game-node.js';
 import { SessionRegistry } from '../server/net.js';
 import { ERR, MATCHMAKING_VERSION } from '../shared/constants.js';
 import { PLAYER_CAPACITIES, PLAYER_CAPACITY_VERSION } from '../shared/playerCapacity.js';
-import { OPERATOR_SKINS, SKIN_LIMITS } from '../shared/skins.js';
+import { MANIFEST_SKINS as OPERATOR_SKINS } from './helpers/manifestSkins.js';
+import { SKIN_LIMITS } from '../shared/protocol.js';
 import { LOADOUT_LIMITS, OWNERSHIP_LIMITS, DIY_LIMITS, validateC2S } from '../shared/protocol.js';
 import { PREPARE_MAX_BYTES } from '../server/cluster/rpc.js';
 
@@ -410,7 +411,7 @@ test('twenty maximally sized structural preference maps fit prepare while indivi
     ops: Object.fromEntries(Array.from({ length: LOADOUT_LIMITS.ops }, (_, i) => [id(i), { potential: 1, cultivate: 0 }])),
     notOwned: Array.from({ length: OWNERSHIP_LIMITS.notOwned }, (_, i) => id(i)),
     diy: Object.fromEntries(Array.from({ length: DIY_LIMITS.slots }, (_, i) => [id(i), { charId: id(i), skillIndex: 9, uniEquipId: id(i) }])),
-    skins: Object.fromEntries(Object.entries(choices).slice(0, SKIN_LIMITS.choices)),
+    skins: Object.fromEntries(Object.entries(choices).slice(0, SKIN_LIMITS.entries)),
   };
   // Synthetic longest IDs bound the wire shape; only skins need the real catalogue.
   // This is not a claim that these unknown operator IDs pass semantic admission.
@@ -418,7 +419,7 @@ test('twenty maximally sized structural preference maps fit prepare while indivi
     { t: 'room.loadout', entries: preferences.loadout, ops: preferences.ops },
     { t: 'room.ownership', notOwned: preferences.notOwned },
     { t: 'room.diy', picks: preferences.diy },
-    { t: 'room.skins', choices: preferences.skins },
+    { t: 'room.skins', skins: preferences.skins },
   ]) {
     assert.equal(validateC2S(message), null);
     assert.ok(Buffer.byteLength(JSON.stringify({ ...message, rid: 2 ** 31 })) <= 64 * 1024);

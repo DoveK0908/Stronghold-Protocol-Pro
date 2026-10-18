@@ -363,7 +363,6 @@ export class MatchViews {
       // DESIGN §16: the skill / module THIS player's operator fights with (the scout's detail card shows it, like the
       // sim's UnitInfo in a shared field); moduleId only for an elite; 0.2.2 its potential (below 6) and 练度
       const lo = piece.kind === 'chess' && chess ? ps.loadoutFor(chess) : null;
-      const skinId = piece.kind === 'chess' ? ps.skinIdFor(chess) : null;
       const diy = this._diyInfo(ps, piece);
       units.push({
         id: piece.uid, uid: piece.uid, kind: piece.kind === 'token' ? 'token' : 'op', side: 'ally', ownerId: ps.playerId, defId: piece.id,
@@ -377,7 +376,9 @@ export class MatchViews {
         items: piece.kind === 'chess' && Array.isArray(piece.items) && piece.items.length ? piece.items.map((it) => it.id) : undefined,
         standInFor: rec && rec.standInFor ? rec.standInFor : undefined,
         diy,
-        ...(skinId ? { skinId } : {}),
+        // 皮肤 (docs/SKINS.md): built per player (the owner of the scouted board), so a teammate's piece shows THEIR
+        // appearance; a 自选 slot fights as its pick's operator, which is the key it wears too
+        skin: ps.skinFor(chess, diy ? diy.charId : null) || undefined,
         ...cultivationInfo(lo),
       });
     }
@@ -431,7 +432,6 @@ export class MatchViews {
       const body = standIn || rec;
       const assets = (body && body.assets) || {};
       const lo = piece.kind === 'chess' && rec ? ps.loadoutFor(rec) : null;
-      const skinId = piece.kind === 'chess' ? ps.skinIdFor(rec) : null;
       const diy = this._diyInfo(ps, piece);
       units.push({
         id: piece.uid, uid: piece.uid, kind: piece.kind === 'token' ? 'token' : piece.kind === 'item' ? 'item' : 'op',
@@ -444,7 +444,7 @@ export class MatchViews {
         items: piece.kind === 'chess' && Array.isArray(piece.items) && piece.items.length ? piece.items.map((it) => it.id) : undefined,
         standInFor: standIn && standIn.standInFor ? standIn.standInFor : undefined,
         diy,
-        ...(skinId ? { skinId } : {}),
+        skin: ps.skinFor(rec, diy ? diy.charId : null) || undefined,
         ...cultivationInfo(lo),
       });
     };

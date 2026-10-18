@@ -1,9 +1,8 @@
 // Process-local game actors. A whole Match stays here; this is neither a session
 // registry nor durable recovery. The caller owns authentication, transport and pools.
 import { Match, AFK_REMOVE_ROUNDS } from '../match/Match.js';
-import { C2S, LOADOUT_LIMITS, OWNERSHIP_LIMITS, DIY_LIMITS, isNotOwnedList, isDiyPicks } from '../../shared/protocol.js';
+import { C2S, LOADOUT_LIMITS, OWNERSHIP_LIMITS, DIY_LIMITS, SKIN_LIMITS, isNotOwnedList, isDiyPicks, isSkinSelection } from '../../shared/protocol.js';
 import { experimentalOptions, isExperimental } from '../../shared/experimental.js';
-import { SKIN_LIMITS, isSkinChoices } from '../../shared/skins.js';
 import { DIFFICULTIES, ERR, NAME_MAX_LEN, modeIdFor } from '../../shared/constants.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { restoreMatch, CHECKPOINT_PREP_END } from '../match/snapshot.js';
@@ -147,8 +146,10 @@ export function copyAssignmentSpec(input, fallbackAssignmentId) {
       seat.diy = diy;
     }
     if (s.skins !== undefined) {
-      const skins = dataRecord(s.skins, undefined, SKIN_LIMITS.choices);
-      if (!isSkinChoices(skins)) invalid();
+      // isSkinSelection takes plain objects only (shared/protocol.js isPlain, docs/SKINS.md), so the copied
+      // assignment DTO always carries a plain map even when the admitted input had a null prototype.
+      const skins = { ...dataRecord(s.skins, undefined, SKIN_LIMITS.entries) };
+      if (!isSkinSelection(skins)) invalid();
       seat.skins = skins;
     }
     // room.setBotBand: an AI seat's designated strategy, one AI seat per strategy (the Match checks it against its mode)
@@ -603,7 +604,7 @@ export class GameHost {
     if (!actor) return fail(ERR.NOT_IN_ROOM);
     if (actor.member.role === 'spectator') return fail(ERR.SPECTATOR);
     if (actor.ctx.state !== 'committed') return fail(ERR.WRONG_PHASE);
-    if (!isSkinChoices(choices)) return fail(ERR.BAD_MSG);
+    if (!isSkinSelection(choices)) return fail(ERR.BAD_MSG);
     return this._invoke(actor.ctx, 'setSkins', playerId, freeze({ ...choices }));
   }
 

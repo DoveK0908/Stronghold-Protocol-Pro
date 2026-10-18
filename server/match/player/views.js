@@ -24,8 +24,10 @@ export class PlayerViews {
       ownerUid: p.kind === 'token' ? p.ownerUid ?? null : null,
 
     };
-    const skinId = p.kind === 'chess' ? this.skinIdFor(rec) : null;
-    if (skinId) v.skinId = skinId;
+    // display only (docs/SKINS.md): the operator's own appearance, the pick's for a filled 自选 slot
+    const pick = p.kind === 'chess' ? this.diyPickOf(p.id) : null;
+    const skinId = p.kind === 'chess' ? this.skinFor(rec, pick ? pick.charId : null) : null;
+    if (skinId) v.skin = skinId;
     if (rc) { v.row = rc[0]; v.col = rc[1]; v.dir = pieceDir(p); }
     return v;
   }

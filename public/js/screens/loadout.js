@@ -40,9 +40,8 @@ import {
   changedCount, skillLabel, moduleBadge, attrRows, skillTags, quickSkillTags, traitLines,
   opsOf, setOps, resetOps, moduleRecord,
 } from '../ui/loadoutModel.js';
-import { loadoutStore, openLoadout, closeLoadout, setEntries, setOpsMap, setNotOwned, setDiyPicks, setSkins, applyOperatorPreset } from '../ui/loadoutSync.js';
+import { loadoutStore, openLoadout, closeLoadout, setEntries, setOpsMap, setNotOwned, setDiyPicks, applyOperatorPreset } from '../ui/loadoutSync.js';
 import { serializeOperatorPreset, parseOperatorPreset, OPERATOR_PRESET_MAX_BYTES } from '../ui/operatorPresetModel.js';
-import { SkinPicker } from '../ui/skinPicker.js';
 import { ownAppearance } from '../ui/skinAssets.js';
 import { OperatorVoice } from '../ui/operatorVoice.js';
 // 皮肤 (docs/SKINS.md): a self-contained section — everything it does lives in ui/skinPicker.js, so this screen keeps
@@ -317,7 +316,7 @@ export function ModuleInfo({ m, golden, opt, potential = null }) {
 const standInName = (chess) => data.get('backups')?.units?.[chess?.backup?.charId]?.name ?? null;
 
 
-function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset, locked, level = 'normal', onLevel, notOwned = false, skins = {}, skinSync = 'idle' }) {
+function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset, locked, level = 'normal', onLevel, notOwned = false, skins = {} }) {
   const [statLevel, setStatLevel] = useState('elite'); // 局内数值: the 精锐 shows the chosen module's effect
   const setLevel = onLevel;
   const bodyRef = useRef(null);
@@ -393,7 +392,6 @@ function Detail({ m, chess, golden, entries, ops = {}, onChange, onOps, onReset,
         </div>
         ${modOpt ? html`<${ModuleInfo} m=${m} golden=${golden} opt=${modOpt} potential=${cv.potentialOn ? cv.potential : null} />` : null}
       </section>` : null}
-      <${SkinPicker} m=${m} charId=${chess.charId} record=${golden || chess} choices=${skins} sync=${skinSync} onChange=${setSkins} locked=${locked} />
       ${notOwned ? html`<p class="lo-locknote lo-locknote--standin" data-testid="loadout-standin-note"><${Icon} name="info" />${standInName(chess) ? t('干员持有中标记为未持有：此棋子由替补干员 {name} 上场，技能与模组固定（补位干员技能不可更改）；这里的调配在改回「持有」后生效', { name: standInName(chess) })
         : t('干员持有中标记为未持有：此棋子由替补干员上场，技能与模组固定（补位干员技能不可更改）；这里的调配在改回「持有」后生效')}</p>` : null}
       ${locked ? html`<p class="lo-locknote"><${Icon} name="info" />${t('本局的调配已锁定，修改将在下一局生效')}</p>` : null}
@@ -1026,7 +1024,7 @@ function LoadoutScreen({ st, leaving = false }) {
   const deckLoadout = deck && tab === 'loadout';
   const clearFilters = () => loadoutStore.set({ filters: { ...st.filters, tier: null, prof: null, bond: null, query: '', changedOnly: false } });
   const lockedText = t('本局的调配已锁定（确认本局信息后无法修改），修改将在下一局生效');
-  const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} skins=${st.skins} skinSync=${st.skinSync} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked}
+  const loadoutDetail = html`<${Detail} m=${m} chess=${base} golden=${golden} entries=${st.entries} skins=${st.skins} ops=${st.ops} onChange=${change} onOps=${setOpsOf} onReset=${resetOne} locked=${locked}
     level=${golden ? previewLevel : 'normal'} onLevel=${setPreviewLevel}
     notOwned=${!!base && (st.notOwned || []).includes(base.chessId)} />`;
 
@@ -1132,7 +1130,7 @@ function LoadoutScreen({ st, leaving = false }) {
       : html`<p class=${cx('lo-note', locked && 'is-locked')}><${Icon} name="info" />${locked ? lockedText : fromText}</p>`}
     ${!ready ? html`<div class="lo-loading"><${Spinner} size="sm" />${t('正在载入干员数据（打开页面后仅载入一次）…')}</div>`
       : lost.length ? html`<${DataMissing} files=${lost} />` : tab === 'diy'
-      ? html`<${DiyPanel} m=${m} picks=${st.diy || {}} legal=${diyLegal} kitted=${st.diyKitted} onSet=${setDiySlot} skins=${st.skins} skinSync=${st.skinSync} onSkins=${setSkins} ops=${st.ops} onOps=${setOpsOf} />`
+      ? html`<${DiyPanel} m=${m} picks=${st.diy || {}} legal=${diyLegal} kitted=${st.diyKitted} onSet=${setDiySlot} ops=${st.ops} onOps=${setOpsOf} />`
       : tab === 'ownership'
       ? html`<${OwnershipPanel} m=${m} roster=${ownRoster} notOwned=${st.notOwned} onToggle=${toggleOwned} />`
       : deck ? html`<main class="lo-deckwrap">

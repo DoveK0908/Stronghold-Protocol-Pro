@@ -10,6 +10,11 @@ each player switches on for themself.
 > `data/skins-installed.json` 又会让更新校验对不上。本实现没有安装报文、不写 `data/` 下的任何文件、不随包发布任何
 > 安装状态：皮肤属于插件，插件怎么落地是 `plugins/` 目录（安装、studio、ZIP）本来就有的问题。
 
+> **卫戍协议 Pro 的默认安装带皮肤目录。** 本仓库不依赖外观插件提供时装：`tools/prepare-operator-skins.mjs` 从
+> 本机提取的官方素材里生成 169 名干员的 266 套时装，按本文的 `chars[<charId>].skins[<skinKey>]` 形状写进
+> `data/assets.json`，随仓库发布，客户端读取链路与本文完全一致（`public/js/ui/skins.js`、`spineEntry { skin }`）。
+> 差别只有安装面：官方要求时装来自 cosmetic 插件（下面的 overlay 与 `/vs/` 合成都支持，装了插件仍按其范围覆盖），
+> 我们是「清单自带 + 插件可叠加」。不进 git 的规则不变：素材在 `.cache`/`_build` 里提取，仓库只提交生成后的清单。
 ## The data: one overlay, no catalogue file
 
 ```

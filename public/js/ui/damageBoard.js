@@ -107,8 +107,8 @@ export function damageGroups(snapshot, owners, metric = 'damage') {
 
 export function damageAppearance(chess, row, ownerId, units = []) {
   const unit = units.find(u => u?.ownerId === ownerId && u.defId === row.defId && u.uid === row.uid && u.kind === 'op');
-  if (!chess || !unit?.skinId) return chess;
-  return appearanceRecord({ ...chess, charId: unit.spine, assets: { ...chess.assets, avatar: unit.avatar } }, unit.skinId);
+  if (!chess || !unit?.skin) return chess;
+  return appearanceRecord({ ...chess, charId: unit.spine, assets: { ...chess.assets, avatar: unit.avatar } }, unit.skin);
 }
 
 export function DamageBoard({ snapshot, ownerId, ownerName, uniteOwners = null, uniteRelay = false, bossOwners = null, bossHidden = false, open = false, onToggle, units = [] }) {
@@ -174,7 +174,7 @@ function DamageRows({ score = { available: false, rows: [], total: 0 }, manifest
         <${Tooltip} text=${detail} block class="damage-board__tip">
           <div class="damage-board__row" tabIndex="0" aria-label=${detail}>
             <span class="damage-board__portrait" aria-hidden="true">
-              ${row.other ? html`<${GIcon} name="gear" />` : html`<${Img} src=${chessAvatarUrl(manifest, chess)} fallbackSrc=${chessAvatarUrl(manifest, chess && { ...chess, skinId: null })}
+              ${row.other ? html`<${GIcon} name="gear" />` : html`<${Img} src=${chessAvatarUrl(manifest, chess)} fallbackSrc=${chessAvatarUrl(manifest, chess && { ...chess, skin: null })}
                 fallback=${html`<span class="damage-board__initial">${Array.from(name)[0]}</span>`} />`}
               <span class="damage-board__rank num">${index + 1}</span>
             </span>

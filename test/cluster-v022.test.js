@@ -15,7 +15,7 @@ import { MatchViews } from '../server/match/match/views.js';
 import { DATA, QUIET, phase } from './match/combat-fixtures.js';
 import { ERR, PHASE, MATCHMAKING_VERSION } from '../shared/constants.js';
 import { LOADOUT_LIMITS } from '../shared/protocol.js';
-import { OPERATOR_SKINS } from '../shared/skins.js';
+import { MANIFEST_SKINS as OPERATOR_SKINS } from './helpers/manifestSkins.js';
 
 const BUILD = 'v022-fixture', NODE = 'v022-game', EPOCH = 'v022-epoch';
 const CHAR = 'char_103_angel', settings = potential => ({ [CHAR]: { potential, cultivate: 0 } });
@@ -155,7 +155,7 @@ test('v0.2.2 native lobby/platform/node chain carries ops and manual AI option; 
   };
   const p = player('Player'), observer = player('Observer');
   assert.deepEqual(lobby.loadout(p, { entries: {}, ops: settings(2) }), { ok: true });
-  assert.deepEqual(lobby.skins(p, { choices: skins }), { ok: true });
+  assert.deepEqual(lobby.skins(p, { skins }), { ok: true });
   assert.deepEqual(lobby.create(p, { mode: 'coop', difficulty: 'NORMAL' }), { ok: true });
   const room = lobby.roomOf(p);
   assert.deepEqual(lobby.addBot(p), { ok: true });

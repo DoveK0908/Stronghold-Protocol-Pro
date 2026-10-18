@@ -58,7 +58,7 @@ English summary: [below](#english).
 
 ### 界面
 
-- **干员外观**：干员调配和自选编队里可以选择时装，只改变头像、立绘和战斗小人，不改变属性、技能和伤害。目前收录 95 名干员、127 套时装，其中部分带动态立绘。见 [docs/OPERATOR-SKINS.md](docs/OPERATOR-SKINS.md)。
+- **干员外观**：干员调配和自选编队里可以选择时装，只改变头像、立绘和战斗小人，不改变属性、技能和伤害。目前收录 169 名干员、266 套时装，其中部分带动态立绘。见 [docs/SKINS.md](docs/SKINS.md)。
 - **配音语言**：干员配音可选中文、日语、英语，和界面语言分开设置。见 [docs/VOICE-LANGUAGES.md](docs/VOICE-LANGUAGES.md)。
 - **完整干员预设**：技能、模组、潜能 / 练度、干员持有、自选编队和外观一起导出、导入，可以带到其他设备。见 [docs/OPERATOR-PRESETS.md](docs/OPERATOR-PRESETS.md)。
 - **干员输出统计**：按当前视角显示本轮伤害排行，包括各自行动、联防和 Boss 战。
@@ -233,7 +233,7 @@ npm start          # 启动服务器：http://localhost:3000
 | 文档 | 内容 |
 |---|---|
 | [docs/EXPERIMENTAL-MULTIPLAYER.md](docs/EXPERIMENTAL-MULTIPLAYER.md) | 扩展人数的好友房：人数模式、整队匹配、卡池分组、接力联防与复活规则 |
-| [docs/OPERATOR-SKINS.md](docs/OPERATOR-SKINS.md) | 干员外观：收录范围、动态立绘、保存方式 |
+| [docs/SKINS.md](docs/SKINS.md) | 干员外观：数据来源、保存方式、与官方外观插件的差别 |
 | [docs/OPERATOR-PRESETS.md](docs/OPERATOR-PRESETS.md) | 完整干员预设的内容、导入导出与旧格式兼容 |
 | [docs/VOICE-LANGUAGES.md](docs/VOICE-LANGUAGES.md) | 界面语言与干员配音语言 |
 | [docs/LATENCY.md](docs/LATENCY.md) | 延迟探测与服务器压力显示（英文） |

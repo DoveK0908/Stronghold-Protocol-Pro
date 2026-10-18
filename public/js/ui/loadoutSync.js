@@ -35,8 +35,8 @@ import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, toStoredOwnership, cleanIds, sanitizeNotOwned } from './ownershipModel.js';
 import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } from './diyModel.js';
 import { toast } from './toasts.js';
-import { cleanSkinChoices } from '../../../shared/skins.js';
-import { SKINS_PREF, parseStoredSkins, toStoredSkins } from './skinsModel.js';
+import { SKINS_KEY, SKINS_PREF, SKINS_SYNC_KEY, parseStoredSkins, setSkins as setSkinChoices, skinsStore } from './skins.js';
+import { serializeSkins } from './skinsModel.js';
 import { t, N_ } from '../../../shared/i18n.js';
 import { prepareOperatorPreset } from './operatorPresetModel.js';
 
@@ -56,25 +56,24 @@ function readStoredDiy() {
   try { return parseStoredDiy(loadPref(DIY_PREF, null)); } catch { return {}; }
 }
 
-function readStoredSkins() {
-  try { return parseStoredSkins(loadPref(SKINS_PREF, null)); } catch { return {}; }
-}
-export function setSkins(choices) {
-  const next = cleanSkinChoices(choices);
-  try { savePref(SKINS_PREF, toStoredSkins(next)); } catch { /* private mode: the session keeps the choice */ }
-  loadoutStore.set({ skins: next });
-}
 
 /** Validate all included sections, then publish one local change; existing ordered sync engines retain their locks. */
 export function applyOperatorPreset(parsed, deps, { target = loadoutStore, persist = savePref } = {}) {
   const result = prepareOperatorPreset(parsed, deps);
   if (!result.ok) return result;
   const formats = {
-    notOwned: [OWNERSHIP_PREF, toStoredOwnership], diy: [DIY_PREF, toStoredDiy], skins: [SKINS_PREF, toStoredSkins],
+    notOwned: [OWNERSHIP_PREF, toStoredOwnership], diy: [DIY_PREF, toStoredDiy],
   };
   const current = target.get?.() || {};
   let loadoutSaved = false;
   for (const [key, value] of Object.entries(result.patch)) {
+    // 皮肤 (docs/SKINS.md) live in their own store (ui/skins.js), never in this one: the loadout's sync engine keeps
+    // that store current, exactly as it keeps the loadout's
+    if (key === 'skins') {
+      try { persist(SKINS_KEY, serializeSkins(value)); } catch { /* blocked storage: the in-memory store still takes it */ }
+      setSkinChoices(value);
+      continue;
+    }
     if (key === 'entries' || key === 'ops') {
       if (loadoutSaved) continue;
       loadoutSaved = true;
@@ -85,7 +84,8 @@ export function applyOperatorPreset(parsed, deps, { target = loadoutStore, persi
     const [pref, format] = formats[key];
     try { persist(pref, format(value)); } catch { /* blocked storage: keep the coherent in-memory preset */ }
   }
-  target.set(result.patch);
+  const { skins: _skins, ...rest } = result.patch;
+  target.set(rest);
   return result;
 }
 
@@ -96,8 +96,6 @@ export const loadoutStore = createStore({
   notOwned: readStoredOwnership(), // 干员持有: base chess ids marked 未持有 (sorted; [] = every operator owned)
   diy: readStoredDiy(), // 自选编队: { [slotBaseId]: { charId, skillIndex?, uniEquipId? } } ({} = every slot empty)
   diyKitted: null,     // the operators a DIY slot may field (welcome.diyKitted; null before the first welcome)
-  skins: readStoredSkins(),
-  skinSync: 'idle',
   open: false,
   from: null,          // 'lobby' | 'room' | 'briefing' | 'prep'
   tab: 'loadout',      // 'loadout' (干员调配) | 'ownership' (干员持有) | 'diy' (自选编队)
@@ -376,17 +374,22 @@ export function installOwnershipSync({ net, timers, target = loadoutStore, notif
 }
 
 /**
- * Wire the 干员皮肤 sync once: `room.skins { choices }` after every welcome and edit, from the same loadout store as the
- * rest of the display preferences (`cleanSkinChoices` drops anything the local skin catalogue does not hold). During
- * a match the server stores it for the next one (ROOM_STARTED → 'locked').
+ * Wire the 干员皮肤 sync once (docs/SKINS.md): `room.skins { skins }` after every welcome and edit, from `skinsStore`
+ * (ui/skins.js — its own store, like the loadout's: a skin choice belongs to no screen).
+ *
+ * The selection goes as stored, structurally clean (ui/skins.js parseStoredSkins): the appearance it names lives in the
+ * composed asset manifest (`chars[<charId>].skins`), which is no part of the room's content set, so there is nothing to
+ * check it against — an unknown id can only fail to resolve in `spineEntry()` and draw the default model. During a match
+ * the server takes it at once (`Match.setSkins`, any phase: a skin is cosmetic and public) instead of storing it for the
+ * next one.
  * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
  *   notify?: (text: string) => void }} deps
  */
-export function installSkinsSync({ net, timers, target = loadoutStore, notify } = {}) {
+export function installSkinsSync({ net, timers, target = skinsStore, notify } = {}) {
   return installPrefSync({
-    net, timers, target, notify, key: 'skins', stateKey: 'skinSync', msgType: 'room.skins', field: 'choices', tag: 'skins',
-    lockedText: N_('本局的干员外观已锁定，修改将在下一局生效'),
-    prepare: async () => cleanSkinChoices(target.get().skins),
+    net, timers, target, notify, key: SKINS_KEY, stateKey: SKINS_SYNC_KEY, msgType: 'room.skins', field: 'skins', tag: 'skins',
+    lockedText: N_('这台服务器不接受皮肤选择，只有本机保存'),
+    prepare: async () => parseStoredSkins(target.get()[SKINS_KEY]),
   });
 }
 

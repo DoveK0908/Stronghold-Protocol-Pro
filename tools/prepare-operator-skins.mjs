@@ -5,7 +5,7 @@ import { resolve, join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { OPERATOR_SKINS, skinFor } from '../shared/skins.js';
+import { SKIN_CATALOGUE as OPERATOR_SKINS } from '../shared/skin-catalogue.js';
 import { atlasInfo, normalizeAtlas } from './assets/atlas.mjs';
 import { parseSkel, normalizeSkelPaths } from './assets/skel.mjs';
 import { resolveRoles } from './assets/anim-roles.mjs';
@@ -24,20 +24,74 @@ export function skinResourceFiles(skins) {
   };
   walk(skins); return files;
 }
+
+/**
+ * One skin as the manifest holds it (docs/SKINS.md): the official record `{ name, group, avatar, avatarE2, portrait,
+ * portraitE2, illust, spine: { front, back? } }` plus this remaker's extras (the dynamic illustration and the battle
+ * prefab id `tools/local-extract` reads). The key is the skin's own data key, never a catalogue index.
+ * @param {Record<string, any>} rec the imported record
+ * @returns {Record<string, any>}
+ */
+export function skinEntry(rec) {
+  const out = { name: rec.name };
+  if (typeof rec.brand === 'string' && rec.brand) out.group = rec.brand;
+  if (rec.avatar) out.avatar = rec.avatar;
+  if (rec.portrait) out.portrait = rec.portrait;
+  if (rec.illustration) out.illust = rec.illustration;
+  out.spine = rec.spine;
+  if (rec.dynamic) out.dynamic = rec.dynamic;
+  if (rec.dynamicDeclared) out.dynamicDeclared = true;
+  if (rec.backUnavailable) out.backUnavailable = true;
+  if (rec.battleModelKind) out.battleModelKind = rec.battleModelKind;
+  if (typeof rec.prefab === 'string' && rec.prefab) out.prefab = rec.prefab;
+  return out;
+}
+
+/**
+ * Merge imported skins into the manifest's operators: `chars[<charId>].skins[<key>]` (docs/SKINS.md). A charId the
+ * manifest does not hold is dropped — a choice can only be keyed by an operator the client knows.
+ * @param {Record<string, any>} chars the manifest's chars
+ * @param {Record<string, { charId: string }>} skins internal records keyed by skin key
+ * @returns {{ chars: Record<string, any>, installed: Record<string, Record<string, any>> }}
+ */
+export function mergeSkinsIntoChars(chars, skins) {
+  const out = { ...(chars || {}) };
+  const installed = {};
+  for (const [key, rec] of Object.entries(skins)) {
+    const char = out[rec.charId];
+    if (!char || typeof char !== 'object') continue;
+    out[rec.charId] = { ...char, skins: { ...(char.skins || {}), [key]: skinEntry(rec) } };
+    (installed[rec.charId] ||= {})[key] = out[rec.charId].skins[key];
+  }
+  return { chars: out, installed };
+}
+
+/** Every skin the manifest holds: `{ [charId]: { [skinKey]: record } }`. */
+export function installedSkins(manifest) {
+  const out = {};
+  for (const [charId, char] of Object.entries(manifest?.chars || {})) {
+    if (char && char.skins && typeof char.skins === 'object') out[charId] = char.skins;
+  }
+  return out;
+}
+
 export function retainInstalledSkins(current, assetRoot) {
   const skins = {}, files = new Set();
-  for (const [id, rec] of Object.entries(current?.skins || {})) {
-    if (!skinFor(rec?.charId, id) || !rec.avatar || !rec.portrait || !rec.spine?.front) continue;
-    const required = skinResourceFiles({ [id]: rec });
-    if (!required.size || [...required].some(rel => !rel.startsWith(`skins/${id}/`) || rel.includes('..') || !existsSync(join(assetRoot, rel)))) continue;
-    skins[id] = rec; for (const rel of required) files.add(rel);
+  for (const [charId, byKey] of Object.entries(installedSkins(current))) {
+    for (const [id, rec] of Object.entries(byKey)) {
+      if (!rec || !rec.avatar || !rec.portrait || !rec.spine?.front) continue;
+      const required = skinResourceFiles({ [id]: rec });
+      if (!required.size || [...required].some(rel => !rel.startsWith(`skins/${id}/`) || rel.includes('..') || !existsSync(join(assetRoot, rel)))) continue;
+      (skins[charId] ||= {})[id] = rec; for (const rel of required) files.add(rel);
+    }
   }
   return { skins, files };
 }
 export function skinManifestMetadata(manifest, assetRoot) {
   const { version, hash, generator, stats, ...body } = manifest;
   const files = skinResourceFiles(body);
-  return { ...manifest, hash: contentHash(body), stats: { ...stats, files: files.size, bytes: totalBytes(assetRoot, files), skins: Object.keys(manifest.skins || {}).length } };
+  const count = Object.values(installedSkins(manifest)).reduce((n, byKey) => n + Object.keys(byKey).length, 0);
+  return { ...manifest, hash: contentHash(body), stats: { ...stats, files: files.size, bytes: totalBytes(assetRoot, files), skins: count } };
 }
 
 async function download(url, max = 16 * 1024 * 1024) {
@@ -141,8 +195,8 @@ export async function prepareSkins({ sourceDir, fetchSources = false, catalogue 
   const prepareOne = async skin => {
     try {
       if (!identifier(skin.id) || !identifier(skin.charId) || !manifest.chars?.[skin.charId] || !Number.isInteger(skin.wikiIndex) || skin.wikiIndex < 1 || skin.wikiIndex > 99 || typeof skin.name !== 'string' || typeof skin.charName !== 'string' || !skin.charName.trim()) throw new Error('Incomplete metadata mapping');
-      if (modelSource === 'metadata' && Object.hasOwn(manifest.skins || {}, skin.id)) {
-        if (manifest.skins[skin.id].charId !== skin.charId || manifest.skins[skin.id].name !== skin.name) throw new Error('Conflicting installed skin identity');
+      if (modelSource === 'metadata' && Object.hasOwn(installedSkins(manifest)[skin.charId] || {}, skin.id)) {
+        if (installedSkins(manifest)[skin.charId][skin.id].name !== skin.name) throw new Error('Conflicting installed skin identity');
         preserved.push(skin.id); return;
       }
       const battle = modelSource === 'metadata' ? skinBattleModels(skin, JSON.parse((await obtain(`${skin.id}/model-meta.json`,
@@ -152,7 +206,8 @@ export async function prepareSkins({ sourceDir, fetchSources = false, catalogue 
       const api = new URL('https://prts.wiki/api.php');
       for (const [k, v] of Object.entries({ action: 'query', format: 'json', prop: 'imageinfo', titles: titles.join('|'), iiprop: 'url|size|sha1' })) api.searchParams.set(k, v);
       const meta = JSON.parse((await obtain(`${skin.id}/imageinfo.json`, api.href, 256 * 1024)).toString('utf8'));
-      const rec = { charId: skin.charId, name: skin.name, brand: skin.brand, spine: {}, dynamicDeclared: !!skin.dynIllustId };
+      const rec = { charId: skin.charId, name: skin.name, brand: skin.brand, spine: {}, dynamicDeclared: !!skin.dynIllustId,
+        ...(typeof skin.officialId === 'string' && skin.officialId ? { prefab: skin.officialId } : {}) };
       for (const [i, field] of ['avatar', 'portrait', 'illustration'].entries()) {
         const info = Object.values(meta.query?.pages || {}).find(page => page.title === titles[i])?.imageinfo?.[0];
         if (!info?.url || !Number.isSafeInteger(info.size) || info.size > 16 * 1024 * 1024) throw new Error(`Missing picture: ${titles[i]}`);
@@ -200,7 +255,9 @@ export async function prepareSkins({ sourceDir, fetchSources = false, catalogue 
   let index = 0;
   const run = async () => { while (index < catalogue.length && !sourceBlocked) { const skin = catalogue[index++]; await prepareOne(skin); await new Promise(resolve => setTimeout(resolve, 250)); } };
   await Promise.all([run(), run()]);
-  manifest.skins = { ...(manifest.skins || {}), ...skins };
+  const merged = mergeSkinsIntoChars(manifest.chars, skins);
+  manifest.chars = merged.chars;
+  delete manifest.skins; // one place for an appearance: chars[<charId>].skins (docs/SKINS.md)
   const report = { schemaVersion: 1, modelSource, baseManifestSHA256: sha(prior), accepted, preserved, failures, dynamicFailures, models, files: inventory };
   const reportPath = join(source, `inventory-${Date.now()}-${randomUUID()}.json`);
   await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });

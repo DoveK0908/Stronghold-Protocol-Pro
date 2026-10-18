@@ -39,7 +39,7 @@ function unitArt(m, info) {
   if (!m || !id) return null;
   if (info.side === 'enemy' || String(id).startsWith('enemy_')) return enemyIconUrl(m, id);
   if (String(id).startsWith('token_')) return tokenAvatarUrl(m, id);
-  const skin = appearanceEntry(m, info.spine, info.skinId);
+  const skin = appearanceEntry(m, info.spine, info.skin);
   if (skin?.avatar) return skin.avatar;
   const chars = m.chars || {};
   if (chars[id]?.avatar) return chars[id].avatar;
@@ -289,7 +289,7 @@ export function createFallbackView(host, opts = {}) {
         style=${`transform:translate(${px - size / 2}px,${py - size / 2}px);width:${size}px;height:${size}px`}
         onPointerDown=${(e) => { if (e.button === 0) emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 0, clientX: e.clientX, clientY: e.clientY }); }}
         onContextMenu=${(e) => { e.preventDefault(); emit('pieceClick', { unitId: id, uid: info.uid ?? null, unit: info, button: 2, clientX: e.clientX, clientY: e.clientY }); }}>
-      <div class="ff-unit__art"><${Img} src=${src} fallbackSrc=${unitArt(m(), { ...info, skinId: null })} fallback=${html`<span>${[...(info.name || '?')][0]}</span>`} /></div>
+      <div class="ff-unit__art"><${Img} src=${src} fallbackSrc=${unitArt(m(), { ...info, skin: null })} fallback=${html`<span>${[...(info.name || '?')][0]}</span>`} /></div>
       <div class="ff-unit__bars"><i class="hp" style=${`width:${hpPct}%`}></i>${!enemy && spMax > 0 ? html`<i class="sp" style=${`width:${spPct}%`}></i>` : null}</div>
     </div>`;
   }

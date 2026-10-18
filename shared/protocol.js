@@ -514,8 +514,9 @@ const isDir = (v) => DIRS.includes(v);
  * also requires a real operator of its game data), `bg`: a namecard background id
  * ('' clears; format only, the client maps ids to art), `trophies`: a self-reported cumulative trophy count (0 clears;
  * cosmetic only, never used by a match). `look` / `avatarLook` (GitHub feedback #9 / #24): the art of the portrait / the
- * avatar operator — '' its 精二 art (as before), 'e1' its 精一 art, or a skin id of that operator (the server checks it
- * belongs to it: shared/skins.js skinFor). `bg` may be `skin:<skin id>`, the skin's full illustration.
+ * avatar operator — '' its 精二 art (as before), 'e1' its 精一 art, or a skin key of that operator (the server checks it
+ * belongs to it: isSkinId over the operator's own chars[<charId>].skins keys, docs/SKINS.md). `bg` may be
+ * `skin:<charId>:<skinKey>`, the skin's full illustration.
  * A field the message leaves out keeps its stored value.
  */
 export const CARD_LIMITS = Object.freeze({ idLength: 48, trophies: 1_000_000 });

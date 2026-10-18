@@ -9,7 +9,7 @@ import { SessionRegistry } from '../server/net.js';
 import { validateC2S, CARD_LIMITS } from '../shared/protocol.js';
 import { ERR, MATCHMAKING_VERSION } from '../shared/constants.js';
 import { DATA } from './match/harness.js';
-import { OPERATOR_SKINS as SKINS } from '../shared/skins.js';
+import { MANIFEST_SKINS as SKINS } from './helpers/manifestSkins.js';
 
 const quiet = { info() {}, warn() {}, error() {}, debug() {} };
 const OPS = [...new Set(Object.values(DATA.chess).map((c) => c.charId).filter(Boolean))].sort();

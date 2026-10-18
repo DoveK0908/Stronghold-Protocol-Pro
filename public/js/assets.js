@@ -77,7 +77,7 @@ export function baseCharId(id) {
 export function avatarUrl(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const skin = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const skin = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (str(skin?.avatar)) return skin.avatar;
   const direct = get(get(m, 'chars'), s);
   let rec = direct, e2 = !!(opts && opts.e2);
@@ -94,7 +94,7 @@ export function avatarUrl(m, id, opts) {
 export function portraitUrl(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const skin = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const skin = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (str(skin?.portrait)) return skin.portrait;
   let rec = get(get(m, 'chars'), s), e2 = !!(opts && opts.e2);
   if (!rec) {
@@ -171,11 +171,11 @@ const appearanceSpines = new WeakMap();
 export function spineEntry(m, id, opts) {
   const s = str(id);
   if (!s) return null;
-  const appearance = appearanceEntry(m, baseCharId(s), opts?.skinId);
+  const appearance = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (appearance?.spine) {
     const sp = opts?.back && validSpine(appearance.spine.back) ? appearance.spine.back : appearance.spine.front;
     if (validSpine(sp)) {
-      const fallback = spineEntry(m, s, { ...opts, skinId: null });
+      const fallback = spineEntry(m, s, { ...opts, skin: null });
       const cached = appearanceSpines.get(sp);
       if (cached?.fallback === fallback) return cached.entry;
       const entry = { ...sp, fallback };
@@ -233,7 +233,7 @@ export function localSpineEntry(sl, local, web) {
 
 /** Whether an operator/token/enemy has a Back model. */
 export function hasBackSpine(m, id, opts) {
-  const skin = appearanceEntry(m, baseCharId(id), opts?.skinId);
+  const skin = appearanceEntry(m, baseCharId(id), opts?.skin);
   if (validSpine(skin?.spine?.front)) return validSpine(skin.spine.back);
   const ch = get(get(m, 'chars'), str(id) || '') || get(get(m, 'chars'), baseCharId(id) || '');
   return !!(ch && isObj(ch.spine) && validSpine(ch.spine.back));

@@ -16,7 +16,7 @@ test('a freshly loaded Archetto skin poses its real Idle before the first draw w
   try {
     for (const side of ['front', 'back']) {
       calls.length = 0;
-      const entry = manifest.skins.char_332_archet_sale_14.spine[side];
+      const entry = manifest.chars.char_332_archet.skins.char_332_archet_sale_14.spine[side];
       const a = new SpineActor({ animations: Object.keys(entry.animations).map(name => ({ name })) }, entry);
       assert.deepEqual(calls, [{ dt: 0, track: 'Idle', time: 0 }]);
       assert.equal(a.spine.posed, true);
