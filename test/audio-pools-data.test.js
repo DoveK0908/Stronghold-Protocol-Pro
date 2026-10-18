@@ -52,8 +52,11 @@ test('every generated attack/hit reference resolves to a valid pool and its sele
       }
     }
   }
-  assert.equal(refs, 952); // 0.3.1 release fetch-assets: + 琳琅诗怀雅 S3, 刻俄柏, 风丸 attacks and 松果's hit (their official pools)
-  assert.equal(Object.keys(pools).length, 941); // + the four pools above
+  // 0.3.1 release fetch-assets: 952 references over 941 pools (+ 琳琅诗怀雅 S3, 刻俄柏, 风丸 attacks, 松果's hit).
+  // Pro content adds 丰川祥子 (char_4182_oblvns): UNIT_SFX_BANKS / SKILL_SFX_BANKS name her talent and per-skill
+  // projectile banks, which the official ON_ABILITY_* convention cannot see — 2 more unit references over 6 pools.
+  assert.equal(refs, 954);
+  assert.equal(Object.keys(pools).length, 947);
   const p = pools[units.char_4064_mlynar.attackPools[2]];
   assert.equal(p.sounds['player/p_imp/p_imp_loyalsword_h.mp3'].delay, 0.1);
 });

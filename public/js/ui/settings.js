@@ -43,7 +43,8 @@ import { copyText } from './clipboard.js';
 import { ScreenFitSection } from './screenFit.js';
 import { OwnerKeySection } from './ownerName.js';
 import { AssetSection } from './assetSection.js';
-import { catalog, loadCatalog, cosmeticPlugins, installedCount, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
+import { catalog, loadCatalog, cosmeticPlugins, installedCount, isPersonalCosmetic, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
+import { resolveThemeVars, themeVarsOf } from '../../../shared/plugins/theme.js';
 import { setUiPlugin, uiPluginEntries, uiPlugins } from './uiPlugins.js';
 import { hasAnySkinChoices } from './skins.js';
 import { UI_LIMITS } from '../../../shared/plugins/ui.js';
@@ -302,7 +303,10 @@ function CosmeticSection() {
   const installed = useStore(installedCount);
   const s = useSettings();
   useEffect(() => { if (installed) loadCatalog({ force: true }); }, [installed]);
-  const list = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
+  const entries = installed ? cosmeticPlugins(cat.plugins, 'personal') : [];
+  // Notice-only cosmetics (公告) carry no art and no theme: they are never listed as a switch (content.js isPersonalCosmetic),
+  // but they still count as a dependency for personalSet — a theme that needs one is on 「自动」, not warned as missing.
+  const list = entries.filter(isPersonalCosmetic);
   // The 显示其他玩家的皮肤 switch is on screen with or without a PERSONAL plugin — the appearance can also come from
   // the manifest's own catalogue (this fork ships one, docs/SKINS.md), and a switch that appears only when a plugin
   // happens to be installed would look like a bug. It follows the same rule the 皮肤 section does (ui/skins.js
@@ -316,9 +320,14 @@ function CosmeticSection() {
       <${OtherSkinsRow} value=${s.otherSkins !== false} onSet=${(v) => updateSettings({ otherSkins: v })} />
     </section>`;
   }
-  const set = personalSet(ids, list.filter((p) => typeof p.vs === 'string'));
+  const set = personalSet(ids, entries);
   const applied = new Set(set.order);
   const auto = new Set(set.auto);
+  // Which plugin each theme variable actually comes from, in the applied order (shared/plugins/theme.js resolveThemeVars).
+  const winners = resolveThemeVars(set.order.map((id) => {
+    const p = entries.find((x) => x.id === id);
+    return { id, vars: themeVarsOf(p) };
+  }));
   const flip = (id, on) => { const r = setPersonalPlugin(id, on); if ('error' in r) toast(describeError(r.error), 'warn'); };
   return html`<section class="set-plugins" aria-labelledby="set-plugins-title" data-testid="personal-plugins">
     <div class="set-keys__head">
@@ -326,6 +335,7 @@ function CosmeticSection() {
     </div>
     <p class="set-hint">${t('只改变你自己看到的画面和声音，不影响其他博士，也不影响战斗；插件为非官方制作。')}</p>
     <${OtherSkinsRow} value=${s.otherSkins !== false} onSet=${(v) => updateSettings({ otherSkins: v })} />
+    ${winners.map((w) => html`<p key=${w.name} class="set-hint set-theme-win">${t('{token} 由「{name}」生效', { token: w.name, name: pluginName(list.find((p) => p.id === w.pluginId) || { id: w.pluginId }) })}</p>`)}
     ${list.map((p) => {
       // on: applied (chosen, or 「自动」: another one needs it) — or chosen but left out now (a conflict): switch it off
       const skipped = set.skipped.includes(p.id);

@@ -192,6 +192,7 @@ import { DIFFICULTIES, ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, MATCHMAKIN
 import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, checkDiyPicks, charPotentialChanges } from '../shared/protocol.js';
 import { checkSkinSelection, isSkinId, operatorCharIds } from '../shared/protocol.js';
 import { EXPERIMENTAL_DEFAULTS, experimentalOptions, isExperimental, sameExperimental } from '../shared/experimental.js';
+import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
 import { MAX_PLAYER_CAPACITY, PLAYER_CAPACITY_VERSION, roomCapacity } from '../shared/playerCapacity.js';
 import { encode, isErrCode, sendEncodedMany, sendMessage, sendRaw, sendSession, TokenBucket } from './net.js';
 import { isCompressibleType } from './wsCompression.js';
@@ -397,6 +398,8 @@ export class Room {
     /** @type {{ live: boolean, ended: boolean, disposed: boolean, match: any } | null} */
     this.matchCtx = null;
     this.matchCount = 0;
+    /** Test room (DESIGN §34.8): set at create only, and only when the process switch is on. Never flipped later. */
+    this.test = false;
     this.revivalLocked = null;
     this.source = 'private';
     // Public rooms charge every participant's network, not a rotating/randomly selected host alone.
@@ -487,6 +490,8 @@ export class Room {
       spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(s.owner ? { owner: true } : {}),
         ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
+      // omitted when false so a normal room.state stays identical
+      ...(this.test ? { test: true } : {}),
     };
   }
 }
@@ -533,8 +538,26 @@ export class Lobby {
     this.getData = getData;
     this.now = now;
     this.seedFn = seedFn || (() => randomInt(2 ** 32));
+    // Test rooms (DESIGN §34.8): the process switch and the bound address, never the HTTP peer.
+    const testModeOpt = options.testMode;
+    const testHostOpt = options.testHost;
+    if (Object.hasOwn(options, 'testMode') || Object.hasOwn(options, 'testHost')) {
+      options = { ...options };
+      delete options.testMode;
+      delete options.testHost;
+    }
     this.opts = { ...LOBBY_DEFAULTS, ...options };
     this.limits = limits;
+    // Test rooms stay off until the bound address is known (setTestHost). An empty host fails closed, so a
+    // server that is about to bind 0.0.0.0 does not briefly accept test rooms on the default. [ASSUMED] the
+    // env words are parsed in server/testMode.js.
+    const rawMode = testModeOpt != null ? testModeOpt : (typeof process !== 'undefined' && process.env ? process.env.SP_TEST_MODE : undefined);
+    this.testMode = parseTestModeEnv(rawMode);
+    this.testUnrecognized = unrecognizedTestMode(rawMode);
+    this.testHost = '';
+    this.testEnabled = false;
+    this.testWarn = this.testUnrecognized;
+    if (testHostOpt != null) this.setTestHost(testHostOpt);
     /** @type {Map<string, Room>} */
     this.rooms = new Map();
     /** Consumed party codes are spectator-only aliases for one exact live match context. */
@@ -1047,7 +1070,22 @@ export class Lobby {
   // room.* handlers
   // ---------------------------------------------------------------------------------------------------
 
-  create(session, { mode, difficulty, experimental = EXPERIMENTAL_DEFAULTS }) {
+  /**
+   * The address this process bound. Test rooms stay disabled until this runs. `host` empty fails closed.
+   * @param {string} host
+   * @returns {{ enabled: boolean, warn: string|null }}
+   */
+  setTestHost(host) {
+    this.testHost = typeof host === 'string' ? host : '';
+    const gate = testModeGate(this.testMode, this.testHost);
+    this.testEnabled = gate.enabled === true;
+    this.testWarn = this.testUnrecognized || gate.warn;
+    return { enabled: this.testEnabled, warn: this.testWarn };
+  }
+
+  create(session, { mode, difficulty, experimental = EXPERIMENTAL_DEFAULTS, test }) {
+    // A test room exists only when the process switch allowed it. The check runs before the room is built.
+    if (test === true && this.testEnabled !== true) return fail(ERR.TEST_DISABLED);
     if (!isExperimental(experimental)) return fail(ERR.BAD_MSG);
     if (roomCapacity(mode, experimental) > MAX_SEATS && !this.supportsCapacity(session)) return fail(ERR.BAD_MSG);
     if (this.maintenance()) return fail(ERR.MAINTENANCE);
@@ -1072,6 +1110,7 @@ export class Lobby {
     if (!code) return fail(ERR.INTERNAL, 'no room code available');
     if (cur) this.removeMember(cur, session.playerId);
     const room = new Room(code, mode, difficulty, this.now(), experimental);
+    room.test = test === true;
     room.content = this.vanilla;
     // the server owner's default plugins (plugins/config.json `default`; header "Gameplay plugins"): none — the original game
     const defaults = this.plugins?.defaults?.() || [];
@@ -1087,12 +1126,12 @@ export class Lobby {
     session.roomCode = code;
     session.notice = null;
     session.pendingResult = null;
-    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}) by ${session.name}`);
+    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}${room.test ? ', test' : ''}) by ${session.name}`);
     this.broadcastState(room);
     return OK;
   }
 
-  join(session, { code }) {
+  join(session, { code, testAck }) {
     const norm = String(code).trim().toUpperCase();
     const room = norm.length === ROOM_CODE_LEN ? this.rooms.get(norm) : undefined;
     if (!room) {
@@ -1103,6 +1142,7 @@ export class Lobby {
       return fail(ERR.ROOM_STARTED); // The client must explicitly confirm spectating; never admit a player via an alias.
     }
     if (room.capacity > MAX_SEATS && !this.supportsCapacity(session)) return fail(ERR.BAD_MSG);
+    if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     const cur = this.roomOf(session);
     // idempotent for players; a spectator may take a free player seat below, but never while the party is queued
     if (cur === room && !room.spectatorOf(session.playerId)) { this.sendState(room, session); return OK; }
@@ -1138,9 +1178,10 @@ export class Lobby {
    * room.spectate: one of a co-op room's MAX_SPECTATORS spectator seats, in its lobby or during its match (header). In a
    * running match the match registers the spectator and resends what it may see (Match.addSpectator).
    */
-  spectate(session, { code }) {
+  spectate(session, { code, testAck }) {
     const room = this.spectatorRoom(code);
     if (!room) return fail(ERR.ROOM_NOT_FOUND);
+    if (room.test && testAck !== true) return fail(ERR.TEST_CONFIRM);
     if (room.capacity > MAX_SEATS && !this.supportsCapacity(session)) return fail(ERR.BAD_MSG);
     const cur = this.roomOf(session);
     if (cur === room) {
@@ -1975,10 +2016,16 @@ export class Lobby {
    * server's content identity (header "Content identity").
    */
   welcomeInfo() {
-    if (!this.vanilla) return { diyKitted: KITTED_CHARS };
-    let n;
-    try { n = Number(this.plugins?.unofficial?.()) || 0; } catch { n = 0; }
-    return { diyKitted: KITTED_CHARS, content: n > 0 ? { vanilla: this.vanilla.cs, plugins: n } : { vanilla: this.vanilla.cs } };
+    let info;
+    if (!this.vanilla) info = { diyKitted: KITTED_CHARS };
+    else {
+      let n;
+      try { n = Number(this.plugins?.unofficial?.()) || 0; } catch { n = 0; }
+      info = { diyKitted: KITTED_CHARS, content: n > 0 ? { vanilla: this.vanilla.cs, plugins: n } : { vanilla: this.vanilla.cs } };
+    }
+    // Omitted when the switch is off, so a welcome from a normal server stays identical.
+    if (this.testEnabled === true) info.testMode = true;
+    return info;
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -1990,6 +2037,7 @@ export class Lobby {
 
   /** @param {Room} room @param {string | null} [key] per-network limit key of the starter */
   startMatch(room, key = null, keys = null, { deferPublish = false, restore = null } = {}) {
+    if (room.test && !this.testEnabled) return fail(ERR.TEST_DISABLED);
     if (!room.validCapacity() || !this.capacityClients(room)) return fail(ERR.BAD_MSG);
     const revival = room.revivalState();
     const host = room.seatOf(room.hostId);
@@ -2051,6 +2099,8 @@ export class Lobby {
         // the room's host: the current executor of a delegated bot layout rehearsal (DESIGN §14; setHost follows a
         // migration while the match runs)
         hostId: room.hostId,
+        // only a room created as a test room; a normal match opts object does not grow a test key
+        ...(room.test === true ? { test: true } : {}),
         seed,
         // the room's match number: with the seed it keeps battleIds unique across the room's matches (DESIGN §14)
         matchNo: restore ? restore.matchNo : room.matchCount + 1,
@@ -2295,13 +2345,17 @@ export class Lobby {
   routeGameNow(session, msg) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (msg.t === 'g.test') {
+      if (!this.testEnabled) return fail(ERR.TEST_DISABLED);
+      if (room.test !== true) return fail(ERR.TEST_FORBIDDEN);
+    }
     if (!room.match) return fail(ERR.WRONG_PHASE, 'no running match');
     if (msg.t === 'g.leave') {
       this.removeMember(room, session.playerId);
       return OK;
     }
     // a spectator only watches (header): nothing else of it ever reaches the match
-    if (msg.t !== 'g.watch' && room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
+    if (msg.t !== 'g.watch' && !(room.test && msg.t === 'g.test') && room.spectatorOf(session.playerId)) return fail(ERR.SPECTATOR);
     let res;
     try {
       res = room.match.handle(session.playerId, msg);

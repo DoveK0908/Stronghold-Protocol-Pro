@@ -590,7 +590,9 @@ describe('the manifest, the files on disk and the client', () => {
     // banks and still refuse every other invented slot.
     const keys = Object.keys(u).sort();
     const base = ['attack', 'born', 'die', 'hit', 'skill', 'skillSfx', 'skills'];
-    const plural = ['attacks', 'hits'];
+    // 0.3.1's own plan writes the pool reference next to every role it pools (the unit roles and the per-skill
+    // banks), so those three maps are not an invented slot either — the official <role>Pools / pools companions.
+    const plural = ['attacks', 'hits', 'attackPools', 'hitPools', 'pools'];
     assert.deepEqual(keys.filter((k) => !base.includes(k) && !plural.includes(k)), [],
       'no invented slot outside the four unit roles, the skill cues and the per-skill roles');
     assert.deepEqual(base.filter((k) => !keys.includes(k)), [],

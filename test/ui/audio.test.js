@@ -2004,9 +2004,18 @@ describe('per-skill sounds (sfx.units[id].skillSfx)', () => {
 describe('SFX priority: an event sound is never starved by the decorations', () => {
   const CHAR = 'char_4182_oblvns';
   const ENEMY = 'enemy_1007_slime';
-  /** n units whose `attack` files are all different (one per unit ⇒ the per-url cap never fires first). */
+  /**
+   * n units whose `attack` files are all different (one per unit ⇒ the per-url cap never fires first) and whose bank
+   * starts the sound at once. An official bank sound may carry a `delay` (audio.mjs bankPool, official `delay`): the
+   * merged pool path waits it out before it takes a voice, so such a unit cannot fill the budget within this test's
+   * settle — the eviction rule is what is under test here, not the official stagger.
+   */
+  const delayedPool = (u) => {
+    const pool = manifest.audio.sfx.pools?.[u?.pools?.attack];
+    return !!pool && Object.values(pool.sounds || {}).some((s) => Number(s?.delay) > 0);
+  };
   const spreadUnits = (n) => Object.entries(manifest.audio.sfx.units)
-    .filter(([id, u]) => id !== CHAR && typeof u.attack === 'string' && normalAttackSfx(id, u.attack))
+    .filter(([id, u]) => id !== CHAR && typeof u.attack === 'string' && normalAttackSfx(id, u.attack) && !delayedPool(u))
     .slice(0, n)
     .map(([id], i) => ({ id: i + 1, side: 'ally', kind: 'chess', spine: id }));
 
