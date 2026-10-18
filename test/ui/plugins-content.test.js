@@ -415,11 +415,11 @@ describe('statistics and the room\'s facts with gameplay plugins', () => {
   });
 
   test('stats v2: a v1 envelope migrates (its records played the original game)', () => {
-    assert.equal(STATS_VERSION, 2);
+    assert.equal(STATS_VERSION, 3); // Pro format v3 (BOSS §: bossDamage + fav, stats.js MIGRATIONS[2])
     const v1 = { v: 1, records: [{ id: 'r1', v: 1, t: 5, end: 'settled', players: [{ playerId: 'p1', stats: {} }], selfId: 'p1' }] };
     const { stats, changed } = migrateStats(v1);
     assert.equal(changed, true);
-    assert.equal(stats.v, 2);
+    assert.equal(stats.v, 3);
     assert.equal(stats.records[0].content, null);
     assert.equal(stats.records[0].id, 'r1');
   });

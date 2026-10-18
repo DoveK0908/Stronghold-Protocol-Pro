@@ -33,6 +33,9 @@ const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI'];
 
 const fmt = (n) => (Number.isFinite(n) ? Math.round(n).toLocaleString('zh-CN') : '0');
 
+/** The 卫戍认证 milestones of the level settlement (config.rewards.milestones, screens/settle.js levelOf). */
+const milestones = () => data.getRaw('config')?.rewards?.milestones || [];
+
 /**
  * The numbers the achievements read, from the stats records (only the records that count, ui/stats.js
  * countsTowardStats; the trophies from every settled record).
@@ -214,7 +217,7 @@ export function AchievementEntry({ onOpen }) {
   const card = useMyCard();
   const records = useRecords();
   const trophies = card.trophies ?? trophyTotal(records);
-  const lv = useMemo(() => levelOf(achievementStats(records).exp).lv, [records]);
+  const lv = useMemo(() => levelOf(achievementStats(records).exp, milestones()).lv, [records]);
   return html`<button type="button" class="hub-ach" onClick=${onOpen} aria-haspopup="dialog" title=${t('成就统计：本机的模拟纪录、奖杯与成就')}>
     <span class="hub-ach__scene"><${Land} /><span class="hub-ach__mark"><${Emblem} /></span>
       <span class="hub-ach__rank"><${TrophyBadge} count=${trophies} /><small><${Icon} name="crown" />${fmt(trophies)}</small></span>
@@ -296,7 +299,7 @@ function TitleHex({ titles, gd }) {
 
 /** The name card (头像 with the LV, the name, DOCTOR #, 名片底图) and the counts beside it. */
 function Plate({ me, card, s, p, done, total, gd, onAvatar, onBg }) {
-  const lv = levelOf(s.exp);
+  const lv = levelOf(s.exp, milestones());
   const opRec = card.charId && gd.ready ? gd.list('chess').find((c) => c.charId === card.charId) : null;
   // 头像 (room.card avatar), else the 名片干员's avatar, else the name's first letter
   const face = cardAvatarUrl(card.avatar, gd.m, card.avatarLook) || (opRec ? chessAvatarUrl(gd.m, opRec) : null);
