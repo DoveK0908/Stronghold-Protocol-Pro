@@ -52,7 +52,7 @@ export const SKIPPED_CI_STEPS = [
  */
 export const STEPS = [
   { id: 'setup', ci: { job: 'test', name: 'Setup check (no downloads)' }, describe: 'node tools/setup.mjs --check --no-local' },
-  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, describe: 'node --test' },
+  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, describe: 'node --test --test-force-exit --test-timeout=45000' },
   { id: 'smoke', ci: { job: 'test', name: 'Server smoke test (boot, /healthz, index.html, doctor)' },
     describe: `server on a free port: GET ${SMOKE_PATHS.join(', ')}; node tools/doctor.mjs` },
   { id: 'lint', ci: { job: 'tooling', name: 'Lint (warnings allowed)' }, npm: 'lint', describe: 'eslint .' },
@@ -323,7 +323,12 @@ async function smoke(env) {
 function runStep(step, env) {
   switch (step.id) {
     case 'setup': return node(['tools/setup.mjs', '--check', '--no-local'], env);
-    case 'test': return node(['--test'], env);
+    // --test-force-exit: suites that leave a timer, socket or worker pool behind keep their child
+    // process alive after every test settled, and the runner then waits on it forever (2026-10-18:
+    // the whole CI job hung for 20+ minutes after the last test had passed).
+    // --test-timeout: on this platform a few tests wait on a peer that never answers, so they never
+    // settle on their own; without a per-test ceiling the run never reaches its summary either.
+    case 'test': return node(['--test', '--test-force-exit', '--test-timeout=45000'], env);
     case 'smoke': return smoke(env);
     case 'lint': return node([binPath('eslint', 'eslint'), '.'], env);
     case 'imports': return node(['tools/check-imports.mjs'], env);
