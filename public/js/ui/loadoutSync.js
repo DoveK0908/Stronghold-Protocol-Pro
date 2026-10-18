@@ -1,30 +1,37 @@
-// Operator loadout + ownership + 自选编队 state and server sync (DESIGN §16; 干员持有 — 0.2.0 补位; 自选编队 — 0.2.0 DIY).
+// Operator loadout + ownership + 自选编队 + 干员皮肤 state and server sync (DESIGN §16; 干员持有 — 0.2.0 补位; 自选编队 —
+// 0.2.0 DIY; 干员皮肤 — docs/SKINS.md).
 //
 // `loadoutStore` holds the per-browser loadout (`entries`, persisted in localStorage through store.js savePref), the
 // per-browser not-owned list of the 干员持有 tab (`notOwned`, likewise), the 自选编队 picks (`diy`, likewise; with
 // `diyKitted` = the operators the server lets a DIY slot field, from every `welcome`) and the overlay's screen state
-// (open / origin / tab / selection / filters). `installLoadoutSync()` / `installOwnershipSync()` / `installDiySync()`
-// (called once by main.js) keep the server's copies current — one sync engine (installPrefSync), three settings: after
-// every `welcome` (new or resumed
+// (open / origin / tab / selection / filters). `installLoadoutSync()` / `installOwnershipSync()` / `installDiySync()` /
+// `installSkinsSync()` (called once by main.js) keep the server's copies current — one sync engine (installPrefSync),
+// four settings: after every `welcome` (new or resumed
 // session — the server keeps them on the session and on the seat, so joining a room needs no resend) and after every
 // edit (debounced; a pending edit goes out at once when the overlay closes), they send `room.loadout { entries, ops }`
 // (sanitised against the loaded data/chess.json: ui/loadoutModel.js sanitizeEntries — a stale entry is dropped, never
 // the whole loadout; `ops` = the per-operator 潜能 / 练度 of 0.2.2, sanitizeOps against chess.json + backups.json), `room.ownership { notOwned }` (sent as stored: the server keeps the droppable chess and drops
-// the rest, so no data is needed) and `room.diy { picks }` (sent as stored, structurally clean: the server keeps the
-// legal picks). Replies: RATE → retried later; WRONG_PHASE / ROOM_STARTED → the running match keeps what it took (the
-// loadout locks when INFO_CHECK ends; the ownership and the 自选 picks never change during a match) — stored for the
-// next match, not an error for the player; anything else is logged. `sync` / `ownSync` / `diySync` ∈ 'idle' |
-// 'pending' | 'sending' | 'synced' | 'locked' | 'error' are mirrored into the store for the screen's status line.
+// the rest, so no data is needed), `room.diy { picks }` (sent as stored, structurally clean: the server keeps the
+// legal picks) and `room.skins { skins }` (ui/skins.js' own store; sent as stored, since an appearance lives in a
+// cosmetic plugin's overlay and can only fail to resolve — and unlike the three above it is accepted in ANY phase, so a
+// match takes it at once). Replies: RATE → retried later; WRONG_PHASE / ROOM_STARTED → the running match keeps what it
+// took (the loadout locks when INFO_CHECK ends; the ownership and the 自选 picks never change during a match) — stored
+// for the next match, not an error for the player; anything else is logged. `sync` / `ownSync` / `diySync` /
+// `skinsSync` ∈ 'idle' | 'pending' | 'sending' | 'synced' | 'locked' | 'error' are mirrored into the store for the
+// screen's status line.
 // A room with gameplay plugins (DESIGN §32.6): data.js then shows the room's content set, so what goes out is checked
 // against the room's data (its operators too); the stored settings keep every entry — one the room does not know is
 // only left out of what is sent, never deleted. Whenever the room's content set arrives or goes (content.js contentSet)
 // the three settings are sent again, and the 自选 picker's list (`diyKitted`) is the set's own (else welcome's).
 
-import { createStore, loadPref, savePref } from '../store.js';
+import { createStore, loadPref, savePref, store } from '../store.js';
 import { data } from '../data.js';
 import { contentSet as appContentSet } from '../content.js';
 import { LOADOUT_PREF, parseStored, parseStoredOps, toStored, sanitizeEntries, sanitizeOps } from './loadoutModel.js';
-import { cultivationCharIds, charPotentialChanges } from '../../../shared/protocol.js';
+import { cultivationCharIds, charPotentialChanges, loadoutOptions } from '../../../shared/protocol.js';
+import { PHASE } from '../../../shared/constants.js';
+import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.js';
+import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, toStoredOwnership, cleanIds, sanitizeNotOwned } from './ownershipModel.js';
 import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks } from './diyModel.js';
 import { toast } from './toasts.js';
@@ -92,7 +99,7 @@ export const loadoutStore = createStore({
   skins: readStoredSkins(),
   skinSync: 'idle',
   open: false,
-  from: null,          // 'lobby' | 'room' | 'briefing'
+  from: null,          // 'lobby' | 'room' | 'briefing' | 'prep'
   tab: 'loadout',      // 'loadout' (干员调配) | 'ownership' (干员持有) | 'diy' (自选编队)
   sel: null,           // selected base chess id
   filters: { tier: null, prof: null, bond: null, query: '', changedOnly: false },
@@ -185,7 +192,7 @@ export function applyDiyImport(picks, data, kitted) {
 }
 
 /**
- * Open the 干员调配 overlay. @param {'lobby'|'room'|'briefing'} from @param {string|null} [sel]
+ * Open the 干员调配 overlay. @param {'lobby'|'room'|'briefing'|'prep'} from @param {string|null} [sel]
  * @param {'loadout'|'ownership'|'diy'|null} [tab] the tab to show (default: the last one)
  */
 export function openLoadout(from = 'lobby', sel = null, tab = null) {
@@ -196,7 +203,7 @@ export function openLoadout(from = 'lobby', sel = null, tab = null) {
   data.load('backups');
   data.load('effects'); // 0.2.2: the 练度 multipliers of the 局内数值 (effects.json CHAR_MAP)
   data.load('garrisons'); // the 特质 at the top of the detail (PR #301)
-  loadoutStore.set({ open: true, from, ...(sel ? { sel } : {}), ...(tab === 'loadout' || tab === 'ownership' || tab === 'diy' ? { tab } : {}) });
+  loadoutStore.set({ open: true, from, ...(sel ? { sel } : {}), ...(from === 'prep' ? { tab: 'loadout', sync: 'idle' } : {}), ...(tab === 'loadout' || tab === 'ownership' || tab === 'diy' ? { tab } : {}) });
 }
 export const closeLoadout = () => loadoutStore.set({ open: false });
 
@@ -313,7 +320,7 @@ function installPrefSync({ net, timers, target, notify, key, stateKey, msgType, 
  *   timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore> }} deps
  * @returns {{ flush: () => Promise<void>, dispose: () => void }}
  */
-export function installLoadoutSync({ net, getChessReady, getBackupsReady, lookupChess, operatorIds, timers, target = loadoutStore, notify } = {}) {
+export function installLoadoutSync({ net, getChessReady, getBackupsReady, lookupChess, operatorIds, timers, target = loadoutStore, notify, matchState = () => store.get() } = {}) {
   const ready = getChessReady || (() => data.load('chess'));
   const readyBackups = getBackupsReady || (() => data.load('backups'));
   const lookup = lookupChess || ((id) => data.lookup('chess', id));
@@ -325,17 +332,30 @@ export function installLoadoutSync({ net, getChessReady, getBackupsReady, lookup
     async prepare() {
       const current = target.get().entries;
       const ops = target.get().ops;
-      const hasOps = !!ops && Object.keys(ops).length > 0;
+      const state = matchState();
+      const prep = state.match?.public?.phase === PHASE.PREP && ruleOption(state.room?.content?.rules, 'prepLoadout') === 'prep';
+      const live = prep ? state.match?.private : null;
+      const hasOps = (!!ops && Object.keys(ops).length > 0) || !!Object.keys(live?.ops || {}).length;
       // an empty loadout needs no data (nothing to sanitise): a player who never opened 干员调配 does not download
       // chess.json in the lobby just for this
-      if ((!current || Object.keys(current).length === 0) && !hasOps) return { entries: {}, ops: {} };
+      if ((!current || Object.keys(current).length === 0) && !Object.keys(live?.loadout || {}).length && !hasOps) return { entries: {}, ops: {} };
       const loaded = await ready();
       if (loaded == null) return null;
       const entries = sanitizeEntries(target.get().entries, lookup);
+      // A prep submission merges by name. Send explicit defaults for removed choices so restoring defaults works.
+      if (live) for (const id of Object.keys(live.loadout || {})) {
+        if (Object.hasOwn(entries, id)) continue;
+        const base = lookup(id);
+        if (!base) continue;
+        const opt = loadoutOptions(base, base.goldenId ? lookup(base.goldenId) : null);
+        entries[id] = { skill: opt.defaultSkill, ...(typeof opt.defaultModule === 'string' ? { module: opt.defaultModule } : {}) };
+      }
       if (!hasOps) return { entries, ops: {} };
       if ((await readyBackups()) == null) return null;
       const ids = opIds();
-      return { entries, ops: sanitizeOps(target.get().ops, (id) => ids.has(id), (id) => charPotentialChanges({ chess: data.get('chess'), backups: data.get('backups') }, id)) };
+      const cleanOps = sanitizeOps(target.get().ops, (id) => ids.has(id), (id) => charPotentialChanges({ chess: data.get('chess'), backups: data.get('backups') }, id));
+      if (live) for (const id of Object.keys(live.ops || {})) if (ids.has(id) && !Object.hasOwn(cleanOps, id)) cleanOps[id] = { potential: POTENTIAL_DEFAULT, cultivate: CULTIVATE_DEFAULT };
+      return { entries, ops: cleanOps };
     },
   });
 }
@@ -356,14 +376,12 @@ export function installOwnershipSync({ net, timers, target = loadoutStore, notif
 }
 
 /**
- * Wire the 自选编队 sync once (0.2.0 DIY): `room.diy { picks }` after every welcome and edit. The picks go as stored
- * (structurally clean); the server keeps the legal ones. During a match the server stores them for the next one
- * (ROOM_STARTED → 'locked'): the setting is out of match. Every `welcome` also brings the operators a DIY slot may field
- * (`diyKitted`, the picker's list).
+ * Wire the 干员皮肤 sync once: `room.skins { choices }` after every welcome and edit, from the same loadout store as the
+ * rest of the display preferences (`cleanSkinChoices` drops anything the local skin catalogue does not hold). During
+ * a match the server stores it for the next one (ROOM_STARTED → 'locked').
  * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
  *   notify?: (text: string) => void }} deps
  */
-/** Display preferences use the same ordered/debounced sync, without altering skill/module configuration. */
 export function installSkinsSync({ net, timers, target = loadoutStore, notify } = {}) {
   return installPrefSync({
     net, timers, target, notify, key: 'skins', stateKey: 'skinSync', msgType: 'room.skins', field: 'choices', tag: 'skins',
@@ -372,6 +390,14 @@ export function installSkinsSync({ net, timers, target = loadoutStore, notify } 
   });
 }
 
+/**
+ * Wire the 自选编队 sync once (0.2.0 DIY): `room.diy { picks }` after every welcome and edit. The picks go as stored
+ * (structurally clean); the server keeps the legal ones. During a match the server stores them for the next one
+ * (ROOM_STARTED → 'locked'): the setting is out of match. Every `welcome` also brings the operators a DIY slot may field
+ * (`diyKitted`, the picker's list).
+ * @param {{ net: any, timers?: { setTimeout: Function, clearTimeout: Function }, target?: ReturnType<typeof createStore>,
+ *   notify?: (text: string) => void }} deps
+ */
 export function installDiySync({ net, timers, target = loadoutStore, notify, content = appContentSet } = {}) {
   // the picker's list: welcome's, and the operators the room's content set adds while it plays one (DESIGN §32.6)
   let welcomeList = null;
