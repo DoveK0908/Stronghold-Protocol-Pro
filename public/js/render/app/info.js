@@ -1,4 +1,5 @@
 // public/js/render/app/info.js — battle-unit info handed to a view, and which deaths draw particles.
+
 /**
  * 'die' reason of an operator that enters the battle already knocked out — a 联防 helper's operator down at the end of
  * its own combat, deployed and forced out at once (server/sim/constants.js FORCED_EXIT, user playtest #5 item 2): its
