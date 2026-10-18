@@ -15,7 +15,7 @@ local NAMESPACE, REPOSITORY = "__MATERIAL_LB_SIGNED_NAMESPACE__", "__MATERIAL_LB
 local TTL = __MATERIAL_LB_SIGNED_TTL__ -- signature validity after its timestamp: a measured lower bound, not the provider's setting
 local SAFETY = 120              -- never hand out a URL with less validity left than this
 local REFRESH = 300             -- re-sign when less than this is left; until SAFETY the old URL is still served
-local BROWSER_MAX = 300         -- browser max-age for the signed redirect, always ending >= 60 s before expiry
+local BROWSER_MAX = 600         -- browser max-age for the signed redirect, always ending >= 60 s before expiry
 local allowed = { filename = true, namespace = true, repository = true, revision = true, tag = true, auth_key = true }
 local dict = ngx.shared.ark_ms_lock and ngx.shared.ark_ms_signed
 
@@ -101,6 +101,11 @@ end
 --- Browser cache lifetime for a URL signed at `ts`: the cached redirect ends at least 60 s before the signature.
 function M.max_age(ts)
     return math.max(0, math.min(BROWSER_MAX, ts + TTL - 60 - ngx.time()))
+end
+
+--- Seconds a URL signed at `ts` may still be handed out (sign.lua): the same SAFETY margin as the cache above.
+function M.valid_for(ts)
+    return math.max(0, ts + TTL - SAFETY - ngx.time())
 end
 
 return M

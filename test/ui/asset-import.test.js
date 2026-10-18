@@ -624,7 +624,7 @@ test('fork: with a material profile the worker keeps public art by path; another
   assert.equal(assetWorkerUrl('bad/profile'), '/sw.js');
   assert.equal(assetWorkerUrl(null), '/sw.js');
   const origin = 'https://game.example';
-  const run = (material, store, fetched, deleted, { network } = {}) => {
+  const run = (material, store, fetched, deleted, { network, codeSource = null } = {}) => {
     const listeners = {};
     const sandbox = {
       self: { location: { origin, href: `${origin}${assetWorkerUrl(material)}` }, addEventListener(type, fn) { listeners[type] = fn; },
@@ -635,17 +635,28 @@ test('fork: with a material profile the worker keeps public art by path; another
           return {
             async match(key, options) { assert.equal(options, undefined); const hit = map.get(typeof key === 'string' ? key : key.url); return hit ? new Response(hit) : undefined; },
             async put(key, response) { map.set(key, await response.text()); },
+            async delete(key) { return map.delete(key); },
           };
+        },
+        async match(key, { cacheName } = {}) { // the worker must name the cache: an unnamed match would search them all
+          assert.ok(cacheName);
+          const hit = store.get(cacheName)?.get(key);
+          return hit === undefined ? undefined : new Response(hit);
         },
         async keys() { return [...store.keys()]; },
         async delete(name) { deleted.push(name); return store.delete(name); },
       },
       fetch: async (request, init) => {
         const url = typeof request === 'string' ? request : request.url;
+        if (url === '/code-source.json') {
+          assert.equal(init?.cache, 'no-store');
+          return codeSource ? new Response(JSON.stringify(codeSource)) : new Response('not found', { status: 404 });
+        }
+        if (url === '/material-sign') return new Response('not found', { status: 404 }); // a proxy without the batch signer
         fetched.push([url, init?.mode ?? null]);
         return network ? network(url) : new Response(`net:${url}`, { headers: { 'content-type': 'image/png' } });
       },
-      URL: globalThis.URL, Response: globalThis.Response, Promise: globalThis.Promise,
+      URL: globalThis.URL, Response: globalThis.Response, Promise: globalThis.Promise, setTimeout, clearTimeout,
     };
     vm.runInNewContext(sw, sandbox, { filename: 'public/sw.js' });
     const fire = async (url, init = {}) => {
@@ -685,6 +696,193 @@ test('fork: with a material profile the worker keeps public art by path; another
   await none.activate();
   assert.equal(await none.fire(`${origin}/assets/char/c.png`), null);
   assert.ok(store.has('sp-material-v030'));
+});
+
+test('fork: a new profile carries the previous profile\'s art except the paths /code-source.json drops', async () => {
+  const sw = fs.readFileSync(path.resolve('public/sw.js'), 'utf8');
+  const origin = 'https://game.example';
+  const store = new Map([
+    ['sp-material-v030', new Map([[`${origin}/assets/char/a.png`, 'old-a'], [`${origin}/assets/char/b.png`, 'old-b'],
+      [`${origin}/assets/char/changed.png`, 'old-changed'], [`${origin}/assets/local/scene/m01/lm0.png`, 'old-scene']])],
+    ['sp-material-older', new Map([[`${origin}/assets/char/a.png`, 'older-a']])],
+  ]);
+  const fetched = [], deleted = [];
+  const codeSource = { version: 1, material: 'rel21',
+    materialCarry: { from: 'v030', drop: ['/assets/char/changed.png', '/assets/local/scene/'] } };
+  const worker = (opts = {}) => {
+    const listeners = {};
+    vm.runInNewContext(sw, {
+      self: { location: { origin, href: `${origin}${assetWorkerUrl('rel21')}` }, addEventListener(type, fn) { listeners[type] = fn; },
+        skipWaiting: () => Promise.resolve(), clients: { claim: () => Promise.resolve() } },
+      caches: {
+        async open(name) {
+          const map = store.get(name) ?? new Map(); store.set(name, map);
+          return {
+            async match(key) { const hit = map.get(key); return hit === undefined ? undefined : new Response(hit); },
+            async put(key, response) { map.set(key, await response.text()); },
+            async delete(key) { return map.delete(key); },
+          };
+        },
+        async match(key, { cacheName } = {}) { const hit = store.get(cacheName)?.get(key); return hit === undefined ? undefined : new Response(hit); },
+        async keys() { return [...store.keys()]; },
+        async delete(name) { deleted.push(name); return store.delete(name); },
+      },
+      fetch: async (url, init) => {
+        if (url === '/code-source.json') return new Response(JSON.stringify(opts.codeSource ?? codeSource));
+        if (url === '/material-sign') return new Response('<html>', { headers: { 'content-type': 'text/html' } });
+        fetched.push(url);
+        return new Response(`net:${url}`, { headers: { 'content-type': 'image/png' } });
+      },
+      URL: globalThis.URL, Response: globalThis.Response, Promise: globalThis.Promise, setTimeout, clearTimeout,
+    }, { filename: 'public/sw.js' });
+    return {
+      activate: async () => { let p; listeners.activate({ waitUntil(x) { p = x; } }); await p; },
+      fire: async (url) => {
+        let responded = null; const waits = [];
+        listeners.fetch({ request: new Request(url), respondWith(p) { responded = p; }, waitUntil(p) { waits.push(p); } });
+        const res = await responded; await Promise.all(waits);
+        return res.text();
+      },
+    };
+  };
+  const w = worker();
+  await w.activate();
+  assert.deepEqual(deleted, ['sp-material-older'], 'the carried profile stays, any other is dropped');
+  assert.equal(await w.fire(`${origin}/assets/char/a.png`), 'old-a');
+  assert.equal(fetched.length, 0, 'an unchanged file is not requested again');
+  assert.equal(store.get('sp-material-rel21').get(`${origin}/assets/char/a.png`), 'old-a', 'moved into the new cache');
+  assert.equal(store.get('sp-material-v030').has(`${origin}/assets/char/a.png`), false, 'and out of the old one');
+  assert.equal(await w.fire(`${origin}/assets/char/changed.png`), `net:${origin}/assets/char/changed.png`, 'a dropped path');
+  assert.equal(await w.fire(`${origin}/assets/local/scene/m01/lm0.png`), `net:${origin}/assets/local/scene/m01/lm0.png`, 'a dropped directory');
+  assert.equal(await w.fire(`${origin}/assets/char/new.png`), `net:${origin}/assets/char/new.png`);
+  assert.equal(fetched.length, 3);
+
+  // a restarted worker (no activate) reads the carry-over it activated with
+  assert.equal(await worker().fire(`${origin}/assets/char/b.png`), 'old-b');
+  assert.equal(fetched.length, 3);
+
+  // a /code-source.json for another profile, or none, carries nothing
+  for (const other of [{ ...codeSource, material: 'rel22' }, { version: 1, material: 'rel21' }]) {
+    store.set('sp-material-v030', new Map([[`${origin}/assets/char/c.png`, 'old-c']]));
+    deleted.length = 0;
+    const again = worker({ codeSource: other });
+    await again.activate();
+    assert.deepEqual(deleted, ['sp-material-v030']);
+    assert.equal(await again.fire(`${origin}/assets/char/c.png`), `net:${origin}/assets/char/c.png`);
+  }
+});
+
+test('fork: a miss is signed in batches through /material-sign and downloaded from the CDN; anything else uses the plain path', async () => {
+  const sw = fs.readFileSync(path.resolve('public/sw.js'), 'utf8');
+  const origin = 'https://game.example';
+  const cdn = (p) => `https://cdn-lfs-cn-1.modelscope.cn/prod/lfs-objects/aa/bb/${Buffer.from(p).toString('hex')}?auth_key=1`;
+  const worker = ({ sign, cdnAnswer, plainType = 'image/png' } = {}) => {
+    const store = new Map(), signs = [], fetched = [], listeners = {};
+    const clock = { now: 1_000_000 };
+    vm.runInNewContext(sw, {
+      self: { location: { origin, href: `${origin}${assetWorkerUrl('rel21')}` }, addEventListener(type, fn) { listeners[type] = fn; },
+        skipWaiting: () => Promise.resolve(), clients: { claim: () => Promise.resolve() } },
+      caches: {
+        async open(name) {
+          const map = store.get(name) ?? new Map(); store.set(name, map);
+          return {
+            async match(key) { const hit = map.get(key); return hit === undefined ? undefined : new Response(hit); },
+            async put(key, response) { map.set(key, await response.text()); },
+            async delete(key) { return map.delete(key); },
+          };
+        },
+        async match() { return undefined; },
+        async keys() { return [...store.keys()]; },
+        async delete(name) { return store.delete(name); },
+      },
+      fetch: async (url, init) => {
+        if (url === '/code-source.json') return new Response('not found', { status: 404 });
+        if (url === '/material-sign') {
+          assert.equal(init.method, 'POST');
+          assert.equal(init.credentials, 'same-origin');
+          const { paths } = JSON.parse(init.body);
+          signs.push(paths);
+          if (sign) return sign(paths);
+          const urls = {};
+          for (const p of paths) if (!p.includes('nosign')) urls[p] = [cdn(p), 600];
+          return new Response(JSON.stringify({ urls }), { headers: { 'content-type': 'application/json' } });
+        }
+        fetched.push([url, init?.credentials ?? null]);
+        if (url.startsWith('https://cdn-lfs')) {
+          const p = Buffer.from(url.split('/').at(-1).split('?')[0], 'hex').toString();
+          return cdnAnswer ? cdnAnswer(p) : new Response(`cdn:${p}`, { headers: { 'content-type': 'image/png' } });
+        }
+        return new Response(`net:${url}`, { headers: { 'content-type': plainType } });
+      },
+      Date: { now: () => clock.now },
+      URL: globalThis.URL, Response: globalThis.Response, Promise: globalThis.Promise, setTimeout, clearTimeout,
+    }, { filename: 'public/sw.js' });
+    const fire = async (url) => {
+      let responded = null; const waits = [];
+      listeners.fetch({ request: new Request(url), respondWith(p) { responded = p; }, waitUntil(p) { waits.push(p); } });
+      const res = await responded; await Promise.all(waits);
+      return res.text();
+    };
+    return { fire, store, signs, fetched, clock };
+  };
+
+  const w = worker();
+  const burst = ['/assets/char/a.png', '/assets/char/b.png', '/media/voice/c'];
+  assert.deepEqual(await Promise.all(burst.map((p) => w.fire(origin + p))), burst.map((p) => `cdn:${p}`));
+  assert.deepEqual(w.signs, [burst], 'one sign request for the burst');
+  assert.deepEqual(w.fetched, burst.map((p) => [cdn(p), 'omit']), 'the files come straight from the CDN, without cookies');
+  assert.deepEqual([...w.store.get('sp-material-rel21').keys()].sort(), burst.map((p) => origin + p).sort(), 'and are kept by path');
+  assert.deepEqual(await Promise.all(burst.map((p) => w.fire(origin + p))), burst.map((p) => `cdn:${p}`));
+  assert.equal(w.signs.length, 1); assert.equal(w.fetched.length, 3, 'hits need neither');
+
+  // left out of the answer: the plain path (the proxy's redirect), as before
+  assert.equal(await w.fire(`${origin}/assets/nosign/x.png`), `net:${origin}/assets/nosign/x.png`);
+  // the OpenI retry is never signed
+  const before = w.signs.length;
+  assert.equal(await w.fire(`${origin}/assets/char/d.png?sp_source=openi`), `net:${origin}/assets/char/d.png?sp_source=openi`);
+  assert.equal(w.signs.length, before);
+
+  // at most 64 paths per request
+  const many = Array.from({ length: 70 }, (_, i) => `/assets/many/${i}.png`);
+  await Promise.all(many.map((p) => w.fire(origin + p)));
+  assert.deepEqual(w.signs.slice(-2).map((b) => b.length), [64, 6]);
+
+  // a signed URL is reused until 60 s before the stated expiry, then signed again; a refused download falls back
+  let status = 200;
+  const e = worker({ cdnAnswer: (p) => status === 200
+    ? new Response(`cdn:${p}`, { headers: { 'content-type': 'text/html' } }) // not kept: the next request misses again
+    : new Response('denied', { status }), plainType: 'text/html' });
+  await e.fire(`${origin}/assets/x/e.png`);
+  e.clock.now += 539_000;
+  await e.fire(`${origin}/assets/x/e.png`);
+  assert.equal(e.signs.length, 1, 'still valid: no new sign request');
+  e.clock.now += 2_000;
+  await e.fire(`${origin}/assets/x/e.png`);
+  assert.equal(e.signs.length, 2, 'past expiry - 60 s: signed again');
+  status = 403;
+  assert.equal(await e.fire(`${origin}/assets/x/e.png`), `net:${origin}/assets/x/e.png`, 'a refused CDN download uses the plain path');
+  status = 200;
+  await e.fire(`${origin}/assets/x/e.png`);
+  assert.deepEqual(e.signs.at(-1), ['/assets/x/e.png'], 'the refused URL was forgotten: signed again');
+
+  // no endpoint (404), a gate page or an answer for another host: plain paths; a missing endpoint is not asked again for 10 min
+  for (const sign of [() => new Response('not found', { status: 404 }), () => new Response('<html>', { headers: { 'content-type': 'text/html' } })]) {
+    const off = worker({ sign });
+    assert.equal(await off.fire(`${origin}/assets/x/g.png`), `net:${origin}/assets/x/g.png`);
+    assert.equal(await off.fire(`${origin}/assets/x/h.png`), `net:${origin}/assets/x/h.png`);
+    assert.equal(off.signs.length, 1);
+    off.clock.now += 601_000;
+    await off.fire(`${origin}/assets/x/i.png`);
+    assert.equal(off.signs.length, 2);
+  }
+  const evil = worker({ sign: (paths) => new Response(JSON.stringify({ urls: Object.fromEntries(paths.map((p) => [p, [`https://evil.example${p}`, 600]])) }),
+    { headers: { 'content-type': 'application/json' } }) });
+  assert.equal(await evil.fire(`${origin}/assets/x/j.png`), `net:${origin}/assets/x/j.png`, 'only the provider CDN is accepted');
+  const busy = worker({ sign: () => new Response('busy', { status: 503 }) });
+  await busy.fire(`${origin}/assets/x/k.png`);
+  busy.clock.now += 31_000;
+  await busy.fire(`${origin}/assets/x/l.png`);
+  assert.equal(busy.signs.length, 2, 'a failing signer is retried after 30 s');
 });
 
 test('site CSP keeps worker-src self and blob, and the sim worker policy does not gain the asset worker', () => {
