@@ -157,6 +157,7 @@ export class PlayerRound {
         // 干员调配 settings, 潜能 6 / 精英2 Lv.60 by default and for bots; never a stand-in's nor a prototype pick's)
         const cv = u.standIn ? null : this.cultivationFor(this.gd.chess(piece.id));
         if (cv) { u.potential = cv.potential; u.cultivate = cv.cultivate; }
+
         if (carry && carry.has(piece.uid)) u.carryState = carry.get(piece.uid);
         units.push(u);
       } else if (piece.kind === 'token') {

@@ -73,7 +73,7 @@ test('the committed manifest: her S3 swing and impact are the `_s` pair, her nor
   assert.equal(u.hits?.['0'], '/assets/audio/sfx/player/p_imp/p_imp_hljdrfswd_d.mp3', '技能1 的命中');
 });
 
-test('every manifest unit with a hits table agrees with the mode convention (d / h / s = 技能1 / 2 / 3)', () => {
+test('every manifest hits entry is a skill-mode file; the slot is not the filename letter (#679)', () => {
   const units = manifest.audio.sfx.units;
   // 丰川祥子 (char_4182_oblvns, the mod's own operator) is the single exception, and it is sourced from the official
   // table rather than invented: `excel/audio_data.json` hangs each of her skills' impact on a bank whose NAME carries

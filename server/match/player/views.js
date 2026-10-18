@@ -12,6 +12,7 @@ import { layerForecast } from '../layerForecast.js';
 export class PlayerViews {
   pieceView(p, rc = null) {
     const rec = p.kind === 'item' ? this.gd.item(p.id) : p.kind === 'token' ? this.gd.token(p.id) : this.gd.chess(p.id);
+
     const v = {
       uid: p.uid,
       kind: p.kind,
@@ -21,6 +22,7 @@ export class PlayerViews {
       items: p.kind === 'chess' ? (p.items || []).map((it) => ({ uid: it.uid, id: it.id })) : [],
       count: p.kind === 'token' ? (p.count || 1) : 1,
       ownerUid: p.kind === 'token' ? p.ownerUid ?? null : null,
+
     };
     const skinId = p.kind === 'chess' ? this.skinIdFor(rec) : null;
     if (skinId) v.skinId = skinId;

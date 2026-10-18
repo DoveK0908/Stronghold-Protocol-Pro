@@ -120,6 +120,22 @@ export class MatchSettle {
     }
   }
 
+  /**
+   * Drop every alive player whose LP is already gone. Settlement calls this after the round's LP loss.
+   * An accepted test round jump calls the same helper before the next round starts, so LP 0 cannot be
+   * written back into a new prep. The LP command itself stays a raw write.
+   */
+  eliminateBroken() {
+    for (const ps of this.alivePlayers()) {
+      if (ps.lp <= 0) {
+        ps.lp = 0;
+        ps.eliminate(this.round);
+        this.toast(ps, 'error', '你的目标生命值耗尽，已被淘汰');
+        this.tickerText(msg('{name}博士的目标生命值已耗尽', { name: ps.name }), FLOW_TICKER_PRIORITY);
+      }
+    }
+  }
+
   afterSettle({ reason } = {}) {
     // The scheduled timeout supplies its provenance: wall/monotonic clock rounding can differ by a millisecond.
     // A forced transition without that provenance is classified from the original deadline instead.
@@ -130,8 +146,11 @@ export class MatchSettle {
   }
 
   finish({ victory, hiddenCleared = false, reason = 'defeat' }) {
+    // A command that ends a test match must be audited/counted before publishing its result.
+    if (this.test && this._testApplying) { this._testOutcome = { victory, hiddenCleared, reason }; return; }
     if (this.ended || this.disposed) return;
     this._freezeDamage();
+    this.offersDispose();
     this.ended = true;
     for (const ps of this.order) this._cancelBotPrep(ps);
     this._finalizePendingDeaths();
@@ -151,6 +170,11 @@ export class MatchSettle {
     } catch (e) {
       this.reportError('buildResult', e);
       result = { t: 'm.result', victory: !!victory, roundsPassed: 0, reason, modeId: this.modeId, difficulty: this.difficulty, players: [] };
+    }
+    if (this.test) {
+      result.test = true;
+      result.testActions = this.testActions;
+      if (this.testReplayable === false) result.testReplayable = false;
     }
     this.lastResultMsg = result;
     this.markPublic();

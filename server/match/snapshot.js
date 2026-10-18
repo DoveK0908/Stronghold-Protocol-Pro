@@ -94,6 +94,9 @@ export const MATCH_FIELDS = Object.freeze({
     'bossOvertimeStartReal', '_finalEnding', '_bossStartAt', 'lastResultMsg', '_uniteBudget', 'onCheckpoint', 'replayRound',
     // the reroll proposal marks and the kick vote (setupVote.js, kickVote.js): a restore drops them
     '_setupProposals', 'kickVote', '_kickVoteSeq', '_kickFailed', '_kickVoteAt',
+    // 0.3.1 plugin offer windows (offers.js): a window is a live popup + a resume callback, so a restore drops it — the
+    // round continues without the window (the same rule as every other timer). `test` is the room's test-console flag.
+    'offers', 'offerWin', '_offerTimers', '_offerResume', 'offerSeq', '_offerResumeTimer', 'test',
   ]),
 });
 
