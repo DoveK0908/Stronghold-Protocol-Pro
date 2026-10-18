@@ -55,7 +55,7 @@ import { resolveOfficialFx } from '../render/vfx/tier.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
-/** Settings store: { bgm, sfx, voice, voiceLang, voiceNative, voiceOverrides, muted, damageNumbers, officialDamageNumbers, ammoCount, combatMetrics, mysticEnergy, quality, officialFx, textSize, uiScale, keys, bgmPrep, bgmCombat }. */
+/** Settings store: { bgm, sfx, voice, voiceLang, voiceNative, voiceOverrides, muted, damageNumbers, officialDamageNumbers, ammoEnergyCount, combatMetrics, prepDeployFold, quality, officialFx, otherSkins, textSize, uiScale, keys, bgmPrep, bgmCombat }. */
 export const settingsStore = createStore(sanitizeSettings({ ...loadPref('settings', null), voiceLang: voiceLanguageStore.get().language }));
 
 /**
@@ -143,7 +143,8 @@ function Toggle({ label, micro, value, onChange }) {
   </div>`;
 }
 
-const QUALITY = [['high', N_('高')], ['medium', N_('中')], ['low', N_('低')]];
+/** Display order only: 低 / 中 / 高, the same direction as 官方特效 关 / 精简 / 完整. Stored values stay high | medium | low. */
+const QUALITY = [['low', N_('低')], ['medium', N_('中')], ['high', N_('高')]];
 /**
  * 官方特效 (0.3.0, render/vfx): the official battle effects the server's owner extracted from their own client (the
  * server serves them: every player of that server sees the owner's extraction) — normal attacks, projectiles, hits,
@@ -435,11 +436,8 @@ export function SettingsModal({ open, onClose }) {
       <${Toggle} label=${t('显示伤害数字')} micro="DAMAGE NUMBERS" value=${s.damageNumbers} onChange=${(v) => updateSettings({ damageNumbers: v })} />
       <${Toggle} label=${t('官方伤害数字')} micro="OFFICIAL NUMBERS" value=${s.officialDamageNumbers} onChange=${(v) => updateSettings({ officialDamageNumbers: v })} />
       <p class="set-hint">${t('只显示达到官方暴击条件的红色数字。关闭时仍显示每一次命中。')}</p>
-      <${Toggle} label=${t('弹药数量')} micro="AMMO COUNT" value=${s.ammoCount} onChange=${(v) => updateSettings({ ammoCount: v })} />
-      <p class="set-hint">${t('弹药类技能开启时，在弹药条下方显示剩余弹药 / 总弹药数（如 13/14）。官方界面没有这个数字。')}</p>
-      <${Toggle} label=${t('秘术师能量')} micro="STORED ENERGY" value=${s.mysticEnergy} onChange=${(v) => updateSettings({ mysticEnergy: v })} />
-      <p class="set-hint">${t('在秘术师的血条下方显示储存的攻击能量 / 上限（如 2/3）。官方用干员身上的特效表示，没有这个数字。')}</p>
-      <p class="set-hint">${t('打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。')}</p>
+      <${Toggle} label=${t('显示弹药与能量数量')} micro="AMMO & ENERGY" value=${s.ammoEnergyCount} onChange=${(v) => updateSettings({ ammoEnergyCount: v })} />
+      <p class="set-hint">${t('弹药类技能开启时，在弹药条下方显示剩余弹药 / 总弹药数（如 13/14）；秘术师的血条下方显示储存的攻击能量 / 上限（如 2/3）。官方界面没有这些数字。')}</p>
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

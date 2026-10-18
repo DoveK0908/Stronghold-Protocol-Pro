@@ -45,13 +45,16 @@ export function uiScaleStep(uiScale, phone) {
 
 /** keys: the in-match shortcuts' key map (ui/gameLogic/shortcuts.js; settings → 快捷键). voiceLang: VOICE_LANGS.
  *  voiceNative: the 本土语言 switch (default off). textSize: TEXT_SIZES (css/theme.css `--t`, applied by ui/settings.js
- *  applyTextSize). uiScale: UI_SCALES (`--ui`, applied by ui/settings.js applyUiScale). ammoCount: 设置「弹药数量」 — the
- *  rounds left / the magazine under an ammo skill's bar (render/units.js; PR #552), off by default: the official HUD has
- *  no such number (the maintainer's decision of 2026-10-13).
+ *  applyTextSize). uiScale: UI_SCALES (`--ui`, applied by ui/settings.js applyUiScale).
+ *  ammoEnergyCount: 设置「显示弹药与能量数量」 (§34.3, one switch for the old 「弹药数量」 `ammoCount` — PR #552, the
+ *  rounds left / the magazine under an ammo skill's bar — and 「秘术师能量」 `mysticEnergy` — PR #636, a 秘术师's stored
+ *  attack energies as stored/cap under the bars; render/units.js). Off by default: the official HUD has neither number
+ *  (the maintainer's decisions of 2026-10-13 and 2026-10-15). A profile that still has either old key `true` migrates
+ *  to on; those keys are not written back. [ASSUMED] a stored boolean `ammoEnergyCount` wins over the old keys, so
+ *  turning the merged switch off stays off.
  *  combatMetrics: 设置「作战统计」 (PR #618), off by default: the official HUD has no such panel.
- *  mysticEnergy: 设置「秘术师能量」 (PR #636) — a 秘术师's stored attack energies as stored/cap under the bars
- *  (render/units.js), off by default: the official HUD shows them as an effect on the operator, not a number (the
- *  maintainer's decision of 2026-10-15).
+ *  设置「部署时收起商店」 (`prepDeployFold`, GitHub #602 / PR #646) is deliberately NOT offered: this fork's owner decided on
+ *  2026-10-16 that picking a piece up leaves the shop bar and the camera as they are (ui/screens/game.js, the header).
  *  officialFx: 设置「官方特效」 (0.3.0, render/vfx): 'full' (完整, this fork's default on every device — the owner's
  *  decision of 2026-10-16), 'auto' (完整 on a desktop, 精简 on a touch device — render/vfx/tier.js), 'off', 'lite'
  *  (精简); only shown when effects were extracted from the local client.
@@ -60,15 +63,26 @@ export function uiScaleStep(uiScale, phone) {
  *  otherSkins: 设置「显示其他玩家的皮肤」 (docs/SKINS.md), ON by default — draw the appearance another player chose instead
  *  of that operator's own model. A pure client preference, never sent: turning it off draws every other seat's operator
  *  model as its owner would see it (the same piece may therefore look different on two screens). */
-export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoCount: false, combatMetrics: false, mysticEnergy: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
+export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
 const QUALITIES = ['high', 'medium', 'low'];
 /** The values of 设置「官方特效」 (render/vfx/tier.js OFFICIAL_FX). */
 export const OFFICIAL_FX_MODES = Object.freeze(['auto', 'off', 'lite', 'full']);
 
 /**
+ * The merged 显示弹药与能量数量 switch. A stored boolean wins. Otherwise on when either retired key was the boolean
+ * true (`ammoCount` PR #552, `mysticEnergy` PR #636). Junk and a missing key stay off.
+ * [ASSUMED] the new boolean wins, so a leftover old key cannot turn the switch back on.
+ * @param {Record<string, any>} r
+ */
+function ammoEnergyCountOf(r) {
+  if (typeof r.ammoEnergyCount === 'boolean') return r.ammoEnergyCount;
+  return r.ammoCount === true || r.mysticEnergy === true;
+}
+
+/**
  * Sanitize persisted settings.
  * @param {any} raw
- * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoCount: boolean, combatMetrics: boolean, mysticEnergy: boolean, quality: 'high'|'medium'|'low', officialFx: 'auto'|'off'|'lite'|'full',
+ * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, combatMetrics: boolean, quality: 'high'|'medium'|'low', officialFx: 'auto'|'off'|'lite'|'full',
  *   officialFx: 'auto'|'off'|'lite'|'full', otherSkins: boolean,
  *   textSize: 'sm'|'md'|'lg'|'xl', uiScale: string, keys: Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>, bgmPrep: string, bgmCombat: string }}
  */
@@ -85,9 +99,8 @@ export function sanitizeSettings(raw) {
     muted: typeof r.muted === 'boolean' ? r.muted : DEFAULT_SETTINGS.muted,
     damageNumbers: typeof r.damageNumbers === 'boolean' ? r.damageNumbers : DEFAULT_SETTINGS.damageNumbers,
     officialDamageNumbers: typeof r.officialDamageNumbers === 'boolean' ? r.officialDamageNumbers : false,
-    ammoCount: typeof r.ammoCount === 'boolean' ? r.ammoCount : DEFAULT_SETTINGS.ammoCount,
+    ammoEnergyCount: ammoEnergyCountOf(r),
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
-    mysticEnergy: typeof r.mysticEnergy === 'boolean' ? r.mysticEnergy : DEFAULT_SETTINGS.mysticEnergy,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
     officialFx: OFFICIAL_FX_MODES.includes(r.officialFx) ? r.officialFx : DEFAULT_SETTINGS.officialFx,
     otherSkins: r.otherSkins !== false,
