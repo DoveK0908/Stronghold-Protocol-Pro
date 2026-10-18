@@ -81,10 +81,14 @@ export const initialState = Object.freeze({
   content: null,
   // how many unofficial plugins the server has (DESIGN §32 P1a: /healthz or welcome `content.plugins`; content.js)
   installedPlugins: 0,
-  session: { entered: false }, // false only before boot and after a NAME_REJECTED hello (ui/nickname.js)
+  // A language-only installation may have announcements without an unofficial plugin count.
+  installedNotices: false,
+  session: { entered: false }, // false until the title screen's 进入 writes it (screens/title.js)
   room: null,
   presence: null,
   queue: { state: 'idle', ticketId: null },
+  // welcome.testMode (DESIGN §34.8). The server omits the key when the switch is off; the client cannot set it.
+  testMode: false,
   match: emptyMatch(),
   ticker: [],
   emotes: [],
@@ -96,12 +100,13 @@ export const initialState = Object.freeze({
 export const store = createStore(initialState);
 
 /**
- * Which screen the router shows for a given app state (there is no title screen: ui/nickname.js):
- * m.public.phase ≠ LOBBY or room.inMatch → game; in a room → room; else lobby.
+ * Which screen the router shows for a given app state:
+ * not entered → title; m.public.phase ≠ LOBBY or room.inMatch → game; in a room → room; else lobby.
  * @param {any} s store state
- * @returns {'lobby'|'room'|'game'}
+ * @returns {'title'|'lobby'|'room'|'game'}
  */
 export function selectRoute(s) {
+  if (!s?.session?.entered) return 'title';
   const phase = s?.match?.public?.phase;
   if (phase && phase !== PHASE.LOBBY) return 'game';
   if (s?.room?.inMatch) return 'game'; // match starting: m.public is on its way

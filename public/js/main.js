@@ -1,14 +1,16 @@
 // Client entry: boot (fonts, identity, socket), net → store wiring, router, global overlays.
 //
-// Router (derived from the store, no URL routes; no title screen — the nickname: ui/nickname.js):
+// Router (derived from the store, no URL routes):
+//   not entered            → Title (screens/title.js: name entry, resume/download/import, settings)
 //   m.public.phase ≠ LOBBY → Game (screens/game.js: briefing / band draft / match / result by phase)
 //   room.inMatch           → Game (match starting, m.public on its way)
 //   in a room              → Room
 //   otherwise              → Lobby
-// Deep link `?room=CODE`: remembered at boot, auto-joined once the player has a name and the
+// Deep link `?room=CODE`: remembered at boot, auto-joined once the player has entered and the
 // session is online (after a short grace period in case the server restores a room on resume).
-// Boot connects with the remembered nickname (the gate's callsign; a first visit: 博士 + four digits) and
-// resumes the server session with the saved token; stale room/match state is dropped if the
+// Boot waits for the title screen's 进入 before connecting (a reload of a tab that already entered
+// reconnects automatically with the remembered nickname and resumes the server session with the saved token);
+// stale room/match state is dropped if the
 // server does not re-push it within RESTORE_GRACE_MS after `welcome`. Boot waits for
 // `identity.init()` (which token this tab may use without stealing another live tab's session)
 // before the first connect; a page restored from the back/forward cache reloads.
@@ -45,7 +47,8 @@ import './queueCancellation.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
 import { data, useData } from './data.js';
 import { GAME_FILES } from './ui/gameComponents.js';
-import { NameHost, sanitizeName, defaultName } from './ui/nickname.js';
+import { sanitizeName } from './ui/nickname.js';
+import { TitleScreen } from './screens/title.js';
 import { LobbyScreen, rememberRoom, parseRoomParam, joinRoom } from './screens/lobby.js';
 import { RoomScreen, TrustedNotice } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
@@ -78,7 +81,7 @@ const CLAIM_RETRY_GAP_MS = 5000;
 const TICKER_KEEP = 20;
 const EMOTE_KEEP = 20;
 
-const SCREENS = { lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
+const SCREENS = { title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen };
 
 /** Copy of a server message without transport fields. */
 function payload(msg) {
@@ -312,8 +315,9 @@ function wireNet() {
       identity.rejectToken();
     }
     if (err.code === 'NAME_REJECTED') {
-      // ui/nickname.js NameHost asks for another name over the screen; room/token stay: correcting a legacy name must
-      // not abandon its game
+      // the server refuses a legacy name: drop back to the title screen (screens/title.js) to correct it; room/token
+      // stay, so correcting a legacy name must not abandon its game
+      identity.setEntered(false);
       store.set({ session: { entered: false } });
     }
     if (err.code === 'SERVER_FULL') return; // the connection banner shows it and counts down to the automatic retry
@@ -464,7 +468,6 @@ function App() {
     <${GuideHost} />
     <${LoadoutHost} />
     <${StatsHost} />
-    <${NameHost} />
   </div>`;
 }
 
@@ -518,9 +521,12 @@ async function boot() {
 
   const pendingJoin = parseRoomParam(location.search);
   const savedName = sanitizeName(identity.loadName());
+  // Reloading a tab that already passed the title re-enters automatically (sessionStorage flag, screens/title.js);
+  // a first visit or a new tab starts on the title screen with the remembered name suggested.
+  const entered = identity.wasEntered() && !!savedName;
   store.set((s) => ({
     me: { ...s.me, name: savedName },
-    session: { entered: true },
+    session: { entered },
     ui: { ...s.ui, pendingJoin },
   }));
 
@@ -556,13 +562,9 @@ async function boot() {
   // the language (and its UI translations) before the first render: no Chinese flash for an English player
   const langReady = initLang().catch((err) => console.warn('[app] language setup failed', err));
   const connectWhenReady = Promise.all([identityReady, langReady]).then(() => {
-    // a first visit (no gate callsign, nothing remembered): 博士 + four digits in the chosen language; ✎ renames
-    const name = savedName || defaultName();
-    if (!savedName) {
-      identity.saveName(name);
-      store.set((s) => ({ me: { ...s.me, name } }));
-    }
-    net.setName(name);
+    // A first visit stays on the title screen until 进入` (screens/title.js enterSession): the socket connects with
+    // the remembered name only for a tab that already passed it (a reload).
+    if (entered) net.setName(savedName);
   });
   await Promise.all([waitForFonts(1200), connectWhenReady, langReady]);
   const root = document.getElementById('app');

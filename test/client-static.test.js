@@ -150,7 +150,7 @@ const JS_FILES = [...walk(path.join(PUBLIC, 'js'), '.js'), ...walk(path.join(PUB
 describe('client modules parse as ES modules', () => {
   test('found client modules', () => {
     for (const f of ['main.js', 'net.js', 'store.js', 'data.js', 'ui/components.js', 'ui/toasts.js',
-      'ui/nickname.js', 'screens/lobby.js', 'screens/room.js', 'screens/game.js']) {
+      'ui/nickname.js', 'screens/title.js', 'screens/lobby.js', 'screens/room.js', 'screens/game.js']) {
       assert.ok(existsSync(path.join(PUBLIC, 'js', f)), `public/js/${f} exists`);
     }
   });
@@ -291,15 +291,15 @@ describe('store.js', () => {
   test('selectRoute', async () => {
     const { selectRoute } = await mod('store.js');
     const base = { session: { entered: true }, room: null, match: { public: null } };
-    // no title screen: a refused name keeps the screen (ui/nickname.js NameHost opens over it)
-    assert.equal(selectRoute({ ...base, session: { entered: false } }), 'lobby');
-    assert.equal(selectRoute({ ...base, session: { entered: false }, room: { code: 'ABCD', inMatch: true } }), 'game');
+    // a tab that has not entered yet (first visit, a new tab) shows the title screen (screens/title.js)
+    assert.equal(selectRoute({ ...base, session: { entered: false } }), 'title');
+    assert.equal(selectRoute({ ...base, session: { entered: false }, room: { code: 'ABCD', inMatch: true } }), 'title');
     assert.equal(selectRoute(base), 'lobby');
     assert.equal(selectRoute({ ...base, room: { code: 'ABCD' } }), 'room');
     assert.equal(selectRoute({ ...base, room: { code: 'ABCD', inMatch: true } }), 'game');
     assert.equal(selectRoute({ ...base, room: { code: 'ABCD' }, match: { public: { phase: 'PREP' } } }), 'game');
     assert.equal(selectRoute({ ...base, room: { code: 'ABCD' }, match: { public: { phase: 'LOBBY' } } }), 'room');
-    assert.equal(selectRoute(undefined), 'lobby');
+    assert.equal(selectRoute(undefined), 'title');
   });
 
   test('serverNow applies the clock offset', async () => {
@@ -1021,14 +1021,20 @@ describe('screen helpers', () => {
     }
   });
 
-  test('no title screen: boot connects with the remembered or a generated name, the lobby renames', () => {
+  test('title exposes the shared settings modal', () => {
+    const source = readFileSync(path.join(PUBLIC, 'js/screens/title.js'), 'utf8');
+    assert.match(source, /import \{ SettingsModal \} from '\.\.\/ui\/settings\.js'/);
+    assert.match(source, /class="title-settings fsbtn tapx"/, 'title screen includes the settings control');
+    assert.match(source, /<\$\{SettingsModal\} open=\$\{settingsOpen\}/, 'settings control opens the shared modal');
+  });
+
+  test('boot enters only from the title screen, and the lobby still renames', () => {
     const main = readFileSync(path.join(PUBLIC, 'js/main.js'), 'utf8');
-    assert.ok(!/screens\/title\.js/.test(main) && !existsSync(path.join(PUBLIC, 'js/screens/title.js')));
-    assert.match(main, /const name = savedName \|\| defaultName\(\);/);
-    assert.match(main, /<\$\{NameHost\} \/>/, 'the rename dialog is mounted over every route');
+    assert.match(main, /const entered = identity\.wasEntered\(\) && !!savedName;/);
+    assert.match(main, /if \(entered\) net\.setName\(savedName\);/);
+    assert.match(main, /const SCREENS = \{ title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen \};/);
     const lobby = readFileSync(path.join(PUBLIC, 'js/screens/lobby.js'), 'utf8');
     assert.match(lobby, /class="me-rename" onClick=\$\{rename\}/);
-    assert.ok(!/backToTitle|lobby-back/.test(lobby), 'no way back to a title screen');
   });
 
   test('lobby: normalizeCode / parseRoomParam / difficultyInfo', async () => {
