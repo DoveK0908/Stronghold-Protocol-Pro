@@ -209,12 +209,6 @@
 .minfo-dlg .brief-banned__n { font-size: max(.24rem, 15px); }
 .minfo-dlg .brief-banned__grid { grid-template-columns: repeat(auto-fill, minmax(max(.76rem, 44px), 1fr)); gap: max(.1rem, 4px); }
 .minfo-dlg .brief-banned__grid .uthumb { --ut: max(.76rem, 44px); }
-/* the grouped 本局禁用干员 at the dialog's size (the fixed name column keeps every bond's avatars on one x) */
-.minfo-dlg .brief-banned__groups { gap: max(.12rem, 6px); column-gap: max(.14rem, 8px); }
-.minfo-dlg .brief-banned__ghead { gap: max(.06rem, 3px); }
-.minfo-dlg .brief-banned__ghead .bond { --disc: max(.48rem, 24px); }
-.minfo-dlg .brief-banned__gname { font-size: max(.21rem, 14px); }
-.minfo-dlg .brief-banned__gcount { font-size: max(.18rem, 12px); }
 .minfo-dlg .brief-banned__diy { font-size: max(.14rem, 12px); }
 .minfo-dlg .t-dim { font-size: max(.16rem, 10px); }
 @media (max-width: 1000px) {

@@ -60,7 +60,7 @@ export function BriefingScreen() {
         <${MatchEnemies} pub=${pub} gd=${gd} />
       </section>
       <section class="brief__right">
-        <${MatchInfo} model=${info} grouped=${false} />
+        <${MatchInfo} model=${info} />
       </section>
     </main>
     <${SetupReroll} pub=${pub} />
