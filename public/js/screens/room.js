@@ -394,6 +394,18 @@ export function RoomScreen() {
   const [optsShown, optsLeaving] = usePresence(opts, 160);
   const [exiting, setExiting] = useState(false);
 
+  // 扩容房（8–20 席）横向排开：鼠标滚轮上下 -> 左右滚动，滚动条与拖拽照旧（社区反馈：人多了看不全）
+  const bindSeatsWheel = (el) => {
+    if (!el || el.dataset.wheelBound) return;
+    el.dataset.wheelBound = '1';
+    el.addEventListener('wheel', (e) => {
+      if (el.scrollWidth <= el.clientWidth) return;          // nothing to scroll (solo / 4 seats)
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;   // a real horizontal wheel/trackpad gesture
+      el.scrollLeft += e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY; // line mode (some mice/firefox)
+      e.preventDefault();
+    }, { passive: false });
+  };
+
   if (!room) return null;
   const online = conn.status === 'online';
   const coop = room.mode !== 'solo';
@@ -518,7 +530,7 @@ export function RoomScreen() {
       </div>
     </header>
 
-    <main class="rs-seats">
+    <main class="rs-seats" ref=${bindSeatsWheel}>
       ${facts.seats.map((s, i) => html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
         myId=${me.playerId} myCard=${myCard} busy=${busy} gd=${gd} queued=${queued} onKick=${kick} onInvite=${() => copy('code')}
         onAddBot=${addBot} onRemoveBot=${removeBot} onBotBand=${setBandSeat} portraits=${portraits}
