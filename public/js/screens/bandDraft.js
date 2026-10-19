@@ -312,6 +312,7 @@ export function BandDraftScreen() {
     <main class="draft__main">
       <aside class="draft-order">
         <h3 class="brief-h"><span>${solo ? t('独立模拟') : t('决策顺序')}</span><${MicroLabel}>${solo ? 'FREE PICK' : 'RANDOM ORDER'}</${MicroLabel}></h3>
+        <div class="draft-order__rows">
         ${(solo ? players.filter((p) => p.playerId === myId) : draft.order.map((pid) => players.find((p) => p.playerId === pid)).filter(Boolean)).map((p, i) => {
           const picked = draft.picks.get(p.playerId) || (p.playerId === myId ? myPick : p.bandId) || null;
           const cur = !picked && (solo || concurrent || draft.turnPid === p.playerId);
@@ -333,6 +334,7 @@ export function BandDraftScreen() {
             </span>
           </div>`;
         })}
+        </div>
         ${concurrent ? html`<div class="draft-queue" data-testid="draft-queue">
           <span class="draft-queue__txt"><b>${t('所有博士同时选择')}</b><span>${t('还剩 {n} 人未选', { n: draft.order.filter((pid) => !draft.picks.has(pid)).length })}</span></span>
           <${Icon} name="hourglass" />
