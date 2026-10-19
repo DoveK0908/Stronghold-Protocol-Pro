@@ -26,7 +26,7 @@
 // shrinks and the prep camera frames a taller board, so the shop stays open while deploying instead of being folded.
 
 import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { html, Modal, Button, Icon, MicroLabel } from './components.js';
+import { html, Modal, Button, Icon, MicroLabel, confirmDialog } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { createStore, useStore, loadPref, savePref, store } from '../store.js';
 import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, TEXT_SIZES, UI_SCALES, uiScaleStep } from './gameLogic.js';
@@ -52,6 +52,8 @@ import { toast, describeError } from './toasts.js';
 import { pluginMicro } from './pluginTag.js';
 import { fxAvailable } from '../render/vfx/available.js';
 import { resolveOfficialFx } from '../render/vfx/tier.js';
+import { askPersistStorage, importSupport, storagePersisted } from '../assetCache.js';
+import { assetImport, pruneImportedAssets } from '../assetPack.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -405,6 +407,77 @@ function UiPluginSection() {
  * Settings modal.
  * @param {{ open: boolean, onClose: Function }} props
  */
+/**
+ * 素材存储: the 导入素材包 dialog asks for persistent storage once, as an import ends (ui/assetImport.js); this button asks
+ * again whenever the player wants, and the line under it says what the browser answers now (navigator.storage.persisted).
+ * Chrome and Edge decide silently from their own signals, Firefox asks the player; neither answer outlives a manual clear
+ * of the site's data. StorageManager exists only in a secure context: on plain http to a LAN IP the line says so and
+ * there is no button. Laid out like 问题反馈 below it.
+ */
+const PERSIST_NOTES = {
+  on: N_('已持久保存：存储空间不足时，浏览器不会自动清掉导入的素材。'),
+  off: N_('未持久保存：存储空间不足时，浏览器可能清掉导入的素材。'),
+  refused: N_('浏览器没有同意。Chrome 和 Edge 会根据本站的使用情况自行决定，常用或安装为应用后更容易同意，可以之后再试。'),
+  insecure: N_('需要通过 https 或 localhost 打开本站，才能申请持久保存。'),
+  unsupported: N_('这个浏览器不支持持久保存。'),
+};
+/** The result line of 清理旧版本素材 (msgids: translated when shown). */
+const PRUNE_NOTES = {
+  done: N_('已清理 {n} 个旧版本文件。'),
+  none: N_('没有需要清理的旧版本文件。'),
+  failed: N_('读不到服务器的素材清单，没有删除任何文件。'),
+};
+
+function StorageSection() {
+  const [state, setState] = useState(null);  // a PERSIST_NOTES key, null while the browser is asked
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const unknown = () => (globalThis.isSecureContext ? 'unsupported' : 'insecure');
+    storagePersisted().then((kept) => { if (live) setState(kept === null ? unknown() : kept ? 'on' : 'off'); });
+    return () => { live = false; };
+  }, []);
+  const ask = async () => {
+    setBusy(true);
+    const kept = await askPersistStorage();
+    setBusy(false);
+    setState(kept === null ? 'unsupported' : kept ? 'on' : 'refused');
+  };
+  const askable = state === 'on' || state === 'off' || state === 'refused';
+  // 清理旧版本素材: only where an import can exist (a secure context with Cache Storage), never while one runs
+  const [importing, setImporting] = useState(() => ['reading', 'importing'].includes(assetImport.get().phase));
+  useEffect(() => assetImport.subscribe((s) => setImporting(['reading', 'importing'].includes(s.phase))), []);
+  const [pruning, setPruning] = useState(false);
+  const [pruned, setPruned] = useState(null); // { kind: 'done' | 'none' | 'failed', n }
+  const prune = async () => {
+    const ok = await confirmDialog({ title: t('清理旧版本素材'), text: t('删除这台浏览器里、当前服务器版本已经用不到的导入素材；仍在使用的会保留。'), okText: t('清理') });
+    if (!ok) return;
+    setPruning(true);
+    try {
+      const r = await pruneImportedAssets();
+      setPruned(r.removedFiles > 0 ? { kind: 'done', n: r.removedFiles } : { kind: 'none' });
+    } catch {
+      setPruned({ kind: 'failed' });
+    } finally { setPruning(false); }
+  };
+  return html`<section class="set-storage" aria-labelledby="set-storage-title" data-testid="storage-section">
+    <div class="set-keys__head">
+      <span class="set-row__label" id="set-storage-title">${t('素材存储')}<${MicroLabel}>STORAGE<//></span>
+      <span class="set-storage__actions">
+        ${importSupport().ok ? html`<${Button} variant="ghost" size="sm" icon="refresh" data-testid="storage-prune" disabled=${pruning || importing}
+          loading=${pruning} onClick=${prune}>${t('清理旧版本素材')}<//>` : null}
+        ${askable ? html`<${Button} variant="ghost" size="sm" icon="shield" data-testid="storage-persist" disabled=${state === 'on' || busy}
+          loading=${busy} onClick=${ask}>${state === 'on' ? t('已持久保存') : t('申请持久保存')}<//>` : null}
+      </span>
+    </div>
+    <p class="set-hint">${t('导入的素材包保存在这个浏览器里。手动清除网站数据会删除它们；Safari 约 7 天没打开本站也可能清除。')}</p>
+    ${state ? html`<p class=${cx('set-keys__note', state !== 'on' && state !== 'off' && 'is-warn')} role="status" aria-live="polite"
+      data-testid="storage-note">${t(PERSIST_NOTES[state])}</p>` : null}
+    ${pruned ? html`<p class=${cx('set-keys__note', pruned.kind === 'failed' && 'is-warn')} role="status" aria-live="polite"
+      data-testid="storage-prune-note">${t(PRUNE_NOTES[pruned.kind], { n: pruned.n })}</p>` : null}
+  </section>`;
+}
+
 export function SettingsModal({ open, onClose }) {
   const s = useSettings();
   const [tested, setTested] = useState(false);
@@ -474,6 +547,7 @@ export function SettingsModal({ open, onClose }) {
       <${ScreenFitSection} />
       <${CosmeticSection} />
       <${UiPluginSection} />
+      <${StorageSection} />
       <${DiagSection} />
       <${OwnerKeySection} />
       <p class="set-hint">${touchUi ? t('触屏操作：点击单位选中（撤退 / 出售）· 长按单位或卡牌查看详情 · 拖动部署后滑动选择朝向') : t('右键查看详情')}</p>

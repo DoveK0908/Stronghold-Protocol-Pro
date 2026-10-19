@@ -844,6 +844,9 @@
 .set-key.is-waiting { border-color: var(--amber); color: var(--amber); font-family: inherit; font-size: calc(.13 * var(--t)); animation: set-key-wait 1s ease-in-out infinite alternate; }
 .set-key.is-fixed { cursor: default; color: var(--text-lo); border-style: dashed; }
 .set-key.is-fixed small { font-family: inherit; font-size: calc(.12 * var(--t)); color: var(--text-dim); }
+/* 素材存储 (ui/settings.js StorageSection; official 0.3.1): persistent storage + 清理旧版本素材 */
+.set-storage { display: flex; flex-direction: column; gap: .08rem; padding-top: .1rem; border-top: 1px solid var(--line); }
+.set-storage__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .08rem; }
 .set-keys__note { min-height: 1.5em; font-size: calc(.14 * var(--t)); line-height: 1.5; color: var(--mint-400); }
 .set-keys__note.is-warn { color: var(--amber); }
 .set-keys__more > summary { padding: .06rem 0; font-size: calc(.15 * var(--t)); color: var(--mint-400); cursor: pointer; }
