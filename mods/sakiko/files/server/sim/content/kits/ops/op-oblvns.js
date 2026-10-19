@@ -75,8 +75,9 @@
 //      battle/players.js `_setupUnit`; test/sim/trait_attack_speed.test.js). Implementing it here as well would
 //      apply the stat twice (her +12 while 2+ enemies stand in her range is the engine's `trait:attack_speed` buff).
 // [ASSUMED] markings of the ported kit: the note count / fan of S1 and the ±20° of S2/S3 come from the skill TEXT
-// (their rows carry no count), 音符的伤害类型 is 法术 (§17 never names the talent note's type; 0.1.4 fired arts), and the
-// timbre is chosen by form (elite = 钢琴, normal = 风琴 — the official timbre is a free switch with no data behind it).
+// (their rows carry no count), and 音符的伤害类型 is 法术 (§17 never names the talent note's type; 0.1.4 fired arts).
+// S2's timbre is NOT assumed any more: this mode has no way to switch it, so it is always 钢琴, the official 初始 timbre
+// (owner's ruling of 2026-10-18 — see the S2 block; 风琴 is gone from S2 and stays only as S3's arts half).
 
 import { num, talentBb, skillRec } from '../shared/tier1.js';
 import { canTargetEnemy, sortEnemyTargets } from '../../../targeting.js';
@@ -131,8 +132,10 @@ const NOTE_S2_PIANO = Object.freeze({
   update: 0.2, minFree: 0.4, seekR: 0.8, trackSpeed: 3.5, turn: 1 / 2, free: 'sine', sineAmp: 0.4, sineX: 1.9,
   hit: Object.freeze({ radius: 0.8, speed: 3.0 }),
 });
-/** S2 满月的舞会 · 风琴: 更新 0.4 s, 最短 0.4 s, 扩张正弦 (0.15, 0.7), 追踪 1.0 / 1.0 / 转向 1/12. */
-const NOTE_S2_ORGAN = Object.freeze({ update: 0.4, minFree: 0.4, seekR: 1.0, trackSpeed: 1.0, turn: 1 / 12, free: 'sine', sineAmp: 0.15, sineX: 0.7 });
+/** S2 满月的舞会 · 风琴: 更新 0.4 s, 最短 0.4 s, 扩张正弦 (0.15, 0.7), 追踪 1.0 / 1.0 / 转向 1/12.
+ *  The documented 风琴 row, kept for the record and unused by the kit: with no timbre switching (owner 2026-10-18) S2
+ *  always plays 钢琴, and S3's 风琴 half uses NOTE_S3 (the row gives S3 one parameter set for both timbres). */
+const _NOTE_S2_ORGAN = Object.freeze({ update: 0.4, minFree: 0.4, seekR: 1.0, trackSpeed: 1.0, turn: 1 / 12, free: 'sine', sineAmp: 0.15, sineX: 0.7 });
 /** S3 残月的余响 (every timbre): 更新 0.4 s, 最短 0.8 s, 扩张正弦 (0.5, 0.8), 追踪 1.0 / 1.3 / 转向 1/4. */
 const NOTE_S3 = Object.freeze({ update: 0.4, minFree: 0.8, seekR: 1.0, trackSpeed: 1.3, turn: 1 / 4, free: 'sine', sineAmp: 0.5, sineX: 0.8 });
 /** S2/S3 音符的初始方向: 「随机在左 20° 至右 20° 范围内选择一个角度」. */
@@ -141,10 +144,15 @@ const NOTE_SPREAD = 20;
 const IDLE_ANGLE = 20;
 /** S3 残月的余响: "各 2 个音符" — the row has no `attack@times` blackboard, so this is the skill text's own count. */
 const S3_NOTES_PER_TIMBRE = 2;
-// S1 新月的苏醒: 「触发技能时以自身朝向为基准，自左 13.125° 至右 13.125° 顺时针均匀演奏音符（间隔 3.75°）」— the
-// notes leave in a fixed fan (13.125 − 3.75·i), NOT the random angle of the row's own `angle` blackboard (15°).
-const S1_FAN_HALF = 13.125;
-const S1_FAN_STEP = 3.75;
+// S1 新月的苏醒: 「触发技能时以自身朝向为基准，自左 13.125° 至右 13.125° 顺时针均匀演奏音符（间隔 3.75°）」— the notes
+// leave in a fixed fan, NOT the random ±angle spread of every other note row.
+//
+// The half-angle is the row's own `angle` blackboard (15 at every rank: Lv1-3 5 / Lv4-6 10 / Lv7 15 — the text's
+// 13.125° is the PRTS-page rendering of that same fan, one note per step). Reading it instead of hard-coding the page's
+// number keeps the fan on the data: should the row change with a promotion or a level, the fan follows. The last note
+// mirrors the first (the text's 「自左 … 至右 …」 is symmetric about her facing), so the step is 2·half/(n−1) — with the
+// page's numbers that is exactly its 3.75°.
+const S1_FAN_FALLBACK = 15;                          // [ASSUMED] only if a record carries no `angle` at all
 /** [ASSUMED] the gap between S1's notes: the row carries no timing, the text only says 演奏出8个音符. */
 const S1_STAGGER = 0.1;
 
@@ -431,8 +439,8 @@ function liftsRangedPenalty(chess) {
  * 「技能期间」 — the engine's own live-skill state, `unit.skill.active` (skills.js: set by `activate()`, cleared by
  * `end()`; the field snapshot.js publishes as UF.SKILL, battle/queries.js reads for the live targeting override and
  * battle/lifecycle.js reports as `skillActive`). It covers:
- *   * a sustained skill for its whole duration — S2 (the timbre switch the kit runs as a `duration` state for as long as
- *     it is switched on) and S3 (25 s);
+ *   * a sustained skill for its whole duration — S2 (a `duration` state switched on once, playing 钢琴 from the first
+ *     tick to the last: this mode has no timbre switching, owner 2026-10-18) and S3 (25 s);
  *   * the release of an instant / charges skill — S1: `activate()` sets `active`, runs `onStart` (where the eight-note
  *     fan is played) and ends the skill in the same call, so `lastStart === battle.time` is the release tick itself:
  *     the fan captures it ONCE for all eight notes (they leave S1_STAGGER apart, yet they are one release), and the
@@ -440,13 +448,29 @@ function liftsRangedPenalty(chess) {
  *     tick.
  * Every activation path lands here, Fever's free releases included (`feverCast` → `sk.activate('fever', …)`), so a
  * Fever-driven cast counts exactly like the engine's own. §17 S2's 「携带此技能时，Y 模组强化后的第一天赋始终将自身视为
- * 技能期间」 is what the sustained switch state already gives: while the timbre is on, S2 IS her running skill.
+ * 技能期间」 is what the sustained state already gives: while S2 is on, S2 IS her running skill.
  */
 function skillRunning(battle, unit) {
   const sk = unit?.skill;
   if (!sk || sk.noSkill || sk.kind === 'passive') return false;
   return !!sk.active || sk.lastStart === battle.time;
 }
+
+/**
+ * 技能的攻击 = 技能自己的音色 — 「期间攻击同时打天赋音符与技能音符」 was a deviation of this port (and of 0.1.4), not the
+ * official model: while S2 or S3 runs, the attack's note IS the skill's tone (S2: 钢琴 one note, 二連撃 in Fever; S3:
+ * 钢琴 + 风琴, "各 2 个音符"), and the talent's own note does not ride along. Firing both made every attack of hers
+ * play two or more notes, which inflated the talent's stack count (每命中一个音符 +1 %DEF/+1 %RES 穿透, capped 10 / 12)
+ * and the damage of one attack far past the official's.
+ *
+ * What counts as "the skill's own tone": a SUSTAINED skill that overrides the attack (`sk.spec.attack`, i.e. S2 / S3),
+ * not merely any running skill — a skill that only buffs her (a 倍率 / ATK-up skill) still attacks with the talent's
+ * note, and the talent note is still 「技能的攻击」 for `isSkill` consumers, exactly as before.
+ *
+ * S1 needs no case: it is an instant, `end()` runs inside `activate()`, so it is never the running skill on an attack tick.
+ * Fever needs none either: the tone keeps firing there (twice per attack), so the tone still covers the attack.
+ */
+const toneReplacesAttack = (unit) => !!(unit?.skill?.active && unit.skill.spec?.attack);
 
 /**
  * The attack multiplier a note carries (PRTS: 所有音符强制使用**缓存攻击力与攻击倍率**). It is the profile's own
@@ -752,7 +776,7 @@ function extremeIn(battle, unit, keys, key) {
 
 export default {
   // 丰川祥子 S1 新月的苏醒 / S2 满月的舞会 / S3 残月的余响: a note per attack (talent 1), the shared Fever gauge
-  // (talent 2's +cnt per damage instance, §16), S1's eight-note fan, S2 the sustained timbre state, S3 the widened
+  // (talent 2's +cnt per damage instance, §16), S1's eight-note fan, S2 a sustained 钢琴 state, S3 the widened
   // range with two notes per timbre seeking the highest-DEF / highest-RES enemy. All numbers from `chess` / each
   // skill's own record, so both tiers, both forms and the module stages are the same file.
   char_4182_oblvns: (bb, chess, def) => {
@@ -784,8 +808,8 @@ export default {
     // would silently return its default, so a skill that changed its note count would have kept firing eight.
     const s1Count = Math.max(1, Object.keys(b1).filter((k) => /^atk_scale(_\d+)?$/.test(k)).length);
     const s1Scale = (i) => num(b1[`atk_scale${i === 0 ? '' : '_' + (i + 1)}`], num(b1.atk_scale, 1));
-    const s2Atk = num(b2['attack@atk']);                          // 钢琴: 攻击力+
-    const s2Aspd = num(b2['attack@attack_speed']);                // 风琴: 攻击速度+ (points, 80 / 110)
+    const s2Atk = num(b2['attack@atk']);                          // 钢琴: 攻击力+ — the only S2 branch this mode reaches
+    // `attack@attack_speed` (the 风琴 branch, 80 / 110 points) is intentionally not read: no timbre switch, no 风琴.
     const s3Scale = num(b3['attack@atk_scale'], 1);
     const s3Notes = S3_NOTES_PER_TIMBRE;                          // "各 2 个音符" — no `attack@times` in the row either
     const skillGrid = skillRec(chess, S3)?.rangeGrid ?? def?.skill?.rangeGrid ?? null;   // S3 3-21 while it runs
@@ -794,11 +818,15 @@ export default {
     // note-on-attack below would never run. A timbre switch is a sustained state, so it gets a duration longer than any
     // battle. `Infinity` is not an option (a non-finite spec duration is rejected and falls back to the def's).
     const s2Duration = 9999;
-    // [ASSUMED] elite (`_b` slot form) plays 钢琴 (ATK + pass-through), the normal form 风琴 (ASPD). The official lets
-    // the player switch freely: WHICH form gets which timbre is ours, the numbers of each branch are the row's own.
-    const piano = def?.golden === true || chess?.isGolden === true;
-    const noteCfg = piano ? NOTE_S2_PIANO : NOTE_S2_ORGAN;
-    const noteType = piano ? 'phys' : 'arts';
+    // 钢琴 only — the owner's ruling (2026-10-18): 「音色只有二技能会切换，只能用初始的钢琴，不会切换成风琴」. The official
+    // lets the player switch 钢琴 ↮ 风琴, but this mode has no timbre control to switch WITH, and 钢琴 is the initial
+    // timbre (PRTS: 「钢琴（初始）或风琴」), so both the normal and the elite form play 钢琴 and its branch of the row is
+    // the only one read: 攻击力 +attack@atk and 【已命中】pass-through. (It used to be [ASSUMED] form-based — elite 钢琴,
+    // normal 风琴 — which made the normal form a strictly different operator.) `attack@attack_speed` (the 风琴 branch)
+    // is deliberately NOT read: nothing in the game can reach it. 风琴 stays in S3 only, where the row itself says
+    // 「攻击同时使用 钢琴 和 风琴 音色演奏」 — S3 fires the organ HALF of that pair as an arts note, not a switch.
+    const noteCfg = NOTE_S2_PIANO;
+    const noteType = 'phys';
     const passby = num(b2['attack@passby_delay'], 0.5);          // S2: 【已命中】持续 0.5 s (the row's own blackboard)
 
     return {
@@ -806,8 +834,8 @@ export default {
       trait: ATTACK_CARRIER,
       skills: {
         // S1 新月的苏醒 — 8 notes, the i-th dealing atk_scale_i × ATK as arts. 「触发技能时以自身朝向为基准，自左 13.125°
-        // 至右 13.125° 顺时针均匀演奏音符（间隔 3.75°）」: the i-th note leaves on the fixed ray `S1_FAN_HALF − 3.75·i`
-        // (left first, clockwise to the right). Targets are picked as each note leaves her, so a later note follows the
+        // 至右 13.125° 顺时针均匀演奏音符（间隔 3.75°）」: the i-th note leaves on the fixed ray `half − step·i`, half
+        // being the row's own `angle` (S1_FAN_FALLBACK, see the constant) — left first, clockwise to the right. Targets are picked as each note leaves her, so a later note follows the
         // field as it is then; with nothing in range the whole run still plays out (each note flying out and hunting).
         // 可充能 2 次 (`maxChargeTime`) — 「充能至最大层数时自动释放一次」 is the CAP's own extra effect, not a trigger
         // rule, so the kit releases it itself (`chargeCapRelease`, registered in the talent below).
@@ -818,6 +846,8 @@ export default {
             // the engine's `active` only spans this synchronous call while the eight notes leave S1_STAGGER apart — they
             // are one release, and every one of them carries the release's multiplier (skillRunning).
             const liftRanged = liftNow(battle, unit);
+            const half = num(b1.angle, S1_FAN_FALLBACK);              // the fan half-angle: the row own angle key
+            const step = s1Count > 1 ? (2 * half) / (s1Count - 1) : 0;   // last note mirrors the first (symmetric fan)
             for (let i = 0; i < s1Count; i++) {
               const shot = () => {
                 if (!unit.alive || !live(unit)) return;
@@ -825,19 +855,19 @@ export default {
                 const list = sortEnemyTargets(battle, unit, cands, unit.profile?.priority ?? null) || [];
                 // [ASSUMED] the fan targets successive enemies and wraps; the fan itself is the sourced part
                 const t = list.length ? list[i % list.length] : null;
-                fireNote(battle, unit, { target: t, scale: s1Scale(i), type: 'arts', cfg: NOTE_S1, tag: 'skill', aim: S1_FAN_HALF - i * S1_FAN_STEP, delay, liftRanged, onImpact: () => applyNotePen(battle, unit, penCfg, 1) });
+                fireNote(battle, unit, { target: t, scale: s1Scale(i), type: 'arts', cfg: NOTE_S1, tag: 'skill', aim: half - i * step, delay, liftRanged, onImpact: () => applyNotePen(battle, unit, penCfg, 1) });
               };
               if (i === 0) shot();
               else battle.after(i * S1_STAGGER, shot, { owner: unit });
             }
           },
         },
-        // S2 满月的舞会 — one timbre for the whole cast (see the header: the timbre is a free switch with no data behind
-        // it). 「【Fever】状態中は現在の音色による2連撃」: 攻击.onHit fires the timbre's notes, twice inside Fever.
+        // S2 满月的舞会 — 钢琴 only (the header's note: no timbre switching in this mode; 钢琴 is the initial timbre).
+        // 「【Fever】状態中は現在の音色による2連撃」: 攻击.onHit fires the timbre's notes, twice inside Fever.
         [S2]: {
           kind: 'duration',
           duration: s2Duration,
-          mods: piano ? { atkPct: s2Atk } : { aspd: s2Aspd },
+          mods: { atkPct: s2Atk },
           attack: {
             onHit({ battle, unit: u, target }) {
               if (!target) return;
@@ -930,12 +960,16 @@ export default {
             const t = (ctx.targets ?? [])[0];
             if (!t || !t.alive) return;
             unit.mem.sakikoLastNoteAt = battle.time;   // the 持续攻击 timer below defers to a real attack
-            fireNote(battle, unit, {
-              target: t, scale: noteScale, type: 'arts', cfg: NOTE_TALENT, tag: 'talent', spread: idleAngle, delay,
-              liftRanged: liftNow(battle, unit),   // LOR-Y ≥2: a note launched while one of her skills runs carries the full multiplier
-              dmgFlags: { isAttack: true, isSkill: !!ctx.isSkill },   // 这是她的一次普通攻击（技能期间的照抄引擎给的 isSkill）
-              onImpact: impact,
-            });
+            // S2/S3 own the attack while they run: their tone IS this attack's note, so the talent does not add one on
+            // top of it (the toneReplacesAttack note). S1 is an instant — it clears before any attack of its own tick.
+            if (!toneReplacesAttack(unit)) {
+              fireNote(battle, unit, {
+                target: t, scale: noteScale, type: 'arts', cfg: NOTE_TALENT, tag: 'talent', spread: idleAngle, delay,
+                liftRanged: liftNow(battle, unit),   // LOR-Y ≥2: a note launched while one of her skills runs carries the full multiplier
+                dmgFlags: { isAttack: true, isSkill: !!ctx.isSkill },   // 这是她的一次普通攻击（技能期间的照抄引擎给的 isSkill）
+                onImpact: impact,
+              });
+            }
             // 出手即结算（攻击回复技力）：音符发出后立刻报这一次攻击。传真实目标给 `onAttackPerformed`（她自己的
             // skill spec 目前没有 onAttack 钩子，参数只喂引擎自己的规则：阻回 / 技能自身的攻击不回复）。
             if (live(unit)) unit.skill?.onAttackPerformed?.(ctx.targets ?? [], !!ctx.isSkill);
@@ -1019,12 +1053,17 @@ export default {
                 // content, `on skill attack` buffs, the attack event). Ask the engine itself, so the flag can never drift
                 // from what a real attack at this instant would carry.
                 const asSkill = !!battle.effectiveProfile?.(unit)?.isSkill;
-                fireNote(battle, unit, {
-                  scale: noteScale, type: 'arts', cfg: NOTE_TALENT, spread: idleAngle, tag: 'talent', delay,
-                  liftRanged: liftNow(battle, unit),   // LOR-Y ≥2: this note is an attack of hers like any other
-                  onImpact: impact,
-                  dmgFlags: { isAttack: true, isSkill: asSkill },   // 技能期间 = 技能的攻击，其余 = 普通攻击
-                });
+                // …unless a skill's own tone is the attack (the toneReplacesAttack note): then this empty-range attack
+                // plays the skill's notes, NOT the talent's — 「技能的攻击」的载体只有技能自己那只, Fever's 二連撃 twice.
+                const replaced = asSkill && toneReplacesAttack(unit);
+                if (!replaced) {
+                  fireNote(battle, unit, {
+                    scale: noteScale, type: 'arts', cfg: NOTE_TALENT, spread: idleAngle, tag: 'talent', delay,
+                    liftRanged: liftNow(battle, unit),   // LOR-Y ≥2: this note is an attack of hers like any other
+                    onImpact: impact,
+                    dmgFlags: { isAttack: true, isSkill: asSkill },   // 技能期间 = 技能的攻击，其余 = 普通攻击
+                  });
+                }
                 unit.mem.sakikoLastNoteAt = battle.time;
                 if (battle.hasHook?.('attack')) battle.emit('attack', { attacker: unit, targets: [], isSkill: asSkill });
                 if (live(unit)) unit.skill?.onAttackPerformed?.([], asSkill);

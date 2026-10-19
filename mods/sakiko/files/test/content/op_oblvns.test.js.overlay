@@ -326,9 +326,11 @@ test('talent 1 gives her the DEF / RES penetration of the notes in flight — th
 // -------------------------------------------------------------------------------------------------------------------
 // 3. the three skills
 
-test('S1 新月的苏醒: 可充能2次, 8 notes on the fixed 自左 13.125° 至右 13.125° (间隔 3.75°) 顺时针 fan, each at its own atk_scale, one after another', () => {
+test('S1 新月的苏醒: 可充能2次, 8 notes on the fixed symmetric fan read from the row own `angle` blackboard, each at its own atk_scale, one after another', () => {
   // §17:「触发技能时以自身朝向为基准，自左 13.125° 至右 13.125° 顺时针均匀演奏音符（间隔 3.75°）」；音符数 = 自己黑盒里
-  // atk_scale* 的条目数（8）。The row's own `angle` blackboard (15) is NOT the fan.
+  // atk_scale* 的条目数（8）。The fan's half-angle is the row's OWN `angle` blackboard — 15 at every rank of S1's data
+  // (5 / 10 / 15 by level); the page's 13.125° / 3.75° is that same fan rendered one step per note, so the expected
+  // degrees are computed from the record rather than hard-coded, and a data change moves the fan with it.
   for (const [tier, elite] of [[5, false], [6, true]]) {
     const sk = skillOf(tier, elite, S1);
     const { h, u } = field({ tier, elite, skill: 0 });
@@ -346,9 +348,11 @@ test('S1 新月的苏醒: 可充能2次, 8 notes on the fixed 自左 13.125° �
     assert.equal(rows.length, 8, `eight notes (got ${rows.length})`);
     const [dr, dc] = u.fwd;
     const degs = rows.map((r) => Math.atan2(r.vx * dr - r.vy * dc, r.vx * dc + r.vy * dr) * (180 / Math.PI));
-    const want = [13.125, 9.375, 5.625, 1.875, -1.875, -5.625, -9.375, -13.125];
+    const half = sk.bb.angle, step = (2 * half) / 7;
+    const want = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => half - i * step);
     degs.forEach((d, i) => assert.ok(Math.abs(d - want[i]) < 0.01, `note ${i + 1}: ${d.toFixed(3)}° should be ${want[i]}°`));
-    for (let i = 1; i < degs.length; i++) assert.ok(Math.abs((degs[i - 1] - degs[i]) - 3.75) < 0.01, 'adjacent notes 3.75° apart');
+    for (let i = 1; i < degs.length; i++) assert.ok(Math.abs((degs[i - 1] - degs[i]) - step) < 0.01, `adjacent notes ${step}° apart`);
+    assert.deepEqual([Number(degs[0].toFixed(4)), Number(degs[7].toFixed(4))], [half, -half], 'symmetric about her facing');
     for (let i = 1; i < rows.length; i++) assert.ok(rows[i].t - rows[i - 1].t > 0.05, 'they leave one after another, not in one tick');
     // every note of the fan is a skill note that deals ITS OWN atk_scale × the cached attack damage, as arts
     const skillHits = hitsOf(h, u, 'skill');
@@ -365,33 +369,39 @@ test('S1 新月的苏醒: 可充能2次, 8 notes on the fixed 自左 13.125° �
   }
 });
 
-test('S2 满月的舞会: one timbre for the cast (elite 钢琴 = ATK, normal 风琴 = ASPD), its notes carry the timbre\'s type, and Fever doubles them', () => {
-  // [ASSUMED] the elite plays 钢琴 and the normal form 风琴: the official lets the player switch freely, so which form
-  // gets which timbre is ours — the numbers of both branches are the row's own Lv4 / Lv7 blackboards.
+test('S2 满月的舞会: always 钢琴 (ATTACK +, physical notes), the form no longer picks the timbre, and Fever doubles them', () => {
+  // 钢琴 only — the owner's ruling of 2026-10-18: 「音色只有二技能会切换，只能用初始的钢琴，不会切换成风琴」. The official lets
+  // the player switch 钢琴 ↮ 风琴, but this mode has no control to switch with, and 钢琴 is the 初始 timbre, so the normal
+  // form plays it too (it used to be [ASSUMED] the other way round: elite 钢琴, normal 风琴 = ASPD + arts).
   const piano = field({ tier: 6, elite: true, skill: 1 });
-  const organ = field({ tier: 5, elite: false, skill: 1 });
+  const normal = field({ tier: 5, elite: false, skill: 1 });
   assert.deepEqual([piano.u.skill.duration, piano.u.skill.kind], [9999, 'duration'], 'a sustained state (the row is a switch: duration -1)');
-  const b2p = skillOf(6, true, S2).bb, b2o = skillOf(5, false, S2).bb;
-  assert.deepEqual([b2p['attack@atk'], b2p['attack@attack_speed'], b2o['attack@atk'], b2o['attack@attack_speed']], [0.75, 110, 0.6, 80]);
-  for (const [f, type] of [[piano, 'phys'], [organ, 'arts']]) {
+  const b2p = skillOf(6, true, S2).bb, b2n = skillOf(5, false, S2).bb;
+  assert.deepEqual([b2p['attack@atk'], b2p['attack@attack_speed'], b2n['attack@atk'], b2n['attack@attack_speed']], [0.75, 110, 0.6, 80]);
+  // `attack@attack_speed` is the 风琴 branch and stays UNREAD: it is never applied, on either form.
+  for (const f of [piano, normal]) {
     const { h, u } = f;
-    h.run(0.2);
+    h.run(1.5);                                     // a couple of engine ticks: the +16 aura has settled (duration 0.75)
+    // The talent-2 aura (+16) is the only ASPD this build gives her, so an ASPD left at its pre-skill value across S2
+    // is what proves the 风琴 branch is never read — +80 would be a different number, not a rounding.
+    const baseAspd = u.s.aspd;
     u.skill.gainSp(9999);
-    assert.equal(u.skill.activate('manual'), true, 'timbre switched on');
+    assert.equal(u.skill.activate('manual'), true, 'S2 switched on');
     h.run(6);
     const notes = hitsOf(h, u, 'skill');
     assert.ok(notes.length > 0, `the timbre played (${notes.length} skill notes)`);
-    assert.deepEqual([...new Set(notes.map((c) => c.dmg.type))], [type], `钢琴 = 物理 / 风琴 = 法术 (${type})`);
+    assert.deepEqual([...new Set(notes.map((c) => c.dmg.type))], ['phys'], '钢琴 notes are physical');
+    assert.ok(u.s.atk > u.base.atk * 1.5, `钢琴 攻击力+60% at least (${u.base.atk} → ${u.s.atk})`);
+    assert.equal(u.s.aspd, baseAspd, `no 风琴 ASPD on this form (${baseAspd} → ${u.s.aspd})`);
     done(h);
   }
-  // the engine's own mods: exactly one of the two branches is on
-  const { h: hp, u: up } = piano;
-  assert.ok(up.s.atk > up.base.atk * 1.5, `钢琴 攻击力+75% (${up.base.atk} → ${up.s.atk})`);
-  const { h: ho, u: uo } = organ;
-  assert.ok(uo.s.aspd > 100 + 70, `风琴 攻击速度+80 (${uo.s.aspd})`);
-  done(hp); done(ho);
+  // each form carries its OWN row's ATK bonus: elite Lv7 +75%, normal Lv4 +60%. They were switched on above (S2 is one
+  // sustained state, still running), so the ATK each one sits at is the number to read.
+  const { h: hp, u: up } = piano, { h: hn, u: un } = normal;
+  assert.ok(Math.abs(up.s.atk / up.base.atk - 1.75) < 1e-6, `elite 钢琴 攻击力+75% (${up.base.atk} → ${up.s.atk})`);
+  assert.ok(Math.abs(un.s.atk / un.base.atk - 1.6) < 1e-6, `normal 钢琴 攻击力+60% (${un.base.atk} → ${un.s.atk})`);
+  done(hp); done(hn);
 });
-
 test('S2 in Fever: 二连击 — twice the notes per attack (「【Fever】状態中は現在の音色による2連撃」), and it stays the open timbre', () => {
   // S2 can only be switched on OUTSIDE Fever (inside it cannot be opened, and a cast at a full gauge only triggers
   // Fever), so the test opens it first, then fills the gauge and triggers Fever with that press.
@@ -407,9 +417,9 @@ test('S2 in Fever: 二连击 — twice the notes per attack (「【Fever】状�
       chargeGauge(h, u, e);
       assert.equal(u.mem.sakikoFever, FEVER_MAX, 'the shared gauge reached 450');
       release(u, rule);
-      assert.equal(u.skill.activate('manual'), false, 'a full gauge turns the cast into Fever: no timbre switch');
+      assert.equal(u.skill.activate('manual'), false, 'a full gauge turns the cast into Fever: no S2 activation');
       assert.ok(u.mem.sakikoFeverLeft > 0, 'in Fever');
-      assert.equal(u.skill.active, true, 'S2 is still the open timbre');
+      assert.equal(u.skill.active, true, 'S2 is still on');
     }
     const n0 = hitsOf(h, u, 'skill').length;
     h.run(12);
@@ -492,8 +502,10 @@ test('LOR-Y 3 级: 技能期间音符 ×1.0（S3 自己的音符 ×1.8），技�
   assert.equal(u.skill.active, true, 'S3 is a 25 s sustained state');
   const t0 = h.b.time + 1.2;        // every note launched before the cast has landed by now (a flight is ≲1 s)
   h.run(6);
-  allRatio(ratiosIn(h, u, 'talent', t0), 1, 'during S3: ATK × 1.0 — the ranged reduction is not applied');
-  allRatio(ratiosIn(h, u, 'skill', t0), sk.bb['attack@atk_scale'], 'during S3: the skill\'s own notes keep their atk_scale (1.8), not 1.8 × 0.8');
+  // S3's tone IS the attack (toneReplacesAttack), so the talent's note does not ride along during it: the clause now shows
+  // on the skill's OWN notes, which keep atk_scale AND lose the 0.8 — that is exactly what the sentence promises.
+  assert.deepEqual(ratiosIn(h, u, 'talent', t0), [], 'during S3: no talent note rides along the skill\'s tone');
+  allRatio(ratiosIn(h, u, 'skill', t0), sk.bb['attack@atk_scale'], 'during S3: the skill\'s own notes keep their atk_scale (1.8) at ATK ×1.0, not 1.8 × 0.8');
   done(h);
   // it stops with the skill: 技能结束后立刻回到 ×0.8
   u.skill.extend(-24);
@@ -513,7 +525,7 @@ test('LOR-Y 3 级: 技能期间音符 ×1.0（S3 自己的音符 ×1.8），技�
   near.u.skill.gainSp(9999);
   near.u.skill.activate('manual');
   near.h.run(6);
-  allRatio(ratiosIn(near.h, near.u, 'talent'), 1, '…and during it: still ×1.0, never double-lifted');
+  allRatio(ratiosIn(near.h, near.u, 'skill'), sk.bb['attack@atk_scale'], '…and during it: the tone keeps atk_scale ×1.0, never double-lifted');
   done(near.h);
 });
 
@@ -538,7 +550,7 @@ test('LOR-Y 2 级（自选路径拿不到的档位）: 同一条句子同样生�
   assert.equal(u.skill.activate('manual'), true);
   const t1 = h.b.time + 1.2;
   h.run(6);
-  allRatio(ratiosIn(h, u, 'talent', t1), 1, 'stage 2 during the skill: ATK × 1.0');
+  allRatio(ratiosIn(h, u, 'skill', t1), skillOf(6, true, S3).bb['attack@atk_scale'], 'stage 2 during the skill: the tone keeps atk_scale at ATK × 1.0');
   done(h);
 });
 
@@ -588,7 +600,7 @@ test('回归: 没有这句文本的形态技能期间仍然 ×0.8 — LOR-Y 1 �
     assert.equal(u.skill.activate('manual'), true, `${name}: S3 fired`);
     const t0 = h.b.time + 1.2;
     h.run(6);
-    allRatio(ratiosIn(h, u, 'talent', t0), u.profile.rangedScale, `${name}: during the skill STILL ×0.8`);
+    assert.deepEqual(ratiosIn(h, u, 'talent', t0), [], `${name}: no talent note during the skill (its tone replaces it)`);
     allRatio(ratiosIn(h, u, 'skill', t0), s3ScaleOf(u) * u.profile.rangedScale, `${name}: its own notes keep atk_scale × 0.8`);
     done(h);
   }
@@ -1127,11 +1139,11 @@ test('S2 是切换类技能: Fever 期间无法开启，可以触发 Fever 时�
   const { h, u } = field({ tier: 5, elite: false, skill: 1 });
   h.run(0.2);
   const rule = hold(u);
-  chargeGauge(h, u, h.enemies()[0]);                 // with everything held back the timbre never switched on
+  chargeGauge(h, u, h.enemies()[0]);                 // with everything held back S2 never switched on
   release(u, rule);
   assert.equal(u.skill.active, false, 'not switched on yet');
   assert.equal(u.skill.activate('manual'), false, 'at a full gauge the cast only triggers Fever');
-  assert.equal(u.skill.activations, 0, 'no timbre switch happened');
+  assert.equal(u.skill.activations, 0, 'no S2 activation happened');
   assert.equal(u.skill.active, false, 'S2 is still off');
   assert.ok(u.mem.sakikoFeverLeft > 0, '…but Fever is in');
   const n0 = u.skill.activations;
