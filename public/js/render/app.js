@@ -161,6 +161,7 @@ import { IDENTITY, bossPrepField, tilesToDisp, leaderStand } from './prepfield.j
 import { pickOnTile, pickBattle, hitTiles } from './pick.js';
 import { promotionsOf } from './promote.js';
 import { ensurePixi } from './app/pixi.js';
+import { advanceEffectClock } from './app/playback.js';
 import { pieceDirOf, pickUnitOf } from './app/pick.js';
 import { CAMERA_MS, BOARD3D_STABLE_MS, BOARD3D_RETRY_MS, PEN_CAMERA_MS, RANGE_GROUPS, LEADER_HIT_STYLE, DRAG_HOLD_TILES, DRAG_HOLD_MOUSE_TILES, DRAG_FOLLOW_RATE, CHAIN_KINDS, DROP_PENDING_MS, DEPLOY_REPLAY_MS } from './app/tune.js';
 import { boardPreference, switchableBox, bandFor, fieldRows, boardArea, viewKind, restView, flightView } from './app/view.js';
@@ -360,7 +361,7 @@ export async function createFieldView(host, options = {}) {
     myPlayerId: null,            // set by the field host (view.setMe): whose pieces this page's viewer owns
     cam: () => cam, heightAt,
     animRate: () => (mode === 'battle' ? interp.rate : 1),
-    timeScale: () => (mode === 'battle' ? interp.rate : 1),
+    timeScale: () => (opts.playbackTime ? 1 : mode === 'battle' ? interp.rate : 1),
     // (a chess fighting as its 补位 stand-in — `standInFor` — reads the stand-in's record: its attack interval)
     lookupDef: (info) => (info.side === 'enemy' ? data.enemy(info.defId)
       : (info.standInFor && data.standIn(info.defId)) || (info.diy && data.diy(info.defId, info.diy)) || data.chess(info.defId) || data.token(info.defId)),
@@ -405,7 +406,7 @@ export async function createFieldView(host, options = {}) {
   ctx.fx = fx;
   // the official battle effects (设置「官方特效」, render/vfx): drawn on the 3D board only (the 2D board fallback keeps the
   // procedural fx), on the battle clock; their files load on demand (data/local-fx.json)
-  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt });
+  const ofx = new OfficialFx({ P, renderer: app.renderer, assets, cam: () => cam, heightAt, fieldRect: () => (mode === 'battle' && battleMeta ? battleMeta.rect : null) });
   setupCleanup.push(() => ofx.destroy());
   layers.vfxGround.addChild(ofx.ground);
   layers.vfxOver.addChild(ofx.over);
@@ -423,6 +424,9 @@ export async function createFieldView(host, options = {}) {
     view: (id) => views.get(id) || null,
   });
   ctx.ofx = ofx;
+  // The skill-slot attack clip query (render/units.js skillAttackMode, DESIGN §34.31): index.json decides whether a
+  // casting operator plays Attack or its Skill clip. Read lazily; role selection never loads the index itself.
+  ctx.skillAttackIndex = () => wiring.index;
   // a plugin's own official effects (its fx descriptors, docs/PLUGINS.md) drawn on the same official layer
   const pluginFx = new PluginFxPlayer({ P, layer: layers.vfxOver, assets, cam: () => cam, enabled: () => settings.officialFx !== 'off',
     record: (info) => (info ? ctx.lookupDef(info) : null), speed: projSpeed, ofx });
@@ -434,7 +438,7 @@ export async function createFieldView(host, options = {}) {
   }
   ofx.init().then((ok) => { if (!destroyed && ok) { syncOfficialFx(); wiring.ready(); } }, () => {});
   // battle devices (crates / turrets as sim units): the official crate mesh in the 3D scene, else a Pixi box
-  ctx.createBox = () => switchableBox({ board: () => board3d, pixi: () => tiles.createBox() });
+  ctx.createBox = (spec) => switchableBox({ board: () => board3d, pixi: () => tiles.createBox(), spec });
   const impostors = new ImpostorAtlas(app.renderer);
   setupCleanup.push(() => impostors.destroy());
   ctx.impostors = impostors;
@@ -1805,6 +1809,11 @@ export async function createFieldView(host, options = {}) {
       }
       case 'status': { const v = views.get(e[1]); if (v) { v.onStatus?.(e[2], !!e[3]); wiring.status(v, e[2], !!e[3]); } break; }
       case 'fx': {
+        if (e[1] === 'copy' && e[4]?.id != null && e[4]?.src != null) {
+          // 变形同构体: the copy takes the copied unit's form (units.js copyFrom, manifoldCopyForm)
+          const src = infos.get(e[4].src);
+          if (src) (views.get(e[4].id) || battleView(e[4].id))?.copyFrom?.(ctx.lookupDef(src));
+        }
         if (e[4] && typeof e[4] === 'object' && e[4].consumed && e[4].id != null) {
           consumedIds.add(e[4].id);
           if (consumedIds.size > 200) consumedIds.delete(consumedIds.values().next().value);
@@ -2042,7 +2051,10 @@ export async function createFieldView(host, options = {}) {
     }
     const dtRaw = (now - lastNow) / 1000;
     lastNow = now;
-    const dt = Math.min(0.1, Math.max(0, dtRaw));
+    // Optional studio clock: freeze animations and procedural effects with the simulation, including single steps.
+    const playbackT = opts.playbackTime?.();
+    const dt = Number.isFinite(playbackT) ? Math.max(0, playbackT - (frame.playbackT ?? playbackT)) : Math.min(0.1, Math.max(0, dtRaw));
+    frame.playbackT = playbackT;
     if (dtRaw < 0.25) frameMs = frameMs * 0.9 + dtRaw * 1000 * 0.1;
     fps = 1000 / Math.max(1, frameMs);
     adaptLoad(dtRaw);
@@ -2072,10 +2084,13 @@ export async function createFieldView(host, options = {}) {
           fx.syncNotes(interp.projAt(renderT));
           // the official effects run on the battle clock (render time of the snapshots: 1× / 2×, still while paused); the
           // skill effects' per-frame part reads the views' fresh sample (render/vfx/skillfx.js sync)
-          const gdt = ofxPrevT == null ? 0 : Math.min(0.25, Math.max(0, renderT - ofxPrevT));
+          const gdt = ofxPrevT == null ? 0 : Math.min(opts.playbackTime ? Infinity : 0.25, Math.max(0, renderT - ofxPrevT));
           ofxPrevT = renderT;
           wiring.sync(views.values());
-          if (ofx.active) { wiring.tick(); ofx.update(gdt); }
+          if (ofx.active) {
+            wiring.tick();
+            if (opts.playbackTime) advanceEffectClock(ofx, gdt); else ofx.update(gdt);
+          }
         }
         if (beamQ.length) pumpBeams(dt);
       } else if (mode === 'prep') {
@@ -2207,6 +2222,7 @@ export async function createFieldView(host, options = {}) {
       return true;
     },
     highlightTiles(tilesList, style) {
+      if (destroyed) return false;
       if (tilesList == null || (Array.isArray(tilesList) && !tilesList.length && style == null)) { clearHl(); return true; }
       const st = style ?? 'range';
       const key = hlKey(st);
