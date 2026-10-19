@@ -159,6 +159,9 @@ test('co-op spectator over websockets: watches the real match like an eliminated
   await ok(a, { t: 'room.addBot' });
   const s = await watcher('Spec');
   await ok(s, { t: 'room.spectate', code: st.code });
+  // this fork's co-op rooms default 「AI 队友最后选择」 ON (server/lobby.js: this.aiPicksLast = mode !== 'solo'); issue
+  // #144's seed-69 premise (the AI takes band_bldsk first) is the upstream order, so turn the option off for this room
+  await ok(a, { t: 'room.setAiPicksLast', on: false });
   await ok(a, { t: 'room.start' });
   const info = await s.waitFor('m.public', (p) => p.phase === 'INFO_CHECK');
   assert.ok(!info.players.some((p) => p.playerId === s.id), 'never a player');

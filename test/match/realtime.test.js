@@ -168,6 +168,10 @@ test('real-time co-op over websockets with the real simulation: 2 humans + 2 AI 
   assert.equal((await b.request({ t: 'room.join', code: st.code })).t, 'ok');
   assert.equal((await a.request({ t: 'room.addBot' })).t, 'ok');
   assert.equal((await a.request({ t: 'room.addBot' })).t, 'ok');
+  // this fork's co-op rooms default to AI picks last (lobby.js aiPicksLast, a Pro default the upstream does not set);
+  // the scripted draft below skips once and then expects one human to be last in the band order, which is the
+  // upstream order (AI first) — turn the fork default off so the draft order is the one this test was written for
+  assert.equal((await a.request({ t: 'room.setAiPicksLast', on: false })).t, 'ok');
   assert.equal((await b.request({ t: 'room.ready', ready: true })).t, 'ok');
   assert.equal((await a.request({ t: 'room.start' })).t, 'ok');
 

@@ -481,7 +481,10 @@ test('timeout, bots and majority skip unavailable slots in order, or close with 
     h.m.dispose();
   }
   for (const bots of [0, 2]) {
-    const h = matchWith([stockOffer({ chess: 'chess_char_5_diy1_a' }, { quorum: 'majority' })], { fake: true, humans: 3, bots });
+    // this fork's Match enforces the room capacity on direct engine fixtures too (server/match/Match.js); 3 humans + 2
+    // AI is five seats, so the eight-seat experiment carries it (the lobby would refuse the fifth seat otherwise)
+    const capacity = 3 + bots > 4 ? { experimental: { revivalEnabled: false, disableSharedPool: false, playerCapacity: 8 } } : {};
+    const h = matchWith([stockOffer({ chess: 'chess_char_5_diy1_a' }, { quorum: 'majority' })], { fake: true, humans: 3, bots, ...capacity });
     h.m.openOfferWindow('prep', 3);
     const w = h.m.offerWin[0];
     const idx = w.options.get('p_0').findIndex(c => c.id === 'funds');

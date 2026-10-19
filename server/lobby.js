@@ -2120,6 +2120,12 @@ export class Lobby {
         ...(room.content ? { cs: room.content.cs } : {}),
         ...(room.content?.vs ? { vs: room.content.vs } : {}),
         ...(modded ? { requireCs: true } : {}),
+        // The list the lobby just checked the picks with (kittedFor). Vanilla rooms omit it: setDiy stays on
+        // KITTED_CHARS, and the worker payload / test journal of a normal match do not grow a key.
+        ...(modded ? { kitted: this.kittedFor(room) } : {}),
+        // 房间规则开关 (DESIGN §34.15, the room's locked rules): carried into the match so its hooks and the identity hash
+        // read the same switches the lobby validated (Match.rules, shared/plugins/rules.js)
+        ...(room.content?.rules ? { rules: room.content.rules } : {}),
         data,
         combatPool: this.combatPool,
         trialPool: this.trialPool,

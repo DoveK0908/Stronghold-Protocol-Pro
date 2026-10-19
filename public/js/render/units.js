@@ -2612,7 +2612,7 @@ export class DeviceView {
     this.screen = { x: 0, y: 0, s: 1, top: 0 };
     this.placed = false;
     this._headTiles = this.spec.height + 0.2;
-    this.box = ctx.createBox ? ctx.createBox() : null;
+    this.box = ctx.createBox ? ctx.createBox(this.spec) : null;
     this.gfx = new P.Graphics();       // fallback body (no tile field) and the turret head
     ctx.layers.units.addChild(this.gfx);
     this.hud = new P.Container();
@@ -2647,10 +2647,14 @@ export class DeviceView {
     const k = this.dying > 0 ? Math.max(0, this.dying / 0.45) : 1;
     if (this.dying > 0) { this.dying -= dt; if (this.dying <= 0) this.remove = true; }
     const zKey = rowDepthKey(cam, Math.round(this.y)) + ROW_KEY.devices;
-    const size = this.spec.size * (0.6 + 0.4 * k), height = this.spec.height * k;
+    // the box may own its spec (ctx.createBox(spec), the test's switchable box): its size and height win over the
+    // fallback the view derived from the defId, and the head height follows whichever is in force
+    const spec = this.box?.spec || this.spec;
+    this._headTiles = spec.height + 0.2;
+    const size = spec.size * (0.6 + 0.4 * k), height = spec.height * k;
     const g = this.gfx;
     if (this.box) {
-      this.box.update(cam, { x: this.x + shake, y: this.y, z: this.z, size, height, top: this.spec.top, side: this.spec.side, alpha: k });
+      this.box.update(cam, { x: this.x + shake, y: this.y, z: this.z, size, height, top: spec.top, side: spec.side, alpha: k });
       if (this.box.mesh) {
         if (!this.box.mesh.parent) this.ctx.layers.units.addChild(this.box.mesh);
         this.box.mesh.zIndex = zKey;
@@ -2666,7 +2670,7 @@ export class DeviceView {
     }
     g.zIndex = zKey + 0.001;
     g.alpha = k;
-    const p = cam.project(this.x, this.y, this.z + this.spec.height + 0.35, this.screen);
+    const p = cam.project(this.x, this.y, this.z + spec.height + 0.35, this.screen);
     this.placed = true;
     const show = this.alive && this.hp < this.maxHp - 0.5;
     this.hud.visible = show;

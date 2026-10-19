@@ -28,7 +28,8 @@ function randomIntent(rng, m, ps) {
     case 'g.test': return { t, cmd: 'funds', args: { amount: rng.int(100000) } };
     case 'g.infoReady': return { t, setupRevision: m.setupRevision ?? 0 };
     case 'g.rerollVote': return { t, voteId: m.setupVote?.id ?? 1 + rng.int(10), agree: rng() < 0.5 };
-    case 'g.kickVote': return { t, targetId: rng.pick([...m.players.keys(), 'unknown']) };
+    // the shape-only pass calls this with `m = {}`: the player list is optional there
+    case 'g.kickVote': return { t, targetId: rng.pick([...(m.players?.keys?.() ?? []), 'unknown']) };
     case 'g.kickBallot': return { t, voteId: m.kickVote?.id ?? 1 + rng.int(10), agree: rng() < 0.5 };
     case 'g.band': return { t, bandId: rng() < 0.8 ? rng.pick(BANDS) : rng.pick(['constructor', '__proto__', 'band_x', 'a'.repeat(64)]) };
     case 'g.buy': return { t, slot: rng.int(16) };
@@ -40,8 +41,8 @@ function randomIntent(rng, m, ps) {
     case 'g.reward': case 'g.choice': return { t, idx: rng.int(6) };
     case 'g.ready': return { t, ready: rng() < 0.4 };
     case 'g.revive': return {
-      t, playerId: rng.pick([...m.players.keys(), 'unknown']), round: Math.max(1, m.round + (rng() < 0.3 ? 1 : 0)),
-      matchId: rng() < 0.8 ? m.battlePrefix : 'stale-match',
+      t, playerId: rng.pick([...(m.players?.keys?.() ?? []), 'unknown']), round: Math.max(1, (m.round ?? 0) + (rng() < 0.3 ? 1 : 0)),
+      matchId: m.battlePrefix && rng() < 0.8 ? m.battlePrefix : 'stale-match',
     };
     case 'g.emote': return { t, id: rng.pick(EMOTES) };
     case 'g.bondPlan': return rng() < 0.2 ? { t } : { t, bondId: rng() < 0.7 ? rng.pick(BONDS) : rng.pick(['constructor', '__proto__', 'bond_x']) };
