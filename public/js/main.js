@@ -204,6 +204,8 @@ function onWelcome(msg) {
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
     installedPlugins: pluginCount(msg.content),
+    // welcome.testMode (DESIGN §34.8): the server sends it only when SP_TEST_MODE is on; the client cannot set it
+    testMode: msg.testMode === true,
   });
   welcomeAt = Date.now();
   // The server rebound this tab's session: until its match state (or a room outside a match) arrives, a match screen
@@ -255,7 +257,7 @@ function onRoomState(msg) {
   store.set({ room });
   identity.rememberMatch(room.inMatch && seats.some((seat) => seat?.playerId === myId)
     ? { name: store.get().me.name, code: room.code || '' } : null);
-  if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code);
+  if (room.mode === 'coop' && typeof room.code === 'string') rememberRoom(room.code, room.test === true);
   if (!room.inMatch && store.get().ui.resumed) store.patch('ui', { resumed: false });
   maybeFinishRestore();
 }

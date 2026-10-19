@@ -997,6 +997,11 @@
 .hub-entries { grid-column: 2 / -1; grid-row: 2; display: flex; flex-direction: column; align-items: flex-end; gap: .12rem; }
 .hub-searching, .hub-maint { width: min(100%, 8.6rem); }
 .hub-maint { padding: .08rem .16rem; border: 1px solid var(--amber); color: var(--amber); background: rgba(40, 24, 6, .7); font-size: calc(.15 * var(--t)); }
+/* 测试房间 (ui/../screens/lobby.js, welcome.testMode): applies to the next 独立模拟 / 同盟模拟 creation */
+.hub-testroom { display: flex; align-items: center; gap: .08rem; padding: .06rem .16rem; border: 1px solid var(--line-2);
+  background: rgba(6, 10, 9, .72); font-size: calc(.15 * var(--t)); color: var(--amber); cursor: pointer; }
+.hub-testroom input { width: .16rem; height: .16rem; accent-color: var(--amber); }
+.hub-testroom em { font-style: normal; font-size: calc(.13 * var(--t)); color: var(--text-dim); }
 .hub-entries__row { display: flex; align-items: flex-end; gap: var(--hub-gap); }
 .hub-entry-wrap { display: flex; flex-direction: column; gap: .05rem; }
 .hub-entry__group { display: flex; align-items: center; gap: .06rem; height: .2rem; padding-left: .04rem; font-size: calc(.13 * var(--t)); color: rgba(223, 230, 226, .7); }

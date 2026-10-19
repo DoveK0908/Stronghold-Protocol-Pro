@@ -52,6 +52,7 @@ import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { data, getConfig, getMode, getStage, useData } from '../data.js';
 import { QueueFlow, queueActive } from '../ui/matchmaking.js';
 import { queueCancellation } from '../queueCancellation.js';
+import { TestMark } from '../ui/testConsole.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
@@ -204,9 +205,23 @@ export async function joinRoom(code, { connection = net, confirm = confirmDialog
       && s.me.playerId === viewer.playerId && s.me.token === viewer.token;
   };
   if (!current()) return false;
+  // a 测试房间 (DESIGN §34.8): the server refuses the first request (ERR.TEST_CONFIRM) and takes the retry with testAck
+  const send = async (type) => {
+    try {
+      await connection.request(type, { code });
+      return true;
+    } catch (err) {
+      if (err?.code !== ERR.TEST_CONFIRM) throw err;
+      const text = type === 'room.spectate'
+        ? t('这是测试房间，不计入任何记录。确认观战？')
+        : t('这是测试房间，不计入任何记录。确认加入？');
+      if (!await confirm({ title: t('测试'), text })) return false;
+      await connection.request(type, { code, testAck: true });
+      return true;
+    }
+  };
   try {
-    await connection.request('room.join', { code });
-    return true;
+    return await send('room.join');
   } catch (err) {
     if (err?.code !== ERR.ROOM_STARTED) throw err;
     if (!current()) return false;
@@ -223,8 +238,7 @@ export async function joinRoom(code, { connection = net, confirm = confirmDialog
       micro: 'SPECTATE STARTED ALLIANCE',
     });
     if (!accepted || !current()) return false;
-    await connection.request('room.spectate', { code });
-    return true;
+    return await send('room.spectate');
   }
 }
 
@@ -234,10 +248,19 @@ export function recentRooms() {
   return Array.isArray(list) ? list.filter((c) => typeof c === 'string' && CODE_RE.test(c)).slice(0, 4) : [];
 }
 
-/** @param {string} code */
-export function rememberRoom(code) {
+/** The codes of recentRooms() that were 测试房间 (测试, DESIGN §34.8). */
+export function recentTestRooms() {
+  const list = loadPref('recentTestRooms', []);
+  return Array.isArray(list) ? list.filter((c) => typeof c === 'string' && CODE_RE.test(c)) : [];
+}
+
+/** @param {string} code @param {boolean} [test] the room is a 测试房间 (不计入战绩) */
+export function rememberRoom(code, test = false) {
   if (!CODE_RE.test(code)) return;
-  savePref('recentRooms', [code, ...recentRooms().filter((c) => c !== code)].slice(0, 4));
+  const recent = [code, ...recentRooms().filter((c) => c !== code)].slice(0, 4);
+  const marks = recentTestRooms();
+  savePref('recentTestRooms', recent.filter((c) => (c === code ? test : marks.includes(c))));
+  savePref('recentRooms', recent);
 }
 
 /** The 观战 tooltip: MAX_SPECTATORS 0 = no cap (shared/constants.js). */
@@ -529,7 +552,7 @@ function ProtocolSelect({ card, purpose = 'create', difficulty, onDifficulty, on
  * remembered difficulty — it is changed in the room) and 加入同盟 (the key field, 观战, recent keys) at the right, 多人匹配
  * between them, 入门协议 (玩法说明) at the bottom left. Esc or ‹ returns to the hub.
  */
-function AllianceSelect({ onClose, code, onCode, codeOk, recent, online, maint, busy, queued, onCreate, onJoin, onSpectate, onMatch, difficulty }) {
+function AllianceSelect({ onClose, code, onCode, codeOk, recent, testMarks = [], online, maint, busy, queued, onCreate, onJoin, onSpectate, onMatch, difficulty }) {
   const [leaving, leave] = useLeave(onClose);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal, .guide')) leave(); };
@@ -567,7 +590,7 @@ function AllianceSelect({ onClose, code, onCode, codeOk, recent, online, maint, 
             ${codeOk ? html`<button type="button" class="ally-key__spec" disabled=${!online || queued || busy === 'spectate'} onClick=${onSpectate}
               title=${spectateHint()}><${Icon} name="eye" />${t('观战')}</button>` : null}
           </label>
-          ${recent.length ? html`<span class="ally-recent">${recent.map((c) => html`<button key=${c} type="button" class="code-chip num" title=${t('填入密钥（不会直接加入）')} onClick=${() => onCode(c)}>${c}</button>`)}</span>` : null}
+          ${recent.length ? html`<span class="ally-recent">${recent.map((c) => html`<button key=${c} type="button" class="code-chip num" title=${t('填入密钥（不会直接加入）')} onClick=${() => onCode(c)}>${c}${testMarks.includes(c) ? html` <${TestMark} />` : null}</button>`)}</span>` : null}
           <button type="button" class="ally-card__bar ally-card__bar--join" disabled=${!codeOk || !online || queued || busy === 'join'} onClick=${() => onJoin()}>
             <span class="ally-card__icon"><${Icon} name="users" /></span>${t('加入同盟')}${busy === 'join' ? html`<${Spinner} size="sm" />` : null}
           </button>
@@ -643,6 +666,7 @@ export function LobbyScreen() {
   const [announcements, setAnnouncements] = useState({ value: null, revision: null });
   const noticeStatus = data.status('announcements'), noticeValue = data.get('announcements');
   const [recent] = useState(recentRooms);
+  const [testMarks] = useState(recentTestRooms);
   const alive = useRef(true);
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   useEffect(() => () => { alive.current = false; }, []);
@@ -702,7 +726,12 @@ export function LobbyScreen() {
   const [sheetChained, setSheetChained] = useState(false); // opened from 选择同盟方式: no darkening of the hub between
   const [allyOpen, setAllyOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
-  const create = (roomMode) => run('create', () => net.request('room.create', { mode: roomMode, difficulty }));
+  // 测试房间 (DESIGN §34.8; welcome.testMode): the server offers it only when SP_TEST_MODE is on
+  const testMode = useStore((s) => s.testMode === true);
+  const [asTest, setAsTest] = useState(false);
+  const create = (roomMode) => run('create', () => net.request('room.create', {
+    mode: roomMode, difficulty, ...(testMode && asTest ? { test: true } : {}),
+  }));
   const queueMatch = () => run('queue', () => net.request('queue.join', { difficulty }));
   // an offer while the hub shows: 选择模拟协议 comes up with 确认入场 (the 30-second window must not go unseen)
   useEffect(() => { if (queue?.state === 'offered' && sheet !== 'match') { setAllyOpen(false); setSheetChained(false); setSheet('match'); } }, [queue?.state]);
@@ -718,7 +747,13 @@ export function LobbyScreen() {
     if (queued) { toast(t('请先取消多人匹配，再进入观战席'), 'warn'); return; }
     const k = codeArg(c, code);
     if (!k) { toast(t('同盟密钥为 {ROOM_CODE_LEN} 位字母或数字', { ROOM_CODE_LEN }), 'warn'); return; }
-    run('spectate', () => net.request('room.spectate', { code: k }).catch((err) => {
+    run('spectate', () => net.request('room.spectate', { code: k }).catch(async (err) => {
+      // a 测试房间 asks first (ERR.TEST_CONFIRM, DESIGN §34.8)
+      if (err?.code === ERR.TEST_CONFIRM) {
+        if (!await confirmDialog({ title: t('测试'), text: t('这是测试房间，不计入任何记录。确认观战？') })) return;
+        await net.request('room.spectate', { code: k, testAck: true });
+        return;
+      }
       // Keep a missing or already-joined room distinct from a generic network error.
       if (err?.code === ERR.ROOM_NOT_FOUND) {
         toast(t('没有找到密钥 {k} 对应的同盟：请和房主核对密钥（同盟结束后密钥即失效）', { k }), 'warn');
@@ -801,6 +836,11 @@ export function LobbyScreen() {
               onClick=${() => queueCancellation.cancel(queue.ticketId)}>${t('取消匹配')}<//>
           </div>` : null}
         ${banner ? html`<div class="hub-maint" role="status">${banner}</div>` : null}
+        ${testMode ? html`<label class="hub-testroom" data-testid="create-test">
+          <input type="checkbox" checked=${asTest} onChange=${(e) => setAsTest(e.currentTarget.checked)} />
+          <span>${t('测试房间')}</span>
+          <em>${t('不计入战绩。房间会标明「测试」，只有房主能使用测试指令。')}</em>
+        </label>` : null}
         <div class="hub-entries__row">
           <${HubEntry} group=${{ icon: 'user', label: t('独立模拟') }} name=${t('独立模拟')} en="SOLO" icon="user" onClick=${openSolo} />
           <${HubEntry} group=${{ icon: 'users', label: t('同盟模拟') }} name=${t('同盟模拟')} en="ALLIANCE" icon="users" onClick=${openAlly} />
@@ -815,7 +855,7 @@ export function LobbyScreen() {
       onCreate=${() => create('solo')} onQueue=${queueMatch} chained=${sheetChained} />` : null}
 
     ${allyOpen ? html`<${AllianceSelect} onClose=${() => setAllyOpen(false)} code=${code} onCode=${(v) => setCode(normalizeCode(v))} codeOk=${codeOk}
-      recent=${recent} online=${online} maint=${maint} busy=${busy} queued=${queued} difficulty=${difficulty}
+      recent=${recent} testMarks=${testMarks} online=${online} maint=${maint} busy=${busy} queued=${queued} difficulty=${difficulty}
       onCreate=${() => create('coop')} onJoin=${() => join()} onSpectate=${() => spectate()} onMatch=${openMatch} />` : null}
 
     <${HubDialog} open=${joinOpen} micro="JOIN WITH ALLIANCE KEY" title=${t('密钥加入')} onClose=${() => setJoinOpen(false)}>
@@ -832,7 +872,7 @@ export function LobbyScreen() {
       <div class="join-foot">
         ${recent.length ? html`<span class="t-lo">${t('最近的同盟')}</span>
           ${recent.map((c) => html`<button key=${c} type="button" class="code-chip num" title=${t('填入密钥（不会直接加入）')}
-            onClick=${() => setCode(c)}>${c}</button>`)}`
+            onClick=${() => setCode(c)}>${c}${testMarks.includes(c) ? html` <${TestMark} />` : null}</button>`)}`
           : html`<span class="t-dim">${t('向同伴索取 {ROOM_CODE_LEN} 位同盟密钥，或直接打开邀请链接', { ROOM_CODE_LEN })}</span>`}
         <span class="join-foot__note t-dim">${t('开局后仍可使用原同盟密钥观战。')}</span>
       </div>
