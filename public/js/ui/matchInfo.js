@@ -135,24 +135,30 @@ export function MatchLegend({ model }) {
 }
 
 /**
- * 本局禁用干员, **按盟约分组** (maintenance 2026-10-16): one line per bond — its disc, its name, how many of its members are
- * banned and those members' avatars. A member carrying several bonds appears under each one (that is the point of the
- * grouping); the count in the header stays the DE-DUPLICATED total. The avatars are the plain (原皮) chess records: no
- * entry of the block ever passes a skinId, so a skin worn in the match cannot leak in here (the layout also relies on it).
- * @param {{ model: MatchInfoModel }} props
+ * 本局禁用干员. Two shapes, because the two screens have very different room (maintenance 2026-10-19):
+ *
+ * - `grouped` (the strategy draft's 本局信息 dialog, the default): one line per bond — its disc, its name, how many of its
+ *   members are banned and those members' avatars. A member carrying several bonds appears under each one (that is the
+ *   point of the grouping); the count in the header stays the DE-DUPLICATED total.
+ * - `grouped=false` (the briefing page): the official 0.3.2 flat grid, unchanged. The briefing's right column also holds
+ *   核心盟约 / 附加盟约 / the legend, and the grouped lines pushed it past the fold there.
+ *
+ * The avatars are the plain (原皮) chess records: no entry of the block ever passes a skinId, so a skin worn in the match
+ * cannot leak in here (the layout also relies on it).
+ * @param {{ model: MatchInfoModel, grouped?: boolean }} props
  */
-export function BannedOperators({ model }) {
+export function BannedOperators({ model, grouped = true }) {
   const { banned } = model;
   const m = data.get('assets');
-  // Grouped by bond (Pro's own shape, back after the official 0.3.2 flat grid): a player choosing a strategy needs to
-  // know WHICH bond each banned operator was taken from — the same bond can lose several members, and one operator can
-  // belong to two bonds. A member with two bonds is listed under each, which is what model.perBondMembers answers.
+  // Grouped by bond (Pro's own shape, kept for the dialog): a player choosing a strategy needs to know WHICH bond each
+  // banned operator was taken from — the same bond can lose several members, and one operator can belong to two bonds.
+  // A member with two bonds is listed under each, which is what model.perBondMembers answers.
   const groups = model.bonds
     .map((b) => ({ bond: b, ids: model.perBondMembers.get(b.bondId) || [] }))
     .filter((g) => g.ids.length);
   return html`<div class="brief-banned">
     <h3 class="brief-h"><span>${t('本局禁用干员')}</span><${MicroLabel}>BANNED OPERATORS</${MicroLabel}><b class="num brief-banned__n">${banned.length}</b></h3>
-    ${banned.length ? (groups.length ? html`<div class="brief-banned__groups">
+    ${banned.length ? (grouped && groups.length ? html`<div class="brief-banned__groups">
       ${groups.map((g) => {
         const state = model.stateOf(g.bond.bondId);
         const off = !!state;
@@ -179,13 +185,13 @@ export function BannedOperators({ model }) {
 
 /**
  * The briefing's bonds and banned operators: 核心盟约, 附加盟约, the legend, 本局禁用干员.
- * @param {{ model: MatchInfoModel }} props
+ * @param {{ model: MatchInfoModel, grouped?: boolean }} props the briefing leaves `grouped` off (official flat grid)
  */
-export function MatchInfo({ model }) {
+export function MatchInfo({ model, grouped = true }) {
   return html`<${MatchBondRow} title=${t('核心盟约')} micro="CORE BONDS" bonds=${model.core} model=${model} />
     <${MatchBondRow} title=${t('附加盟约')} micro="ADD-ON BONDS" bonds=${model.addon} model=${model} />
     <${MatchLegend} model=${model} />
-    <${BannedOperators} model=${model} />`;
+    <${BannedOperators} model=${model} grouped=${grouped} />`;
 }
 
 /**

@@ -1,9 +1,3 @@
-/* Briefing page — layout and component rules come from the official 0.3.2 dev build (the
-   雨千代/isomerpoi UI: two columns, the leader card on the left, the bonds and the banned
-   operators on the right). Only the Pro additions below deviate: the banned operators are
-   grouped per bond (ui/matchInfo.js) and the strategy draft's 本局信息 dialog reuses these
-   blocks. Everything above the marker is byte-identical to official/dev. */
-
 /* ==========================================================================================
    screens/briefing.css — INFO_CHECK briefing (js/screens/briefing.js) + the pre-game step header
    shared with the band draft (js/ui/matchChrome.js StepHeader). Research 06 §4.1 / §11.6.
@@ -141,23 +135,3 @@
   .brief-reroll__actions { flex-shrink: 1; }
   .brief-reroll__actions .btn { min-height: .44rem; padding-inline: .12rem; }
 }
-
-/* ---- Pro additions (kept from the pre-0.3.2 fork) ---- */
-
-/* ---- Pro additions ---- */
-/* the official grid lets a row size to its tallest content, and the grouped banned operators make the
-   right column taller than the viewport: pin the row to the free height so both columns scroll inside
-   and the 准备就绪 footer stays on screen */
-.brief__main { grid-template-rows: minmax(0, 1fr); }
-/* the banned operators grouped per bond (ui/matchInfo.js) */
-.brief-banned__groups { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem .26rem; }
-.brief-banned__group { display: flex; flex: none; align-items: center; gap: .1rem; }
-.brief-banned__ghead { display: flex; align-items: center; gap: .1rem; }
-.brief-banned__ghead > :first-child { flex: none; }
-/* the disc keeps its art; the row names the bond once in the fixed left column */
-.brief-banned__ghead .bond__name { display: none; }
-.brief-banned__gname { flex: none; font-size: calc(.2 * var(--t)); color: var(--text-md); white-space: nowrap; }
-.brief-banned__gcount { flex: none; font-size: calc(.18 * var(--t)); color: var(--red-premium); }
-.brief-banned__groups .brief-banned__grid { display: flex; flex-wrap: wrap; gap: .05rem; }
-.brief-banned__groups .uthumb { --ut: .52rem; }
-.brief-banned__grid .uthumb.is-banned { position: relative; box-shadow: inset 0 0 0 1.5px var(--red-premium); }

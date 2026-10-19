@@ -153,6 +153,15 @@ test('BannedOperators: 本局禁用干员 grouped by bond (a member with several
   assert.equal([...walk(none)].filter((v) => v.type === UnitThumb).length, 0);
 });
 
+test('BannedOperators: grouped=false (the briefing page) keeps the official flat grid', () => {
+  const m = model();
+  const flat = BannedOperators({ model: m, grouped: false });
+  assert.equal([...walk(flat)].filter((v) => hasClass(v, 'brief-banned__group')).length, 0, 'no per-bond rows');
+  const thumbs = [...walk(flat)].filter((v) => v.type === UnitThumb);
+  assert.deepEqual(thumbs.map((v) => v.props.id), m.banned, 'the de-duplicated list, in order');
+  assert.ok(thumbs.every((v) => v.props.kind === 'chess' && v.props.size === 'sm' && v.props.dim === true), 'official dimmed avatars');
+});
+
 test('MatchInfoDialog retains the briefing bonds, enemy information, 关闭 and the status line', () => {
   const m = model();
   const parts = MatchInfo({ model: m }).filter((v) => v && typeof v === 'object');
@@ -263,7 +272,7 @@ test('draftInfoStatus: the dialog repeats the turn and its seconds (warning at �
 test('the briefing, the strategy draft and the in-game 本局信息 tab all read ui/matchInfo.js (no second copy to drift)', () => {
   const brief = read('public/js/screens/briefing.js');
   assert.match(brief, /import \{ MatchInfo, matchInfoModel \} from '\.\.\/ui\/matchInfo\.js';/);
-  assert.match(brief, /<section class="brief__right">\s*<\$\{MatchInfo\} model=\$\{info\} \/>\s*<\/section>/);
+  assert.match(brief, /<section class="brief__right">\s*<\$\{MatchInfo\} model=\$\{info\} grouped=\$\{false\} \/>\s*<\/section>/);
   // (+ the viewer's 自选 pieces out of the shop: priv / diyData, 0.2.0 WE2)
   assert.match(brief, /const info = matchInfoModel\(pub, \{ bonds: gd\.list\('bonds'\), chess: gd\.chess, mode, priv, diyData: \{ chess: data\.get\('chess'\), backups: data\.get\('backups'\) \} \}\);/);
   assert.doesNotMatch(brief, /brief-legend|brief-banned|function BondRow|bannedPerBond|disabledBondSets/, 'no own copy of the blocks');
