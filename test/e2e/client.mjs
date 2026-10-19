@@ -188,7 +188,7 @@ export async function startRealServer(opts = {}) {
     if (opts.fast.slowSpawns) env.SP_SLOW_SPAWNS = String(opts.fast.slowSpawns);
     if (opts.pluginsDir) env.SP_PLUGINS_DIR = opts.pluginsDir;
   }
-  const child = spawn(process.execPath, [entry], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [entry], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
   const logs = [];
   const onData = (buf) => { for (const line of String(buf).split('\n')) if (line.trim()) logs.push(line); if (logs.length > 400) logs.splice(0, logs.length - 400); };
   child.stdout.on('data', onData);

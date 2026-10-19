@@ -1007,7 +1007,7 @@ describe('browser E2E against the real server', { skip: !ENABLED && 'needs Chrom
       await c.waitFor((s) => !!s.room, 'solo room');
       if (!(await c.st()).phase) await c.roomStart({ timeout: 20000 });
       await c.waitFor((s) => s.phase === 'INFO_CHECK', 'briefing', 30000);
-      await c.settled('.brief-go');
+      await c.settled('.brief__foot .btn--primary');
       await c.click('.brief__foot .btn--primary', '准备就绪');
       await c.waitFor((s) => s.phase === 'BAND_DRAFT', 'band draft', 30000);
       await c.click('.dband', null, { nth: 2 });
@@ -1079,7 +1079,7 @@ describe('browser E2E against the real server', { skip: !ENABLED && 'needs Chrom
       for (const c of both) await c.waitFor((s) => s.phase === 'INFO_CHECK', 'briefing', 30000);
       await sleep(1200);
       for (const c of both) await c.shot('briefing');
-      for (const c of both) { await c.settled('.brief-go'); await c.click('.brief__foot .btn--primary', '准备就绪'); }
+      for (const c of both) { await c.settled('.brief__foot .btn--primary'); await c.click('.brief__foot .btn--primary', '准备就绪'); }
 
       // ---- band draft -----------------------------------------------------------------------------------------------
       for (const c of both) await c.waitFor((s) => s.phase !== 'INFO_CHECK', 'band draft', 40000);
@@ -1309,7 +1309,7 @@ describe('browser E2E against the real server', { skip: !ENABLED && 'needs Chrom
       await solo.waitFor((s) => s.phase === 'INFO_CHECK', 'briefing', 30000);
       await sleep(900);
       await solo.shot('briefing');
-      await solo.settled('.brief-go');
+      await solo.settled('.brief__foot .btn--primary');
       await solo.click('.brief__foot .btn--primary', '准备就绪');
       await solo.waitFor((s) => s.phase === 'BAND_DRAFT', 'band draft', 30000);
       await sleep(700);
@@ -1368,7 +1368,7 @@ describe('browser E2E against the real server', { skip: !ENABLED && 'needs Chrom
       await c.waitFor((s) => !!s.room, 'solo room');
       if (!(await c.st()).phase) await c.roomStart({ timeout: 20000 });
       await c.waitFor((s) => s.phase === 'INFO_CHECK', 'briefing', 30000);
-      await c.settled('.brief-go');
+      await c.settled('.brief__foot .btn--primary');
       await c.click('.brief__foot .btn--primary', '准备就绪');
       await c.waitFor((s) => s.phase === 'BAND_DRAFT', 'band draft', 30000);
       await c.click('.dband', null, { nth: 0 });

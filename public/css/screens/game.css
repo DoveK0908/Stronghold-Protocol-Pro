@@ -1456,3 +1456,7 @@
 @media (prefers-reduced-motion: reduce) {
   .downm__face.is-out, .downm__title { animation: none; }
 }
+
+/* The combat HUD wrapper (.chud) is a transparent full-screen layer: its children take the clicks, the
+   wrapper itself must not (it sits over the top bar; a later duplicate `.gm__hud > *` rule re-enabled it). */
+.gm__hud > .chud { pointer-events: none; }
