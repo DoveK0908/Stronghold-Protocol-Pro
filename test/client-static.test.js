@@ -1028,13 +1028,14 @@ describe('screen helpers', () => {
     assert.match(source, /<\$\{SettingsModal\} open=\$\{settingsOpen\}/, 'settings control opens the shared modal');
   });
 
-  test('boot enters only from the title screen, and the lobby still renames', () => {
+  test('boot enters only from the title screen, and the lobby name chip is the 统计数据 entry', () => {
     const main = readFileSync(path.join(PUBLIC, 'js/main.js'), 'utf8');
     assert.match(main, /const entered = identity\.wasEntered\(\) && !!savedName;/);
     assert.match(main, /if \(entered\) net\.setName\(savedName\);/);
     assert.match(main, /const SCREENS = \{ title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen \};/);
     const lobby = readFileSync(path.join(PUBLIC, 'js/screens/lobby.js'), 'utf8');
-    assert.match(lobby, /class="me-rename" onClick=\$\{rename\}/);
+    assert.match(lobby, /class="me-chip me-chip--btn stats-entry"/);
+    assert.doesNotMatch(lobby, /me-rename/, 'the ✎ rename control is gone (its dialog host was never mounted)');
   });
 
   test('lobby: normalizeCode / parseRoomParam / difficultyInfo', async () => {

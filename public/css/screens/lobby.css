@@ -2769,3 +2769,9 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
   .hub-topbar .topbar__left { flex: 1 1 100%; flex-wrap: wrap; row-gap: 6px; }
   .hub-topbar .topbar__left > .topbar__sep { display: none; }
 }
+
+/* 统计数据入口（右上角 me-chip）：去掉旁边的改名铅笔后，整块放大一档 */
+.hub-topbar .stats-entry { padding: .06rem .22rem .06rem .06rem; gap: .14rem; }
+.hub-topbar .stats-entry .avatar { --av: .72rem; }
+.hub-topbar .stats-entry .me-chip__name { font-size: calc(.2 * var(--t)); max-width: 3.1rem; }
+.hub-topbar .stats-entry .me-chip__stats { width: .26rem; height: .26rem; margin-left: .06rem; }

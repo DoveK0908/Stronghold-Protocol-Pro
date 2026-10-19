@@ -295,16 +295,8 @@ describe('multi-device (Chrome device emulation)', { skip: !ENABLED && 'set SP_E
         await tapText('.announcement-board .modal__actions button');
         await page.waitForSelector('.announcement-board', { hidden: true });
       }
-      // the callsign: ✎ beside the name chip, the dialog opens with the current name selected — typing replaces it
-      await tapText('.me-rename');
-      await page.waitForSelector('.name-dialog input', { visible: true });
-      await page.$eval('.name-dialog input', (el) => { el.focus(); el.select(); });
-      await page.keyboard.type('凯尔希');
-      await tapText('.name-dialog .modal__actions button', '确认');
-      await page.waitForFunction(() => globalThis.__SP__?.net.helloName === '凯尔希', { timeout: 15000 }).catch(async (err) => {
-        await page.screenshot({ path: path.join(OUT, `device-${dev}-lobby-FAILED.png`) });
-        throw err;
-      });
+      // the name chip doubles as the 统计数据 entry (the ✎ rename control was removed with the dead dialog host)
+      await page.waitForSelector('.stats-entry', { visible: true });
       await sleep(400);
       await page.screenshot({ path: path.join(OUT, `device-${dev}-lobby.png`) });
       assert.deepEqual(await layoutProblems(page), [], `${dev} lobby`);

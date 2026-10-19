@@ -25,7 +25,6 @@ import { LobbyMusicButton } from '../ui/lobbyMusic.js';
 import { Emblem } from '../ui/emblem.js';
 import { useHubBackdrop, HubBackdrop, HubRadar, BackdropSettings, BackdropGlyph, backdropTheme } from '../ui/hubBackdrop.js';
 import { ResumeMatchButton, resumeLocalMatch } from '../ui/resumeMatch.js';
-import { openNameDialog } from '../ui/nickname.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
 import { html, Button, Icon, MicroLabel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
@@ -635,7 +634,7 @@ function MeChip({ me }) {
   const face = cardAvatarUrl(card.avatar, undefined, card.avatarLook);
   const label = t('统计数据');
   return html`<button type="button" class="me-chip me-chip--btn stats-entry" onClick=${openStats} title=${label} aria-label=${label}>
-    <${AvatarFrame} size="sm" name=${me.name} src=${face} seat=${0} self=${true} />
+    <${AvatarFrame} size="md" name=${me.name} src=${face} seat=${0} self=${true} />
     <span class="me-chip__text">
       <span class="me-chip__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" />${me.name || t('博士')}</span>
       <${MicroLabel}>${me.playerId != null ? `DOCTOR #${doctorNo(me.playerId)}` : 'DOCTOR'}<//>
@@ -766,10 +765,6 @@ export function LobbyScreen() {
       throw err;
     }));
   };
-  const rename = () => {
-    if (queued) { toast(t('请先取消多人匹配再修改代号'), 'warn'); return; }
-    openNameDialog();
-  };
   const openSolo = () => { if (queued) { toast(t('请先取消多人匹配'), 'warn'); return; } savePref('lobby.mode', 'solo'); setSheetChained(false); setSheet('solo'); };
   const openAlly = () => { savePref('lobby.mode', 'coop'); setAllyOpen(true); };
   const openMatch = () => { savePref('lobby.mode', 'match'); setSheetChained(allyOpen); setAllyOpen(false); setSheet('match'); };
@@ -798,7 +793,6 @@ export function LobbyScreen() {
           <span class="online-pill__dot"></span>${Number.isInteger(presence?.online) && conn.status === 'online'
             ? html`<span class="num">${presence.online}</span><span class="online-word">${t('名博士在线')}</span>` : html`<span>${t('在线人数 —')}</span>`}</span>
         <${ResumeMatchButton} />
-        <${Button} variant="secondary" size="sm" square=${true} icon="edit" class="me-rename" onClick=${rename} title=${t('修改博士代号')} aria-label=${t('修改博士代号')} />
         <${MeChip} me=${me} />
       </div>
     </header>

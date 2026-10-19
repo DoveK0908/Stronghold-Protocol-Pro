@@ -42,7 +42,7 @@ describe('language switch in the lobby', { skip: !ENABLED && 'set SP_E2E=1 (Chro
 
   // the lobby (no title screen since 2026-10-15): the labels of its ⚙ and ✎ buttons, in the language on screen
   const settingsLabel = (page) => page.$eval('.lobby-settings', (el) => el.getAttribute('aria-label'));
-  const renameLabel = (page) => page.$eval('.me-rename', (el) => el.getAttribute('aria-label'));
+  const statsLabel = (page) => page.$eval('.stats-entry', (el) => el.getAttribute('aria-label'));
   /** The menu's languages, [code, label] — its buttons, or the options of its list. */
   const openLanguageSettings = async (page) => {
     if (!await page.$('.modal [data-testid="lang-toggle"]')) {
@@ -98,13 +98,13 @@ describe('language switch in the lobby', { skip: !ENABLED && 'set SP_E2E=1 (Chro
     await page.goto(`${base}/`, { waitUntil: 'load' });
     await openLanguageSettings(page);
     assert.equal(await settingsLabel(page), '设置');
-    assert.equal(await renameLabel(page), '修改博士代号');
+    assert.equal(await statsLabel(page), '统计数据');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'zh-CN');
 
     assert.deepEqual(await menu(page), SHIPPED, 'the shipped languages');
     await pick(page, 'en');
     await page.waitForFunction(() => document.querySelector('.lobby-settings')?.getAttribute('aria-label') === 'Settings', { timeout: 8000 });
-    assert.equal(await renameLabel(page), 'Change callsign');
+    assert.equal(await statsLabel(page), 'Statistics');
     assert.deepEqual(await page.evaluate(() => ({ lang: document.documentElement.lang, title: document.title, pref: localStorage.getItem('sp.pref.lang') })),
       { lang: 'en', title: 'Stronghold Protocol: Alliance · Web Simulation', pref: '"en"' });
     // the game texts follow (data/i18n/en.json applied by data.js)
@@ -145,7 +145,7 @@ describe('language switch in the lobby', { skip: !ENABLED && 'set SP_E2E=1 (Chro
 
       await pick(page, 'qaa');
       await page.waitForFunction(() => document.querySelector('.lobby-settings')?.getAttribute('aria-label') === 'Einstellungen', { timeout: 8000 });
-      assert.equal(await renameLabel(page), 'Change callsign', 'untranslated: English, the pack\'s fallback');
+      assert.equal(await statsLabel(page), 'Statistics', 'untranslated: English, the pack\'s fallback');
       assert.deepEqual(await page.evaluate(() => ({ lang: document.documentElement.lang, script: document.documentElement.dataset.script, pref: localStorage.getItem('sp.pref.lang') })),
         { lang: 'qaa', script: 'alphabetic', pref: '"qaa"' });
       // no game texts of its own: English's through the chain
@@ -154,7 +154,7 @@ describe('language switch in the lobby', { skip: !ENABLED && 'set SP_E2E=1 (Chro
 
       await pick(page, 'qab');
       await page.waitForFunction(() => document.querySelector('.lobby-settings')?.getAttribute('aria-label') === 'Qab-Einstellung', { timeout: 8000 });
-      assert.equal(await renameLabel(page), '修改博士代号', 'no fallback declared: the Chinese msgid');
+      assert.equal(await statsLabel(page), '统计数据', 'no fallback declared: the Chinese msgid');
 
       await pick(page, 'qaa');
       await page.waitForFunction(() => document.querySelector('.lobby-settings')?.getAttribute('aria-label') === 'Einstellungen', { timeout: 8000 });
