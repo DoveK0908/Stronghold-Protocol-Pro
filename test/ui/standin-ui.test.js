@@ -368,7 +368,7 @@ describe('match UI of a not-owned chess', () => {
     assert.match(src, /const si = chess && standInList\.includes\(chess\.baseId \|\| chess\.chessId\) \? data\.standIn\(piece\.id\) : null;/);
     assert.doesNotMatch(src, /area === 'board' && chess && standInList/, 'not only on the board');
     assert.match(src, /standInList = Array\.isArray\(src\.standIns\)/);
-    assert.match(src, /const sig = `\$\{info\.kind\}\|\$\{info\.defId\}\|\$\{info\.golden \? 1 : 0\}\|\$\{info\.spine \|\| ''\}\|\$\{info\.skinId \|\| ''\}`/, 'both stand-in identity and appearance invalidate a prep model');
+    assert.match(src, /const sig = `\$\{info\.kind\}\|\$\{info\.defId\}\|\$\{info\.golden \? 1 : 0\}\|\$\{info\.spine \|\| ''\}` \+ \(info\.skin \? `\|\$\{info\.skin\}` : ''\)/, 'both stand-in identity and appearance invalidate a prep model (official 0.3.1 shape: the skin key appends to the base signature)');
     assert.match(readFileSync(path.join(ROOT, 'public/js/render/app/info.js'), 'utf8'), /standInFor: typeof u\.standInFor === 'string'/);
     // the DOM fallback field draws every own piece of it with the stand-in's avatar and name
     const ff = readFileSync(path.join(ROOT, 'public/js/ui/fallbackField.js'), 'utf8');

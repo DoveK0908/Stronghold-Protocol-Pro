@@ -84,7 +84,9 @@ describe('界面大小: the CSS', () => {
         if (ch === '{') { stack.push(text.trim()); text = ''; }
         else if (ch === '}' || ch === ';') {
           const m = UNIT.exec(text);
-          if (m && text.includes('var(') && !stack.some((p) => p.startsWith('@supports') && p.includes(`${m[1]}v${m[2]}`))) {
+          // the [data-fit] page clamp is pinned by test/ui/screen-fit.test.js; in a match it scales through its own
+          // html[data-fit].sp-in-match rule (the @supports copy covers browsers without svh)
+          if (m && text.includes('var(') && !text.includes('--fit-') && !stack.some((p) => p.startsWith('@supports') && p.includes(`${m[1]}v${m[2]}`))) {
             bad.push(`${f}: ${text.trim().slice(0, 100)}`);
           }
           if (ch === '}') stack.pop();
@@ -104,7 +106,10 @@ describe('界面大小: the CSS', () => {
         scaled += (line.match(/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/g) || []).length;
         // a px literal inside max( / min( / clamp( that is not a calc(Npx * var(--ui))
         for (const args of sizeCalls(line)) {
-          if (/\d(?:\.\d+)?px/.test(args.replace(/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/g, ''))) bad.push(`${f}:${i + 1} ${line.trim().slice(0, 120)}`);
+          if (line.includes('--fit-')) continue; // the page-fit clamp of css/devices.css (screen-fit pins it; .sp-in-match scales it)
+          // a 1 px border/seam compensation is not a size floor
+          const args2 = args.replace(/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/g, '').replace(/([+-])\s*1px/g, '$1');
+          if (/\d(?:\.\d+)?px/.test(args2)) bad.push(`${f}:${i + 1} ${line.trim().slice(0, 120)}`);
         }
       }
     }

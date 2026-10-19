@@ -218,7 +218,7 @@ function RowStatus({ status, meta, offline }) {
 }
 
 /** One seat. `bubble`: its emote beside the row (classic roster), else null. */
-function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, selfLive, cap, uniteLocal, team, frameArt, list, bubble, spMark = null }) {
+function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, selfLive, cap, uniteLocal, team, frameArt, list, bubble, spMarks = null }) {
   const self = p.playerId === myId;
   const status = p.pendingDeath ? 'rescue' : p.alive === false ? 'dead' : p.status;
   const meta = p.pendingDeath ? { ...STATUS_META.deciding, text: t('等待救援') } : STATUS_META[status] || STATUS_META.acting;
@@ -240,8 +240,8 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
       <span class="team__seat num">P${(p.seat ?? 0) + 1}</span>
       ${p.isBot ? html`<span class="team__ai">AI</span>` : null}
       ${self ? html`<span class="team__you"><${Icon} name="user" /></span>` : null}
-      ${spMark === 'done' ? html`<span class="team__spmark is-done" title=${t('已完成选择')}><${Icon} name="check" /></span>`
-        : spMark === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
+      ${spMarks?.get(p.playerId) === 'done' ? html`<span class="team__spmark is-done" title=${t('已完成选择')}><${Icon} name="check" /></span>`
+        : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
     </button>
     <div class="team__info">
       <span class="team__name" title=${p.name || t('博士')}>${p.name || t('博士')}</span>
@@ -325,7 +325,7 @@ export function TeamPanel({ pub, myId, watching, onWatch, roster, emoteTtl = 300
   const frameArt = team.size ? localAsset('ui/battle', 'bg_team_border') : null;
   const columns = measured ? layout.columns : 1;
   const style = list ? `--team-columns:${columns};--team-rows:${Math.ceil(players.length / columns)}` : undefined;
-  const row = (p) => html`<${TeamRow} key=${p.playerId} p=${p} pub=${pub} myId=${myId} watching=${watching} onWatch=${onWatch} observe=${observe} halves=${halves} clicks=${clicks} spMark=${spMarks?.get(p.playerId) || null}
+  const row = (p) => html`<${TeamRow} key=${p.playerId} p=${p} pub=${pub} myId=${myId} watching=${watching} onWatch=${onWatch} observe=${observe} halves=${halves} clicks=${clicks} spMarks=${spMarks}
     selfLive=${selfLive} cap=${cap} uniteLocal=${uniteLocal} team=${team} frameArt=${frameArt} list=${list} bubble=${bubbles?.get(p.playerId) || null} />`;
   return html`<aside ref=${panelRef} class=${cx('team', `team--${density}`, list && columns > 1 && 'team--wide', pools && 'team--pools', !rosterOpen && 'is-folded', rosterOpen && 'is-open')} style=${style} aria-label=${t('同盟成员')}>
     <div ref=${headerRef} class="team__header">
