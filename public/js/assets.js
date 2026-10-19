@@ -51,6 +51,7 @@
 // caller falls back (docs/ASSETS.md "Other fallbacks").
 
 import { appearanceEntry } from './ui/skinAssets.js';
+import { EMPTY_SKINS, skinsOf, skinHasModel } from './ui/skinModel.js';
 import { loadMaterialImage } from './materialFallback.js';
 import { installPixiMaterialFallback } from './render/materialLoader.js';
 import { codeSource } from './codeSource.js';
@@ -137,22 +138,9 @@ export function itemIconUrl(m, item) {
   return id ? str(get(get(m, 'items'), id)) : null;
 }
 
-/** The manifest's shared empty skins map (one object, so callers can compare identity). */
-export const EMPTY_SKINS = Object.freeze({});
-
-/**
- * The appearances of an operator the manifest holds (docs/SKINS.md, the picker's source): `chars[charId].skins`,
- * written by a cosmetic plugin's overlay — `{ [skinId]: { name, group, avatar, …, spine: { front, back? } } }` — or an
- * empty object. A skin may carry a Spine model or pictures only; missing layers use the operator defaults.
- * @returns {Record<string, any>}
- */
-export function skinsOf(m, charId) {
-  const rec = get(get(m, 'chars'), str(charId) || '');
-  return rec && isObj(rec.skins) ? rec.skins : EMPTY_SKINS;
-}
-
-/** Whether a skin record names a Spine model (picture-only outfits are wearable too) (docs/SKINS.md). */
-export const skinHasModel = (skin) => !!skin && isObj(skin.spine) && typeof skin.spine.front === 'object' && skin.spine.front !== null && typeof skin.spine.front.skel === 'string';
+// EMPTY_SKINS / skinsOf / skinHasModel are defined in ui/skinModel.js (ui/skins.js imports the same module) and
+// re-exported here for the callers that already read them off the asset store.
+export { EMPTY_SKINS, skinsOf, skinHasModel };
 
 /** Skill icon by iconId, or by skillId via `skillsById`. Falls back to the empty skill icon. */
 export function skillIconUrl(m, id, opts) {

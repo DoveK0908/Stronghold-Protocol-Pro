@@ -1,7 +1,7 @@
 /* ==========================================================================================
    screens/draft.css — BAND_DRAFT strategy pick (js/screens/bandDraft.js). Research 06 §4.2: draft order on the left,
    portrait grid, detail pane with 初始生命值 and 确认选择; the 本局信息 dialog (js/ui/matchInfo.js MatchInfoDialog,
-   GitHub issue #8 item 1). Also the pre-game motion of js/ui/matchIntro.js: the 「请选择策略」 band (.tbanner) and the
+   GitHub issue #8 item 1). Also the pre-game motion of js/ui/turnBanner.js: the 「请选择策略」 band (.tbanner) and the
    协议启动！ screen (.pboot).
    2026-10-13 (the event's pre-game, video 6:29–7:51; the 2026-10-14 UI package by 雨千代chiyo): name-card rows, a 4-wide
    wall of portraits, the detail pane sliding in on a tap (the order list narrows), 已选定策略 after the pick. Original

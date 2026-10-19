@@ -24,6 +24,7 @@
 import { createStore, loadPref, savePref } from '../store.js';
 import { data } from '../data.js';
 import { SKIN_LIMITS } from '../../../shared/protocol.js';
+import { skinHasModel } from './skinModel.js';
 
 /** The localStorage preference (`sp.pref.<key>`) of this browser's skin choices: `{ [charId]: skinId }`. */
 export const SKINS_PREF = 'skins';
@@ -35,15 +36,9 @@ export const SKINS_SYNC_KEY = 'skinsSync';
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const str = (v) => (typeof v === 'string' && v ? v : null);
 
-/**
- * Whether a skin record names a Spine model (not whether it can be worn). Like assets.js
- * `skinHasModel`; actual model loading additionally checks `validSpine`. This module is on the
- * boot path (main.js → screens/lobby.js → screens/loadout.js → ui/loadoutSync.js) and pulling the asset store in with
- * its Spine cache there would be a cost the title page never needs (test/ui/plugins-client.test.js pins that). The
- * difference can only be a skin whose model is written but does not resolve — the picker would offer it once and the
- * renderer would draw the operator's own body, which is the same fallback a plugin-withdrawn model gets.
- */
-export const skinHasModel = (skin) => !!skin && isObj(skin.spine) && isObj(skin.spine.front) && typeof skin.spine.front.skel === 'string';
+// skinHasModel: the one definition shared with the asset store (ui/skinModel.js) — this module stays free of the asset
+// store so the boot path keeps its cost (test/ui/plugins-client.test.js).
+export { skinHasModel };
 
 // B6: maintainer option A (2026-10-18), docs/history/0.3.2.md §35.4. [ASSUMED] The existing E2 and
 // illust slots count as pictures too; metadata alone never offers a selectable outfit.

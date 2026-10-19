@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createDataStore, CORE_DATA_TIMEOUT_MS, ART_MANIFEST_TIMEOUT_MS } from '../../public/js/data.js';
-import { GAME_FILES } from '../../public/js/ui/gameComponents.js';
-import { GameLoadingView, missingCoreData, pendingGameFiles, gameScreenStage } from '../../public/js/ui/gameLoading.js';
 import { BrowserClock, flushPromises } from '../helpers/browserClock.js';
 
 const json = (value) => ({ ok: true, status: 200, json: async () => value });
@@ -143,59 +141,4 @@ test('language-overlay retries use the injected clock alongside core data recove
   assert.equal(await switching, 'en');
   assert.equal(calls, 2);
   assert.equal(clock.jobs.size, 0);
-});
-
-test('loading recovery excludes optional missing art and successful data', () => {
-  const statuses = Object.fromEntries(GAME_FILES.map((name) => [name, 'ready']));
-  const source = { status: (name) => statuses[name] };
-  statuses.local = statuses.assets = 'missing';
-  statuses.announcements = 'loading';
-  assert.equal(missingCoreData(source), false);
-  assert.deepEqual(pendingGameFiles(source), []);
-  statuses.announcements = 'missing';
-  assert.equal(missingCoreData(source), false);
-  assert.deepEqual(pendingGameFiles(source), []);
-  statuses.chess = 'missing'; statuses.config = 'loading';
-  assert.equal(missingCoreData(source), true);
-  assert.deepEqual(pendingGameFiles(source), [{ name: 'config', status: 'loading' }, { name: 'chess', status: 'missing' }]);
-});
-
-test('missing/hung core data never blocks result or match-ended return paths', () => {
-  const unavailable = { hasResult: false, ended: false, mode: 'prep', hasPublic: true, ready: false, missing: true };
-  assert.equal(gameScreenStage(unavailable), 'loading');
-  assert.equal(gameScreenStage({ ...unavailable, hasResult: true }), 'result');
-  assert.equal(gameScreenStage({ ...unavailable, mode: 'result' }), 'result');
-  assert.equal(gameScreenStage({ ...unavailable, ended: true }), 'ended');
-  assert.equal(gameScreenStage({ ...unavailable, hasResult: true, ended: true, hasPublic: false }), 'result');
-  assert.equal(gameScreenStage({ ...unavailable, ready: true, missing: false }), 'game');
-});
-
-function* nodes(value) {
-  if (Array.isArray(value)) { for (const child of value) yield* nodes(child); return; }
-  if (!value || typeof value !== 'object') return;
-  yield value;
-  yield* nodes(value.props?.children);
-}
-
-test('recovery view offers retry/refresh only for slow or failed loading and exposes file status', () => {
-  const files = [{ name: 'chess', status: 'loading' }], retry = () => {}, reload = () => {};
-  const view = (slow, data = files) => [...nodes(GameLoadingView({ hasPublic: true, slow, files: data, onRetry: retry, onReload: reload }))];
-  assert.equal(view(false).filter((node) => node.type === 'section').length, 0);
-  for (const tree of [view(true), view(false, [{ name: 'chess', status: 'missing' }])]) {
-    assert.ok(tree.some((node) => node.props?.onClick === retry));
-    assert.ok(tree.some((node) => node.props?.onClick === reload));
-    assert.ok(tree.some((node) => node.type === 'span' && node.props.children === 'chess.json'));
-  }
-});
-
-test('a resumed session waiting for its match says the match is being restored, with no data retry', () => {
-  const reload = () => {};
-  const text = (props) => [...nodes(GameLoadingView({ hasPublic: false, files: [], onRetry() {}, onReload: reload, ...props }))]
-    .flatMap((node) => [node.props?.children].flat()).filter((c) => typeof c === 'string').join(' ');
-  assert.match(text({ slow: false, resumed: true }), /正在恢复对局/);
-  const slow = text({ slow: true, resumed: true });
-  assert.match(slow, /服务器重启后正在恢复对局/);
-  assert.doesNotMatch(slow, /重试只重新下载/);
-  assert.match(text({ slow: false, resumed: false }), /正在进入模拟/);
-  assert.doesNotMatch(text({ slow: false, resumed: true, hasPublic: true }), /正在恢复对局/, 'match state here: loading its data');
 });

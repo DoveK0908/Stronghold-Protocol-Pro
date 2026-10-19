@@ -1128,7 +1128,7 @@
   .mpop__old, .mpop__spark, .mpop__flare, .mpop__chevs { display: none; }
 }
 
-/* 首领与结局弹窗 (2026-10-13, the event's video 9:59–10:19 / 10:52–10:59 / 11:03–11:40; ui/matchPlates.js): 轮到你选 over
+/* 首领与结局弹窗 (2026-10-13, the event's video 9:59–10:19 / 10:52–10:59 / 11:03–11:40; ui/turnPopup.js / ui/bossPlates.js): 轮到你选 over
    the 机变 cards, the 最终攻势 plate (each survivor's LP running into one node, then the leader's crest), 隐秘核心已解锁,
    协议已失效 (interactive: 继续观战 / 前往结算) and the end plates before the settlement. Dark translucent plates with a
    faint grid, + crosses and a smear of ink; the crests are pixel masks (ui/pixbots.js crest / core). */
@@ -1201,7 +1201,7 @@
 .fa__row .pavatar { --pa: var(--fa-av, .66rem); border: 2px solid rgba(236, 240, 239, .78); }
 .fa__lp { display: flex; align-items: center; gap: .03rem; min-width: .62rem; font-size: calc(.24 * var(--t)); font-weight: 700; color: #eef2f1; }
 .fa__lp .icon { width: .2rem; height: .2rem; color: var(--mint-400); }
-/* more than 5 survivors (matchPlates.js finalLayout): a grid, each LP under its avatar, centred on its cell */
+/* more than 5 survivors (ui/bossPlates.js finalRowsY): a grid, each LP under its avatar, centred on its cell */
 .fa__row--grid { flex-direction: column; gap: .02rem; transform: translate(-50%, -50%); animation-name: fa-row-grid; }
 .fa__row--grid .fa__lp { justify-content: center; min-width: 0; font-size: calc(.16 * var(--t)); line-height: 1; }
 .fa__row--grid .fa__lp .icon { width: .15rem; height: .15rem; }

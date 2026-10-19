@@ -646,7 +646,7 @@ describe('DESIGN §20.15 — the bond strip shows the watched teammate\'s bonds 
       // the eliminated guest answers the official 协议已失效 dialog (PR #705) with 继续观战 before watching
       await continueWatching(guest);
       await guest.page.waitForSelector('.chud__layers', { timeout: 20000 });
-      // the eliminated guest's 协议已失效 plate (ui/matchPlates.js DownedPlate) covers the field: 继续观战 closes it
+      // the eliminated guest's 协议已失效 plate (ui/downedPlate.js DownedPlate) covers the field: 继续观战 closes it
       if (await guest.page.waitForSelector('[data-testid="downed-plate"]', { visible: true, timeout: 3000 }).catch(() => null)) {
         await guest.click('[data-testid="downed-plate"] .downpl__btn--watch');
         await guest.page.waitForSelector('[data-testid="downed-plate"]', { hidden: true, timeout: 5000 });

@@ -15,11 +15,11 @@
 // spinner over its text — user playtest #3 item 9), dropped as soon as the pick shows in m.public (spBusy itself resets
 // when the request settles, ≤ 8 s, or the phase moves on). Untimed drafts (solo, a single-human match: sp.untimed) show
 // no countdown and say so. When the pick order comes round to the player, 轮到你选 drops in over the cards (the event's
-// video 10:08, ui/matchPlates.js TurnPopup); the selected card's frame and 确认选择 strip are white, as in the video.
+// video 10:08, ui/turnPopup.js TurnPopup); the selected card's frame and 确认选择 strip are white, as in the video.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Icon, TierChip, Countdown, Button } from './components.js';
-import { TurnPopup } from './matchPlates.js';
+import { TurnPopup } from './turnPopup.js';
 import { SP_POPUP_MS, LEAVE_MS } from './matchPopups.js';
 import { Img, RichText, PlayerAvatar, GIcon } from './gameComponents.js';
 import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';

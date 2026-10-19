@@ -211,7 +211,7 @@ function onWelcome(msg) {
   });
   welcomeAt = Date.now();
   // The server rebound this tab's session: until its match state (or a room outside a match) arrives, a match screen
-  // still loading is a match being restored after a server restart (ui/gameLoading.js 正在恢复对局…).
+  // still loading is a match being restored after a server restart (screens/game.js 的 .gload 正在恢复对局…).
   store.patch('ui', { resumed: msg.resumed === true });
   // A retained ticket is not a fresh population sample from this new socket.
   if (Object.hasOwn(prev.queue || {}, 'waitingCount')) store.set({ queue: { ...prev.queue, waitingCount: undefined } });

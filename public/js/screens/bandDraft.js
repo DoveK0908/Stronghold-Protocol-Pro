@@ -28,7 +28,7 @@
 // across a taken one, the pickers' avatars, an orange mark on a strategy this browser has cleared a run with —
 // ui/stats.js); the detail pane slides in only once a portrait is tapped (the order list narrows); after the pick the
 // grid gives way to 已选定策略 and a beam runs along the picker's row. Each time a pick becomes the player's, the
-// 「请选择策略」 band sweeps across (ui/matchIntro.js TurnBanner).
+// 「请选择策略」 band sweeps across (ui/turnBanner.js TurnBanner).
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, MicroLabel, useTicker, secondsLeft } from '../ui/components.js';
