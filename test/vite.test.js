@@ -26,7 +26,10 @@ test('the bundle keeps /shared and /sim native, inlines no shared code, and leav
   assert.ok(files.length > 0 && files.every((f) => /^[A-Za-z0-9_.-]+-[A-Za-z0-9_-]{8}\.(?:js|css)$/.test(f)), `only hashed JS/CSS: ${files.join(' ')}`);
   const js = files.filter((f) => f.endsWith('.js')).map((f) => fs.readFileSync(path.join(out, 'assets', f), 'utf8')).join('\n');
   assert.ok(/from"\/shared\/constants\.js"/.test(js), 'shared modules are imported from /shared/');
-  assert.equal(/["'](?:\.\.\/)+shared\//.test(js), false, 'never a relative path to shared/');
+  // Import specifiers must be absolute. The one relative "shared/" left in the output is a run-time string, not an
+  // import: public/js/battle/simLoader.js builds the file:// fallback URL with new URL('../../shared/plugins/sdk.js', base).
+  const specifiers = js.replace(/new URL\((['"])[^'"]*\1/g, 'new URL(');
+  assert.equal(/["'](?:\.\.\/)+shared\//.test(specifiers), false, 'never a relative path to shared/');
   // strings that live only in shared modules: their code is not copied into the bundle
   for (const marker of ['bad patch', 'missing path']) assert.equal(js.includes(marker), false, `shared/stateDelta.js inlined (${marker})`);
   assert.ok(js.includes('/js/battle/simWorker.js'), 'the simulation Worker keeps its URL (its CSP header)');

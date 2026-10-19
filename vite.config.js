@@ -14,6 +14,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const abs = (rel) => normalizePath(path.join(ROOT, rel));
 const SHARED = abs('shared') + '/';
 const SIM = abs('server/sim') + '/';
+const SERVER = abs('server') + '/';
 const PUBLIC = abs('public') + '/';
 // public/ paths that stay at their own URL (not bundled): the vendored three.js (imported by URL at run time anyway)
 const KEEP_PUBLIC = new Set(['vendor/three.module.js', 'vendor/three.core.js']);
@@ -30,16 +31,30 @@ export function keepNativeModules() {
         ? normalizePath(path.join(ROOT, 'public', source)) : normalizePath(path.resolve(path.dirname(importer), source));
       if (file.startsWith(SHARED)) return { id: '/shared/' + file.slice(SHARED.length), external: 'absolute' };
       if (file.startsWith(SIM)) return { id: '/sim/' + file.slice(SIM.length), external: 'absolute' };
+      // the one server module the page names (simLoader's file:// fallback, server/plugins/operatorTraits.js) is Node-only
+      // code: bundling it would pull node:fs and a relative /shared import into a chunk. Keep the URL the way the source
+      // names it — the served page never takes the file:// branch.
+      if (file.startsWith(SERVER)) return { id: '/server/' + file.slice(SERVER.length), external: 'absolute' };
       if (file.startsWith(PUBLIC) && KEEP_PUBLIC.has(file.slice(PUBLIC.length))) return { id: '/' + file.slice(PUBLIC.length), external: 'absolute' };
       return null;
     },
     transform(code, id) {
       // The simulation Worker stays /js/battle/simWorker.js: its CSP header (static.js SIM_WORKER_CSP) and the plugin
       // sandbox are tied to that URL. Vite would otherwise bundle the `new URL(…, import.meta.url)` worker.
-      if (id !== abs('public/js/battle/simHost.js')) return null;
-      const from = "new Worker(new URL('./simWorker.js', import.meta.url), { type: 'module' })";
-      if (!code.includes(from)) this.error('simHost.js: the simulation Worker construction changed; update vite.config.js');
-      return { code: code.replace(from, "new Worker('/js/battle/simWorker.js', { type: 'module' })"), map: null };
+      if (id === abs('public/js/battle/simHost.js')) {
+        const from = "new Worker(new URL('./simWorker.js', import.meta.url), { type: 'module' })";
+        if (!code.includes(from)) this.error('simHost.js: the simulation Worker construction changed; update vite.config.js');
+        return { code: code.replace(from, "new Worker('/js/battle/simWorker.js', { type: 'module' })"), map: null };
+      }
+      // simLoader's file:// fallback names a Node-only module: `new URL(…, import.meta.url)` would make Vite emit that
+      // module's source text as an asset (with its relative /shared imports). The served page never takes the file://
+      // branch, so keep a plain URL.
+      if (id === abs('public/js/battle/simLoader.js')) {
+        const from = "new URL('../../../server/plugins/operatorTraits.js', import.meta.url).href";
+        if (!code.includes(from)) this.error('simLoader.js: the server trait fallback changed; update vite.config.js');
+        return { code: code.replace(from, "/* @vite-ignore */ '/server/plugins/operatorTraits.js'"), map: null };
+      }
+      return null;
     },
     transformIndexHtml: {
       order: 'pre',
