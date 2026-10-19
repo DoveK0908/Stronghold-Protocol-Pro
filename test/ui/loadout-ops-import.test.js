@@ -33,16 +33,16 @@ test('a loadout ops payload is refused with the DIY data check; entries-only is 
   assert.equal(loadoutOpsImportRefusal(null, false, noBackups), null, 'entries-only does not wait on backups');
 });
 
-test('ioApply asks loadoutOpsImportRefusal after a successful parse and before any write', () => {
-  // upstream 0.2.x imports through the shared payload (ui/loadoutModel.js parseImport -> applyLoadoutEntries)
+test('ioApply asks loadoutOpsImportRefusal after parseOperatorPreset and before applyOperatorPreset', () => {
+  // this fork imports through the operator preset (ui/operatorPresetModel.js, ui/loadoutSync.js applyOperatorPreset)
   const src = readFileSync(path.join(ROOT, 'public/js/screens/loadout.js'), 'utf8');
   const at = src.indexOf('const ioApply = () => {');
   assert.ok(at > 0, 'ioApply');
   const body = src.slice(at, src.indexOf('\n  };\n', at));
-  const parsed = body.indexOf('const res = parseImport(ioText);');
-  const guard = body.indexOf('loadoutOpsImportRefusal(res.ops, ready)');
-  const apply = body.indexOf('applyLoadoutEntries(');
+  const parsed = body.indexOf('if (!parsed.ok)');
+  const guard = body.indexOf('loadoutOpsImportRefusal(parsed.patch.ops, ready)');
+  const apply = body.indexOf('applyOperatorPreset(');
   assert.ok(parsed > 0 && guard > parsed, 'refuse only a payload that parsed');
   assert.ok(apply > guard, 'no write until the refusal returns null');
-  assert.match(body.slice(guard), /^loadoutOpsImportRefusal\(res\.ops, ready\);\s*if \(opsRefused\) \{ toast\(opsRefused\.text, opsRefused\.tone\); return; \}/);
+  assert.match(body.slice(guard), /^loadoutOpsImportRefusal\(parsed\.patch\.ops, ready\);\s*if \(opsRefused\) \{ toast\(opsRefused\.text, opsRefused\.tone\); return; \}/);
 });
