@@ -65,18 +65,19 @@ test('every import is refused while the files load or when the game data did not
   assert.deepEqual(importRefusal('diy', true, noBackups), { text: NOT_LOADED, tone: 'error' });
 });
 
-test('the unified screen identifies the file scope, then guards data-dependent imports before any application; missing tabs still show DataMissing', () => {
+test('the unified screen guards data-dependent imports before any application; missing tabs still show DataMissing', () => {
   const src = readFileSync(path.join(ROOT, 'public/js/screens/loadout.js'), 'utf8');
   const at = src.indexOf('const ioApply = () => {');
   assert.ok(at > 0, 'ioApply');
   const body = src.slice(at, src.indexOf('\n  };\n', at));
-  const parse = body.indexOf('parseOperatorPreset(ioText)');
-  const guard = body.indexOf('const refused = importRefusal(kind, ready);');
-  const apply = body.indexOf('applyOperatorPreset(parsed,');
-  assert.ok(parse >= 0 && guard > parse && apply > guard, 'pure scope parsing precedes the guard, application follows it');
-  assert.match(body.slice(guard), /^const refused = importRefusal\(kind, ready\);\s*if \(refused\) \{ toast\(refused\.text, refused\.tone\); return; \}/);
-  assert.match(body, /if \(parsed\.scope !== 'skins'\)/, 'only legacy display-only files bypass game-data requirements');
-  assert.match(body, /Object\.keys\(parsed\.patch\.diy \|\| \{\}\)\.length \? 'diy' : 'loadout'/, 'a preset with support picks requires backups data too');
+  // upstream 0.2.x: one guard at the top of ioApply, keyed by the file scope the io panel was opened for
+  const guard = body.indexOf('const refused = importRefusal(io.kind, ready);');
+  const applyDiy = body.indexOf('applyDiyImport(');
+  const applyOwn = body.indexOf('applyOwnershipImport(');
+  const applyLoadout = body.indexOf('applyLoadoutEntries(');
+  assert.ok(guard >= 0, 'one guard for loading and missing data');
+  assert.ok(applyDiy > guard && applyOwn > guard && applyLoadout > guard, 'no write until the guard returns null');
+  assert.match(body.slice(guard), /^const refused = importRefusal\(io\.kind, ready\);\s*if \(refused\) \{ toast\(refused\.text, refused\.tone\); return; \}/);
   assert.doesNotMatch(body.slice(0, guard), /setEntries\(|setNotOwned\(|setDiyPicks\(|setSkins\(|savePref\(|loadoutStore\.set\(/);
   assert.ok(!/if \(!ready\)/.test(body), 'one guard for loading and missing data');
   assert.match(src, /const lost = ready \? missingGameData\(tab\) : \[\];/);
