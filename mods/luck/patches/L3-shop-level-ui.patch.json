@@ -3,11 +3,6 @@
   "about": "L3 —— 面板上的「调度」控件：沙盒条上一个 1..6 的数字框 + 「设置」按钮 + 总开关页新增一行「调度中心 · 直接设置等级」。",
   "hunks": [
     {
-      "id": "L3-const",
-      "find": "const ENABLE = 'g.modEnable';",
-      "replace": "const SHOPLEVEL = 'g.modShopLevel';\nconst ENABLE = 'g.modEnable';"
-    },
-    {
       "id": "L3-c2s",
       "find": "if (!Object.hasOwn(C2S, ENABLE)) {",
       "replace": "if (!Object.hasOwn(C2S, SHOPLEVEL)) C2S[SHOPLEVEL] = { level: (v) => Number.isInteger(v) && v >= 1 && v <= 6 };\nif (!Object.hasOwn(C2S, ENABLE)) {"
