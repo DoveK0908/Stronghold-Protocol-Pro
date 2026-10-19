@@ -199,7 +199,8 @@ describe('the report', () => {
   test('an empty page: the lobby, nothing recorded, unknown fields left out', () => {
     const text = buildDiagnostics({ state: {}, now: 0, pageStart: 0 });
     assert.match(text, /\ncontent: unknown\n/);
-    assert.match(text, /\nwhere: lobby\n/);
+    // 0.3.1's title screen: no session.entered yet means the title, not the lobby (screens/title.js selectRoute)
+    assert.match(text, /\nwhere: title\n/);
     assert.match(text, /\nconnection: unknown\n/);
     assert.match(text, /\ndevice: unknown\n/);
     assert.match(text, /\nerrors: none recorded\n```$/);

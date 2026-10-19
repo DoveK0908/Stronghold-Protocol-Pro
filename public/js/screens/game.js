@@ -575,6 +575,8 @@ function MatchScreen() {
     if (!wanted || !field || !field.fieldId || !relayFieldReady || field === staleFieldRef.current || field === enteredFieldRef.current) return;
     if (watchingOther && !combat && field.fieldId !== watching) return; // an older push while switching
     if (lastFieldRef.current && lastFieldRef.current !== field.fieldId) setDetail((d) => (inBattleCard(d) ? null : d));
+    // the same scouted board sent again (still prep) keeps the camera: only the pieces changed
+    const rescout = !!field.prep && !!enteredFieldRef.current?.prep && enteredFieldRef.current.fieldId === field.fieldId;
     enteredFieldRef.current = field;
     lastFieldRef.current = field.fieldId;
     reentryRef.current = null;
@@ -610,7 +612,9 @@ function MatchScreen() {
     view.raw?.setLocalFeed?.({ on: !!field.local, speed: field.speed });
     // a lone 联防 helper starts on its own half with the ‹ › pill on that half (全景 stays one press away)
     const helperHalf = field.prep ? null : loneHalf(field);
-    setLayer(helperHalf || 'ALL');
+    if (!rescout) {
+      setLayer(helperHalf || 'ALL');
+    }
     // a lone player's boss field (solo modes, the odd player of a co-op Final Assault: the `_s` templates route every
     // enemy to the left objective) is framed on its own half like the ‹ › half view; pairs start on 全景
     const lone = kind === 'boss' && members.length === 1;

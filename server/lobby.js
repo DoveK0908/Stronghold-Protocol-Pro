@@ -205,6 +205,7 @@ import { NO_PHASES } from './phaseMetrics.js';
 
 const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
+import { ruleOption } from '../shared/plugins/rules.js';
 import { msg, wireMessage } from '../shared/i18n.js';
 
 /** Room code alphabet: uppercase letters without I and O (and no digits, so no 0/1). */
@@ -1641,7 +1642,10 @@ export class Lobby {
     if (typeof room.match.setLoadout !== 'function') return fail(ERR.ROOM_STARTED, 'stored for the next match');
     let r;
     try {
-      r = room.match.setLoadout(session.playerId, loadout, opsSet);
+      // Preserve named defaults for prep merging: normalisation drops them, but they mean reset this operator.
+      r = ruleOption(room.content?.rules, 'prepLoadout') === 'prep'
+        ? room.match.setLoadout(session.playerId, entries, ops)
+        : room.match.setLoadout(session.playerId, loadout, opsSet);
     } catch (e) {
       this.log.error(`[lobby] ${room.code} match.setLoadout threw`, e);
       return fail(ERR.INTERNAL);

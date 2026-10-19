@@ -36,6 +36,8 @@ export const CI_TEST_ENV = { SP_E2E: '0', SP_REAL_E2E: '0', RENDER_E2E: '0', NO_
 
 /** The paths the smoke step requests (the curl URLs of ci.yml's smoke step; test/ci.test.js compares them). */
 export const SMOKE_PATHS = ['/healthz', '/', '/vendor/pixi.min.js'];
+/** What the `test` step runs: the same globs as package.json "test" (node --test expands them). */
+export const TEST_FILES = ['test/**/*.test.js', 'test/e2e/coop.e2e.mjs', 'plugins/_template/**/*.test.js'];
 
 /** ci.yml steps that only make sense on a GitHub runner, by `uses:` action or by step name. */
 export const SKIPPED_CI_STEPS = [
@@ -52,7 +54,8 @@ export const SKIPPED_CI_STEPS = [
  */
 export const STEPS = [
   { id: 'setup', ci: { job: 'test', name: 'Setup check (no downloads)' }, describe: 'node tools/setup.mjs --check --no-local' },
-  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, describe: 'node --test --test-force-exit --test-timeout=45000' },
+  { id: 'test', ci: { job: 'test', name: 'Unit & integration tests' }, npm: 'test',
+    describe: "node --test --test-force-exit --test-timeout=45000 \"test/**/*.test.js\" \"test/e2e/coop.e2e.mjs\" \"plugins/_template/**/*.test.js\"" },
   { id: 'smoke', ci: { job: 'test', name: 'Server smoke test (boot, /healthz, index.html, doctor)' },
     describe: `server on a free port: GET ${SMOKE_PATHS.join(', ')}; node tools/doctor.mjs` },
   { id: 'lint', ci: { job: 'tooling', name: 'Lint (warnings allowed)' }, npm: 'lint', describe: 'eslint .' },

@@ -77,7 +77,10 @@ test('the commands match ci.yml: the run lines, the npm scripts ci.yml calls, th
 
 test('npm test runs every test file and nothing else under test/: no helper, no child-process entry, no Forge fixture', () => {
   // the test step's command line is package.json's (checked above) and runs node --test over TEST_FILES
-  assert.equal(STEPS.find((s) => s.id === 'test').describe, `node --test ${TEST_FILES.map((g) => `"${g}"`).join(' ')}`);
+  // the local hang fix (tools/ci.mjs: --test-force-exit --test-timeout=45000) rides along; the globs are the contract
+  const testDescribe = STEPS.find((s) => s.id === 'test').describe;
+  assert.match(testDescribe, /^node --test --test-force-exit --test-timeout=45000 /);
+  for (const g of TEST_FILES) assert.ok(testDescribe.includes(`"${g}"`), `the test step runs ${g}`);
   // what Node's test runner expands them to (the same glob, node_modules left out the way --test leaves it out)
   const picked = fs.globSync(TEST_FILES, { cwd: ROOT, exclude: (p) => path.basename(String(p?.name ?? p)) === 'node_modules' })
     .map((f) => f.split(path.sep).join('/')).sort();
