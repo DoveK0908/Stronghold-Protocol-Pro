@@ -23,7 +23,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { pickModeAttacks, pickModeHits, skillModeLetter, SLOT_MODE_LETTER } from '../tools/assets/audio.mjs';
+import { pickModeAttacks, pickModeHits, skillModeLetter } from '../tools/assets/audio.mjs';
 
 const P = (f) => `player/${f.startsWith('p_imp') ? 'p_imp' : 'p_atk'}/${f}.mp3`;
 const CHEN3 = 'char_1050_chen3';
@@ -96,7 +96,9 @@ test('every manifest hits entry is a skill-mode file; the slot is not the filena
         loose.push(`${id}:hits[${i}]`);
         continue;
       }
-      assert.equal(letter, SLOT_MODE_LETTER[i], `${id}: hits[${i}] is 技能${Number(i) + 1} (the _${letter} mode)`);
+      // 0.3.1 #679: the letter comes from the skill's fx mode, not from the slot — a mode may sit on any slot
+      // (e.g. 推进之王's S3 mode carries the `_h` bank), so the manifest's job is "every impact is a mode file".
+      assert.ok(letter, `${id}: hits[${i}] carries a skill-mode letter (${url})`);
     }
   }
   assert.deepEqual(loose, ['char_4182_oblvns:hits[0]', 'char_4182_oblvns:hits[1]', 'char_4182_oblvns:hits[2]'], 'only her three official impact banks are mode-less');

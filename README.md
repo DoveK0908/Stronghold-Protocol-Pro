@@ -1,10 +1,10 @@
 # 卫戍协议：盟约 · Stronghold Protocol: Alliance
 
-> 本仓库是 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) 的 fork。玩法规则、游戏数据和素材流程跟随上游（目前同步到上游 0.3.0），在此之上增加了公开匹配、扩展人数的好友房、服务器端战斗与集群部署、登录门禁和素材分发等改动，见[与上游的区别](#与上游的区别)。`master` 是开发集成分支，推送不等于线上发布；本文不记录任何部署地址或上线状态。
+> 本仓库是 [sganggs/Stronghold-Protocol](https://github.com/sganggs/Stronghold-Protocol) 的 fork。玩法规则、游戏数据和素材流程跟随上游（目前同步到上游 0.3.1），在此之上增加了公开匹配、扩展人数的好友房、服务器端战斗与集群部署、登录门禁和素材分发等改动，见[与上游的区别](#与上游的区别)。`master` 是开发集成分支，推送不等于线上发布；本文不记录任何部署地址或上线状态。
 
 《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人、1–4 人合作，或在好友房里扩展到最多 20 人。
 
-![version](https://img.shields.io/badge/version-0.3.0-2ea44f)
+![version](https://img.shields.io/badge/version-0.3.1-2ea44f)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-24-339933)
 
@@ -41,7 +41,7 @@ English summary: [below](#english).
 - **两种运行方式**：
   - **单进程**：和上游一样，一个 Node.js 进程同时提供页面和 WebSocket，战斗默认在各玩家的浏览器里模拟，一台低功耗小主机就能开服。
   - **集群**：一个 coordinator 负责大厅、房间与匹配，多个 game 节点用固定的 Worker 池在服务器上模拟战斗，多个 ingress 转发玩家连接。浏览器在本地演算自己看到的战场，由服务器定期校验，胜负以服务器为准。见 [deploy/stardust/cluster/](deploy/stardust/cluster/README.md)。
-- **版本**：玩法与数据同步到上游 0.3.0（包括插件系统，见[插件](#插件)；上游的版本记录见 [CHANGELOG.md](CHANGELOG.md)）。本 fork 的改动见下一节和提交记录。仍有少数规则按推断实现，与官方不一致的地方欢迎在 Issue 里反馈。
+- **版本**：玩法与数据同步到上游 0.3.1（包括插件系统，见[插件](#插件)；上游的版本记录见 [CHANGELOG.md](CHANGELOG.md)）。本 fork 的改动见下一节和提交记录。仍有少数规则按推断实现，与官方不一致的地方欢迎在 Issue 里反馈。
 
 ## 与上游的区别
 
@@ -138,7 +138,7 @@ npm start          # 启动服务器：http://localhost:3000
 |---|---|
 | 开服的电脑 | Windows / macOS / Linux，Node.js 24（LTS，只支持这一版本）；磁盘约 1.2–1.4 GB（素材、依赖与本地提取的贴图、场景和特效）；单进程模式内存空闲约 100 MB，每局再加几 MB；服务器模拟战斗时，CPU 和内存随 Worker 数与同时进行的对局数增加 |
 | 玩家 | 支持 WebGL 的现代浏览器（Chrome / Edge / Firefox / Safari 最新版），电脑、手机或平板（横屏） |
-| 网络 | 首次进入游戏时，每位玩家要从开服的电脑下载几十 MB 素材（之后走浏览器缓存）；对局中流量很小，服务器推流战斗时会多一些。上游 0.3.0 里已有素材的玩家可以在标题画面点「导入素材包」（「下载完整素材」旁边），从素材包 zip、完整包 zip 或自己的 `public/assets` 文件夹导入，这部分美术不再从开服的电脑下载；需要 HTTPS 或 localhost（[docs/DEPLOY.md](docs/DEPLOY.md) 2.5 节）。0.3.0 的素材包 `Stronghold-Protocol-v0.3.0-assets.zip` 由上游维护者另行提供下载，不在 Releases 附件里。本 fork 打开页面直接进入大厅，没有标题画面，不显示这两个按钮 |
+| 网络 | 首次进入游戏时，每位玩家要从开服的电脑下载几十 MB 素材（之后走浏览器缓存）；对局中流量很小，服务器推流战斗时会多一些。上游 0.3.0 里已有素材的玩家可以在标题画面点「导入素材包」（「下载完整素材」旁边），从素材包 zip、完整包 zip 或自己的 `public/assets` 文件夹导入，这部分美术不再从开服的电脑下载；需要 HTTPS 或 localhost（[docs/DEPLOY.md](docs/DEPLOY.md) 2.5 节）。0.3.0 的素材包 `Stronghold-Protocol-v0.3.0-assets.zip` 由上游维护者另行提供下载，不在 Releases 附件里。本 fork 的标题画面同样有「下载完整素材」与「导入素材包」两个按钮 |
 
 显卡较弱时可以在「设置」里调低画质，或在网址后加 `?board=2d`（强制 2D 棋盘）/ `?render=fallback`（不用 WebGL 的简化画面）。
 
@@ -180,7 +180,7 @@ npm start          # 启动服务器：http://localhost:3000
 
 ## 插件
 
-0.3.0 开发版已支持插件；不开插件时按原版游玩。
+0.3.1 起插件系统随上游；不开插件时按原版游玩。
 
 - **服主安装**：将插件文件夹放进服务器的 `plugins/`，或用 `node tools/plugin.mjs install <zip路径或HTTPS地址>` 安装；远程地址需带 `--sha256`。工作台也支持从社区目录安装和导入 Forge 工坊包。服主可在 `plugins/config.json` 限定可用插件。
 - **房主开启**：在房间顶部的「原版 / 插件 ×N」面板里选外观或玩法插件、修改插件设置、选择插件模式。玩法插件的内容会由所有玩家下载并校验，房间标为「非官方」，统计总览默认不计入。

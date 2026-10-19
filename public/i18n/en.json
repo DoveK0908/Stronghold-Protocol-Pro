@@ -3269,7 +3269,7 @@
   "精英一": "Elite 1",
   "Boss 关伤害": "Boss rounds' damage",
   "策略阶段看特训敌人": "Special enemies while drafting",
-  "默认开启：选择策略时打开「本局信息」也能看到本局的特训敌人（准备阶段的简报本来就显示它）；取消勾选就只看简报。": "On by default: opening 本局信息 while drafting also lists this match's special enemies (the briefing already shows them); untick to keep them in the briefing only.",
+  "默认开启：选择策略时打开「本局信息」也能看到本局的特训敌人（准备阶段的简报本来就显示它）；取消勾选就只看简报。": "On by default: opening Match info while drafting also lists this match's special enemies (the briefing already shows them); untick to keep them in the briefing only.",
   "策略阶段不看特训敌人": "No special enemies while drafting",
   "Luck 测试插件": "Luck test console",
   "开局后允许打开 Luck 测试面板（改资金、回合、地图、盟约层数等）；不勾选则完全不加载。": "Lets the Luck test panel open once the match starts (funds, rounds, map, bond layers…); nothing loads when off.",

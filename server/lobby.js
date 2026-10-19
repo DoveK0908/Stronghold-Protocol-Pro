@@ -2021,7 +2021,14 @@ export class Lobby {
     else {
       let n;
       try { n = Number(this.plugins?.unofficial?.()) || 0; } catch { n = 0; }
-      info = { diyKitted: KITTED_CHARS, content: n > 0 ? { vanilla: this.vanilla.cs, plugins: n } : { vanilla: this.vanilla.cs } };
+      // hasNotices (server/plugins/roomSets.js): the catalogue carries 外观插件 公告, so the client fetches it even
+      // without gameplay plugins (docs/PLUGINS.md; test/plugins/theme-notices.test.js)
+      let notices = false;
+      try { notices = this.plugins?.hasNotices?.() === true; } catch { notices = false; }
+      info = {
+        diyKitted: KITTED_CHARS,
+        content: { vanilla: this.vanilla.cs, ...(n > 0 ? { plugins: n } : {}), ...(notices ? { notices: true } : {}) },
+      };
     }
     // Omitted when the switch is off, so a welcome from a normal server stays identical.
     if (this.testEnabled === true) info.testMode = true;
