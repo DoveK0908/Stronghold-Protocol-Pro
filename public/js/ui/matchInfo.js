@@ -19,7 +19,7 @@
 
 import { html, Button, Icon, MicroLabel, BondDisc, Tooltip, Modal } from './components.js';
 import { UnitThumb } from './gameComponents.js';
-import { bannedMembersByBond, disabledBondSets, briefingBondTip, diyBannedPieces, factionTypes } from './gameLogic.js';
+import { bannedMembersByBond, disabledBondSets, briefingBondTip, diyBannedPieces } from './gameLogic.js';
 import { bondIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
 import { t, dn } from '../../../shared/i18n.js';
@@ -144,14 +144,35 @@ export function MatchLegend({ model }) {
 export function BannedOperators({ model }) {
   const { banned } = model;
   const m = data.get('assets');
+  // Grouped by bond (Pro's own shape, back after the official 0.3.2 flat grid): a player choosing a strategy needs to
+  // know WHICH bond each banned operator was taken from — the same bond can lose several members, and one operator can
+  // belong to two bonds. A member with two bonds is listed under each, which is what model.perBondMembers answers.
   const groups = model.bonds
     .map((b) => ({ bond: b, ids: model.perBondMembers.get(b.bondId) || [] }))
     .filter((g) => g.ids.length);
   return html`<div class="brief-banned">
     <h3 class="brief-h"><span>${t('本局禁用干员')}</span><${MicroLabel}>BANNED OPERATORS</${MicroLabel}><b class="num brief-banned__n">${banned.length}</b></h3>
-    ${banned.length ? html`<div class="brief-banned__grid">
+    ${banned.length ? (groups.length ? html`<div class="brief-banned__groups">
+      ${groups.map((g) => {
+        const state = model.stateOf(g.bond.bondId);
+        const off = !!state;
+        return html`<div key=${g.bond.bondId} class="brief-banned__group" data-bond=${g.bond.bondId}>
+          <div class="brief-banned__ghead">
+            <${Tooltip} text=${briefingBondTip(g.bond.name, state, g.ids.length)}>
+              <${BondDisc} name=${g.bond.name} icon=${bondIconUrl(m, g.bond.bondId)} active=${!off} disabled=${off}
+                tier=${off ? 0 : (g.bond.thresholds?.length || 1)} maxTier=${Math.max(1, g.bond.thresholds?.length || 1)} size="sm" />
+            <//>
+            <span class="brief-banned__gname">${g.bond.name}</span>
+            <b class="num brief-banned__gcount">${g.ids.length}</b>
+          </div>
+          <div class="brief-banned__grid">
+            ${g.ids.map((id) => html`<${UnitThumb} key=${id} kind="chess" id=${id} size="sm" class="is-banned" />`)}
+          </div>
+        </div>`;
+      })}
+    </div>` : html`<div class="brief-banned__grid">
       ${banned.map((id) => html`<${UnitThumb} key=${id} kind="chess" ownerId=${null} id=${id} size="sm" dim=${true} />`)}
-    </div>` : html`<p class="t-dim">${t('本局没有禁用干员')}</p>`}
+    </div>`) : html`<p class="t-dim">${t('本局没有禁用干员')}</p>`}
     <${DiyBannedLine} model=${model} />
   </div>`;
 }

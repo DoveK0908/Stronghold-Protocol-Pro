@@ -221,3 +221,78 @@
   .modal__box.minfo-dlg { width: min(max(12rem, 600px), calc(100vw - .6rem - var(--sa-l, 0px) - var(--sa-r, 0px))); }
   .minfo-dlg__content.has-enemies { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- restored after the 0.3.2 merge: element rules official/dev keeps for the blocks this screen renders
+   (the detail pane, the wall labels, the order rows). They went missing when the merge resolved draft.css's
+   conflicting hunks to the official side while this file kept the chiyo four-column layout; without them the
+   detail pane sat unstyled in the 0-wide fourth column and spilled over the wall. ---- */
+.draft-detail{
+  grid-column: 4; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: .12rem; padding: .26rem .26rem .22rem; min-height: 0;
+  background: linear-gradient(180deg, rgba(20, 30, 26, .9), rgba(10, 13, 12, .92)); border: 1px solid var(--line-2);
+}
+
+.draft-detail__art{ position: relative; padding: .06rem; border: 1px solid var(--mint-800); background: radial-gradient(circle, rgba(78, 216, 175, .14), transparent 70%); }
+
+.draft-detail__art .bandicon{ --bi: 2rem; }
+
+.draft-detail__hp{ display: flex; align-items: center; gap: .12rem; font-size: calc(.16 * var(--t)); color: var(--text-lo); }
+
+.draft-detail__name{ font-size: calc(.42 * var(--t)); font-weight: 900; letter-spacing: .1em; }
+
+.draft-detail__eff{ align-self: stretch; display: flex; flex-direction: column; gap: .06rem; padding: .12rem .14rem; background: rgba(0, 0, 0, .3); border-left: 3px solid var(--mint-500); flex: 1; min-height: 0; overflow: auto; }
+
+.draft-detail__eff b{ font-size: calc(.2 * var(--t)); color: var(--mint-400); }
+
+.draft-detail__desc{ font-size: calc(.16 * var(--t)); line-height: 1.7; color: var(--text-md); }
+
+.draft-detail__actions{ align-self: stretch; display: flex; flex-direction: column; gap: .1rem; }
+
+.draft-detail__status{ display: flex; align-items: center; gap: .06rem; font-size: calc(.15 * var(--t)); color: var(--text-lo); }
+
+.draft-detail__status .icon{ width: .18rem; height: .18rem; }
+
+.draft-detail__btns{ display: flex; gap: .1rem; }
+
+.draft-detail__btns .btn{ flex: 1; }
+
+.draft-detail__status--taken{ color: var(--amber); }
+
+.dband .bandicon{ --bi: 1.1rem; border: 1px solid var(--line-2); }
+
+.dband__lp{ display: inline-flex; align-items: center; gap: .04rem; font-size: calc(.15 * var(--t)); color: var(--mint-400); }
+
+.dband__lp i{ width: .12rem; height: .14rem; background: var(--mint-500); clip-path: polygon(0 0, 30% 0, 30% 20%, 45% 20%, 45% 0, 55% 0, 55% 20%, 70% 20%, 70% 0, 100% 0, 100% 35%, 85% 50%, 85% 80%, 100% 90%, 100% 100%, 0 100%, 0 90%, 15% 80%, 15% 50%, 0 35%); }
+
+.dband.is-mine::after{ content: '已选择'; position: absolute; left: 0; top: 0; font-size: calc(.11 * var(--t)); font-weight: 700; padding: 0 .06rem; background: var(--mint-500); color: var(--text-on-mint); }
+
+.dorder__idx{ font-size: calc(.22 * var(--t)); color: var(--text-dim); width: .26rem; text-align: center; }
+
+.dorder__state span{ display: inline-flex; align-items: center; gap: .04rem; }
+
+.dorder__state .icon{ width: .16rem; height: .16rem; }
+
+.dorder__finger{ width: .44rem; height: .44rem; animation: finger 1s ease-in-out infinite; }
+
+.dorder.is-cur{ border-color: var(--gold); background: linear-gradient(90deg, rgba(255, 198, 0, .12), rgba(12, 15, 14, .82)); box-shadow: 0 0 .2rem rgba(255, 198, 0, .15); }
+
+.dorder.is-done{ border-color: var(--mint-800); }
+
+.dorder.is-self .dorder__name{ color: var(--mint-400); }
+
+.dorder__secs{ margin-left: .06rem; font-size: calc(.15 * var(--t)); color: var(--gold); }
+
+/* the 本局信息 button under the order list (official/dev draft.css:93) */
+.draft-order__info {
+  margin-top: .04rem; justify-content: flex-start; padding: 0 .16rem;
+  height: max(.5rem, 28px); font-size: max(calc(.18 * var(--t)), 10px);
+  --btn-bd: var(--mint-800); --btn-bg: rgba(78, 216, 175, .06); --btn-bg-hover: rgba(78, 216, 175, .14);
+}
+.draft-order__info .btn__icon{ color: var(--mint-400); }
+
+/* The fourth column is 0 wide until a portrait is hovered or tapped: keep the pane from spilling over the wall while
+   collapsed. It stays in the grid (so the column transition still animates) but contributes no box of its own. */
+.draft__main > .draft-detail { overflow: hidden; min-width: 0; }
+.draft:not(.draft--detail) .draft-detail { padding: 0; border: 0; opacity: 0; }
+.draft-detail { transition: opacity 160ms var(--tr-ease, ease-out); }
+.draft--detail .draft-detail { opacity: 1; }
