@@ -152,6 +152,7 @@ export class MatchSettle {
     this._freezeDamage();
     this.offersDispose();
     this.ended = true;
+    this.externalAI?.close();
     for (const ps of this.order) this._cancelBotPrep(ps);
     this._finalizePendingDeaths();
     if (this.runner) { try { this.runner.stop(); } catch { /* ignore */ } this.runner = null; }

@@ -7,14 +7,14 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 // Optional rules with their own defaults: a room that never mentions one keeps the ordinary two-flag wire shape
 // (legacy DTOs, matchmaking offers and stored rooms are unaffected). Mostly presentation/runtime switches, plus one
 // combat rule the owner asked to keep explicit:
-//   briefingSpecialEnemies  the strategy draft also shows 本局特训敌人 — **on by default** (the owner, 2026-10-16);
-//                           a room that wants the old behaviour stores an explicit `false`
 //   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
 //   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 5,
 //                           off by default: the official rule stays the default)
-export const EXPERIMENTAL_OPTIONAL = Object.freeze(['briefingSpecialEnemies', 'luckConsole', 'bossHitSoftCap']);
-export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ briefingSpecialEnemies: true, luckConsole: false, bossHitSoftCap: false });
-const OPTIONAL_TAGS = Object.freeze({ briefingSpecialEnemies: 'brief', luckConsole: 'luck', bossHitSoftCap: 'cap' });
+// The strategy draft's 本局信息 dialog and the briefing share the official enemy column (ui/matchEnemies.js, GitHub #484),
+// so there is no room switch for it any more.
+export const EXPERIMENTAL_OPTIONAL = Object.freeze(['luckConsole', 'bossHitSoftCap']);
+export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ luckConsole: false, bossHitSoftCap: false });
+const OPTIONAL_TAGS = Object.freeze({ luckConsole: 'luck', bossHitSoftCap: 'cap' });
 
 /** The switch's value as the game reads it: the stored boolean, or the option's own default when absent. */
 export function optionalValue(value, key) {
@@ -43,7 +43,7 @@ export function isExperimental(value) {
   });
 }
 
-/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, briefingSpecialEnemies?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean }} [value] */
+/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean }} [value] */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
@@ -51,8 +51,7 @@ export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
     ...(capacity > MAX_SEATS && value.disableDuckLord === true ? { disableDuckLord: true } : {}),
-    // Only switches that differ from their own default ride the wire: an ordinary room keeps its two-flag shape,
-    // and 策略阶段看特训敌人 (default on) is carried as an explicit `false` when a room turns it off.
+    // Only switches that differ from their own default ride the wire: an ordinary room keeps its two-flag shape.
     ...EXPERIMENTAL_OPTIONAL.reduce((out, key) => {
       const next = optionalValue(value, key);
       if (next !== EXPERIMENTAL_OPTIONAL_DEFAULTS[key]) out[key] = next;

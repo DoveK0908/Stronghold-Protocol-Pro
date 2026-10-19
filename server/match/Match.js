@@ -169,6 +169,7 @@
 //   opts.combatSpeed   game seconds per real second while battles run in real time (default 2, the forced 2×)
 //   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 3, 0 = heuristic only;
 //                      a whole battle per candidate: ~20–300 ms of CPU each, see server/match/bot.js createRehearsal)
+//   opts.botStrategy  a registered ID or trusted server-side strategy object; defaults to SP_BOT_STRATEGY / 'legacy'
 //   opts.botSliceMs    wall-clock ms of rehearsal per scheduler callback (default 8 with a real scheduler, unbounded
 //                      with a virtual one); the rest runs in later callbacks (scheduleBotPrep)
 //   opts.botRehearsalDelegate  offer each bot prep's layout rehearsal to the current host's browser instead (DESIGN §14;
@@ -257,6 +258,7 @@ import { SharedPool, createItemPools, createPoolGroups, drawDisabledBonds } from
 import { PlayerState } from './PlayerState.js';
 import { EffectDispatcher, getDefaultRegistry } from './effectsMeta.js';
 import { setupMatchWaves } from './waves.js';
+import { getBotStrategy } from './botStrategies.js';
 import { GAME_SPEED, HEADLESS_SLICE_MS, parseSnapshotHz } from './fields.js';
 import { MatchPlatform } from './match/platform.js';
 import { MatchInfra } from './match/infra.js';
@@ -282,6 +284,7 @@ import { AFK_REMOVE_ROUNDS } from './match/common.js';
 import { installTestTrace } from './testTrace.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
+import { ExternalAI } from './externalAI.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS, REVIVAL_UNAVAILABLE_REASONS, AFK_REMOVE_ROUNDS, OFFLINE_TAKEOVER_ROUNDS } from './match/common.js';
 
@@ -373,6 +376,7 @@ export class Match {
     this.localReplica = opts.localReplica != null ? !!opts.localReplica : String(env('SP_LOCAL_REPLICA') ?? '').trim() !== '0';
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
     this.botRehearsal = Number.isInteger(opts.botRehearsal) && opts.botRehearsal >= 0 ? Math.min(opts.botRehearsal, 8) : BOT_REHEARSAL_DEFAULT;
+    this.bot = getBotStrategy(opts.botStrategy ?? env('SP_BOT_STRATEGY'));
     /** wall-clock budget of one rehearsal slice (scheduleBotPrep) */
     this.botSliceMs = Number.isFinite(opts.botSliceMs) && opts.botSliceMs > 0 ? opts.botSliceMs : this.sched.virtual ? Infinity : BOT_SLICE_MS;
     /**
@@ -630,6 +634,7 @@ export class Match {
     // [ASSUMED] A real scheduler keeps the 8 ms bot and headless slices, including a test match,
     // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
     // above). The input journal records the steps that callback took; replay stops there.
+    this.externalAI = this.bot.id === 'external' ? new ExternalAI(this, opts.externalAI, opts.externalReplay === true) : null;
     if (this.test && opts.journal !== false) installTestTrace(this, opts);
   }
 }

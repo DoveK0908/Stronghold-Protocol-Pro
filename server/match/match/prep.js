@@ -5,10 +5,9 @@
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { PHASE } from '../../../shared/constants.js';
-import { canUseWorkerRehearsal, rehearsalFingerprint } from '../combat/rehearsal.js';
-import { botPrepBeginSteps, botPrepEndSteps } from '../bot.js';
 import { testSlice } from '../testTrace.js';
 import { DELAYS } from './common.js';
+import { canUseWorkerRehearsal, rehearsalFingerprint } from '../combat/rehearsal.js';
 
 export class MatchPrep {
   enterPrep() {
@@ -111,6 +110,7 @@ const sliceCtl = testSlice(this);
       try {
         do {
           r = gen.next();
+          if (!r || typeof r.done !== 'boolean') throw new TypeError('Bot prep hooks must return a synchronous iterator');
           if (sliceCtl) sliceCtl.note(1);
         } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
       } catch (e) { failure = e; }
@@ -133,12 +133,34 @@ const sliceCtl = testSlice(this);
     };
     const end = (job) => {
       let gen = null;
-      try { gen = botPrepEndSteps(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
+      try { gen = this.bot.prepEnd(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
       if (!gen) { ready(); return; }
       drive(gen, '', ready);
     };
-    defer(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
-      drive(botPrepBeginSteps(this, ps, { delegate: this.botRehearsalDelegate }), '', (job) => {
+    /** The layout the finished job chose is applied in a callback of its own (bounded slices end one stage per call). */
+    const finish = (job) => {
+      if (bounded) this.later(0, () => { if (valid()) end(job); });
+      else end(job);
+    };
+    /** The rehearsal's slices, once the job simulates locally (nobody answered, or the server took it over). */
+    const runJob = (job) => {
+      const slice = () => {
+        if (!valid()) return;
+        let done = true;
+        try { done = job.run(this.botSliceMs, sliceCtl); } catch (e) { this.reportError(`bot ${ps.playerId} rehearsal`, e); }
+        if (done) finish(job);
+        else this.later(0, slice);
+      };
+      // bounded slices start in a callback of their own (the economy + default layout above already used this one)
+      if (bounded) this.later(0, slice);
+      else slice();
+    };
+    const begin = () => {
+      if (!valid()) return;
+      let gen;
+      try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate }); }
+      catch (e) { this.reportError(`bot ${ps.playerId}`, e); end(null); return; }
+      drive(gen, '', (job) => {
         if (!job) { end(null); return; }
         work.job = job;
         const complete = () => { if (bounded || job.remote) defer(0, () => end(job)); else end(job); };
@@ -206,6 +228,12 @@ const sliceCtl = testSlice(this);
         }
         if (bounded || job.remote) defer(0, slice); else slice();
       });
+    };
+    this.later(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
+      if (!valid()) return;
+      if (this.bot.decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
+        fallback: () => this.later(0, begin) })) return;
+      begin();
     });
   }
 

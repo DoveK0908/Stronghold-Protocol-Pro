@@ -13,14 +13,14 @@
 // bonds are off (gameLogic diyBannedPieces; 0.2.0). The blocks are hookless (unit-tested by calling them): the 核心盟约 /
 // 附加盟约 rows of bond discs —
 // greyed with the ✕, the red banned-member badge, the briefingBondTip tooltip — the legend and the 本局禁用干员 grid.
-// MatchInfoDialog shows the same blocks read-only in a components.js Modal (关闭, a tap outside or Esc close it) with a
-// status line from its caller (the draft's turn and countdown, so the running clock stays in view).
+// MatchInfoDialog shows the same blocks and the caller's enemy information read-only in a components.js Modal
+// (关闭, a tap outside or Esc close it) with a status line (the draft's turn and countdown stays in view).
 // Styles: css/screens/briefing.css (.brief-*), css/screens/draft.css (.minfo-dlg).
 
 import { html, Button, Icon, MicroLabel, BondDisc, Tooltip, Modal } from './components.js';
-import { UnitThumb, Img } from './gameComponents.js';
+import { UnitThumb } from './gameComponents.js';
 import { bannedMembersByBond, disabledBondSets, briefingBondTip, diyBannedPieces, factionTypes } from './gameLogic.js';
-import { bondIconUrl, factionIconUrl } from './assetUrls.js';
+import { bondIconUrl } from './assetUrls.js';
 import { data } from '../data.js';
 import { t, dn } from '../../../shared/i18n.js';
 
@@ -89,7 +89,7 @@ function BondBannedAside(bond, model, banned) {
       const c = data.lookup('chess', id);
       const bonds = (Array.isArray(c?.bonds) ? c.bonds : []).filter((b) => nameOf.has(b));
       return html`<div key=${id} class="brief-bantip__op" data-chess=${id}>
-        <${UnitThumb} kind="chess" id=${id} size="xs" showTier=${false} />
+        <${UnitThumb} kind="chess" ownerId=${null} id=${id} size="xs" showTier=${false} />
         <div class="brief-bantip__txt"><b>${c?.name || id}</b>
           <span>${bonds.map((b, i) => html`${i ? ' · ' : ''}<span class=${cx(b === bond.bondId && 'is-this')}>${nameOf.get(b)}</span>`)}</span></div>
       </div>`;
@@ -149,44 +149,10 @@ export function BannedOperators({ model }) {
     .filter((g) => g.ids.length);
   return html`<div class="brief-banned">
     <h3 class="brief-h"><span>${t('本局禁用干员')}</span><${MicroLabel}>BANNED OPERATORS</${MicroLabel}><b class="num brief-banned__n">${banned.length}</b></h3>
-    ${banned.length ? html`<div class="brief-banned__groups">
-      ${groups.map((g) => {
-        const state = model.stateOf(g.bond.bondId);
-        const off = !!state;
-        return html`<div key=${g.bond.bondId} class="brief-banned__group" data-bond=${g.bond.bondId}>
-          <div class="brief-banned__ghead">
-            <${Tooltip} text=${briefingBondTip(g.bond.name, state, g.ids.length)}>
-              <${BondDisc} name=${g.bond.name} icon=${bondIconUrl(m, g.bond.bondId)} active=${!off} disabled=${off}
-                tier=${off ? 0 : (g.bond.thresholds?.length || 1)} maxTier=${Math.max(1, g.bond.thresholds?.length || 1)} size="sm" />
-            <//>
-            <span class="brief-banned__gname">${g.bond.name}</span>
-            <b class="num brief-banned__gcount">${g.ids.length}</b>
-          </div>
-          <div class="brief-banned__grid">
-            ${g.ids.map((id) => html`<${UnitThumb} key=${id} kind="chess" id=${id} size="sm" class="is-banned" />`)}
-          </div>
-        </div>`;
-      })}
+    ${banned.length ? html`<div class="brief-banned__grid">
+      ${banned.map((id) => html`<${UnitThumb} key=${id} kind="chess" ownerId=${null} id=${id} size="sm" dim=${true} />`)}
     </div>` : html`<p class="t-dim">${t('本局没有禁用干员')}</p>`}
     <${DiyBannedLine} model=${model} />
-  </div>`;
-}
-
-/**
- * 本局特训敌人 (the mode's enemy types, config.modes[].factions): the round icons of the briefing, shared with the strategy
- * draft's 本局信息 dialog (experimental flag `briefingSpecialEnemies`, **on unless the room switched it off** — the owner's
- * default of 2026-10-16). The description rides in the tooltip; the empty state says the match has none.
- * @param {{ types: string[], factions: Record<string, any>, assets: any }} props types: factionTypes(pub.factions);
- *   factions: gd.factions.types; assets: gd.m (the manifest the icons resolve against)
- */
-export function SpecialEnemies({ types, factions, assets }) {
-  return html`<div class="brief-factions">
-    ${types.length ? types.map((ty) => html`<${Tooltip} key=${ty} text=${factions[ty]?.desc || null}>
-      <div class="brief-faction" tabindex="0">
-        <span class="brief-faction__icon"><${Img} src=${factionIconUrl(assets, factions[ty]?.icon)} /></span>
-        <b class="brief-faction__name">${factions[ty]?.name || ty}</b>
-      </div>
-    <//>`) : html`<p class="t-dim">${t('本局没有特训敌人')}</p>`}
   </div>`;
 }
 
@@ -203,26 +169,16 @@ export function MatchInfo({ model }) {
 
 /**
  * The read-only match-info dialog (the strategy draft's 本局信息): MatchInfo in a Modal that 关闭, a tap outside or Esc
- * closes. `status` (the caller's line, e.g. the draft's turn and countdown) sits left of 关闭. 本局特训敌人 goes on top
- * (read from `pub`), **on unless the room set `briefingSpecialEnemies: false`** (the owner's default of 2026-10-16), and the
- * match's boss is named beside the heading. A room that switched it off sees exactly the old dialog.
- * @param {{ open: boolean, onClose: Function, model: MatchInfoModel|null, status?: any, pub?: any }} props
+ * closes. `enemies` is the shared briefing enemy block; `status` (e.g. the draft's turn and countdown) sits left of 关闭.
+ * @param {{ open: boolean, onClose: Function, model: MatchInfoModel|null, enemies?: any, status?: any }} props
  */
-export function MatchInfoDialog({ open, onClose, model, status = null, pub = null }) {
-  // 策略阶段看特训敌人 is on unless the room turned it off (`briefingSpecialEnemies: false`).
-  const special = pub?.experimental?.briefingSpecialEnemies === false ? [] : factionTypes(pub?.factions);
-  const factions = data.get('factions')?.types || {};
-  // The boss of this match, named next to the tiles (the briefing names it in its own 本局遭遇敌方 block). Plain lookups,
-  // not the game-data hook: the block stays hookless and unit-testable, like the rest of this file.
-  const bossRec = pub?.bossId ? data.lookup('bosses', pub.bossId) : null;
-  const bossName = bossRec?.name || (bossRec?.enemyKey ? data.lookup('enemies', bossRec.enemyKey)?.name : null) || null;
-  return html`<${Modal} open=${open && !!model} onClose=${onClose} title=${t('本局信息')} micro="MATCH INFO // BONDS & BANNED OPERATORS" class="minfo-dlg"
+export function MatchInfoDialog({ open, onClose, model, enemies = null, status = null }) {
+  return html`<${Modal} open=${open && !!model} onClose=${onClose} title=${t('本局信息')} micro="MATCH INFO" class="minfo-dlg"
     actions=${html`${status ? html`<div class="minfo-dlg__status" data-testid="match-info-status">${status}</div>` : null}
       <${Button} variant="secondary" icon="close" data-autofocus data-testid="match-info-close" onClick=${onClose}>${t('关闭')}<//>`}>
-    ${open && model ? html`${special.length ? html`<section class="brief-sec brief-sec--special">
-      <h3 class="brief-h"><span>${t('本局特训敌人')}</span><${MicroLabel}>SPECIAL ENEMIES</${MicroLabel}>${bossName ? html`<span class="brief-h__boss" data-testid="match-info-boss">${t('敌方领袖')} ${bossName}</span>` : null}</h3>
-      <${SpecialEnemies} types=${special} factions=${factions} assets=${data.get('assets')} />
-    </section>` : null}
-      <${MatchInfo} model=${model} />` : null}
+    ${open && model ? html`<div class=${cx('minfo-dlg__content', enemies && 'has-enemies')}>
+      ${enemies ? html`<section class="minfo-dlg__enemies">${enemies}</section>` : null}
+      <section class="minfo-dlg__bonds"><${MatchInfo} model=${model} /></section>
+    </div>` : null}
   <//>`;
 }

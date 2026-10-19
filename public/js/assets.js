@@ -116,18 +116,6 @@ export function illustUrl(m, id, opts) {
   return rec ? str(rec.illust) || null : null;
 }
 
-/** The manifest's shared empty skins map (one object, so callers can compare identity). */
-export const EMPTY_SKINS = Object.freeze({});
-
-/** The appearances of an operator the manifest holds (docs/SKINS.md, the picker's source), or EMPTY_SKINS. */
-export function skinsOf(m, charId) {
-  const rec = get(get(m, 'chars'), str(charId) || '');
-  return rec && isObj(rec.skins) ? rec.skins : EMPTY_SKINS;
-}
-
-/** Whether a skin record can be worn: it has a Spine model the client resolves (docs/SKINS.md). */
-export const skinHasModel = (skin) => !!skin && isObj(skin.spine) && typeof skin.spine.front === 'object' && skin.spine.front !== null && typeof skin.spine.front.skel === 'string';
-
 export function enemyIconUrl(m, enemyId) {
   const rec = get(get(m, 'enemies'), str(enemyId) || '');
   return str(rec && rec.icon);
@@ -148,6 +136,23 @@ export function itemIconUrl(m, item) {
   const id = isObj(item) ? (str(item.iconId) || str(item.trapId)) : str(item);
   return id ? str(get(get(m, 'items'), id)) : null;
 }
+
+/** The manifest's shared empty skins map (one object, so callers can compare identity). */
+export const EMPTY_SKINS = Object.freeze({});
+
+/**
+ * The appearances of an operator the manifest holds (docs/SKINS.md, the picker's source): `chars[charId].skins`,
+ * written by a cosmetic plugin's overlay — `{ [skinId]: { name, group, avatar, …, spine: { front, back? } } }` — or an
+ * empty object. A skin may carry a Spine model or pictures only; missing layers use the operator defaults.
+ * @returns {Record<string, any>}
+ */
+export function skinsOf(m, charId) {
+  const rec = get(get(m, 'chars'), str(charId) || '');
+  return rec && isObj(rec.skins) ? rec.skins : EMPTY_SKINS;
+}
+
+/** Whether a skin record names a Spine model (picture-only outfits are wearable too) (docs/SKINS.md). */
+export const skinHasModel = (skin) => !!skin && isObj(skin.spine) && typeof skin.spine.front === 'object' && skin.spine.front !== null && typeof skin.spine.front.skel === 'string';
 
 /** Skill icon by iconId, or by skillId via `skillsById`. Falls back to the empty skill icon. */
 export function skillIconUrl(m, id, opts) {
@@ -196,8 +201,9 @@ export function spineEntry(m, id, opts) {
   if (!s) return null;
   const appearance = appearanceEntry(m, baseCharId(s), opts?.skin);
   if (appearance?.spine) {
+    // B6 / §35.4: an unfinished spine map with no Front is a picture-only skin: the complete default body stays
     const sp = opts?.back && validSpine(appearance.spine.back) ? appearance.spine.back : appearance.spine.front;
-    if (validSpine(sp)) {
+    if (validSpine(appearance.spine.front) && validSpine(sp)) {
       const fallback = spineEntry(m, s, { ...opts, skin: null });
       const cached = appearanceSpines.get(sp);
       if (cached?.fallback === fallback) return cached.entry;
@@ -207,9 +213,21 @@ export function spineEntry(m, id, opts) {
     }
   }
   const ch = get(get(m, 'chars'), s) || get(get(m, 'chars'), baseCharId(s));
-  if (ch && isObj(ch.spine)) {
-    const sp = (opts && opts.back && isObj(ch.spine.back)) ? ch.spine.back : ch.spine.front;
-    return validSpine(sp) ? sp : null;
+  if (ch) {
+    const wanted = opts && str(opts.skin) ? String(opts.skin) : null;
+    if (wanted) {
+      const skin = get(get(ch, 'skins'), wanted);
+      // B6 / §35.4 [ASSUMED]: an unfinished spine map with no Front uses the complete default body.
+      if (skinHasModel(skin)) {
+        const sp = (opts && opts.back && isObj(skin.spine.back)) ? skin.spine.back : skin.spine.front;
+        if (validSpine(sp)) return sp;
+      }
+    }
+    // no such skin (or no skin asked for): the operator's own model
+    if (isObj(ch.spine)) {
+      const sp = (opts && opts.back && isObj(ch.spine.back)) ? ch.spine.back : ch.spine.front;
+      return validSpine(sp) ? sp : null;
+    }
   }
   const tk = get(get(m, 'tokens'), s);
   if (tk) {
@@ -257,10 +275,11 @@ export function localSpineEntry(sl, local, web) {
 /** Whether an operator/token/enemy has a Back model; `opts` may name a skin (`{ skin }`) or be the skin id itself. */
 export function hasBackSpine(m, id, opts) {
   const skinId = typeof opts === 'string' ? opts : opts?.skin;
-  const skin = appearanceEntry(m, baseCharId(id), skinId);
-  if (validSpine(skin?.spine?.front)) return validSpine(skin.spine.back);
   const ch = get(get(m, 'chars'), str(id) || '') || get(get(m, 'chars'), baseCharId(id) || '');
-  return !!(ch && isObj(ch.spine) && validSpine(ch.spine.back));
+  if (!ch) return false;
+  const skin = str(skinId) ? get(get(ch, 'skins'), String(skinId)) : null;
+  const src = skinHasModel(skin) ? skin.spine : ch.spine;
+  return !!(isObj(src) && validSpine(src.back));
 }
 
 export function validSpine(sp) {

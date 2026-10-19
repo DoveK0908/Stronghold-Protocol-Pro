@@ -8,7 +8,6 @@ import { PHASE, ERR } from '../../../shared/constants.js';
 import { buildNormalWave, buildBossWave } from '../waves.js';
 import { pairPlayers } from '../finalAssault.js';
 import { createRng, deriveSeed } from '../../sim/rng.js';
-import { botPickBand } from '../bot.js';
 import { OK, fail, DELAYS, BAND_TURN_SECONDS } from './common.js';
 
 export class MatchPhases {
@@ -192,14 +191,20 @@ export class MatchPhases {
       if (this.phase !== PHASE.BAND_DRAFT || token !== this._turnToken || this.draft !== d) return;
       const ps = d.concurrent ? target : this.players.get(this.draftTurn());
       if (!ps || !ps.botControlled || d.picks[ps.playerId]) return;
-      // an AI seat the host designated a strategy for (room.setBotBand) takes it — held for it, so still free
-      const own = this.designatedBand(ps);
-      if (own) { this._applyBand(ps, own, { dedupe: true }); return; }
-      // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one
-      let id = botPickBand(this, ps);
-      for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = botPickBand(this, ps);
-      if (this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
-      this._applyBand(ps, id, { dedupe: true });
+      const fallback = () => {
+        // an AI seat the host designated a strategy for (room.setBotBand) takes it — held for it, so still free
+        const own = this.designatedBand(ps);
+        if (own) { this._applyBand(ps, own, { dedupe: true }); return; }
+        // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one
+        let id = this.bot.pickBand(this, ps);
+        for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = this.bot.pickBand(this, ps);
+        if (this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
+        this._applyBand(ps, id, { dedupe: true });
+      };
+      if (this.bot.decide?.(this, ps, { kind: 'band',
+        valid: () => this.phase === PHASE.BAND_DRAFT && token === this._turnToken,
+        complete: () => token !== this._turnToken || !!this.draft?.picks[ps.playerId], fallback })) return;
+      fallback();
     });
   }
 

@@ -28,8 +28,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Modal, Button, Icon, MicroLabel, confirmDialog } from './components.js';
 import { GIcon } from './gameComponents.js';
-import { createStore, useStore, loadPref, savePref, store } from '../store.js';
-import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, TEXT_SIZES, UI_SCALES, uiScaleStep } from './gameLogic.js';
+import { useStore, savePref, store } from '../store.js';
+import { settingsStore } from './settingsStore.js';
+export { settingsStore } from './settingsStore.js';
+import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, VOICE_LANGS, TEXT_SIZES, UI_SCALES, uiScaleStep } from './gameLogic.js';
 import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
 import { detectFeatures, useMedia } from './device.js';
@@ -56,9 +58,6 @@ import { askPersistStorage, importSupport, storagePersisted } from '../assetCach
 import { assetImport, pruneImportedAssets } from '../assetPack.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
-
-/** Settings store: { bgm, sfx, voice, voiceLang, voiceNative, voiceOverrides, muted, damageNumbers, officialDamageNumbers, ammoEnergyCount, combatMetrics, prepDeployFold, quality, officialFx, otherSkins, textSize, uiScale, keys, bgmPrep, bgmCombat }. */
-export const settingsStore = createStore(sanitizeSettings({ ...loadPref('settings', null), voiceLang: voiceLanguageStore.get().language }));
 
 /**
  * 设置 →「文字大小」: put the step on <html data-text> — css/theme.css turns it into the text root `--t`
@@ -511,6 +510,8 @@ export function SettingsModal({ open, onClose }) {
       <p class="set-hint">${t('只显示达到官方暴击条件的红色数字。关闭时仍显示每一次命中。')}</p>
       <${Toggle} label=${t('显示弹药与能量数量')} micro="AMMO & ENERGY" value=${s.ammoEnergyCount} onChange=${(v) => updateSettings({ ammoEnergyCount: v })} />
       <p class="set-hint">${t('弹药类技能开启时，在弹药条下方显示剩余弹药 / 总弹药数（如 13/14）；秘术师的血条下方显示储存的攻击能量 / 上限（如 2/3）。官方界面没有这些数字。')}</p>
+      <${Toggle} label=${t('盟约效果剩余时间')} micro="BOND TIMERS" value=${s.bondTimers} onChange=${(v) => updateSettings({ bondTimers: v })} />
+      <p class="set-hint">${t('在选中单位的详情中显示叙拉古、萨尔贡效果的剩余时间；萨尔贡显示层数与下一层到期时间。官方界面没有这些数字。')}</p>
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

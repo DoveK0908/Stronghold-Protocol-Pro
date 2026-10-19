@@ -79,7 +79,7 @@ export const MATCH_FIELDS = Object.freeze({
     'opts', 'roomCode', 'mode', 'difficulty', 'modeId', 'seed', 'log', 'sendFn', 'broadcastFn', 'onEndFn', 'data', 'cs', 'vs',
     'requireCs', 'gd', 'isSolo', 'aiPicksLast', 'afkRemoveRounds', 'ownsScheduler', 'sched', 'registry', 'dispatcher',
     'BattleClass', 'battleContent', 'timerScale', 'gameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
-    'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
+    'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'bot', 'externalAI', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
     'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
     'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
     'playerPools', 'itemPool', 'ended', 'disposed',

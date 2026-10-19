@@ -726,7 +726,7 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official' },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official' },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voice, DEFAULT_SETTINGS.voice, 'a saved profile without `voice` gets the default');
     // 语音语言: 中文 by default. en / kr are dubs (0.3.0); anything else, including the per-operator 'native', stays 中文.
@@ -734,6 +734,16 @@ describe('keyboard & settings', () => {
     assert.equal(DEFAULT_SETTINGS.voiceNative, false);
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voiceLang, 'cn');
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voiceNative, false, 'a profile saved before the switch stays off');
+    // 盟约效果剩余时间 (#746, official): off by default, only an explicit true turns it on
+    assert.equal(DEFAULT_SETTINGS.bondTimers, false);
+    assert.equal(sanitizeSettings({ bgm: 0.5 }).bondTimers, false);
+    assert.equal(sanitizeSettings({ bondTimers: true }).bondTimers, true);
+    assert.equal(sanitizeSettings({ bondTimers: 'yes' }).bondTimers, false);
+    // 显示其他玩家的皮肤 (docs/SKINS.md): on by default, and off only when the profile says so
+    assert.equal(DEFAULT_SETTINGS.otherSkins, true);
+    assert.equal(sanitizeSettings({ bgm: 0.5 }).otherSkins, true);
+    assert.equal(sanitizeSettings({ otherSkins: false }).otherSkins, false);
+    assert.equal(sanitizeSettings({ otherSkins: 'no' }).otherSkins, true);
     assert.equal(DEFAULT_SETTINGS.combatMetrics, false);
     assert.equal(sanitizeSettings({ bgm: 0.5 }).combatMetrics, false, 'a profile saved before 作战统计 stays off');
     assert.equal(sanitizeSettings({ combatMetrics: true }).combatMetrics, true);

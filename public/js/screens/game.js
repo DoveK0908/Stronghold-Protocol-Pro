@@ -84,6 +84,7 @@ import { BondStrip, BondPopup } from '../ui/bondStrip.js';
 import { TeamPanel, useRoster } from '../ui/teamPanel.js';
 import { Danmaku } from '../ui/danmaku.js';
 import { ShopBar } from '../ui/shopBar.js';
+import { selectedBondTimers } from '../ui/bondTimers.js';
 import { DetailPanel, resolveDetail } from '../ui/detailPanel.js';
 import { RewardOverlay } from '../ui/rewardOverlay.js';
 import { FinalAssaultPlate, HiddenCorePlate, EndPlate, preloadBossPlateArt, bossPlateArtReady, finalPlateRows, endPlateOf } from '../ui/bossPlates.js';
@@ -449,13 +450,14 @@ function MatchScreen() {
   const lastFieldRef = useRef(null);
   const viewModeRef = useRef(null);
   const snapUnitsRef = useRef(new Map());
-  // the shown battle's opening stats (user playtest #4 item 7: a server field's card reads these, never a later snapshot)
-  // and the piece uid → unit id map the compact frames lack (filled from the meta's infos and the 'spawn' events)
-  const snapStatsRef = useRef(snapshotStats(null));
-  const pieceUnitsRef = useRef(new Map());
+  const bondTimerSnapRef = useRef(null);
   // the shown battle's device units (crates / “双眼皮” turrets: UnitInfo by id) — the meta's `units` plus the 'spawn' events,
   // for the tap on a device (gameLogic.deviceTipAt); the renderer's pick skips devices, a tap on one lands in tileClick
   const deviceUnitsRef = useRef(new Map());
+  // the 战斗统计 panel's snapshot of the shown field (game/early.js snapshotStats) and the piece→unit index it reads
+  // (notePieceUnits; a piece is on a field for a few ticks after its 'spawn' — the panel's rows stay between frames)
+  const snapStatsRef = useRef(snapshotStats(null));
+  const pieceUnitsRef = useRef(new Map());
   const hudRef = useRef(null);
   // b.ev / b.snap that arrive before the UI entered their field (the battle's first ticks race the m.public /
   // m.field re-render): kept per fieldId and replayed on enter so no unit's 'spawn' UnitInfo is ever lost.
@@ -583,6 +585,7 @@ function MatchScreen() {
     viewModeRef.current = 'battle';
     snapUnitsRef.current = new Map();
     snapStatsRef.current = snapshotStats(field);
+    bondTimerSnapRef.current = null;
     const early = evBufRef.current.get(field.fieldId);
     evBufRef.current.delete(field.fieldId);
     pieceUnitsRef.current = notePieceUnits(new Map(), { infos: field.units, events: early });
@@ -635,6 +638,7 @@ function MatchScreen() {
       });
     }
     if (earlySnap) {
+      bondTimerSnapRef.current = earlySnap;
       view.pushSnapshot(earlySnap);
       if (Array.isArray(earlySnap.units)) {
         snapUnitsRef.current = new Map(earlySnap.units.filter(Array.isArray).map((t) => [t[0], t]));
@@ -670,6 +674,7 @@ function MatchScreen() {
         reentryRef.current = msg.fieldId;
         snapStatsRef.current = snapshotStats(null);
         pieceUnitsRef.current = new Map();
+        bondTimerSnapRef.current = null;
       }
     };
     // the field the view shows now (null while a re-entry of it is pending: its frames are buffered)
@@ -681,6 +686,7 @@ function MatchScreen() {
         if (typeof snap.fieldId === 'string') snapBufRef.current.set(snap.fieldId, snap);
         return;
       }
+      bondTimerSnapRef.current = snap;
       view?.pushSnapshot(snap);
       if (Array.isArray(snap.units)) {
         const mp = new Map();
@@ -1462,6 +1468,13 @@ function MatchScreen() {
     };
   })();
 
+  // One snapshot path for local/Worker/server fields, spectators and reconnects; no wall-clock countdown.
+  const bondTimers = playerSettings.bondTimers && !showPrep && !field?.prep && field?.fieldId ? () => {
+    const id = resolved?.unitId ?? (Number.isInteger(resolved?.piece?.uid)
+      ? field.units?.find(u => u.uid === resolved.piece.uid && u.ownerId === myId)?.id : null);
+    return selectedBondTimers(bondTimerSnapRef.current, field.fieldId, id);
+  } : null;
+
   // ---- keyboard ---------------------------------------------------------------------------------------------
   useEffect(() => {
     // Remember only pointer coordinates. Hit-test again on keydown so moved/removed pieces, overlays,
@@ -1805,13 +1818,13 @@ function MatchScreen() {
         bandId=${scoutBandId} bandOwner=${scoutBandOwner}
         onEnemy=${(k, n) => setDetail({ kind: 'enemy', id: k, count: n })} onChess=${(id) => setDetail({ kind: 'chess', id, foreign: true })} />` : null}
 
-      ${bondPop ? html`<${BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name}
+      ${bondPop ? html`<${BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} ownerId=${bondPop.ownerId}
         off=${offBonds.has(bondPop.bondId)} morphMode=${morphMode}
         place=${bpPlace} over=${!!resolved && bpPlace === dSide}
         onClose=${() => setBondOpen(null)} onMember=${(id, items, standInFor, diy, skin) => setDetail({ kind: 'chess', id, owner: bondPop.ownerId, items: items || null, standInFor: standInFor || null, diy: diy || null, ...(skin ? { skin } : null) })} />` : null}
 
       ${resolved ? html`<${DetailPanel} detail=${resolved} snapHp=${snapHp} onClose=${() => { setDetail(null); setSel(null); }}
-        bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} voice=${true}
+        bonds=${detailBonds} offBonds=${offBonds} loadout=${detailLoadout} ops=${priv?.ops ?? null} side=${dSide} shopOpen=${shopOpen} live=${liveStats} bondTimers=${bondTimers} voice=${true}
         morphMode=${morphMode} unequipAllowed=${unequipAllow}
         onUnequip=${editable && unequipAllow ? (itemUid) => actions.unequip(itemUid) : null}
         onBond=${(id) => openBond(id, detailOwner, 'detail')} />` : null}

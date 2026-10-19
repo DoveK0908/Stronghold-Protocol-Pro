@@ -52,7 +52,8 @@ export function uiScaleStep(uiScale, phone) {
  *  (the maintainer's decisions of 2026-10-13 and 2026-10-15). A profile that still has either old key `true` migrates
  *  to on; those keys are not written back. [ASSUMED] a stored boolean `ammoEnergyCount` wins over the old keys, so
  *  turning the merged switch off stays off.
- *  combatMetrics: 设置「作战统计」 (PR #618), off by default: the official HUD has no such panel.
+ *  bondTimers: selected-unit timed bond readouts (#746), off by default (a convenience HUD absent from the official
+ *  game; the detail card's BondTimers block). combatMetrics: 设置「作战统计」 (PR #618), off by default: the official HUD has no such panel.
  *  设置「部署时收起商店」 (`prepDeployFold`, GitHub #602 / PR #646) is deliberately NOT offered: this fork's owner decided on
  *  2026-10-16 that picking a piece up leaves the shop bar and the camera as they are (ui/screens/game.js, the header).
  *  officialFx: 设置「官方特效」 (0.3.0, render/vfx): 'full' (完整, this fork's default on every device — the owner's
@@ -63,7 +64,7 @@ export function uiScaleStep(uiScale, phone) {
  *  otherSkins: 设置「显示其他玩家的皮肤」 (docs/SKINS.md), ON by default — draw the appearance another player chose instead
  *  of that operator's own model. A pure client preference, never sent: turning it off draws every other seat's operator
  *  model as its owner would see it (the same piece may therefore look different on two screens). */
-export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
+export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
 const QUALITIES = ['high', 'medium', 'low'];
 /** The values of 设置「官方特效」 (render/vfx/tier.js OFFICIAL_FX). */
 export const OFFICIAL_FX_MODES = Object.freeze(['auto', 'off', 'lite', 'full']);
@@ -100,6 +101,7 @@ export function sanitizeSettings(raw) {
     damageNumbers: typeof r.damageNumbers === 'boolean' ? r.damageNumbers : DEFAULT_SETTINGS.damageNumbers,
     officialDamageNumbers: typeof r.officialDamageNumbers === 'boolean' ? r.officialDamageNumbers : false,
     ammoEnergyCount: ammoEnergyCountOf(r),
+    bondTimers: r.bondTimers === true,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
     officialFx: OFFICIAL_FX_MODES.includes(r.officialFx) ? r.officialFx : DEFAULT_SETTINGS.officialFx,
