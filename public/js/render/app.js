@@ -146,6 +146,7 @@ import { UnitView, ItemView, DeviceView, FORMS, syncView } from './units.js';
 import { FxSystem, ensureDamageFonts, projSpeed } from './fx.js';
 import { OfficialFx } from './vfx/system.js';
 import { FxWiring } from './vfx/wiring.js';
+import { PluginFxPlayer } from './vfx/pluginPlayer.js';
 import { resolveOfficialFx } from './vfx/tier.js';
 import { createDragController, pieceTile } from './drag.js';
 import { backdropTextures, shadowTexture, refreshTierChips, refreshDownLabels, silhouetteTexture } from './textures.js';
@@ -422,6 +423,10 @@ export async function createFieldView(host, options = {}) {
     view: (id) => views.get(id) || null,
   });
   ctx.ofx = ofx;
+  // a plugin's own official effects (its fx descriptors, docs/PLUGINS.md) drawn on the same official layer
+  const pluginFx = new PluginFxPlayer({ P, layer: layers.vfxOver, assets, cam: () => cam, enabled: () => settings.officialFx !== 'off',
+    record: (info) => (info ? ctx.lookupDef(info) : null), speed: projSpeed, ofx });
+  setupCleanup.push(() => pluginFx.destroy());
   let ofxPrevT = null;        // renderT of the last effects step (the battle clock)
   /** The tier the effects run at now: the setting (auto: 精简 on touch devices) while the 3D board draws. */
   function syncOfficialFx() {
@@ -1063,7 +1068,7 @@ export async function createFieldView(host, options = {}) {
     battleMeta = null;
     interp.reset();
     fx.clear();
-    ofx.clear(); wiring.clear(); ofxPrevT = null;
+    ofx.clear(); wiring.clear(); pluginFx.clear(); ofxPrevT = null;
     meleePending.clear();
     consumedIds.clear();
     tiles.setBattleRect(null);
@@ -1520,7 +1525,7 @@ export async function createFieldView(host, options = {}) {
     gone.clear();
     interp.reset();
     fx.clear();
-    ofx.clear(); wiring.clear(); ofxPrevT = null;
+    ofx.clear(); wiring.clear(); pluginFx.clear(); ofxPrevT = null;
     meleePending.clear();
     consumedIds.clear();
     clearHl();
@@ -1750,7 +1755,8 @@ export async function createFieldView(host, options = {}) {
         if (e[3] === 'none' || !e[3]) { if (tgt && src) meleePending.set(tgt.id, { src, t: now }); }
         // the unit's official attack (casts, projectile, melee hits — render/vfx/wiring.js) or a chain's bounce (the line of
         // the official shot that opened the chain: wiring.chain), else the procedural one
-        const drew = !!src && (CHAIN_KINDS.has(e[3]) ? wiring.chain(src, tgt, e[3], now) : wiring.attack(src, tgt, e[3], now, woundUp.has(e)));
+        const custom = !CHAIN_KINDS.has(e[3]) && pluginFx.attack(src, tgt, e[3]);
+        const drew = custom || !!src && (CHAIN_KINDS.has(e[3]) ? wiring.chain(src, tgt, e[3], now) : wiring.attack(src, tgt, e[3], now, woundUp.has(e)));
         if (!drew) fx.attack(src, tgt, e[3]);
         break;
       }
@@ -1762,7 +1768,7 @@ export async function createFieldView(host, options = {}) {
         let src = null;
         if (m && now - m.t < 0.35) { src = m.src; meleePending.delete(v.id); fx._slashAt = src.id; }
         // an official hit drawn for this damage replaces the procedural spark / slash (the numbers stay)
-        const official = wiring.damage(v, e[3], src, now);
+        const official = pluginFx.hit(src, v) || wiring.damage(v, e[3], src, now);
         fx.damage(v, amt, e[3], src, e[4], official ? NO_SPARK : undefined);
         break;
       }
@@ -1771,7 +1777,7 @@ export async function createFieldView(host, options = {}) {
       // activation burst and aura when the official layer shows the skill
       case 'skill': {
         const v = views.get(e[1]);
-        if (v) { v.setSkill?.(!!e[2]); if (!wiring.skill(v, !!e[2]) || !e[2]) fx.skill(v, !!e[2]); }
+        if (v) { const custom = pluginFx.skill(v, !!e[2]); v.setSkill?.(!!e[2]); if ((!wiring.skill(v, !!e[2]) && !custom) || !e[2]) fx.skill(v, !!e[2]); }
         break;
       }
       // the skill slot an enemy ability casts (PR #275): the view swaps to that slot's clip (a multi-skill boss's Skill_01..04)
@@ -1833,8 +1839,9 @@ export async function createFieldView(host, options = {}) {
           if (fv) officialForm = wiring.form(fv, form, x);
         }
         // a kit fx the official skill / talent effects stand for (render/vfx/skillfx.js, talentfx.js) is not drawn procedurally
+        const custom = !(late > 0) && pluginFx.simFx(e[1], Number(e[2]), Number(e[3]), e[4]);
         const official = !(late > 0) && wiring.simFx(e[1], Number(e[2]), Number(e[3]), e[4]);
-        if (!(late > 0) && !official && !officialForm) fx.simFx(e[1], Number(e[2]), Number(e[3]), e[4]);
+        if (!(late > 0) && !official && !officialForm && !custom) fx.simFx(e[1], Number(e[2]), Number(e[3]), e[4]);
         break;
       }
       case 'layer': {
