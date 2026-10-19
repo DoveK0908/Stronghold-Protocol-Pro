@@ -182,3 +182,35 @@
   flex: 1 1 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   padding-right: .04rem; scrollbar-width: thin;
 }
+
+/* ==========================================================================================
+   决策顺序行：把博士的名片铺在官方骨架后面（fork，2026-10-19）
+   - .dorder__nc：名片底图（room.state seats[].card.bg，NameCardLayer）
+   - .dorder__art：没设底图时用名片干员半身像，右侧渐隐
+   两者都是绝对定位的背景层，格子与文字列不动 —— 名字不会因为插图被挤掉
+   ========================================================================================== */
+.dorder { overflow: hidden; }
+.draft-order__rows > .dorder { flex: none; } /* rows keep their height; the strip scrolls instead of squashing them */
+.dorder__nc, .dorder__art { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+.dorder__nc { opacity: .5; }
+.dorder__art { width: 1.8rem; max-width: 58%; left: auto; background-size: cover; background-position: 50% 12%; opacity: .42;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 45%); mask: linear-gradient(90deg, transparent, #000 45%); }
+.dorder.has-nc { border-color: rgba(255, 255, 255, .2); }
+.dorder > *:not(.dorder__nc):not(.dorder__art) { position: relative; z-index: 1; }
+.dorder__face { position: relative; display: flex; }
+.dorder .dorder__face .pavatar { box-shadow: 0 0 0 .02rem rgba(230, 233, 233, .85); border: 0; }
+.dorder__me { position: absolute; left: -.08rem; top: -.08rem; width: .24rem; height: .24rem; display: grid; place-items: center;
+  background: var(--mint-500); color: #062019; }
+.dorder__me .icon { width: 74%; height: 74%; }
+.dorder__text { text-shadow: 0 1px 3px #000, 0 0 .12rem #000; }
+.dorder__name { align-items: center; }
+.dorder__name > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dorder__name .tbadge--inline { flex: none; }
+/* 选中：格子上闪一下，卡片里透出薄荷色，不改变任何尺寸 */
+.dorder.is-flash { animation: dorder-flash 900ms ease-out; }
+@keyframes dorder-flash {
+  0% { box-shadow: inset 0 0 0 1px var(--mint-400), 0 0 .18rem rgba(89, 244, 202, .35); }
+  100% { box-shadow: none; }
+}
+.dorder.is-flash .dorder__check { animation: dorder-pop 320ms var(--ease-out) 120ms backwards; }
+@keyframes dorder-pop { 0% { transform: scale(.4); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }

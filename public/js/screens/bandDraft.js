@@ -39,6 +39,11 @@ import { bootArtReady } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
 import { t, tParts, tName } from '../../../shared/i18n.js';
+import { NameCardLayer } from '../ui/namecards.js';
+import { TrophyBadge } from '../ui/trophies.js';
+import { cardOperators, seatPortrait } from '../ui/seatArt.js';
+import { useMyCard } from '../ui/playerCard.js';
+import { useRise } from '../ui/transitions.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -196,6 +201,34 @@ export function draftInfoStatus({ myPick = null, pickName = null, myTurn, turnNa
 }
 
 /** BAND_DRAFT screen. */
+/**
+ * One 决策顺序 row. The official row is a plain name; this one puts the doctor's 名片 behind it (底图 from
+ * room.state seats[].card, else their 名片干员 half-body) so the order reads like the room's seat cards. The name keeps
+ * its own column and ellipsises — the card art only fills the background, it never squeezes the text.
+ */
+function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, gd, turnSecs }) {
+  const flash = useRise(!!picked, 1100);
+  const pband = picked ? gd.band(picked) : null;
+  return html`<div key=${p.playerId} class=${cx('dorder', cur && 'is-cur', picked && 'is-done', self && 'is-self', flash && 'is-flash', nc && 'has-nc')} style=${solo ? null : `--i:${i}`}>
+    ${nc ? html`<span class="dorder__nc"><${NameCardLayer} card=${nc} /></span>` : null}
+    ${art && !nc ? html`<span class="dorder__art" style=${'background-image:url("' + art + '")'}></span>` : null}
+    ${!solo ? html`<span class="dorder__idx num">${i + 1}</span>` : null}
+    <span class="dorder__face"><${PlayerAvatar} player=${p} self=${self} />${self ? html`<span class="dorder__me" title=${t('我')}><${Icon} name="user" /></span>` : null}</span>
+    <div class="dorder__text">
+      <b class="dorder__name">${p.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<span>${p.name || t('博士')}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
+      <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || t('已选择')}</span>`
+        : cur ? html`<span class="t-gold"><${Icon} name="hourglass" />${t('决策中')}${turnSecs != null ? html`<b class="num dorder__secs">${turnSecs}s</b>` : null}</span>`
+        : html`<span class="t-dim"><${Icon} name="dots" />${t('等待中')}</span>`}</span>
+      ${!solo && p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} gd=${gd} class="dorder__plan" />` : null}
+    </div>
+    <span class="dorder__box">
+      ${picked ? html`<${BandIcon} bandId=${picked} size="sm" /><span class="dorder__check"><${Icon} name="check" /></span>`
+        : cur && self ? html`<${Sprite} k="bandChoose/youturn_finger" class="dorder__finger" fallback=${html`<${Icon} name="chevronLeft" />`} />`
+        : null}
+    </span>
+  </div>`;
+}
+
 export function BandDraftScreen() {
   const pub = useStore((s) => s.match.public);
   const priv = useStore((s) => s.match.private);
@@ -216,6 +249,18 @@ export function BandDraftScreen() {
   const disableDuckLord = !solo && pub?.playerCapacity > 4 && pub?.experimental?.disableDuckLord === true;
   const bands = useMemo(() => allowedBands(gd.list('bands'), mode?.type || (solo ? 'SINGLE' : 'MULTI'), disableDuckLord), [gd.ready, mode?.type, solo, disableDuckLord, data.locale()]);
   const players = sortedPlayers(pub);
+  // 名片 of the order rows: 底图/奖杯 from room.state seats[].card (mine from this browser), else the doctor's 名片干员
+  // art (their pick, else one chosen from the player id) — the same sources the room's seat cards use
+  const roomSeats = useStore((st) => st.room?.seats);
+  const myCard = useMyCard();
+  const cardList = useMemo(() => cardOperators(gd.list('chess')), [gd.ready]);
+  const portraits = useMemo(() => ({
+    pool: cardList.filter((c) => (c.rarity ?? 0) >= 5).sort((a, b) => (a.charId < b.charId ? -1 : 1)),
+    byChar: new Map(cardList.map((c) => [c.charId, c])), m: data.get('assets'), myId, myCard: myCard.charId, myLook: myCard.look,
+  }), [cardList, myId, myCard.charId, myCard.look]);
+  const seatOf = (pid) => (Array.isArray(roomSeats) ? roomSeats.find((x) => x && x.playerId === pid) : null) || null;
+  const cardOf = (pl) => (pl.playerId === myId ? myCard : seatOf(pl.playerId)?.card || null);
+  const artOf = (pl) => (pl.isBot ? null : seatPortrait(seatOf(pl.playerId) || { playerId: pl.playerId }, portraits));
   const draft = normalizeDraft(pub?.draft, players);
   // an expanded room's draft: every seat picks at once (server MatchPhases.concurrentDraft) — no turn, no skip
   const concurrent = !solo && draft.concurrent === true;
@@ -316,23 +361,8 @@ export function BandDraftScreen() {
         ${(solo ? players.filter((p) => p.playerId === myId) : draft.order.map((pid) => players.find((p) => p.playerId === pid)).filter(Boolean)).map((p, i) => {
           const picked = draft.picks.get(p.playerId) || (p.playerId === myId ? myPick : p.bandId) || null;
           const cur = !picked && (solo || concurrent || draft.turnPid === p.playerId);
-          const pband = picked ? gd.band(picked) : null;
-          return html`<div key=${p.playerId} class=${cx('dorder', cur && 'is-cur', picked && 'is-done', p.playerId === myId && 'is-self')}>
-            ${!solo ? html`<span class="dorder__idx num">${i + 1}</span>` : null}
-            <${PlayerAvatar} player=${p} self=${p.playerId === myId} />
-            <div class="dorder__text">
-              <b class="dorder__name">${p.name || t('博士')}${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
-              <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || t('已选择')}</span>`
-                : cur ? html`<span class="t-gold"><${Icon} name="hourglass" />${t('决策中')}${turnSecs != null ? html`<b class="num dorder__secs">${turnSecs}s</b>` : null}</span>`
-                : html`<span class="t-dim"><${Icon} name="dots" />${t('等待中')}</span>`}</span>
-              ${!solo && p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} gd=${gd} class="dorder__plan" />` : null}
-            </div>
-            <span class="dorder__box">
-              ${picked ? html`<${BandIcon} bandId=${picked} size="sm" /><span class="dorder__check"><${Icon} name="check" /></span>`
-                : cur && p.playerId === myId ? html`<${Sprite} k="bandChoose/youturn_finger" class="dorder__finger" fallback=${html`<${Icon} name="chevronLeft" />`} />`
-                : null}
-            </span>
-          </div>`;
+          return html`<${OrderRow} key=${p.playerId} p=${p} i=${i} picked=${picked} cur=${cur} self=${p.playerId === myId} solo=${solo}
+            nc=${(!p.isBot && cardOf(p)?.bg) || null} art=${artOf(p)} card=${cardOf(p)} gd=${gd} turnSecs=${turnSecs} />`;
         })}
         </div>
         ${concurrent ? html`<div class="draft-queue" data-testid="draft-queue">
