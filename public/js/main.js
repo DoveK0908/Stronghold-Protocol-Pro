@@ -204,6 +204,8 @@ function onWelcome(msg) {
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
     installedPlugins: pluginCount(msg.content),
+    // a cosmetic plugin with 公告 (DESIGN §32 P1a): the lobby's / title's notice button draws a dot without fetching
+    installedNotices: msg.content?.notices === true,
     // welcome.testMode (DESIGN §34.8): the server sends it only when SP_TEST_MODE is on; the client cannot set it
     testMode: msg.testMode === true,
   });
@@ -357,7 +359,8 @@ function wireNet() {
     // replays dedupe by content id inside recordResult (spectator seats' copies build no record at all)
     // (`vs`: the room's cosmetic plugins, recorded — such a match still counts as the original game: ui/stats.js)
     // (`content`: the room's content set when it played gameplay plugins — such a match is unofficial: ui/stats.js)
-    recordResult(res, { myId: store.get().me.playerId, roomMode: store.get().room?.mode ?? null, vs: store.get().room?.content?.vs ?? null, content: store.get().room?.content ?? null, now: Date.now() });
+    // (`test`: a host's test room — recorded nowhere, DESIGN §34.8)
+    if (store.get().room?.test !== true && store.get().match.public?.test !== true) recordResult(res, { myId: store.get().me.playerId, roomMode: store.get().room?.mode ?? null, vs: store.get().room?.content?.vs ?? null, content: store.get().room?.content ?? null, now: Date.now() });
   });
   net.on('m.toast', (msg) => {
     const kind = ['info', 'success', 'warn', 'error'].includes(msg.kind) ? msg.kind : 'info';
@@ -590,8 +593,10 @@ async function boot() {
       // only { build }, which says nothing about plugins: the count welcome gave stays
       onHealth: (h) => {
         if (!h?.content || typeof h.content !== 'object') return;
-        const n = pluginCount(h.content);
-        if (n !== store.get().installedPlugins) store.set({ installedPlugins: n });
+        // the same /healthz names how many plugins the server has and whether one carries 公告 (a dot on the notice
+        // button before any hello)
+        const n = pluginCount(h.content), notices = h.content.notices === true;
+        if (n !== store.get().installedPlugins || notices !== store.get().installedNotices) store.set({ installedPlugins: n, installedNotices: notices });
       },
     });
   } catch (err) {
