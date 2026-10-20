@@ -55,6 +55,7 @@ Usage:
                                                           copied from a release bundle; needs Pillow)
   .venv/bin/python tools/local-extract/extract.py --only scene [--scenes <dir of in-season bundles>]
   .venv/bin/python tools/local-extract/extract.py --only fx [--fx-set sample|used] [--fx-keys k1,k2] [--fx-jobs N]
+                                                              [--skin-bundles <newer client's Bundles dir>]
   .venv/bin/python tools/local-extract/extract.py --only plugin-art [--plugin-root <installation>]
 
 Writes <out>/**.png|.webp|.skel|.atlas and data/local-assets.json (manifest of what was extracted). With --only, just
@@ -927,6 +928,9 @@ def main():
     ap.add_argument('--fx-keys', default='', metavar='K1,K2',
                     help='with --only fx: export only these effect prefabs (comma-separated keys)')
     ap.add_argument('--fx-jobs', type=int, default=0, metavar='N', help='with --only fx: worker processes (default up to 8)')
+    ap.add_argument('--skin-bundles', default='', metavar='DIR',
+                    help='with --only fx --fx-set used: an AB root of a newer client (its skinpack/<charId>.ab and the '
+                         'effect prefabs the skins swap in) for the skins of shared/skin-catalogue.js')
     ap.add_argument('--webp', action='store_true',
                     help='only write the WebP copies of the board textures and the guide pages from the PNGs already '
                          'under --out and list them in the manifest (needs Pillow, not the client)')
@@ -990,7 +994,7 @@ def main():
     if fx_on:
         keys = [k.strip().lower() for k in args.fx_keys.split(',') if k.strip()]
         total += fx.export_fx(ab_root, out_root, manifest, print, selection=args.fx_set, keys=keys or None,
-                              jobs=args.fx_jobs or None, root=ROOT,
+                              jobs=args.fx_jobs or None, root=ROOT, skin_bundles=args.skin_bundles or None,
                               fx_manifest=Path(args.manifest).with_name(fx.FX_MANIFEST))
     if stage_ids:
         total += export_scenes(ab_root, out_root, manifest, print, stage_ids, scene_roots(ab_root, args.scenes))
