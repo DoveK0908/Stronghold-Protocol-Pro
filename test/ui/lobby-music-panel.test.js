@@ -101,3 +101,35 @@ test('the dropdown owns the lobby: switching away from 自选上传 stops the pl
   const panel = read('public/js/ui/lobbyMusicPanel.js');
   assert.match(panel, /music\.pickChanged\(\);/, 'the card tells lobbyMusic.js when the pick moves');
 });
+
+test('the player\'s own music is a local library: several files, all kept in this browser', () => {
+  // 「所有上传的自选区不应该只能同时传一首，而是可以都保留在列表里面……都不要保留在服务器上」 (owner, 2026-10-20)
+  const src = read('public/js/ui/lobbyMusic.js');
+  assert.match(src, /let library = \[\], selectedId = '', playState/, 'a library, not a single record');
+  assert.match(src, /const saveLibrary = \(\) => saved\(true, \{ tracks: library \}, 'library'\);/, 'the whole list is one IndexedDB record');
+  assert.match(src, /saved\(true, \{ id: selectedId, \.\.\.playState \}, 'state'\)/, 'which entry plays is a separate record');
+  assert.match(src, /library = \[\.\.\.library, \{ id, name: file\.name\.slice\(0, 180\), size: file\.size, blob: file/, 'uploading appends instead of replacing');
+  assert.match(src, /await music\.select\(id\);/, 'and the new entry becomes the pick');
+  assert.match(src, /async select\(id\) \{[\s\S]*?updateSettings\(\{ lobbyTrack: 'custom', lobbyCustomId: id \}\);/, 'the pick is written to settings');
+  assert.match(src, /async remove\(id\) \{[\s\S]*?library = library\.filter\(\(x\) => x\.id !== id\);/, 'entries can be deleted');
+  assert.match(src, /updateSettings\(\{ lobbyTrack: 'official', lobbyCustomId: '' \}\);/, 'deleting the last pick falls back to the official track');
+  assert.match(src, /tracks: library\.map\(\(\{ id, name, size \}\) => \(\{ id, name, size \}\)\)/, 'the snapshot lists the library without the blobs');
+  assert.ok(!/fetch\(|net\.request\(|XMLHttpRequest/.test(src), 'nothing about the music goes over the network');
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /tracks\.map\(\(x\) => html`<option key=\$\{x\.id\} value=\$\{`custom:\$\{x\.id\}`\}>/, 'every library entry is an option');
+  assert.match(panel, /const UPLOAD = '__upload';/, 'and there is an upload entry');
+  assert.match(panel, /music\.select\(value\.slice\(7\)\)/, 'picking an entry selects it');
+  assert.match(panel, /data-testid="lobby-remove"/, 'the current entry can be deleted');
+  const settings = read('public/js/ui/gameLogic/settings.js');
+  assert.match(settings, /lobbyCustomId: ''/, 'the default settings know the entry');
+  assert.match(settings, /lobbyCustomId: typeof r\.lobbyCustomId === 'string'/, 'and sanitize keeps it a string');
+});
+
+test('the 音乐 modal keeps only 对局音乐 — 大厅音乐 moved to the lobby card', () => {
+  const src = read('public/js/ui/lobbyMusic.js');
+  const button = src.slice(src.indexOf('export function LobbyMusicButton()'));
+  assert.doesNotMatch(button, /大厅音乐<\/strong>/, 'no 大厅音乐 block in the modal');
+  assert.doesNotMatch(button, /music\.upload\(/, 'and no upload of its own');
+  assert.match(button, /<\$\{MatchMusic\} \/>/, '对局音乐 stays');
+  assert.match(button, /大厅音乐已移到大厅左上角的「主界面音乐」卡片/, 'the modal points at the card');
+});

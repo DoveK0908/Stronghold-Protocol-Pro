@@ -16,11 +16,13 @@ import { music } from './lobbyMusic.js';
 /** The track names the dropdown offers; 'custom' is the player's own file (lobbyMusic.js), 'official' the lobby's own. */
 // 上海Major stops here: its file is host-provided (MAJOR_BGM_URL) and this repo ships no copy, so offering it in the
 // lobby list only ever produced a failed load (the owner: 「之前那个上海major的bgm没有文件就不要了」).
-const TRACK_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby' && x.id !== 'major').map((x) => x.id), 'custom']);
+const PACKED_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby' && x.id !== 'major').map((x) => x.id)]);
+const UPLOAD = '__upload';
 
-/** The name of one column value (`lobbyTrack`). */
+/** The name of one column value (`lobbyTrack`) or of a library entry (`custom:<id>`). */
 export function lobbyTrackName(id, customName = '') {
   if (id === 'official') return t('官方大厅音乐');
+  if (id?.startsWith?.('custom:')) return customName || t('自选上传');
   if (id === 'custom') return customName || t('自选上传');
   return t(BGM_TRACKS.find((x) => x.id === id)?.name || id);
 }
@@ -37,7 +39,10 @@ export function LobbyMusicPanel() {
   const input = useRef(null);
   const open = s.lobbyMusicOpen !== false;
   const pick = s.lobbyTrack || 'official';
-  const custom = pick === 'custom';
+  const tracks = state.tracks || [];
+  const selectedCustom = tracks.find((x) => x.id === state.selectedId) || null;
+  const custom = pick === 'custom' && !!selectedCustom;
+  const column = custom ? `custom:${selectedCustom.id}` : pick;
   const playing = custom ? state.playing : !audio.lobbyPaused;
   const volume = Math.round((Number.isFinite(s.lobbyVolume) ? s.lobbyVolume : 1) * 100);
 
@@ -47,23 +52,30 @@ export function LobbyMusicPanel() {
     return music.subscribe ? music.subscribe(fn) : undefined;
   }, []);
 
-  const choose = (id) => {
-    updateSettings({ lobbyTrack: id });
+  const choose = (value) => {
+    if (value === UPLOAD) { input.current?.click(); return; }
+    if (value.startsWith('custom:')) {
+      // a library entry: ui/lobbyMusic.js owns the file and writes lobbyTrack/lobbyCustomId itself
+      setUploadError('');
+      music.select(value.slice(7)).catch((e) => setUploadError(e?.message || t('音乐导入失败')));
+      return;
+    }
+    updateSettings({ lobbyTrack: value });
     // the player's own file and the packaged tracks share the lobby key: tell ui/lobbyMusic.js the pick moved on
     music.pickChanged();
-    if (id === 'custom' && !state.name) input.current?.click();
   };
+  const options = [...PACKED_IDS, ...tracks.map((x) => `custom:${x.id}`)];
   const step = (dir) => {
-    const at = Math.max(0, TRACK_IDS.indexOf(pick));
+    const at = Math.max(0, options.indexOf(column));
     let next;
     if (s.lobbyShuffle) {
-      const pool = TRACK_IDS.filter((id) => id !== pick);
-      next = pool[Math.floor(Math.random() * pool.length)] || pick;
-    } else next = TRACK_IDS[(at + dir + TRACK_IDS.length) % TRACK_IDS.length];
+      const pool = options.filter((id) => id !== column);
+      next = pool[Math.floor(Math.random() * pool.length)] || column;
+    } else next = options[(at + dir + options.length) % options.length];
     choose(next);
   };
   const toggle = () => {
-    if (custom) { if (state.name) music.toggle(); else input.current?.click(); return; }
+    if (custom) { music.toggle(); return; }
     audio.setLobbyPaused(!audio.lobbyPaused);
     // audio.js has no listener of its own: re-render this card
     setState(music.snapshot());
@@ -82,8 +94,10 @@ export function LobbyMusicPanel() {
     </header>
     ${open ? html`<div class="lobmusic__body">
       <div class="lobmusic__sel">
-        <select data-testid="lobby-track" value=${pick} onChange=${(e) => choose(e.currentTarget.value)}>
-          ${TRACK_IDS.map((id) => html`<option key=${id} value=${id}>${lobbyTrackName(id, state.name)}</option>`)}
+        <select data-testid="lobby-track" value=${column} onChange=${(e) => choose(e.currentTarget.value)}>
+          ${PACKED_IDS.map((id) => html`<option key=${id} value=${id}>${lobbyTrackName(id)}</option>`)}
+          ${tracks.map((x) => html`<option key=${x.id} value=${`custom:${x.id}`}>${lobbyTrackName(`custom:${x.id}`, x.name)}</option>`)}
+          <option value=${UPLOAD}>${t('＋ 上传新的…')}</option>
         </select>
       </div>
       <div class="lobmusic__row">
@@ -104,8 +118,10 @@ export function LobbyMusicPanel() {
         <b>${volume}</b>
       </label>
       ${custom ? html`<div class="lobmusic__file">
-        <small>${state.name || t('未选择文件')}</small>
-        <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${state.name ? t('更换') : t('选择文件')}<//>
+        <small data-testid="lobby-file">${selectedCustom.name}</small>
+        <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${t('更换')}<//>
+        <${Button} size="sm" variant="secondary" class="lobmusic__remove" data-testid="lobby-remove"
+          onClick=${() => music.remove(selectedCustom.id).catch((e) => setUploadError(e?.message || t('音乐导入失败')))}>${t('删除')}<//>
       </div>` : null}
       ${custom && uploadError ? html`<p class="lobmusic__note is-bad" data-testid="lobby-upload-error">${uploadError}</p>` : null}
       <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden

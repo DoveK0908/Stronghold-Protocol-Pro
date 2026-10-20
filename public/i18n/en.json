@@ -3323,5 +3323,8 @@
   "浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传": "Browsers cannot play MIDI files — convert it to MP3, WAV or OGG first.",
   "添加精英干员": "Add elite operator",
   "阿尔图罗": "Arturia",
-  "拉维妮娅": "Lavinia"
+  "拉维妮娅": "Lavinia",
+  "已添加到大厅音乐列表": "Added to your lobby music list",
+  "大厅音乐已移到大厅左上角的「主界面音乐」卡片：可以添加多首自选曲，切换、随机播放和单独的音量都在那里。自选曲只保存在本机浏览器，不上传服务器。": "Lobby music moved to the “主界面音乐” card at the top-left of the lobby: add as many of your own tracks as you like — switching, shuffle and its own volume live there. Your own tracks stay in this browser and are never uploaded.",
+  "＋ 上传新的…": "+ Upload a new track…"
 }

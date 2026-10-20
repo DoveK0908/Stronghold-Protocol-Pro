@@ -9,15 +9,21 @@ import { t, N_ } from '../../../shared/i18n.js';
 
 export const MAX_MUSIC_BYTES = 20 * 1024 * 1024;
 const listeners = new Set();
+// The player's own lobby music is a *library* (the owner's request of 2026-10-20): every upload stays in this
+// browser's IndexedDB — nothing is ever sent to a server — the card lists them all, and settings (lobbyTrack +
+// lobbyCustomId) say which one plays.
+let library = [], selectedId = '', playState = { enabled: true, paused: false };
 let record = null, url = null, media = null, source = null, revision = 0, installed = false, dbPromise;
 let status = N_('默认大厅音乐'), busy = false, lastRoute;
 const notify = () => listeners.forEach(fn => fn(music.snapshot()));
 let videoAudible=false;
 const inMusicArea = () => { const s=store.get(),route=selectRoute(s);return ['lobby','room'].includes(route)||(route==='game'&&[PHASE.INFO_CHECK,PHASE.BAND_DRAFT,PHASE.BATTLE_CHECK].includes(s.match?.public?.phase)); };
 let customGain=null,gainParent=null,fadeTarget=0,fadeTimer,handoff=false,handoffTimer;
-// the 大厅音乐 card's dropdown owns the choice: 'custom' is this player's own file, any other pick is a packaged
-// track (audio.js plays it) — the file must not override the pick once the player switches away from it.
+// the 大厅音乐 card's dropdown owns the choice: 'custom' is this player's own library, any other pick is a packaged
+// track (audio.js plays it) — the library must not override the pick once the player switches away from it.
 const customPicked = () => (settingsStore.get().lobbyTrack || 'official') === 'custom';
+const customId = () => selectedId || settingsStore.get().lobbyCustomId || '';
+const entryOf = (id) => library.find((x) => x?.id === id) || null;
 const areaKey = () => selectRoute(store.get()) + ':' + inMusicArea();
 function db() {
   return dbPromise ||= new Promise((resolve, reject) => {
@@ -36,6 +42,8 @@ async function saved(write, value, key = 'lobby') {
     tx.onerror = tx.onabort = () => reject(Error(t('音乐保存失败，可能是浏览器存储空间不足')));
   });
 }
+const saveLibrary = () => saved(true, { tracks: library }, 'library');
+const saveState = () => saved(true, { id: selectedId, ...playState }, 'state');
 async function validate(file, maxSeconds = 0) {
   if (!file || file.size <= 0) throw Error(t('请选择有效的音频文件'));
   if (file.size > MAX_MUSIC_BYTES) throw Error(t('音乐不能超过 20MB，请选择较小的文件'));
@@ -79,7 +87,7 @@ function sync() {
   if (!media || !record) return;
   // the card's dropdown is authoritative: any pick other than 'custom' plays a packaged track instead
   if (!customPicked()) { clearHandoff(); fadeCustom(false, true); return; }
-  if ((videoAudible&&selectRoute(store.get())==='lobby') || !record.enabled || record.paused || document.hidden || audio.bgmSilent) {clearHandoff();fadeCustom(false,true);return;}
+  if ((videoAudible&&selectRoute(store.get())==='lobby') || !playState.enabled || playState.paused || document.hidden || audio.bgmSilent) {clearHandoff();fadeCustom(false,true);return;}
   if (!inMusicArea()) {
     // Keep the old music while the next game's BGM buffer is loading.
     if (selectRoute(store.get())==='game' && !media.paused && fadeTarget>0) {
@@ -107,9 +115,9 @@ function refresh() {
 function install() {
   if (installed) return; installed = true;
   media = new Audio(); media.loop = true; media.preload = 'none';
-  media.onerror = () => { record && (record.enabled = false); status = t('音乐播放失败，已恢复默认音乐'); refresh(); };
+  media.onerror = () => { playState.enabled = false; status = t('音乐播放失败，已恢复默认音乐'); refresh(); };
   audio.lobbyMusicOverride = key => {
-    const override = key === 'lobby' && customPicked() && ((videoAudible&&selectRoute(store.get())==='lobby') || (record?.enabled&&inMusicArea()));
+    const override = key === 'lobby' && customPicked() && ((videoAudible&&selectRoute(store.get())==='lobby') || (playState.enabled&&inMusicArea()));
     sync();
     return !!override;
   };
@@ -118,12 +126,31 @@ function install() {
   lastRoute = areaKey();
   store.subscribe(() => { const route = areaKey(); if (route !== lastRoute) { lastRoute = route; refresh(); } else sync(); });
   document.addEventListener('visibilitychange', sync);
-  window.addEventListener('pointerdown', () => { if (record?.enabled) { audio._unlock(); sync(); } }, { passive: true });
+  window.addEventListener('pointerdown', () => { if (playState.enabled) { audio._unlock(); sync(); } }, { passive: true });
   const initialRevision = revision;
-  saved(false).then(value => {
-    if (revision !== initialRevision || !value?.blob || value.blob.size > MAX_MUSIC_BYTES) return;
-    replace(value); status = value.paused ? t('已暂停') : t('点击“播放”开始音乐'); refresh();
-  }).catch(() => { status = t('浏览器暂不能保存音乐，可稍后重试'); notify(); });
+  (async () => {
+    try {
+      const lib = await saved(false, undefined, 'library');
+      const st = await saved(false, undefined, 'state');
+      if (revision !== initialRevision) return;
+      library = Array.isArray(lib?.tracks) ? lib.tracks.filter((x) => x?.id && x?.blob?.size > 0) : [];
+      if (!library.length) {
+        // one-file layouts (before the library) kept the file under the 'lobby' key: adopt it instead of dropping it
+        const legacy = await saved(false);
+        if (legacy?.blob?.size > 0) {
+          library = [{ id: 'legacy', name: legacy.name || 'lobby', size: legacy.blob.size, blob: legacy.blob, addedAt: Date.now() }];
+          selectedId = 'legacy';
+          playState = { enabled: legacy.enabled !== false, paused: !!legacy.paused };
+          await saveLibrary(); await saveState(); await saved(true, null);
+        }
+      }
+      if (st?.id && entryOf(st.id)) { selectedId = st.id; playState = { enabled: st.enabled !== false, paused: !!st.paused }; }
+      if (!selectedId) selectedId = library[0]?.id || '';
+      replace(entryOf(customId()));
+      status = record ? (playState.paused ? t('已暂停') : t('点击“播放”开始音乐')) : N_('默认大厅音乐');
+      refresh();
+    } catch { status = t('浏览器暂不能保存音乐，可稍后重试'); notify(); }
+  })();
 }
 // debug surface for the browser probes (only with ?debug-music in the URL; nothing in a normal page)
 if (typeof window !== 'undefined' && window.location.search.includes('debug-music')) {
@@ -131,24 +158,84 @@ if (typeof window !== 'undefined' && window.location.search.includes('debug-musi
   window.__spAudio = () => audio;
 }
 export const music = {
-  /** Subscribe to the player's own file (upload / toggle / reset): the 大厅音乐 card (ui/lobbyMusicPanel.js) reads it. */
+  /** Subscribe to the player's own library (upload / pick / toggle / remove): the 大厅音乐 card reads it. */
   subscribe(fn) { install(); listeners.add(fn); fn(music.snapshot()); return () => listeners.delete(fn); },
-  snapshot: () => ({ name: record?.name || '', size: record?.blob?.size || 0, enabled: !!record?.enabled, paused: !!record?.paused, playing: !!media && !media.paused, status, busy }),
+  snapshot: () => ({
+    tracks: library.map(({ id, name, size }) => ({ id, name, size })),
+    selectedId: customId(),
+    name: record?.name || '', size: record?.blob?.size || 0,
+    enabled: playState.enabled, paused: playState.paused,
+    playing: !!media && !media.paused, status, busy,
+  }),
+  /** Add one file to the local library and start playing it (nothing leaves this browser). */
   async upload(file) {
-    if (busy) return; install(); ++revision; busy = true; notify();
-    try { await validate(file); const next = { blob: file, name: file.name.slice(0,180), enabled: true, paused: false }; await saved(true, next); replace(next); status = t('已保存音乐'); audio._unlock(); refresh(); }
-    catch(e) { status = e.message || t('音乐导入失败'); throw e; }
+    if (busy) return; install(); busy = true; notify();
+    try {
+      await validate(file);
+      const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+      library = [...library, { id, name: file.name.slice(0, 180), size: file.size, blob: file, addedAt: Date.now() }];
+      await saveLibrary();
+      await music.select(id);
+      status = t('已添加到大厅音乐列表');
+    } catch (e) { status = e.message || t('音乐导入失败'); throw e; }
     finally { busy = false; notify(); }
+  },
+  /** Play one library entry; the card's dropdown calls this (and settings follow it). */
+  async select(id) {
+    install();
+    const entry = entryOf(id);
+    if (!entry) return;
+    ++revision;
+    selectedId = id;
+    playState = { enabled: true, paused: false };
+    replace(entry);
+    updateSettings({ lobbyTrack: 'custom', lobbyCustomId: id });
+    await saveState();
+    status = t('正在播放 · 单曲循环');
+    audio._unlock(); refresh(); notify();
+  },
+  /** Drop one entry from the library; a deleted pick falls back to the next entry (or the official track). */
+  async remove(id) {
+    if (busy) return; install(); busy = true; notify();
+    try {
+      library = library.filter((x) => x.id !== id);
+      await saveLibrary();
+      if (customId() === id) {
+        const next = library[0];
+        if (next) await music.select(next.id);
+        else {
+          selectedId = '';
+          replace(null);
+          updateSettings({ lobbyTrack: 'official', lobbyCustomId: '' });
+          await saveState();
+          status = t('默认大厅音乐');
+          refresh();
+        }
+      }
+    } finally { busy = false; notify(); }
   },
   async toggle() {
     if (!record || busy) return; ++revision;
-    const next = { ...record, enabled: true, paused: !!record.enabled && !media.paused };
-    await saved(true,next); record=next; status=next.paused?t('已暂停'):t('正在播放 · 单曲循环'); audio._unlock(); refresh();
+    playState = { ...playState, enabled: true, paused: !playState.paused };
+    await saveState();
+    status = playState.paused ? t('已暂停') : t('正在播放 · 单曲循环');
+    audio._unlock(); refresh(); notify();
   },
-  async reset() { if (busy) return; ++revision; await saved(true,null); replace(null); status=t('默认大厅音乐'); refresh(); },
-  /** The card switched the pick: stop or restart the player's own file (ui/lobbyMusicPanel.js). */
+  /** 恢复默认: forget the whole local library and play the official lobby track again. */
+  async reset() {
+    if (busy) return; install(); busy = true; notify();
+    try {
+      ++revision; library = []; selectedId = '';
+      replace(null); playState = { enabled: true, paused: false };
+      await Promise.all([saveLibrary(), saveState()]);
+      updateSettings({ lobbyTrack: 'official', lobbyCustomId: '' });
+      status = t('默认大厅音乐'); refresh();
+    } finally { busy = false; notify(); }
+  },
+  /** The card switched the pick: stop or restart the player's own file. */
   pickChanged() { sync(); notify(); },
 };
+
 // 对局音乐 (the owner's request of 2026-10-15): the 休整期 / 作战 BGM, official by default — bgmChoice.js, settings
 // bgmPrep / bgmCombat. 休整期 offers every track but its own official one (that is 官方); 作战's 官方 is the round table.
 // 自选曲 is a file of the player's, one per kind, kept like the lobby music (the same IndexedDB store, keys 'prep' /
@@ -228,28 +315,13 @@ function MatchMusic() {
 }
 
 export function LobbyMusicButton() {
-  const [open,setOpen]=useState(false),[state,setState]=useState(music.snapshot),[error,setError]=useState('');const input=useRef(null);
-  useEffect(()=>{install();const fn=s=>setState(s);listeners.add(fn);fn(music.snapshot());return()=>listeners.delete(fn);},[]);
-  const action=async fn=>{setError('');try{await fn();}catch(e){setError(e.message||t('操作失败'));}};
-  return html`<${Button} variant="secondary" size="sm" square=${true} class="hub-music-btn" title=${t('音乐')} aria-label=${t('音乐')} onClick=${()=>setOpen(true)}><span style="font-size:22px;line-height:1" aria-hidden="true">♫</span><//>
+  const [open, setOpen] = useState(false);
+  return html`<${Button} variant="secondary" size="sm" square=${true} class="hub-music-btn" title=${t('音乐')} aria-label=${t('音乐')} onClick=${() => setOpen(true)}><span style="font-size:22px;line-height:1" aria-hidden="true">♫</span><//>
     <style>.lobby-music-panel .modal__head{padding:14px 16px 4px}.lobby-music-panel .modal__title{font-size:18px}.lobby-music-panel .modal__head>:first-child{font-size:10px}.lobby-music-panel .modal__body{padding:12px 16px 16px}.lobby-music-panel .modal__actions{padding:10px 16px}.lobby-music-panel button{font-size:13px;min-height:36px;padding:8px 12px}.lobby-music-panel select{height:36px;font-size:13px}@media (pointer: coarse){.lobby-music-panel select{height:44px;font-size:16px}}</style>
-    <${Modal} class="lobby-music-panel" open=${open} title=${t('音乐')} micro="MUSIC" width="min(420px, calc(100vw - 32px))" onClose=${()=>setOpen(false)} actions=${html`<${Button} variant="secondary" onClick=${()=>setOpen(false)}>${t('关闭')}<//>`}>
+    <${Modal} class="lobby-music-panel" open=${open} title=${t('音乐')} micro="MUSIC" width="min(420px, calc(100vw - 32px))" onClose=${() => setOpen(false)} actions=${html`<${Button} variant="secondary" onClick=${() => setOpen(false)}>${t('关闭')}<//>`}>
       <div style="display:grid;gap:14px;padding:8px 0;min-width:0">
-        <strong style="font-size:15px">${t('大厅音乐')}</strong>
-        <p style="margin:0;color:var(--muted);font-size:13px;line-height:1.7">${t('选择你喜欢的大厅音乐，每首最大 20MB。保存在当前浏览器，无需上传服务器；房间、战前信息和选人时继续播放，进入战场淡出并切换游戏音乐。')}</p>
-        <div style="padding:14px;border:1px solid var(--mint,#58d9b5);background:rgba(30,90,75,.12);min-width:0">
-          <strong style="display:block;font-size:15px;overflow-wrap:anywhere">${state.name||t('默认大厅音乐')}</strong>
-          <small style="display:block;font-size:12px;margin-top:8px;color:var(--mint,#58d9b5)">${t(state.status)}${state.size?` · ${(state.size/1024/1024).toFixed(1)} MB`:''}</small>
-        </div>
-        <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden onChange=${e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';if(file)action(()=>music.upload(file));}} />
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <${Button} disabled=${state.busy} onClick=${()=>input.current?.click()}>${state.busy?t('正在导入…'):t('上传音乐')}<//>
-          <${Button} disabled=${!state.name||state.busy} onClick=${()=>action(()=>music.toggle())}>${state.playing?t('暂停'):t('播放')}<//>
-          <${Button} disabled=${!state.name||state.busy} variant="secondary" onClick=${()=>action(()=>music.reset())}>${t('恢复默认')}<//>
-        </div>
-        <small style="color:var(--muted);font-size:12px;line-height:1.6">${t('音量和静音沿用游戏设置。刷新后保留；清理浏览器数据会删除音乐。')}</small>
-        ${error?html`<p role="alert" style="margin:0;color:#ff9393;overflow-wrap:anywhere">${error}</p>`:null}
         <${MatchMusic} />
+        <small style="color:var(--muted);font-size:12px;line-height:1.6">${t('大厅音乐已移到大厅左上角的「主界面音乐」卡片：可以添加多首自选曲，切换、随机播放和单独的音量都在那里。自选曲只保存在本机浏览器，不上传服务器。')}</small>
       </div>
     <//>`;
 }
