@@ -478,7 +478,9 @@ export function OpCard({ m, chess, golden, entries, ops = {}, skins = {}, select
       </div>
       <button type="button" class="lo-op__pick" aria-pressed=${selected ? 'true' : 'false'} title=${chess.name} onClick=${() => onPick(chess.chessId)}>
         <span class="lo-op__art">
-          <${Img} src=${chessPortraitUrl(m, ownAppearance(chess, { skins })) || chessAvatarUrl(m, chess)} fallbackSrc=${chessPortraitUrl(m, chess) || chessAvatarUrl(m, chess)} fallback=${html`<span class="lo-op__glyph">${[...(chess.name || '?')][0]}</span>`} />
+          ${/* OperatorImage, not a raw Img: it subscribes to the skins store, so card view follows 皮肤 the moment it is picked
+                (2026-10-20 the card kept the default art until a reload) */ null}
+          <${OperatorImage} m=${m} chess=${chess} portrait avatarFallback fallback=${html`<span class="lo-op__glyph">${[...(chess.name || '?')][0]}</span>`} />
         </span>
         <${Img} src=${subProfIconUrl(m, chess)} class="lo-op__sub" />
         ${notOwned ? html`<span class="lo-op__ribbon" title=${t('未持有（干员持有）：由替补干员上场')}>${t('替补')}</span>` : null}

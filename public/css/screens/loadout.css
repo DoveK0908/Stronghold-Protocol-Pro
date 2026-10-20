@@ -654,7 +654,7 @@
 .lo-skin:focus-visible { outline: 2px solid var(--mint-400); outline-offset: 2px; }
 .lo-skin.is-on { border-color: var(--mint-400); background: var(--bg-2); }
 .lo-skin:disabled { opacity: .5; cursor: not-allowed; }
-.lo-skin__art { display: flex; align-items: center; justify-content: center; height: max(1.24rem, 110px); overflow: hidden; }
+.lo-skin__art { position: relative; display: flex; align-items: center; justify-content: center; height: max(1.24rem, 110px); overflow: hidden; }
 .lo-skin__art img { max-width: 100%; width: auto; height: 100%; object-fit: contain; }
 .lo-skin__name { font-size: max(.16rem, 12px); font-weight: 700; overflow-wrap: anywhere; }
 .lo-skin__brand { font-size: max(.12rem, 10px); color: var(--text-lo); overflow-wrap: anywhere; }
@@ -959,7 +959,7 @@
   .lo-top--deck { grid-template-columns: max-content minmax(0, 1fr); }
   .lo-bbar__tier > span:not(.lo-bbar__roman):not(.lo-bbar__diy) { display: none; }
 }
-.lo-skin__art img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+.lo-skin__art img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; }
 /* the appearance's 1:1 avatar of the same tile, drawn only where the 1:2 box does not fit (the media query at the end) */
 .lo-skin__art > .lo-skin__art--faceimg { display: none; }
 .lo-skin__art--none { position: absolute; inset: 0; background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .06) 0 3px, transparent 3px 7px); }
