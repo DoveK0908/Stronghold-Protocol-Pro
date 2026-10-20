@@ -519,12 +519,11 @@ export function RoomScreen() {
           ${big ? html`<span class="room-capacity">${t('实验性同盟 · {n} 人模式 · 支持同模式匹配', { n: facts.seats.length })}</span>` : html`<span>${t(DIFFICULTY_NAMES[room.difficulty])} · ${info.code}</span>`}
         </div>
         <div class="rs-tools">
-          <${PingPill} hidePing=${true} online=${online} status=${conn.status} loadState=${conn.loadState ?? 'unknown'} loadDetails=${conn.loadDetails}
+          <${PingPill} online=${online} status=${conn.status} loadState=${conn.loadState ?? 'unknown'} loadDetails=${conn.loadDetails}
             clusterLoad=${conn.clusterLoad} loadOpen=${loadOpen} onLoadClick=${() => setLoadOpen(true)} class="rs-pingpill" />
           <${Button} variant="secondary" size="sm" square=${true} icon="chart" class="stats-entry" onClick=${openStats} title=${t('统计数据')} aria-label=${t('统计数据')} />
           <${SettingsButton} class="room-settings" variant="secondary" square=${true} />
           <${GuideButton} class="room-guide" variant="secondary" square=${true} />
-          <${PingPill} ms=${conn.ping} online=${online} class="rs-pingpill" />
           ${showPlugins ? html`<${PluginTag} room=${room} myId=${me.playerId} />` : null}
         </div>
       </div>

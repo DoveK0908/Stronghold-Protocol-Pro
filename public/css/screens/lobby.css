@@ -2819,8 +2819,8 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .hub-topbar .me-card__id { color: rgba(240, 246, 244, .86); font-size: calc(.14 * var(--t)); letter-spacing: .04em; }
 /* The lobby latency badge keeps one width whatever the measured value is: the number is tabular and the pill reserves
    room for four digits, so a 1 ms → 9999 ms change (or the -- placeholder) never shoves the tools to the right. */
-.hub-topbar .latency-status .ping { width: max(.8rem, 78px); justify-content: center; overflow: hidden; }
-.hub-topbar .ping__value { min-width: 2.2ch; text-align: right; font-variant-numeric: tabular-nums; }
+.hub-topbar .latency-status .ping { align-items: center; flex: none; }
+.hub-topbar .ping__value { display: inline-block; min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
 
 .me-info { display: flex; flex-direction: column; gap: .16rem; }
 .me-info__card { width: 100%; }
