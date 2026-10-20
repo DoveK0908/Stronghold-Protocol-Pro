@@ -672,7 +672,7 @@ describe('AudioManager', () => {
     assert.equal(a.unit('char_x', 'attack', 1), false);
     a.handleBattleEvents([['atk', 1, 2, 'arrow'], 'junk', null]);
     a.setVolumes({ bgm: 5, sfx: -1, muted: true });
-    assert.deepEqual(a.volumes, { bgm: 1, sfx: 0, voice: 0.8, muted: true });
+    assert.deepEqual(a.volumes, { bgm: 1, sfx: 0, voice: 0.8, lobby: 1, muted: true });
     assert.equal(a.unlocked, false);
   });
   test('the manager has no `play`: the projectile entry point is `playProj` (render/fx/notes.js asks for it)', () => {

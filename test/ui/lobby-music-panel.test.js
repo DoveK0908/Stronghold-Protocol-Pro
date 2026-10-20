@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { lobbyTrackOf } from '../../public/js/audio.js';
+import { AudioManager, lobbyTrackOf } from '../../public/js/audio.js';
 import { BGM_TRACKS } from '../../public/js/bgmChoice.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -32,9 +32,22 @@ test('lobbyTrackOf: packaged picks resolve, official / custom leave the lobby it
   assert.equal(lobbyTrackOf(null, 'knight'), null);
 });
 
+test('a track that fails to load falls back to the lobby music instead of restarting forever', () => {
+  const m = new AudioManager({ getManifest: () => MANIFEST });
+  m.setLobbyPick('knight');
+  assert.equal(m._bgmTrack('lobby').loop, '/assets/audio/bgm/m_bat_kazimierz2_1_loop.mp3');
+  // a 404 / a file the browser cannot decode: _startBgm marks the pick; the lobby keeps its own music (no retry loop)
+  m.bgmChoiceFailed.add('knight');
+  assert.equal(m._bgmTrack('lobby').loop, '/assets/audio/bgm/m_sys_act1autochess_loop.mp3');
+  // choosing it again is an explicit retry
+  m.setLobbyPick('knight');
+  assert.equal(m.bgmChoiceFailed.has('knight'), false);
+  assert.equal(m._bgmTrack('lobby').loop, '/assets/audio/bgm/m_bat_kazimierz2_1_loop.mp3');
+});
+
 test('audio.js: the lobby pick and pause gate its own key, and lobby music rides its own gain', () => {
   const src = read('public/js/audio.js');
-  assert.match(src, /if \(key === 'lobby' && this\.lobbyPick && this\.lobbyPick !== 'official'\)/, '_bgmTrack prefers the pick');
+  assert.match(src, /this\.bgmChoiceFailed\.has\(this\.lobbyPick\)/, 'a failed pick never resolves again (no restart loop)');
   assert.match(src, /const pick = lobbyTrackOf\(manifest, this\.lobbyPick\);/, 'the pick goes through lobbyTrackOf');
   assert.match(src, /setLobbyPick\(id\) \{/, 'the panel writes the pick through setLobbyPick');
   assert.match(src, /if \(this\.lastBgmKey === 'lobby'\) this\.playBgm\('lobby'\);/, 'a new pick restarts the lobby track');

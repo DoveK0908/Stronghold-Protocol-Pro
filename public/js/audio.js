@@ -974,7 +974,7 @@ export class AudioManager {
     const manifest = this.getManifest();
     // 大厅音乐 panel: a packaged track instead of the lobby's own (ui/lobbyMusicPanel.js; 'custom' and 'official' keep
     // the lobby's own music — the player's own file plays through ui/lobbyMusic.js, which overrides this key)
-    if (key === 'lobby' && this.lobbyPick && this.lobbyPick !== 'official') {
+    if (key === 'lobby' && this.lobbyPick && this.lobbyPick !== 'official' && !this.bgmChoiceFailed.has(this.lobbyPick)) {
       const pick = lobbyTrackOf(manifest, this.lobbyPick);
       if (pick) return pick;
     }
@@ -984,7 +984,9 @@ export class AudioManager {
   /** 大厅音乐 panel: which packaged track the lobby plays ('official': the manifest's own lobby music). */
   setLobbyPick(id) {
     const next = typeof id === 'string' && id ? id : 'official';
-    if (next === this.lobbyPick) return;
+    // an explicit pick retries a track that failed before (a host that adds the file back, a fixed download)
+    this.bgmChoiceFailed.delete(next);
+    if (next === this.lobbyPick) { if (this.lastBgmKey === 'lobby') this.playBgm('lobby'); return; }
     this.lobbyPick = next;
     if (this.lastBgmKey === 'lobby') this.playBgm('lobby');
   }
