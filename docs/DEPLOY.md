@@ -171,6 +171,44 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 
 不用更新包也可以：停止服务器，把新版本的整合包解压到新目录后从那里启动（完整包已含素材；装了开机自启的，在新目录重新运行一次 `install-service-windows.ps1`）。用精简包或 GitHub「Download ZIP」源码包的：解压新版本后，把旧目录里的 `public\assets`、`public\fonts`、`.cache` 和 `data\local-assets.json`（若有）复制过去，可避免重新下载（setup 只补下新增的素材）。
 
+## 1.6 下行流量：实测数字与可选优化（2026-10-20 测量）
+
+给带宽紧张（家用上行、公网隧道）的服主一份实测基线。测量环境：本仓库 0.3.1，`dev/game-mock.html?phase=COMBAT` 的重度战斗（10 个干员对 70 只敌人，`tools/combatbench.mjs` 的同一份输入），以及本站当前的静态响应头。
+
+### 对局消息（服务器 → 浏览器）
+
+| 项目 | 每个快照帧 | 10 Hz 下的下行 |
+|---|---|---|
+| `b.snap` JSON 原样 | 2460 B | **24.0 KB/s ≈ 86 MB/小时**（每个玩家） |
+| 单帧 deflate（各自压缩） | 628 B | 6.1 KB/s |
+| permessage-deflate 共享上下文（`SP_WS_COMPRESSION=on`） | 280 B | **2.7 KB/s ≈ 9.7 MB/小时** |
+
+- 共享上下文就是 `server/wsCompression.js` 的实现：只压缩白名单里的状态帧与战斗帧（`m.public` / `m.private` / `m.state` / `m.unitStats` / `m.field` / `m.damage` / `b.start` / `b.snap` / `b.ev` / `b.ext`），凭证与未知消息永不进压缩上下文。
+- 换来的体积是 **约 8.8 倍**，代价是每连接约 144 KiB 的 zlib 状态和少量 CPU（10 Hz × 2.4 KB 的 deflate，实测量级可以忽略）。
+- 本 fork 默认 `SP_WS_COMPRESSION=off`；**改 `on` 即可**，不需要改代码。
+- 想再省一半可以把快照降到 5 Hz（本 fork 没有这个开关；`snapshotHz` 目前只在集群配置/房间规格里，取 5/10/20）。
+
+### 静态资源（首次之后）
+
+| 端点 | 原大小 | 线上传输 | 缓存 |
+|---|---|---|---|
+| `/assets/~<hash>/…`（图片/模型/音频） | — | 按需 | `immutable`，一年 |
+| `/data/assets.json` | 2.73 MB | 145 KB（brotli） | `no-cache` + ETag（未变即 304） |
+| `/data/local-assets.json` | 177 KB | 36 KB（brotli） | 同上 |
+| `/data/local-fx.json` | 2.38 MB | 211 KB（brotli） | 同上 |
+| `/assets/local/fx/index.json` | 10.67 MB | 476 KB（brotli） | `max-age=86400`（不是哈希 URL） |
+
+- 静态资源本身已经是「哈希 URL + 一年 immutable + brotli」，重复访问只有 304（几百字节）。
+- `fx/index.json` 是唯一没走哈希 URL 的大文件：每个新客户端每天可能重新拉 476 KB。把它挪到 `/assets/~<hash>/local/fx/index.json` 就能变成一年缓存。
+- 玩家在标题画面点「导入素材包」之后，素材直接从本机读，**完全不走服务器**——这是静态流量最大的一笔节省，包见 `tools/package.mjs --assets`（本 fork 已产出整包）。
+
+### 按收益排序的建议
+
+1. `SP_WS_COMPRESSION=on`：约 8.8 倍下行下降，零代码。
+2. 让玩家导入素材包：首次之后静态流量归零（浏览器缓存以外）。
+3. `fx/index.json` 换成哈希 URL + 一年缓存：省 476 KB/客户端/天。
+4. 低带宽模式（5 Hz 快照）：再省一半对局下行，但动作略卡；需要新增开关。
+
 ## 2. 让不在同一网络的朋友加入
 
 ### 2.1 Tailscale / ZeroTier（推荐给家用小主机）
