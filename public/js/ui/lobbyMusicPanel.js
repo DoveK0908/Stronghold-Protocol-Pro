@@ -49,6 +49,8 @@ export function LobbyMusicPanel() {
 
   const choose = (id) => {
     updateSettings({ lobbyTrack: id });
+    // the player's own file and the packaged tracks share the lobby key: tell ui/lobbyMusic.js the pick moved on
+    music.pickChanged();
     if (id === 'custom' && !state.name) input.current?.click();
   };
   const step = (dir) => {

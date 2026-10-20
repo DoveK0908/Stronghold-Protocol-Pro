@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { store, selectRoute } from '../store.js';
 import { audio, bgmKeyFor } from '../audio.js';
 import { BGM_TRACKS, BGM_CHOICES } from '../bgmChoice.js';
-import { useSettings, updateSettings } from './settings.js';
+import { useSettings, updateSettings, settingsStore } from './settings.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
 export const MAX_MUSIC_BYTES = 20 * 1024 * 1024;
@@ -14,7 +14,10 @@ let status = N_('默认大厅音乐'), busy = false, lastRoute;
 const notify = () => listeners.forEach(fn => fn(music.snapshot()));
 let videoAudible=false;
 const inMusicArea = () => { const s=store.get(),route=selectRoute(s);return ['lobby','room'].includes(route)||(route==='game'&&[PHASE.INFO_CHECK,PHASE.BAND_DRAFT,PHASE.BATTLE_CHECK].includes(s.match?.public?.phase)); };
-let customGain=null,fadeTarget=0,fadeTimer,handoff=false,handoffTimer;
+let customGain=null,gainParent=null,fadeTarget=0,fadeTimer,handoff=false,handoffTimer;
+// the 大厅音乐 card's dropdown owns the choice: 'custom' is this player's own file, any other pick is a packaged
+// track (audio.js plays it) — the file must not override the pick once the player switches away from it.
+const customPicked = () => (settingsStore.get().lobbyTrack || 'official') === 'custom';
 const areaKey = () => selectRoute(store.get()) + ':' + inMusicArea();
 function db() {
   return dbPromise ||= new Promise((resolve, reject) => {
@@ -74,6 +77,8 @@ function fadeCustom(on, immediate = false) {
 function clearHandoff() { clearTimeout(handoffTimer);handoff=false; }
 function sync() {
   if (!media || !record) return;
+  // the card's dropdown is authoritative: any pick other than 'custom' plays a packaged track instead
+  if (!customPicked()) { clearHandoff(); fadeCustom(false, true); return; }
   if ((videoAudible&&selectRoute(store.get())==='lobby') || !record.enabled || record.paused || document.hidden || audio.bgmSilent) {clearHandoff();fadeCustom(false,true);return;}
   if (!inMusicArea()) {
     // Keep the old music while the next game's BGM buffer is loading.
@@ -84,7 +89,13 @@ function sync() {
   }
   clearHandoff();
   if (!audio.ctx) return;
-  if (!source) {source=audio.ctx.createMediaElementSource(media);customGain=audio.ctx.createGain();customGain.gain.value=0;source.connect(customGain);customGain.connect(audio.lobbyGain || audio.bgmGain);}
+  if (!source) {source=audio.ctx.createMediaElementSource(media);customGain=audio.ctx.createGain();customGain.gain.value=0;source.connect(customGain);}
+  // the lobby's own gain (settings 大厅音乐音量) when audio.js has made one, the master BGM gain otherwise
+  const parent = audio.lobbyGain || audio.bgmGain;
+  if (customGain && parent && parent !== gainParent) {
+    try { customGain.disconnect(); } catch { /* nothing connected yet */ }
+    customGain.connect(parent); gainParent = parent;
+  }
   fadeCustom(true);
   if (!media.paused) return;
   media.play().then(()=>{status=t('正在播放 · 单曲循环');notify();},()=>{status=t('点击“播放”开始音乐');notify();});
@@ -98,7 +109,7 @@ function install() {
   media = new Audio(); media.loop = true; media.preload = 'none';
   media.onerror = () => { record && (record.enabled = false); status = t('音乐播放失败，已恢复默认音乐'); refresh(); };
   audio.lobbyMusicOverride = key => {
-    const override = key === 'lobby' && ((videoAudible&&selectRoute(store.get())==='lobby') || (record?.enabled&&inMusicArea()));
+    const override = key === 'lobby' && customPicked() && ((videoAudible&&selectRoute(store.get())==='lobby') || (record?.enabled&&inMusicArea()));
     sync();
     return !!override;
   };
@@ -113,6 +124,11 @@ function install() {
     if (revision !== initialRevision || !value?.blob || value.blob.size > MAX_MUSIC_BYTES) return;
     replace(value); status = value.paused ? t('已暂停') : t('点击“播放”开始音乐'); refresh();
   }).catch(() => { status = t('浏览器暂不能保存音乐，可稍后重试'); notify(); });
+}
+// debug surface for the browser probes (only with ?debug-music in the URL; nothing in a normal page)
+if (typeof window !== 'undefined' && window.location.search.includes('debug-music')) {
+  window.__spMusic = () => ({ ...music.snapshot(), pausedFocus: typeof media !== 'undefined' && media ? media.paused : null });
+  window.__spAudio = () => audio;
 }
 export const music = {
   /** Subscribe to the player's own file (upload / toggle / reset): the 大厅音乐 card (ui/lobbyMusicPanel.js) reads it. */
@@ -130,6 +146,8 @@ export const music = {
     await saved(true,next); record=next; status=next.paused?t('已暂停'):t('正在播放 · 单曲循环'); audio._unlock(); refresh();
   },
   async reset() { if (busy) return; ++revision; await saved(true,null); replace(null); status=t('默认大厅音乐'); refresh(); },
+  /** The card switched the pick: stop or restart the player's own file (ui/lobbyMusicPanel.js). */
+  pickChanged() { sync(); notify(); },
 };
 // 对局音乐 (the owner's request of 2026-10-15): the 休整期 / 作战 BGM, official by default — bgmChoice.js, settings
 // bgmPrep / bgmCombat. 休整期 offers every track but its own official one (that is 官方); 作战's 官方 is the round table.

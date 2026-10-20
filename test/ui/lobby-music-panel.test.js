@@ -86,3 +86,18 @@ test('the site policy lets the card play a blob: file, and 上海Major is not of
   assert.match(panel, /x\.id !== 'lobby' && x\.id !== 'major'/, '上海Major has no shipped file — not listed');
   assert.doesNotMatch(panel, /\['official', \.\.\.BGM_TRACKS\.filter\(\(x\) => x\.id !== 'lobby'\)\.map/, 'the 上海Major entry is gone from the picker');
 });
+
+test('the dropdown owns the lobby: switching away from 自选上传 stops the player\'s file, and its volume is the lobby gain', () => {
+  // 「受控制不了，不能切歌，不能调音量」 (owner report 2026-10-20): the uploaded file's override never asked which pick was
+  // active (so every later pick was ignored), and customGain connected once to whatever gain existed at that moment
+  // (the master BGM gain before audio.js had built the lobby gain), so the lobby volume slider did nothing to it.
+  const src = read('public/js/ui/lobbyMusic.js');
+  assert.match(src, /const customPicked = \(\) => \(settingsStore\.get\(\)\.lobbyTrack \|\| 'official'\) === 'custom'/, 'the pick is read from settings');
+  assert.match(src, /lobbyMusicOverride = key => \{\n\s*const override = key === 'lobby' && customPicked\(\)/, 'the override follows the pick');
+  assert.match(src, /if \(!customPicked\(\)\) \{ clearHandoff\(\); fadeCustom\(false, true\); return; \}/, 'a packaged pick pauses the file');
+  assert.match(src, /const parent = audio\.lobbyGain \|\| audio\.bgmGain;/, 'customGain follows the lobby gain when it exists');
+  assert.match(src, /if \(customGain && parent && parent !== gainParent\) \{/, 'and is re-connected when audio.js builds it later');
+  assert.match(src, /pickChanged\(\) \{ sync\(\); notify\(\); \}/);
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /music\.pickChanged\(\);/, 'the card tells lobbyMusic.js when the pick moves');
+});
