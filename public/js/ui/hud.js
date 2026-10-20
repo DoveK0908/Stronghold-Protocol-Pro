@@ -536,25 +536,33 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     <${ServerStatusModal} open=${loadOpen} online=${conn?.status === 'online'} state=${conn?.loadState}
       details=${conn?.loadDetails} clusterLoad=${conn?.clusterLoad} scope="game" onClose=${() => setLoadOpen(false)} />
 
-    <div class="gtop__center brackets">
+    <div class="gtop__center">
+      <div class="gtop__frame">
       <${Tooltip} text=${btn.left.tip} placement="bottom">
         <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
           chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
       <//>
+      </div>
+      <div class="gtop__plate">
       <div class="roundbox">
         <span class="roundbox__label">${t('回合')}</span>
         <b class="roundbox__num num">${roundText}</b>
+      </div>
       </div>
       <div class=${cx('gtop__cap', fx.kind && `is-fx-${fx.kind}`)} key=${`cap${fx.seq}`}>
         <${PhaseCapsule} pub=${pub} hud=${hud} miss=${!boss && Number.isFinite(live?.left) ? live.left : null} />
         ${fx.kind && fx.kind !== 'enter' ? html`<${CapsuleScene} kind=${fx.kind} />` : null}
       </div>
+      <div class="gtop__plate gtop__plate--lp">
       <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
         note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
+      </div>
+      <div class="gtop__frame">
       <${Tooltip} text=${btn.right.tip} placement="bottom">
         <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
           chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
       <//>
+      </div>
     </div>
 
     <div class="gtop__right">

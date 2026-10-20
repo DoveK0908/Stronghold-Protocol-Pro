@@ -43,17 +43,12 @@
 /* a match with gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark */
 .gtop__mod { pointer-events: auto; }
 /* the latency pill and, beside it, the 观战席 capsule (ui/hud.js SpectatorPill: an eye + how many are watching; opens the roster) */
-/* 界面#12: one rounded pill like the official HUD — signal icon + "35 ms", then the service glyph. The words
-   已连接 / 服务 正常 move into the tooltips (the dot and the icon keep their colours), so the pill is one line. */
-.gtop__net { display: inline-flex; align-items: center; gap: .1rem; height: .32rem; padding: 0 .12rem;
-  border: 1px solid var(--line); border-radius: 99px; background: rgba(0, 0, 0, .5); }
-.gtop__net > * { height: auto; border: 0; border-radius: 0; background: transparent; }
-.gtop__net > * + * { border-left: 0; }
-.gtop__net .ping, .gtop__net .specpill { --btn-bg: transparent; --btn-bg-hover: rgba(255, 255, 255, .05); --btn-bd: transparent; padding-inline: 0; }
-.gtop__net .connection-status { display: none; }
-.gtop__net .server-load { display: none; }
-.gtop__net .server-load-button { width: auto; padding: 0; }
-.gtop__net .server-load__icon { width: .17rem; height: .17rem; }
+.gtop__net { display: inline-flex; align-items: stretch; gap: 0; height: .32rem;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .5); }
+/* 已连接 / 延迟 / 服务 read as one strip instead of three chips of different sizes */
+.gtop__net > * { height: 100%; border: 0; border-radius: 0; background: transparent; }
+.gtop__net > * + * { border-left: 1px solid var(--line); }
+.gtop__net .ping, .gtop__net .specpill { --btn-bg: transparent; --btn-bg-hover: rgba(255, 255, 255, .05); --btn-bd: transparent; padding-inline: .12rem; }
 .specpill { --btn-bg: rgba(0, 0, 0, .5); --btn-bg-hover: rgba(0, 0, 0, .66); --btn-bd: var(--line); height: .32rem; min-width: 0; padding: 0 .12rem; gap: .05rem; border-radius: 99px; }
 .specpill .btn__icon { width: .18rem; height: .18rem; color: var(--mint-500); }
 .specpill__num { font-size: .18rem; font-weight: 700; color: var(--mint-400); }
@@ -73,6 +68,15 @@
    bevelled plate in a grey outer frame across the middle, then [🔍▶▶] in its own bracket frame. Outlines of bevelled
    shapes are two clipped layers (the line colour, then the fill 1–2 px inside). */
 .gtop__center { position: relative; display: flex; align-items: center; margin-top: .02rem; }
+/* 界面#12 (maintainer 2026-10-20): 本局信息 and 查看即将迎击的敌方单位 each sit in their own bracket frame,
+   回合 / 血量 in their own dark plates — the centre no longer reads as one long undivided band. */
+.gtop__center { gap: .1rem; }
+.gtop__plate { position: relative; display: flex; align-items: center; justify-content: center; height: .64rem;
+  padding: 0 .14rem; background: linear-gradient(180deg, rgba(16, 20, 20, .92), rgba(9, 12, 12, .92));
+  border: 1px solid rgba(200, 206, 208, .28); }
+.gtop__plate--lp { padding: 0 .1rem; }
+.gtop__plate .roundbox__num { min-width: .3rem; padding: 0; background: none; clip-path: none; color: var(--text-hi); font-size: .34rem; }
+.gtop__plate .roundbox { gap: .1rem; }
 .gtop__frame { position: relative; display: flex; align-items: center; justify-content: center; height: .64rem; padding: 0 .17rem; }
 .gtop__frame::before, .gtop__frame::after { content: ''; position: absolute; top: 0; bottom: 0; width: .12rem; border: 2px solid rgba(200, 206, 208, .42); pointer-events: none; }
 .gtop__frame::before { left: 0; border-right: 0; }

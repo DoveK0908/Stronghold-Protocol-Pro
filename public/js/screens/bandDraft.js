@@ -214,7 +214,7 @@ function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, face, gd, turn
   return html`<div key=${p.playerId} class=${cx('dorder', cur && 'is-cur', picked && 'is-done', self && 'is-self', flash && 'is-flash', nc && 'has-nc')} style=${solo ? null : `--i:${i}`}>
     ${nc ? html`<span class="dorder__nc"><${NameCardLayer} card=${nc} /></span>` : null}
     ${art && !nc ? html`<span class="dorder__art" style=${'background-image:url("' + art + '")'}></span>` : null}
-    ${!solo ? html`<span class="dorder__idx num">${i + 1}</span>` : null}
+    <span class="dorder__idx num">${i + 1}</span>
     <span class="dorder__face">${p.isBot
       ? html`<${PlayerAvatar} player=${p} self=${self} />`
       : html`<${Img} src=${face} alt="" class="dorder__img" fallback=${html`<span class="dorder__glyph">${glyph}</span>`} />`}${self ? html`<span class="dorder__me" title=${t('我')}><${Icon} name="user" /></span>` : null}</span>
