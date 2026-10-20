@@ -11,7 +11,7 @@ import { createStore, loadPref, savePref, useStore, shallowEqual } from '../stor
 import { useData } from '../data.js';
 import { peekStatsRecords, selfRowOf } from './stats.js';
 import { CARD_PREF, cardAvatarUrl } from './seatArt.js';
-import { NAMECARD_PREF, namecardOf } from './namecards.js';
+import { DEFAULT_NAMECARD, NAMECARD_PREF, namecardOf } from './namecards.js';
 import { C2S } from '../../../shared/protocol.js';
 
 /** The server takes room.card (this build's protocol): teammates then see one's card. */
@@ -38,7 +38,7 @@ export const AVATAR_LOOK_PREF = 'room.avatar.look';
 export const cardStore = createStore({
   charId: str(loadPref(CARD_PREF, '')),
   avatar: str(loadPref(AVATAR_PREF, '')),
-  bg: str(loadPref(NAMECARD_PREF, '')),
+  bg: namecardOf(loadPref(NAMECARD_PREF, '')) ? loadPref(NAMECARD_PREF, '') : DEFAULT_NAMECARD,
   look: str(loadPref(CARD_LOOK_PREF, '')),
   avatarLook: str(loadPref(AVATAR_LOOK_PREF, '')),
   trophies: null, // read from the stats on first use
@@ -65,8 +65,8 @@ export function setCardAvatar(charId) {
 export function setCardLook(look) { savePref(CARD_LOOK_PREF, str(look)); cardStore.set({ look: str(look) }); }
 /** @param {string} look '' / 'e1' / a skin id of the 头像 operator */
 export function setAvatarLook(look) { savePref(AVATAR_LOOK_PREF, str(look)); cardStore.set({ avatarLook: str(look) }); }
-/** @param {string} bg '' = none */
-export function setCardBackground(bg) { const id = namecardOf(bg) ? bg : ''; savePref(NAMECARD_PREF, id); cardStore.set({ bg: id }); }
+/** @param {string} bg a card id; anything unknown falls back to the default 模拟·终极 card */
+export function setCardBackground(bg) { const id = namecardOf(bg) ? bg : DEFAULT_NAMECARD; savePref(NAMECARD_PREF, id); cardStore.set({ bg: id }); }
 
 /** One's card, the trophies re-read when a component that shows it mounts. */
 export function useMyCard() {
@@ -78,7 +78,7 @@ export function useMyCard() {
 export function cardMessage(card) {
   const trophies = Number.isSafeInteger(card?.trophies) ? Math.max(0, Math.min(1_000_000, card.trophies)) : 0;
   const charId = str(card?.charId), avatar = str(card?.avatar);
-  return { charId, avatar, bg: namecardOf(card?.bg) ? card.bg : '', trophies,
+  return { charId, avatar, bg: namecardOf(card?.bg) ? card.bg : DEFAULT_NAMECARD, trophies,
     look: charId ? str(card?.look) : '', avatarLook: avatar ? str(card?.avatarLook) : '' };
 }
 

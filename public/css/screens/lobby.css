@@ -2633,20 +2633,8 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .rseat__ava:hover .rseat__ava-pen, .rseat__ava:focus-visible .rseat__ava-pen { opacity: 1; }
 .rseat__ava-pen .icon { width: 75%; height: 75%; }
 .nc-pick__card { display: flex; flex-direction: column; text-align: left; }
-/* a skin's card (feedback #24): the picker shows its half-body art (lazy), the plate its full illustration */
-.nc-pick__art--skin img { position: absolute; right: 0; top: 0; width: 50%; height: 100%; object-fit: cover; object-position: 50% 14%; pointer-events: none;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%); mask-image: linear-gradient(90deg, transparent, #000 45%); }
-.nc-pick__art--skin .nc-pick__name { position: relative; display: flex; flex-direction: column; }
-.nc-pick__art--skin .nc-pick__name small { font-size: 11px; font-weight: 500; color: #a9b4b0; }
-.nc-pick__theme--skins { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.nc-pick__search { flex: 0 1 200px; min-width: 0; height: 26px; padding: 0 8px; font: inherit; font-size: 13px; font-weight: 400; color: #e6ecea;
-  background: rgba(0, 0, 0, .4); border: 1px solid rgba(255, 255, 255, .18); outline: none; }
-.nc-layer--skin { background: var(--nc-shade, linear-gradient(90deg, rgba(8, 11, 11, .86), rgba(8, 11, 11, .45) 50%, rgba(8, 11, 11, .1))),
-  var(--nc) center 24% / cover no-repeat, #101514; }
 .nc-pick__art { position: relative; display: flex; align-items: center; gap: .08rem; width: 100%; aspect-ratio: 600 / 186; padding: 0 12px; border-radius: 2px; overflow: hidden;
   color: #eef3f1; font-size: 13px; font-weight: 700; background: #101514; }
-.nc-pick__card--none .nc-pick__art { justify-content: center; color: #9aa6a2; border: 1px dashed rgba(255, 255, 255, .18); }
-.nc-pick__card--none .icon { width: 18px; height: 18px; }
 
 /* 服主 */
 .sp-owner-name { color: #ffd27a !important; }
@@ -2742,7 +2730,6 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 
 /* touch screens: inputs at 16px, so iOS does not zoom the page on focus */
 :is(.sp-touch, .sp-coarse) :is(.ally-key input, .cardpick__search input, .sw-search input) { font-size: 16px; }
-:is(.sp-touch, .sp-coarse) .nc-pick__search { font-size: 16px; }
 /* the 密钥加入 dialog's key field: 16 px at least, so iOS does not zoom the page on focus */
 .lobby-screen .join-row .field--code .field__input { font-size: max(calc(.34 * var(--t)), 16px); }
 
