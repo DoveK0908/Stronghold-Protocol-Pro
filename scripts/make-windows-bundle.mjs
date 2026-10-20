@@ -9,6 +9,7 @@
 //   app\                     游戏本体：**只收 git 跟踪的文件** + 生产依赖 + 素材，离线可玩
 //   启动游戏.bat             app\scripts\launch.mjs --no-setup
 //   启动游戏-插件沙箱.bat    the same with --scripts sandbox (script plugins in the SES sandbox, docs/PLUGINS.md §13)
+//   启动游戏.sh / 启动游戏-插件沙箱.sh  the same two launchers for Linux / macOS / WSL (system Node 24)
 //   README-开箱即用.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
 //   LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 //
@@ -386,6 +387,11 @@ function bat(body) {
   return `@echo off\r\nchcp 65001 >nul\r\nsetlocal\r\nset "HERE=%~dp0"\r\nset "NODE="\r\nif exist "%HERE%node\\node.exe" set "NODE=%HERE%node\\node.exe"\r\nif not defined NODE set "NODE=node"\r\n${body}\r\nset "CODE=%ERRORLEVEL%"\r\nif not "%CODE%"=="0" pause\r\nexit /b %CODE%\r\n`;
 }
 
+/** 启动 .sh（Linux / macOS / WSL；包内的 node.exe 只适用于 Windows，这里必须找到系统的 node）。 */
+function sh(body) {
+  return `#!/bin/sh\nset -eu\nHERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)\nNODE="$HERE/node/node"\nif [ ! -x "$NODE" ]; then NODE=node; fi\nexec "$NODE" "$HERE/app/scripts/launch.mjs" ${body} "$@"\n`;
+}
+
 /**
  * 包内说明。带不带便携版 Node 会影响三处措辞（是否需要预装 Node、许可证在哪、目录结构），
  * 所以先算好片段再拼，别在模板里嵌套引号。
@@ -401,11 +407,15 @@ node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
 启动游戏.bat             app\\scripts\\launch.mjs --no-setup
 启动游戏-插件沙箱.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
+启动游戏.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
+启动游戏-插件沙箱.sh     同上，并开启插件脚本沙箱
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
 启动游戏.bat             app\\scripts\\launch.mjs --no-setup
 启动游戏-插件沙箱.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
+启动游戏.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
+启动游戏-插件沙箱.sh     同上，并开启插件脚本沙箱
 README-开箱即用.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
@@ -440,6 +450,7 @@ Noto Sans SC 这类网页字体（\`index.html\` 里那条外链这次没有改�
 本机当服务器   双击 启动游戏.bat：在这台电脑开服，浏览器自动打开；
                控制台会打印「发给朋友」的局域网地址（形如 http://192.168.1.23:3000）
 用脚本插件     双击 启动游戏-插件沙箱.bat：同上，脚本插件在沙箱里运行（房主在房间里选中才生效）
+在 Linux/macOS ./启动游戏.sh：同上（用系统的 Node 24；包里的 node.exe 是 Windows 版）
 连别人的服务器 不需要这个包，直接用浏览器打开对方的网址就行
 \`\`\`
 
@@ -570,6 +581,12 @@ async function main() {
 
   await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup %*'), 'latin1');
   await fsp.writeFile(path.join(out, '启动游戏-插件沙箱.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup --scripts sandbox %*'), 'latin1');
+  await fsp.writeFile(path.join(out, '启动游戏.sh'), sh('--no-setup'), 'utf8');
+  await fsp.writeFile(path.join(out, '启动游戏-插件沙箱.sh'), sh('--no-setup --scripts sandbox'), 'utf8');
+  if (!IS_WIN) {
+    await fsp.chmod(path.join(out, '启动游戏.sh'), 0o755);
+    await fsp.chmod(path.join(out, '启动游戏-插件沙箱.sh'), 0o755);
+  }
   await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node }), 'utf8');
 
   const total = await dirSize(out);
