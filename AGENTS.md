@@ -51,6 +51,8 @@ npm run ci                                  # the CI checks locally (tools/ci.mj
 npm run golden                              # golden results
 ```
 
+**不要从仓库根裸跑 `node --test`**：它会顺手抓走 `deploy/stardust/feedback/test/feedback.test.mjs`（那套测试保持一个 HTTP server 开着，永远不会自己退出；本机实测整轮挂 10 分钟以上、CPU 空转），`test/ui/audio.test.js` 也需要 `--test-force-exit` 才收尾。请定向跑文件并带 `--test-force-exit`（如 `node --test --test-force-exit test/ui/audio.test.js`），全量走 `npm run ci` 里的测试入口（它已限定 `test/**` 并带好参数）。
+
 Browser suites are off by default and need Chrome: `SP_E2E=1` (UI), `SP_REAL_E2E=1` (real match, needs assets),
 `RENDER_E2E=1`, `SIM_E2E=1` — see CONTRIBUTING.md §2. Battle tests are easiest with the helpers described in
 docs/SIM.md (the test harness section) and the patterns in `test/content/op_siege.test.js`.
