@@ -144,10 +144,21 @@ function install() {
           await saveLibrary(); await saveState(); await saved(true, null);
         }
       }
+      // one-file 对局音乐 layouts (settings bgmPrep / bgmCombat = 'custom') kept their file under the kind's key
+      for (const kind of ['prep', 'combat']) {
+        const legacy = await saved(false, undefined, kind);
+        if (!legacy?.blob?.size) continue;
+        const id = `m${kind}`;
+        if (!entryOf(id)) { library = [...library, { id, name: legacy.name || kind, size: legacy.blob.size, blob: legacy.blob, addedAt: Date.now() }]; await saveLibrary(); }
+        const key = kind === 'prep' ? 'bgmPrep' : 'bgmCombat';
+        if ((settingsStore.get()[key] || 'official') === 'custom') updateSettings({ [key]: `custom:${id}` });
+        await saved(true, null, kind);
+      }
       if (st?.id && entryOf(st.id)) { selectedId = st.id; playState = { enabled: st.enabled !== false, paused: !!st.paused }; }
       if (!selectedId) selectedId = library[0]?.id || '';
       replace(entryOf(customId()));
       status = record ? (playState.paused ? t('已暂停') : t('点击“播放”开始音乐')) : N_('默认大厅音乐');
+      syncMatchLocal();
       refresh();
     } catch { status = t('浏览器暂不能保存音乐，可稍后重试'); notify(); }
   })();
@@ -167,18 +178,25 @@ export const music = {
     enabled: playState.enabled, paused: playState.paused,
     playing: !!media && !media.paused, status, busy,
   }),
-  /** Add one file to the local library and start playing it (nothing leaves this browser). */
-  async upload(file) {
-    if (busy) return; install(); busy = true; notify();
+  /** Add one file to the local library (nothing leaves this browser); returns its id. */
+  async add(file) {
+    if (busy) return ''; install(); busy = true; notify();
     try {
       await validate(file);
       const id = `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
       library = [...library, { id, name: file.name.slice(0, 180), size: file.size, blob: file, addedAt: Date.now() }];
       await saveLibrary();
-      await music.select(id);
+      syncMatchLocal();
       status = t('已添加到大厅音乐列表');
+      return id;
     } catch (e) { status = e.message || t('音乐导入失败'); throw e; }
     finally { busy = false; notify(); }
+  },
+  /** Add one file to the library and play it in the lobby (the card's upload button). */
+  async upload(file) {
+    if (busy) return;
+    const id = await music.add(file);
+    if (id) await music.select(id);
   },
   /** Play one library entry; the card's dropdown calls this (and settings follow it). */
   async select(id) {
@@ -192,6 +210,7 @@ export const music = {
     updateSettings({ lobbyTrack: 'custom', lobbyCustomId: id });
     await saveState();
     status = t('正在播放 · 单曲循环');
+    syncMatchLocal();
     audio._unlock(); refresh(); notify();
   },
   /** Drop one entry from the library; a deleted pick falls back to the next entry (or the official track). */
@@ -212,6 +231,7 @@ export const music = {
           refresh();
         }
       }
+      syncMatchLocal();
     } finally { busy = false; notify(); }
   },
   async toggle() {
@@ -229,7 +249,7 @@ export const music = {
       replace(null); playState = { enabled: true, paused: false };
       await Promise.all([saveLibrary(), saveState()]);
       updateSettings({ lobbyTrack: 'official', lobbyCustomId: '' });
-      status = t('默认大厅音乐'); refresh();
+      status = t('默认大厅音乐'); refresh(); syncMatchLocal();
     } finally { busy = false; notify(); }
   },
   /** The card switched the pick: stop or restart the player's own file. */
@@ -243,74 +263,89 @@ export const music = {
 // tracks (the lobby music streams), so it may last MAX_MATCH_MUSIC_S at most: 5 minutes are ~115 MB of PCM.
 export const MAX_MATCH_MUSIC_S = 300;
 const MATCH_KINDS = ['prep', 'combat'];
-const matchFiles = { prep: null, combat: null }, matchUrls = { prep: null, combat: null }, matchRev = { prep: 0, combat: 0 };
-const matchListeners = new Set();
-let matchLoaded = false;
-function setMatchFile(kind, rec) {
-  const old = matchUrls[kind];
-  matchFiles[kind] = rec;
-  matchUrls[kind] = rec?.blob ? URL.createObjectURL(rec.blob) : null;
-  audio.setBgmLocal(kind, matchUrls[kind]);
-  if (old) URL.revokeObjectURL(old);
-  matchListeners.forEach((fn) => fn());
+// the object URLs audio.js plays for each kind, with the library id they came from (so a switch revokes the old one)
+const matchLocal = { prep: null, combat: null };
+/**
+ * Point audio.js at the library entry 休整期 / 作战 picked (`custom:<id>`), revoking the URL of the old one. The library
+ * is shared with the 大厅音乐 card: a file uploaded for one place can be picked in the other.
+ */
+export function syncMatchLocal() {
+  install();
+  const settings = settingsStore.get();
+  for (const kind of MATCH_KINDS) {
+    const pick = kind === 'prep' ? settings.bgmPrep : settings.bgmCombat;
+    const id = typeof pick === 'string' && pick.startsWith('custom:') ? pick.slice(7) : '';
+    const prev = matchLocal[kind];
+    if ((prev?.id || '') === id) continue;
+    if (prev?.url) URL.revokeObjectURL(prev.url);
+    const entry = id ? entryOf(id) : null;
+    const url = entry ? URL.createObjectURL(entry.blob) : null;
+    matchLocal[kind] = id && url ? { id, url } : null;
+    audio.setBgmLocal(kind, url, id || null);
+  }
 }
 export const matchMusic = {
-  /** Hand the saved files to audio.js (main.js boot: a page that resumes a match never opens the lobby). */
-  load() {
-    if (matchLoaded) return;
-    matchLoaded = true;
-    for (const kind of MATCH_KINDS) {
-      const rev = matchRev[kind];
-      saved(false, undefined, kind).then((v) => {
-        if (rev === matchRev[kind] && v?.blob && v.blob.size <= MAX_MUSIC_BYTES) setMatchFile(kind, v);
-      }).catch(() => {});
-    }
+  /** Hand the picked library entries to audio.js (main.js boot: a page that resumes a match never opens the lobby). */
+  load() { install(); syncMatchLocal(); },
+  /** The file name of the entry this kind picked ('' when it picked an official track). */
+  name(kind) {
+    const pick = kind === 'prep' ? settingsStore.get().bgmPrep : settingsStore.get().bgmCombat;
+    const id = typeof pick === 'string' && pick.startsWith('custom:') ? pick.slice(7) : '';
+    return id ? entryOf(id)?.name || '' : '';
   },
-  name: (kind) => matchFiles[kind]?.name || '',
-  async upload(kind, file) {
-    ++matchRev[kind];
-    await validate(file, MAX_MATCH_MUSIC_S);
-    const rec = { blob: file, name: file.name.slice(0, 180) };
-    await saved(true, rec, kind);
-    setMatchFile(kind, rec);
-    audio._unlock();
-  },
-  async remove(kind) { ++matchRev[kind]; await saved(true, null, kind); setMatchFile(kind, null); },
 };
-const PREP_PICKS = BGM_CHOICES.filter((id) => id !== 'prep');
-const trackName = (id) => (id === 'official' ? t('官方（默认）') : id === 'custom' ? t('自选曲') : t(BGM_TRACKS.find((x) => x.id === id)?.name || id));
-function BgmPick({ kind, label, value, options, onPick, busy, action }) {
+const PREP_PICKS = BGM_CHOICES.filter((id) => id !== 'prep' && id !== 'custom');
+const COMBAT_PICKS = BGM_CHOICES.filter((id) => id !== 'custom');
+const trackName = (id, customName = '') => (id === 'official' ? t('官方（默认）') : id?.startsWith?.('custom:') ? customName || t('自选上传') : id === 'custom' ? t('自选曲') : t(BGM_TRACKS.find((x) => x.id === id)?.name || id));
+function BgmPick({ kind, label, value, options, tracks, onPick, busy, action }) {
   const input = useRef(null);
-  const name = matchMusic.name(kind);
+  const customId = typeof value === 'string' && value.startsWith('custom:') ? value.slice(7) : '';
+  const name = customId ? tracks.find((x) => x.id === customId)?.name || '' : '';
+  const upload = (file) => action(async () => {
+    const id = await music.add(file);
+    if (id) onPick(`custom:${id}`);
+  });
+  const fileInput = html`<input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden
+    onChange=${(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) upload(file); }} />`;
   return html`<div style="display:grid;gap:6px;min-width:0">
     <label style="display:grid;grid-template-columns:4.5em minmax(0,1fr);align-items:center;gap:10px;font-size:13px">
       <span>${label}</span>
-      <span class="lang-select" style="display:block;min-width:0"><select data-testid=${`bgm-${kind}`} style="width:100%" value=${value} onChange=${(e) => onPick(e.currentTarget.value)}>
+      <span class="lang-select" style="display:block;min-width:0"><select data-testid=${`bgm-${kind}`} style="width:100%" value=${value} onChange=${(e) => {
+        const next = e.currentTarget.value;
+        if (next === '__upload') { input.current?.click(); return; }
+        onPick(next);
+      }}>
         ${options.map((id) => html`<option key=${id} value=${id}>${trackName(id)}</option>`)}
+        ${tracks.map((x) => html`<option key=${x.id} value=${`custom:${x.id}`}>${trackName(`custom:${x.id}`, x.name)}</option>`)}
+        <option value="__upload">${t('＋ 上传新的…')}</option>
       </select></span>
     </label>
-    ${value === 'custom' ? html`<div style="display:flex;align-items:center;gap:8px;padding-left:calc(4.5em + 10px);min-width:0">
-      <small data-testid=${`bgm-${kind}-file`} style="flex:1;min-width:0;font-size:12px;overflow-wrap:anywhere;color:${name ? 'var(--mint,#58d9b5)' : 'var(--muted)'}">${name || t('未选择文件')}</small>
-      <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden onChange=${(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) action(() => matchMusic.upload(kind, file), 'error'); }} />
-      <${Button} size="sm" disabled=${busy} onClick=${() => input.current?.click()}>${busy ? t('正在导入…') : name ? t('更换') : t('选择文件')}<//>
-      ${name ? html`<${Button} size="sm" variant="secondary" disabled=${busy} onClick=${() => action(async () => { await matchMusic.remove(kind); onPick('official'); })}>${t('清除')}<//>` : null}
-    </div>` : null}
+    ${customId ? html`<div style="display:flex;align-items:center;gap:8px;padding-left:calc(4.5em + 10px);min-width:0">
+      <small data-testid=${`bgm-${kind}-file`} style="flex:1;min-width:0;font-size:12px;overflow-wrap:anywhere;color:${name ? 'var(--mint,#58d9b5)' : 'var(--muted)'}">${name || t('文件已不存在')}</small>
+      ${fileInput}
+      <${Button} size="sm" disabled=${busy} onClick=${() => input.current?.click()}>${busy ? t('正在导入…') : t('更换')}<//>
+      <${Button} size="sm" variant="secondary" disabled=${busy} onClick=${() => onPick('official')}>${t('清除')}<//>
+    </div>` : fileInput}
   </div>`;
 }
 function MatchMusic() {
   const s = useSettings();
-  const [, setRev] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState('');
-  useEffect(() => { const fn = () => setRev((n) => n + 1); matchListeners.add(fn); return () => matchListeners.delete(fn); }, []);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [tracks, setTracks] = useState(() => music.snapshot().tracks);
+  useEffect(() => music.subscribe((snap) => setTracks(snap.tracks)), []);
+  // the library entries behind `custom:<id>` picks: rebuild the object URLs audio.js plays whenever either moves
+  useEffect(() => { syncMatchLocal(); }, [s.bgmPrep, s.bgmCombat, tracks]);
   const action = async (fn) => {
     setError(''); setBusy(true);
     try { await fn(); } catch (e) { setError(e.message || t('音乐导入失败')); } finally { setBusy(false); }
   };
+  const pick = (kind, value) => updateSettings({ [kind === 'prep' ? 'bgmPrep' : 'bgmCombat']: value });
   return html`<div style="display:grid;gap:10px;padding-top:14px;border-top:1px solid rgba(223,230,226,.14);min-width:0">
     <strong style="font-size:15px">${t('对局音乐')}</strong>
-    <${BgmPick} kind="prep" label=${t('休整期')} value=${s.bgmPrep} options=${PREP_PICKS} busy=${busy} action=${action} onPick=${(v) => updateSettings({ bgmPrep: v })} />
-    <${BgmPick} kind="combat" label=${t('作战')} value=${s.bgmCombat} options=${BGM_CHOICES} busy=${busy} action=${action} onPick=${(v) => updateSettings({ bgmCombat: v })} />
+    <${BgmPick} kind="prep" label=${t('休整期')} value=${s.bgmPrep} options=${PREP_PICKS} tracks=${tracks} busy=${busy} action=${action} onPick=${(v) => pick('prep', v)} />
+    <${BgmPick} kind="combat" label=${t('作战')} value=${s.bgmCombat} options=${COMBAT_PICKS} tracks=${tracks} busy=${busy} action=${action} onPick=${(v) => pick('combat', v)} />
     ${error ? html`<p role="alert" style="margin:0;color:#ff9393;font-size:13px;overflow-wrap:anywhere">${error}</p>` : null}
-    <small style="color:var(--muted);font-size:12px;line-height:1.6">${t('只改变你自己听到的音乐。自选曲保存在当前浏览器，每首最长 5 分钟。作战的官方音乐：第 1–7 回合《无畏者》，第 8 回合起《骑士之日》；联防、最终攻势和隐秘核心保持官方音乐。')}</small>
+    <small style="color:var(--muted);font-size:12px;line-height:1.6">${t('只改变你自己听到的音乐。自选曲和主界面音乐共用本机曲库，每首最长 5 分钟。作战的官方音乐：第 1–7 回合《无畏者》，第 8 回合起《骑士之日》；联防、最终攻势和隐秘核心保持官方音乐。')}</small>
   </div>`;
 }
 

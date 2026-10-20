@@ -737,6 +737,14 @@ describe('AudioManager', () => {
     assert.equal(pickedBgm(manifest, 'prep', null), null);
     const local = { prep: 'blob:prep-file', combat: null };
     assert.deepEqual(pickedBgm(manifest, 'prep', { prep: 'custom' }, null, local), { intro: null, loop: 'blob:prep-file', choice: 'blob:prep-file', local: true });
+    // 对局音乐 lists the same local library as 大厅音乐 (owner, 2026-10-20): the pick is `custom:<id>` and setBgmLocal
+    // carries that id, so only the entry the kind actually picked plays
+    const lib = { prep: { id: 'abc', url: 'blob:lib-a' }, combat: { id: 'def', url: 'blob:lib-b' } };
+    assert.match(sanitizeBgmChoice('custom:abc'), /^custom:abc$/);
+    assert.equal(sanitizeBgmChoice('custom:'), 'official');
+    assert.deepEqual(pickedBgm(manifest, 'prep', { prep: 'custom:abc' }, null, lib), { intro: null, loop: 'blob:lib-a', choice: 'blob:lib-a', local: true });
+    assert.equal(pickedBgm(manifest, 'prep', { prep: 'custom:zzz' }, null, lib), null, 'another entry: official');
+    assert.deepEqual(pickedBgm(manifest, 'combat:0', { combat: 'custom:def' }, null, lib)?.loop, 'blob:lib-b');
     assert.equal(pickedBgm(manifest, 'combat:0', { combat: 'custom' }, null, local), null, '自选曲 without a file: official');
     assert.equal(pickedBgm(manifest, 'prep', { prep: 'custom' }), null);
     assert.equal(pickedBgm(manifest, 'prep', { prep: 'custom' }, new Set(['blob:prep-file']), local), null, 'a file that did not decode: official');

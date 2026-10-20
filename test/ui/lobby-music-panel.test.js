@@ -133,3 +133,20 @@ test('the 音乐 modal keeps only 对局音乐 — 大厅音乐 moved to the lob
   assert.match(button, /<\$\{MatchMusic\} \/>/, '对局音乐 stays');
   assert.match(button, /大厅音乐已移到大厅左上角的「主界面音乐」卡片/, 'the modal points at the card');
 });
+
+test('对局音乐 lists the same local library as the lobby card', () => {
+  // 「对局音乐里面的列表应该也和主界面音乐的列表一样啊」 (owner, 2026-10-20)
+  const src = read('public/js/ui/lobbyMusic.js');
+  assert.match(src, /export function syncMatchLocal\(\)/, 'the picked entries become object URLs for audio.js');
+  assert.match(src, /const id = typeof pick === 'string' && pick\.startsWith\('custom:'\) \? pick\.slice\(7\) : ''/, 'a pick names a library entry');
+  assert.match(src, /audio\.setBgmLocal\(kind, url, id \|\| null\);/, 'and the id travels with the URL');
+  assert.match(src, /const id = await music\.add\(file\);/, 'uploading from 对局音乐 adds to the same library');
+  assert.match(src, /tracks\.map\(\(x\) => html`<option key=\$\{x\.id\} value=\$\{`custom:\$\{x\.id\}`\}>/, 'every library entry is offered');
+  assert.match(src, /<option value="__upload">\$\{t\('＋ 上传新的…'\)\}<\/option>/, 'with an upload entry');
+  assert.match(src, /matchMusic = \{\n\s*\/\*\* Hand the picked library entries/, 'boot wires the picks up');
+  assert.match(src, /for \(const kind of \['prep', 'combat'\]\) \{\n\s*const legacy = await saved\(false, undefined, kind\);/, 'old one-file 对局音乐 picks are adopted into the library');
+  const bgm = read('public/js/bgmChoice.js');
+  assert.match(bgm, /const CUSTOM_PICK = \/\^custom:\[A-Za-z0-9_-\]\{1,64\}\$\//, 'custom:<id> is a valid pick');
+  const audio = read('public/js/audio.js');
+  assert.match(audio, /setBgmLocal\(kind, url, id = null\)/, 'audio.js keeps the entry id');
+});

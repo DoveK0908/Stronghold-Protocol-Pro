@@ -27,8 +27,10 @@ export const BGM_TRACKS = Object.freeze([
 /** Every valid value of settings bgmPrep / bgmCombat. */
 export const BGM_CHOICES = Object.freeze(['official', ...BGM_TRACKS.map((t) => t.id), 'custom']);
 
+/** A library entry of the player's own music (ui/lobbyMusic.js): `custom:<id>`. */
+const CUSTOM_PICK = /^custom:[A-Za-z0-9_-]{1,64}$/;
 /** @param {any} v @returns {string} a valid pick ('official' for anything else) */
-export const sanitizeBgmChoice = (v) => (BGM_CHOICES.includes(v) ? v : 'official');
+export const sanitizeBgmChoice = (v) => (BGM_CHOICES.includes(v) || (typeof v === 'string' && CUSTOM_PICK.test(v)) ? v : 'official');
 
 /**
  * Which pick a BGM key follows: 'prep' (休整期 and the other prep-like phases) or 'combat' (a normal 作战, the round's own
@@ -57,7 +59,15 @@ export function pickedBgm(manifest, key, choices, failed = null, local = null) {
   const id = kind ? sanitizeBgmChoice(choices?.[kind]) : 'official';
   if (id === 'official') return null;
   if (id === 'custom') {
-    const url = local?.[kind];
+    // one-file layouts: `local` used to be the bare object URL (it may also be the { id, url } slot of setBgmLocal)
+    const slot = local?.[kind];
+    const url = typeof slot === 'string' ? slot : slot?.url || null;
+    return url && !failed?.has(url) ? { intro: null, loop: url, choice: url, local: true } : null;
+  }
+  if (id.startsWith('custom:')) {
+    // a library entry: `local` is { id, url } for the file that kind picked (ui/lobbyMusic.js syncMatchLocal)
+    const slot = local?.[kind];
+    const url = slot && typeof slot === 'object' && slot.id === id.slice(7) ? slot.url : null;
     return typeof url === 'string' && url && !failed?.has(url) ? { intro: null, loop: url, choice: url, local: true } : null;
   }
   if (failed?.has(id)) return null;

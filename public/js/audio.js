@@ -960,11 +960,14 @@ export class AudioManager {
    * The player's 自选曲 file of 休整期 / 作战 (an object URL, null: none); the track on screen follows at once.
    * @param {'prep'|'combat'} kind
    * @param {string|null} url
+   * @param {string|null} [id] the library entry the URL belongs to (`custom:<id>` picks need it)
    */
-  setBgmLocal(kind, url) {
-    if (!(kind in this.bgmLocal) || this.bgmLocal[kind] === (url || null)) return;
-    this.bgmLocal = { ...this.bgmLocal, [kind]: url || null };
-    if (this.localBgm && !Object.values(this.bgmLocal).includes(this.localBgm.url)) this.localBgm = null;
+  setBgmLocal(kind, url, id = null) {
+    const next = url ? { id: id || 'custom', url } : null;
+    const prev = this.bgmLocal[kind] || null;
+    if (!(kind in this.bgmLocal) || (prev?.url ?? null) === (next?.url ?? null) && (prev?.id ?? null) === (next?.id ?? null)) return;
+    this.bgmLocal = { ...this.bgmLocal, [kind]: next };
+    if (this.localBgm && !Object.values(this.bgmLocal).some((slot) => slot?.url === this.localBgm.url)) this.localBgm = null;
     const key = this.bgm?.key ?? this.wantBgm;
     if (key) this.playBgm(key);
   }

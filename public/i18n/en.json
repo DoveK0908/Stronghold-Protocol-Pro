@@ -3326,5 +3326,7 @@
   "拉维妮娅": "Lavinia",
   "已添加到大厅音乐列表": "Added to your lobby music list",
   "大厅音乐已移到大厅左上角的「主界面音乐」卡片：可以添加多首自选曲，切换、随机播放和单独的音量都在那里。自选曲只保存在本机浏览器，不上传服务器。": "Lobby music moved to the “主界面音乐” card at the top-left of the lobby: add as many of your own tracks as you like — switching, shuffle and its own volume live there. Your own tracks stay in this browser and are never uploaded.",
-  "＋ 上传新的…": "+ Upload a new track…"
+  "＋ 上传新的…": "+ Upload a new track…",
+  "文件已不存在": "That file is gone",
+  "只改变你自己听到的音乐。自选曲和主界面音乐共用本机曲库，每首最长 5 分钟。作战的官方音乐：第 1–7 回合《无畏者》，第 8 回合起《骑士之日》；联防、最终攻势和隐秘核心保持官方音乐。": "Only changes the music you hear. Your own tracks share the lobby card's local library (each up to 5 minutes). Official 作战 music: 《无畏者》 for rounds 1–7, 《骑士之日》 from round 8 on; 联防, the final assault and the hidden core keep their own tracks."
 }
