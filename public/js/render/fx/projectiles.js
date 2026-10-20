@@ -24,6 +24,20 @@ const SHELL_RISE = 0.34, SHELL_UP = 5.5;
 /** 蕾缪安 S3 shell (fx 'bombardShell'); `look` 'mortar' is its own flight (_stepMortar). */
 const BOMBARD_SHELL = Object.freeze({ look: 'mortar', tint: 0xfff2d8, glow: 0xff9c33, trail: 0xffb35c, smoke: 0x3a3430, len: 1.3, width: 0.3, head: 0.56 });
 
+/** The muzzle bone names an operator skin may carry (render/vfx/mounts.js POINT_NAMES.muzzle, same order). */
+const MUZZLE_BONES = Object.freeze(['Muzzle', 'MuzzlePoint', 'muzzle']);
+
+/**
+ * Where the weapon of a drawn unit is, in tiles from its feet (`x` along the screen's right with the facing applied,
+ * `up` along the model), read off the live Spine pose at the attack clip's strike frame. Null when no model is drawn
+ * (2D board, a unit without a skeleton, a harness) — the caller then keeps the old body-centred launch point.
+ */
+export function muzzleOffset(view) {
+  if (!view || typeof view.boneOffset !== 'function') return null;
+  const o = view.boneOffset(MUZZLE_BONES, { x: 0, up: 0, angle: 0, flip: 1 }, true);
+  return o && Number.isFinite(o.x) && Number.isFinite(o.up) ? o : null;
+}
+
 export class FxProjectiles {
   // ---- helpers ------------------------------------------------------------------------------------------
 
@@ -80,6 +94,9 @@ export class FxProjectiles {
     const look = spec.look;
     pr.kind = kind; pr.spec = spec; pr.src = src; pr.tgt = tgt; pr.rise = 0;
     pr.x0 = src.x + ux * hand; pr.y0 = src.y + uy * hand; pr.z0 = bodyZ(cam, src, SHOT_HEIGHT.launch);
+    // the shot leaves the weapon (the model's Muzzle bone as the attack clip poses it), not the middle of the sprite
+    const mo = muzzleOffset(src);
+    pr.ox = mo ? mo.x : 0; pr.oy = mo ? -mo.up : 0;
     pr.tx = tgt.x; pr.ty = tgt.y; pr.tz = look === 'shell' ? feetZ(tgt) : bodyZ(cam, tgt, SHOT_HEIGHT.aim);
     pr.t = 0; pr.fade = 0; pr.hit = false; pr.emit = Math.random(); pr.ang = Math.atan2(-uy, ux);   // ≈ on screen (rows run up)
     pr.dur = clamp(dist / projSpeed(kind) / this._ts(), 0.04, 1.5);
@@ -167,7 +184,9 @@ export class FxProjectiles {
   _shotPoint(pr, k, cam, out) {
     const x = pr.x0 + (pr.tx - pr.x0) * k, y = pr.y0 + (pr.ty - pr.y0) * k;
     const z = pr.z0 + (pr.tz - pr.z0) * k + (pr.arc ? pr.arc * 4 * k * (1 - k) : 0);
-    return cam.project(x, y, z, out);
+    const p = cam.project(x, y, z, out);
+    if (pr.ox || pr.oy) { p.x += pr.ox * p.s; p.y += pr.oy * p.s; }
+    return p;
   }
 
   /**
@@ -336,6 +355,8 @@ export class FxProjectiles {
     }
     const p = cam.project(x, y, z, this._p);
     const q = cam.project(x, y, zq, this._q);
+    // the shell climbs out of the barrel, not out of the middle of the sprite
+    if (k < pr.rise && (pr.ox || pr.oy)) { p.x += pr.ox * p.s; p.y += pr.oy * p.s; q.x += pr.ox * q.s; q.y += pr.oy * q.s; }
     const s = p.s, px = p.x, py = p.y;
     const seg = Math.hypot(px - q.x, py - q.y);
     if (seg > 0.5) pr.ang = Math.atan2(py - q.y, px - q.x);
@@ -368,7 +389,7 @@ export class FxProjectiles {
     const spec = pr.spec, look = spec.look;
     if (!spec.muzzle) return;
     const cam = this.ctx.cam();
-    const p = cam.project(pr.x0, pr.y0, pr.z0, this._g);
+    const p = this._shotPoint(pr, 0, cam, this._g);
     const px = p.x, py = p.y, s = p.s;
     if (look === 'tracer') {
       const q = cam.project(pr.tx, pr.ty, pr.tz, this._q);
