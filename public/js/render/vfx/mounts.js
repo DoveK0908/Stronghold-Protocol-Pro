@@ -174,6 +174,14 @@ export function pointOffset(skin, kind, back) {
 
 const _bo = { x: 0, up: 0, angle: 0, flip: 1 };
 
+/** The bone names to try for a point kind on a model that carries no skin point table (front and back skeletons). */
+function boneNames(kind) {
+  const base = POINT_NAMES[kind] || [];
+  const out = [];
+  for (const n of base) out.push(n, `F_${n}`, `B_${n}`);
+  return out;
+}
+
 /**
  * The live bone of a bone-followed point on the unit's model (`unit.view.boneOffset`, render/units.js: the bone as the
  * model is drawn now — `unit.strike`: as its attack clip poses it at the strike frame —, its offset from the feet in
@@ -196,7 +204,11 @@ export function unitPoint(skin, kind, unit, out = [0, 0, 0]) {
   const k = Number.isFinite(unit.scale) ? unit.scale : 1;
   out[0] = unit.x - 10; out[1] = unit.y - 9; out[2] = -(unit.z || 0);
   const p = kind ? skinPoint(skin, kind, !!unit.back) : null;
-  const b = p ? liveBone(p, unit) : null;
+  // No cosmetic skin (the common case: the operator's own model): the prefab index has no point table for it, but the
+  // unit's drawn skeleton still has the bone the client's BoneFollower follows — read the muzzle/hit/head bone straight
+  // off the model (with the skeleton's F_/B_ front/back prefixes). Without this every default operator shot from a
+  // generic point over its feet, i.e. the middle of the sprite.
+  const b = p ? liveBone(p, unit) : (kind && unit.view ? liveBone({ bones: boneNames(kind) }, unit) : null);
   if (b) {
     const t = (Number.isFinite(unit.tilt) ? unit.tilt : SKELETON_TILT) * DEG;
     out[0] += b.x; out[1] += b.up * Math.cos(t); out[2] -= b.up * Math.sin(t);

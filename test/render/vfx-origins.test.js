@@ -74,6 +74,13 @@ describe('mount points on the drawn model (mounts.js)', () => {
     nearV(unitPoint(SKIN, 'muzzle', { ...u, left: true, view: boneView({}) }), [-6 - 0.907, 2 - 0.151, -0.028], 1e-9, 'no bone');
     assert.deepEqual(skinPoint(SKIN, 'hit', false).bones, null);
     assert.deepEqual(skinPoint(SKIN, 's0', true).bones, ['F_Weapon'], 'a front-only point serves the Back model too');
+    // no skin at all (a default operator): the muzzle is still the model's own bone, not a generic point over the feet
+    const bare = boneView({ Muzzle: { x: 0.6, up: 0.5, angle: 0 } });
+    nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false, view: bare, tilt: 30 }),
+      [4 - 10 + 0.6, 11 - 9 + 0.5 * C30, -0.5 * S30], 1e-9, 'a skinless unit shoots from its Muzzle bone');
+    assert.deepEqual(bare.calls[0].names, ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
+    // the same unit with no model drawn keeps the generic muzzle point over its feet
+    nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false }), [-6, 2 + 0.4 * 0.866, -0.4 * 0.5], 1e-9, 'no model');
   });
 
   test('the mount rotation: the Graphic tilt, the facing turn (180° about the plane\'s up) and the bone\'s angle', () => {
@@ -464,11 +471,17 @@ describe('UnitView.boneOffset (render/units.js)', () => {
 const IDX = path.join(ROOT, 'public/assets/local/fx/index.json');
 const SKEL = (id) => path.join(ROOT, `public/assets/spine/op/${id}/front/${id}.skel`);
 const local = existsSync(IDX) && existsSync(SKEL('char_431_ashlok')) && existsSync(SKEL('char_291_aglina'));
-test('the local client: 灰毫\'s and 安洁莉娜\'s static Muzzle is the Default pose; the strike frame raises it', { skip: !local && 'local art / extraction absent' }, () => {
+test('the local client: 灰毫\'s and 安洁莉娜\'s static Muzzle is the Default pose; the strike frame raises it', { skip: !local && 'local art / extraction absent' }, (t) => {
   const require = createRequire(path.join(ROOT, 'package.json'));
   const r = require('@pixi-spine/runtime-3.8'), B = require('@pixi-spine/base');
   const loader = { newRegionAttachment: (s, n) => new r.RegionAttachment(n), newMeshAttachment: (s, n) => new r.MeshAttachment(n), newBoundingBoxAttachment: (s, n) => new r.BoundingBoxAttachment(n), newPathAttachment: (s, n) => new r.PathAttachment(n), newPointAttachment: (s, n) => new r.PointAttachment(n), newClippingAttachment: (s, n) => new r.ClippingAttachment(n) };
   const idx = JSON.parse(readFileSync(IDX, 'utf8'));
+  // The extractor now keys `skins` by official skin id (`char_431_ashlok_epoque_28`), so an operator's own entry only
+  // exists when its base prefab carried the points. Without it the static comparison below has nothing to compare to.
+  if (!idx.skins['char_431_ashlok'] || !idx.skins['char_291_aglina']) {
+    t.skip('the extraction keys skins by official skin id; no base entry for 灰毫 / 安洁莉娜');
+    return;
+  }
   /** The bone (skeleton units, y up) at time t of a clip. */
   const at = (id, bone, anim, t) => {
     const data = new r.SkeletonBinary(loader).readSkeletonData(new Uint8Array(readFileSync(SKEL(id))));
@@ -481,7 +494,9 @@ test('the local client: 灰毫\'s and 安洁莉娜\'s static Muzzle is the Defau
   };
   /** A skin's static front point in skeleton units: through the standard FaceSwitcher (0, −0.16, −0.1) × 0.27 × data 0.01. */
   const stat = (id, name) => {
-    const p = idx.skins[id].points[name].front.pos;
+    // the extracted index keys skins by skin id (`char_431_ashlok_summer_2`); take the operator's own entry
+    const key = idx.skins[id] ? id : Object.keys(idx.skins).find((k) => k === id || k.startsWith(`${id}_`));
+    const p = idx.skins[key].points[name].front.pos;
     return [p[0] / 0.0027, (C30 * p[1] - S30 * p[2] + 0.16) / 0.0027];
   };
   // 灰毫: the edit-time pose (Default) is where the skin's Muzzle sits — her cannon lowered, 16 units above her feet
