@@ -16,8 +16,13 @@ import { createStore, loadPref, savePref, selectRoute, store, useStore } from '.
 import { toast } from './toasts.js';
 import { t } from '../../../shared/i18n.js';
 
-/** Approximate sizes of the tiers for the 0.3.0 material set, in GB (shown as「约 …」; the queue counts files). */
-export const ASSET_TIER_GB = Object.freeze({ match: 0.8, all: 2.6 });
+/**
+ * Approximate sizes of the tiers for the 0.3.0 material set, in GB (shown as「约 …」; the queue counts files). Measured
+ * on the 2026-10 material set served here: 对局素材 1.20 GB (39 121 files, no skins, only the dubs this player hears —
+ * the same size for every dub), 全部素材 2.78 GB (41 590 files). The free-space warning below compares the file bytes
+ * against this, so an understated figure let a download fill the browser's storage.
+ */
+export const ASSET_TIER_GB = Object.freeze({ match: 1.2, all: 2.8 });
 const BUSY = ['preparing', 'downloading'];
 
 /** Whether this page's service worker keeps fetched art (registered with the material profile: public/sw.js). */

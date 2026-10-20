@@ -21,6 +21,9 @@ test('对局素材 leaves out skins and the dubs the player does not hear; 全�
   assert.deepEqual(selectAssetTier(['/assets/~0123456789abcdef/skins/x/b.png', '/media/~0123456789abcdef/voice/kr/a/1',
     '/assets/~0123456789abcdef/char/a.png'], { tier: 'match', voice: 'cn' }), ['/assets/~0123456789abcdef/char/a.png']);
   assert.deepEqual(Object.keys(ASSET_TIER_GB), ['match', 'all']);
+  // measured on the 2026-10 material set (39 121 / 41 590 files): the free-space warning compares the file bytes against
+  // these, so they may round up but must not understate them (0.8 / 2.6 did, by 30 % and 7 %)
+  assert.ok(ASSET_TIER_GB.match >= 1.2 && ASSET_TIER_GB.all >= 2.78);
 });
 
 test('a tier is chosen at start; files done in one tier count in the other and are not fetched again', async () => {
