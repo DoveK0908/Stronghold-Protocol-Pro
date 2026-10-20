@@ -1,4 +1,4 @@
-// U08 界面#08 卡池剩余: the shop card prints the copies left in the pool bottom-right. The server field is pinned by
+// U07 界面#07 卡池剩余: the shop card prints the copies left in the pool bottom-right. The server field is pinned by
 // test/match/shop-pool-left.test.js; this file pins the client side (markup, style, translations).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

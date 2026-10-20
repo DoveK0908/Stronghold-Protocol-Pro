@@ -331,7 +331,7 @@ export class Net {
   }
 
   /**
-   * Set the four digits of 名字#1234 used in `hello` (界面#10). Like setName it re-hellos a live socket; the server
+   * Set the four digits of 名字#1234 used in `hello` (界面#09). Like setName it re-hellos a live socket; the server
    * answers NAME_TAKEN when another browser claimed that pair first.
    * @param {string | null} tag
    */
@@ -345,7 +345,7 @@ export class Net {
   }
 
   /**
-   * Set name and #four digits together and send one hello (界面#10: a rename must not claim the digits under the old
+   * Set name and #four digits together and send one hello (界面#09: a rename must not claim the digits under the old
    * name first).
    * @param {string} name
    * @param {string | null} tag
@@ -446,7 +446,7 @@ export class Net {
     const rid = this._nextRid();
     const msg = { t: 'hello', rid, name: this.name, version: PROTOCOL_VERSION, matchmakingVersion: MATCHMAKING_VERSION, playerCapacityVersion: PLAYER_CAPACITY_VERSION,
       stateDelta: STATE_DELTA_VERSION };
-    // 界面#10: the four digits and the install id that owns their claim (an older server ignores both)
+    // 界面#09: the four digits and the install id that owns their claim (an older server ignores both)
     const tag = this.wantTag || null;
     if (tag) msg.tag = tag;
     try { msg.uid = identity.uid(); } catch { /* storage blocked: no claim ownership */ }
@@ -500,7 +500,7 @@ export class Net {
     this._helloRid = null;
     this.lastError = new NetError(msg.code, msg.msg, msg.detail);
     if (msg.code === 'NAME_REJECTED') this.name = null; // wait for an explicit corrected name, not endless rejected reconnects
-    // 名字#四位 taken (界面#10): wait for the dialog to pick another pair instead of retrying the same one forever
+    // 名字#四位 taken (界面#09): wait for the dialog to pick another pair instead of retrying the same one forever
     if (msg.code === 'NAME_TAKEN') this.name = null;
     if (msg.code === 'SERVER_FULL') {
       // the online cap: leave this socket and try again after the server's interval (±25 %), no exponential backoff;
@@ -845,7 +845,7 @@ export class Net {
 // its own token (never another tab's), so it can't steal a live session either.
 
 const K_NAME = 'sp.name';
-const K_TAG = 'sp.tag';        // localStorage: the player's own 名字#1234 four digits (界面#10)
+const K_TAG = 'sp.tag';        // localStorage: the player's own 名字#1234 four digits (界面#09)
 const K_UID = 'sp.uid';        // localStorage: this browser's install id, the owner of the #tag claim
 let uidCache = null;           // one per page load, so a storage-less environment still has a stable owner
 const K_TOKEN = 'sp.token';      // sessionStorage: this tab's token

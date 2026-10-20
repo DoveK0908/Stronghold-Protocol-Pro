@@ -1308,7 +1308,7 @@ export class Lobby {
   }
 
   /**
-   * room.moveSeat {seat} (界面#15): a seated human moves to an empty seat of the same room before the match.
+   * room.moveSeat {seat} (界面#14): a seated human moves to an empty seat of the same room before the match.
    * Expanded rooms (8–20 seats) seat four players at a time, so the seat a player picks is the group they
    * play with; the table changing un-readies everyone else, like a strategy change on an AI seat.
    */

@@ -1,4 +1,4 @@
-// test/ui/room-seat-move.test.js — 界面#15: choosing your seat in the ready room and the four-a-group
+// test/ui/room-seat-move.test.js — 界面#14: choosing your seat in the ready room and the four-a-group
 // dividers of an expanded room. Static: room.js asks the server for room.moveSeat from an empty seat's
 // 「移到这里」 button, inserts a .rseat-sep divider every four seats once the room has more than four,
 // and the styles / English strings exist.

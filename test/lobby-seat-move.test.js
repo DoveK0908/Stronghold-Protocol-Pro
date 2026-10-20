@@ -1,4 +1,4 @@
-// test/lobby-seat-move.test.js — 界面#15: a seated human moves to an empty seat before the match
+// test/lobby-seat-move.test.js — 界面#14: a seated human moves to an empty seat before the match
 // (room.moveSeat {seat}); expanded rooms of 8–20 seats group four at a time, so the seat is the group.
 // Covers the protocol, the happy path (host and guest, room.state follows, un-readying everyone else),
 // and the refusals (not seated, taken seat, outside capacity, after the match started, solo rooms).

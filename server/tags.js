@@ -1,4 +1,4 @@
-// 名字#四位 (the owner's decision of 2026-10-20, 界面#10): a player shows `名字#1234` instead of `Doctor #NNNN`.
+// 名字#四位 (the owner's decision of 2026-10-20, 界面#09): a player shows `名字#1234` instead of `Doctor #NNNN`.
 // The four digits are chosen by the player (initially random) and **claimed**: two players may share a name, and two
 // may share a tag, but the same `name#tag` pair belongs to whoever claimed it first. The claim is kept on this server
 // (a JSON file) so it survives restarts, and is bound to the browser that claimed it (`uid`, a random id kept in
@@ -107,7 +107,7 @@ export function createTagRegistry({ file = defaultFile(), log = console, now = D
       schedule();
       return true;
     },
-    /** Drop every pair this uid holds except `name#tag` (one browser owns one pair, 界面#10). */
+    /** Drop every pair this uid holds except `name#tag` (one browser owns one pair, 界面#09). */
     releaseOthers(uid, name, tag) {
       const u = ownerKey(uid);
       const keep = pairKey(name, tag);

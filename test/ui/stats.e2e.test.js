@@ -87,7 +87,7 @@ describe('统计数据 page (real server, headless Chrome)', { skip: !ENABLED &&
   }
   const texts = (c, sel) => c.page.$$eval(sel, (els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').trim()));
   const stored = (c) => c.page.evaluate(() => { const r = localStorage.getItem('sp.pref.stats'); return r ? JSON.parse(r) : null; });
-  // 界面#10: the top bar's 名片 card opens 我的信息, whose 统计数据 button opens the stats screen
+  // 界面#09: the top bar's 名片 card opens 我的信息, whose 统计数据 button opens the stats screen
   const openStats = async (c, from = null) => {
     if (!from) {
       await c.click('.lobby-screen [data-testid="me-card"]');

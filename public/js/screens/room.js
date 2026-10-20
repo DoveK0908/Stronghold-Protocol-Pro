@@ -232,7 +232,7 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
   if (!seat) {
     const invitable = coop && !facts.spectating;
     const canAdd = coop && facts.isHost && !queued;
-    // 界面#15: a seated player may claim any empty seat before the match (8–20 seat rooms group four at a time).
+    // 界面#14: a seated player may claim any empty seat before the match (8–20 seat rooms group four at a time).
     const canMove = coop && !facts.spectating && !queued && !!facts.mine;
     return html`<article class=${`rseat rseat--empty${queued ? ' is-searching' : ''}`} style=${`--i:${index}`}>
       <span class="rseat__clip" aria-hidden="true"></span>
@@ -551,7 +551,7 @@ export function RoomScreen() {
           onAddBot=${addBot} onAddElite=${addElite} onRemoveBot=${removeBot} onBotBand=${setBandSeat} onMove=${() => moveTo(i)} portraits=${portraits}
           onPickCard=${cardList.length ? () => setPicking('op') : null} onPickAvatar=${cardList.length ? () => setPicking('avatar') : null}
           onPickBg=${() => setPicking('bg')} />`;
-        // 界面#15: in an 8–20 seat room a dashed divider every four seats shows who plays in the same group.
+        // 界面#14: in an 8–20 seat room a dashed divider every four seats shows who plays in the same group.
         if (facts.seats.length <= 4 || i === 0 || i % 4 !== 0) return card;
         return [html`<div key=${`sep${i}`} class="rseat-sep" data-testid="seat-group-sep"><span>${t('第 {n} 组', { n: i / 4 + 1 })}</span></div>`, card];
       })}

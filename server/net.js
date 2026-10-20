@@ -129,7 +129,7 @@ export class Session {
     this.token = token;
     /** @type {string} sanitized nickname */
     this.name = name;
-    /** @type {string | null} the four digits of 名字#1234 (server/tags.js, 界面#10); null until a hello names one */
+    /** @type {string | null} the four digits of 名字#1234 (server/tags.js, 界面#09); null until a hello names one */
     this.tag = null;
     /** @type {string | null} the browser id that owns this tag's claim (never sent to other players) */
     this.uid = null;
@@ -679,7 +679,7 @@ export class Network {
     this.onlineLimit = onlineLimit;
     /** @type {{ verify: (key: unknown) => boolean, reserved: (name: unknown) => boolean } | null} the owner file (server/ownerFile.js) */
     this.ownerFile = ownerFile;
-    /** @type {ReturnType<typeof createTagRegistry>} 名字#四位 claims (server/tags.js, 界面#10); in memory unless server/http/websocket.js passes the file one */
+    /** @type {ReturnType<typeof createTagRegistry>} 名字#四位 claims (server/tags.js, 界面#09); in memory unless server/http/websocket.js passes the file one */
     this.tags = tags || createTagRegistry({ file: null, log });
     /** first hellos of a socket since start, by outcome (/healthz reconnect.hello; helloStats) */
     this.helloCounts = { resumed: 0, fresh: 0, unknownToken: 0, inUse: 0 };
@@ -880,12 +880,12 @@ export class Network {
       this.reply(conn, errorMsg(isErrCode(admission.error) ? admission.error : ERR.INTERNAL, rid, admission.detail));
       return;
     }
-    // 界面#10: 名字#四位 — the pair is claimed by the browser that used it first (server/tags.js). A hello without a
+    // 界面#09: 名字#四位 — the pair is claimed by the browser that used it first (server/tags.js). A hello without a
     // tag keeps the session's, or gets a free one for this name; a browser without a uid (an older client) is not
     // tracked, so it can never hold a claim against anybody.
     const uid = typeof msg.uid === 'string' ? msg.uid : null;
     // a client that names no uid (an older browser, the test harness) keeps no tag at all: seats and match views stay
-    // exactly as they were before 界面#10
+    // exactly as they were before 界面#09
     const tag = isTag(msg.tag) ? msg.tag : (uid ? previous?.tag || this.tags.pick(name) || '0000' : null);
     if (uid && tag) {
       const claim = this.tags.claim(name, tag, uid);

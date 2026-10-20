@@ -1,4 +1,4 @@
-// server/tags.js: the 名字#四位 claims (界面#10) and how a hello uses them.
+// server/tags.js: the 名字#四位 claims (界面#09) and how a hello uses them.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -98,7 +98,7 @@ test('hello: a client with a uid claims 名字#四位; another browser is refuse
   assert.equal(renamed.tag, '5678');
   assert.equal(tags.owner('博士', '1234'), null);
   assert.equal(tags.owner('博士', '5678'), ownerKey('uid-a'));
-  // a client without a uid keeps the pre-界面#10 behaviour: no digits at all
+  // a client without a uid keeps the pre-界面#09 behaviour: no digits at all
   const legacy = hello({ t: 'hello', rid: 4, name: '凯尔希' });
   assert.equal(legacy.t, 'welcome');
   assert.equal(legacy.tag, null);

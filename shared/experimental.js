@@ -10,7 +10,7 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 //   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
 //   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 5,
 //                           off by default: the official rule stays the default)
-//   prepUnlimited           无限休整期 (玩法#05): the prep has no countdown; a co-op room enters combat only once every
+//   prepUnlimited           无限休整期 (玩法#04): the prep has no countdown; a co-op room enters combat only once every
 //                           living player is ready (off by default: the official timed prep stays the default)
 // The strategy draft's 本局信息 dialog and the briefing share the official enemy column (ui/matchEnemies.js, GitHub #484),
 // so there is no room switch for it any more.

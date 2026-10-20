@@ -1,4 +1,4 @@
-// 无限休整期 (玩法#05, experimental.prepUnlimited): a co-op prep has no countdown and combat starts only once every
+// 无限休整期 (玩法#04, experimental.prepUnlimited): a co-op prep has no countdown and combat starts only once every
 // living player is ready. Ordinary rooms keep the timed prep (asserted here too, so the option cannot leak).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

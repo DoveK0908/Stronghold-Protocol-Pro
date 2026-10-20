@@ -109,7 +109,7 @@ test('experimental rules display room options without a revival ballot', () => {
   // 项目 5（原项目 7）增的两条可选开关：Luck 测试插件与限伤封顶默认关（策略阶段看敌人已由官方 #484 提供，不再有开关）。
   assert.equal(switches[3].props.checked, false, 'the Luck console stays dormant unless the room asked for it');
   assert.equal(switches[4].props.checked, false, 'the boss hit soft cap stays off: the official rule is the default');
-  assert.equal(switches[5].props.checked, false, 'unlimited prep (G05) is opt-in');
+  assert.equal(switches[5].props.checked, false, 'unlimited prep (G04) is opt-in');
 });
 
 test('queue UI distinguishes pending vs allocated and clamps clocks', () => {

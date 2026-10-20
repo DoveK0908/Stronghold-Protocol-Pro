@@ -45,7 +45,7 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   const lobby = createLobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, combatPool, trialPool, options: lobbyOptions,
     limits: onlineLimit, content, plugins, hosts, ...metrics });
   // The owner file (server/ownerFile.js): the 服主 key every hello may carry and the owner's reserved names.
-  // The 名字#四位 claims (server/tags.js, 界面#10): one registry per server, on disk so a restart keeps them taken.
+  // The 名字#四位 claims (server/tags.js, 界面#09): one registry per server, on disk so a restart keeps them taken.
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
   const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, ...metrics });
   return { registry, lobby, network };

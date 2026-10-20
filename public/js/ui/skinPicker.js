@@ -110,7 +110,7 @@ export function SkinSection({ charId }) {
   // the tile art of a row is already resolved (its own portrait, else the operator's); `face` is the same appearance's
   // 1:1 avatar, which CSS draws instead of the 1:2 art when the panel is too short for it. The enlarged preview prefers
   // the 立绘 — a 1024 px+ picture — and is only offered for a skin (the 默认 tile's own portrait is not a poster)
-  // 界面#12: the tile shows the skin's own HALF-BODY portrait (the same 1:2 picture the detail panel draws), sized so the
+  // 界面#11: the tile shows the skin's own HALF-BODY portrait (the same 1:2 picture the detail panel draws), sized so the
   // whole picture fits — no more illustration cropped to a face. The 立绘 is what the click-to-enlarge preview shows.
   const shown = rows.map((row) => ({ ...row, art: row.portrait || row.avatar || row.illust || null, face: row.avatar || null }));
   const previewRow = preview ? rows.find((x) => !x.own && x.id === preview) || null : null;

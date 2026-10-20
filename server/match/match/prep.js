@@ -24,7 +24,7 @@ export class MatchPrep {
       this.dispatch(ps, 'onPrepStart', { round: this.round });
       ps.recompute();
     }
-    // solo / single-human matches: untimed (soloUntimed); 无限休整期 (玩法#05) untimed too, ended by everybody's Ready;
+    // solo / single-human matches: untimed (soloUntimed); 无限休整期 (玩法#04) untimed too, ended by everybody's Ready;
     // otherwise co-op's round prepTime
     const untimed = this.soloUntimed || this.experimental?.prepUnlimited === true;
     const secs = untimed ? null : this.gd.prepTime(this.round);

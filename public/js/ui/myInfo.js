@@ -1,4 +1,4 @@
-// 界面#10: the lobby's 名片 button (头像 + 名字#四位 + 名片) and the 我的信息 dialog behind it — 修改头像 / 修改名片 /
+// 界面#09: the lobby's 名片 button (头像 + 名字#四位 + 名片) and the 我的信息 dialog behind it — 修改头像 / 修改名片 /
 // 统计数据 plus the 代号 and the four digits. The same name card the achievements page draws, at the top bar's height.
 import { html, Icon, Modal, Button } from './components.js';
 import { useState, useEffect } from '../../vendor/hooks.module.js';

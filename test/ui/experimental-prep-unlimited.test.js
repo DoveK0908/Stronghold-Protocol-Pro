@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-// 无限休整期 (玩法#05): the room dialog's switch, the wire shape and the server's untimed prep.
+// 无限休整期 (玩法#04): the room dialog's switch, the wire shape and the server's untimed prep.
 const read = (p) => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
 test('the room dialog offers 无限休整期 and mirrors it onto the wire', async () => {

@@ -51,7 +51,7 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
   const change = (field, checked) => {
     if (editable && !busy) onChange?.({ ...options, [field]: checked });
   };
-  // 地图禁用 (玩法#04): the checkbox means "ban this stage", matching the heading. Never ban every stage — the
+  // 地图禁用 (玩法#03): the checkbox means "ban this stage", matching the heading. Never ban every stage — the
   // click that would empty the pool is ignored, so the server always has something to draw.
   const toggleStage = (id, disable) => {
     if (!editable || busy) return;

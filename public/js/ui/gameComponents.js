@@ -316,7 +316,7 @@ function standInAvatar(playerId) {
 export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band', class: cls }) {
   useData('assets', 'chess');
   const src = player?.bandId ? bandIconUrl(data.get('assets'), player.bandId) : null;
-  // 界面#10 follow-up: a human's own 头像 (room.card, carried into the match) always wins over the band icon — draft rows,
+  // 界面#09 follow-up: a human's own 头像 (room.card, carried into the match) always wins over the band icon — draft rows,
   // 协议启动, the in-match team panel, the settlement and the results all draw the same face
   // the 头像 they picked, else their 名片干员 (card.charId) — the same operator their seat card shows
   const cardPick = player?.card?.avatar || player?.card?.charId || null;

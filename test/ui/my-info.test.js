@@ -1,4 +1,4 @@
-// 界面#10: the 名片 button, 我的信息, 名字#四位 claims and the displays that no longer say `DOCTOR #NNNN`.
+// 界面#09: the 名片 button, 我的信息, 名字#四位 claims and the displays that no longer say `DOCTOR #NNNN`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

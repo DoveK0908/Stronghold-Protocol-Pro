@@ -440,7 +440,7 @@ describe('net.js', () => {
     const hello = ws().last('hello');
     const { PLAYER_CAPACITY_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/playerCapacity.js')).href);
     const { STATE_DELTA_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/stateDelta.js')).href);
-    // 界面#10: every hello carries this browser's install id (the owner of its #tag claim); no tag until one is chosen
+    // 界面#09: every hello carries this browser's install id (the owner of its #tag claim); no tag until one is chosen
     assert.match(hello.uid, /^[a-z0-9]{32}$/);
     assert.equal(hello.tag, undefined);
     const { uid: helloUid, ...rest } = hello;
@@ -1039,7 +1039,7 @@ describe('screen helpers', () => {
     assert.match(main, /if \(entered\) \{ net\.setTag\(identity\.loadTag\(\) \|\| null\); net\.setName\(savedName\); \}/);
     assert.match(main, /const SCREENS = \{ title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen \};/);
     const lobby = readFileSync(path.join(PUBLIC, 'js/screens/lobby.js'), 'utf8');
-    // 界面#10: the 统计数据 chip became the 名片 button that opens 我的信息 (the old chip asserted here is gone)
+    // 界面#09: the 统计数据 chip became the 名片 button that opens 我的信息 (the old chip asserted here is gone)
     assert.match(lobby, /<\$\{MeCard\} me=\$\{me\} onOpen=\$\{\(\) => setInfoOpen\(true\)\} \/>/);
     assert.doesNotMatch(lobby, /me-chip/, 'the old 统计数据 chip markup is gone');
     const info = readFileSync(path.join(PUBLIC, 'js/ui/myInfo.js'), 'utf8');

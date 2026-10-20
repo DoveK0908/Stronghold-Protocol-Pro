@@ -138,7 +138,7 @@ export const ANIM = Object.freeze({ IDLE: 0, MOVE: 1, ATTACK: 2, SKILL: 3, DIE: 
 export const ERR = Object.freeze({
   BAD_MSG: 'BAD_MSG',             // malformed / unknown message
   NAME_REJECTED: 'NAME_REJECTED', // displayed nickname/callsign failed moderation
-  NAME_TAKEN: 'NAME_TAKEN',       // this 名字#四位 pair is already claimed (server/tags.js, 界面#10)
+  NAME_TAKEN: 'NAME_TAKEN',       // this 名字#四位 pair is already claimed (server/tags.js, 界面#09)
   SESSION_IN_USE: 'SESSION_IN_USE', // a local recovery candidate cannot replace the connected holder
   SERVER_FULL: 'SERVER_FULL',     // the online cap is reached (server/onlineLimit.js); a resumed session is never refused
   RATE: 'RATE',                   // rate limited

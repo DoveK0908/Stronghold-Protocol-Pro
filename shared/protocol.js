@@ -538,7 +538,7 @@ export const C2S = {
   hello: { name: (v) => isStr(v, NAME_MAX_LEN) && v.trim().length > 0, token: (v) => v == null || isStr(v, 64), version: (v) => v == null || isInt(v, 0, 1e6),
     matchmakingVersion: isId, playerCapacityVersion: isId, noReplace: isBool, claimAt: (v) => isNum(v, 0, Number.MAX_SAFE_INTEGER),
     owner: (v) => isStr(v, 128), stateDelta: (v) => isInt(v, 0, 1e6),
-    // 界面#10: the four digits after the name (server/tags.js claims 名字#四位), and the browser id that owns the claim
+    // 界面#09: the four digits after the name (server/tags.js claims 名字#四位), and the browser id that owns the claim
     tag: (v) => v == null || (typeof v === 'string' && /^\d{4}$/.test(v)),
     uid: (v) => v == null || (typeof v === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(v)),
     $optional: ['token', 'version', 'matchmakingVersion', 'playerCapacityVersion', 'noReplace', 'claimAt', 'owner', 'stateDelta', 'tag', 'uid'] },
@@ -565,7 +565,7 @@ export const C2S = {
   'room.setBotBand': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), bandId: nullable(isId), $optional: ['bandId'] },
   'room.addBot': { persona: optional((v) => v === 'arturia' || v === 'lavinia') },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
-  // room.moveSeat (界面#15): a seated human moves to an empty seat before the match — rooms of 8–20 seats
+  // room.moveSeat (界面#14): a seated human moves to an empty seat before the match — rooms of 8–20 seats
   // seat four players at a time, so the table you pick is the group you play with.
   'room.moveSeat': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the

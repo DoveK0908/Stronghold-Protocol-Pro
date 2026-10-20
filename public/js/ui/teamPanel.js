@@ -232,7 +232,7 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
   const title = half ? (half === 'ALL' ? t('返回全景') : self ? t('查看自己的半场') : t('查看 {name} 的半场', { name: p.name }))
     : observe ? (self ? (observe.observing ? t('返回战场') : t('你自己')) : t('查看 {name} 的战场', { name: p.name })) : (self ? t('查看自己的阵地') : t('查看 {name} 的阵地', { name: p.name }));
   const lp = rowLp(p, pub, self ? selfLive : null, { uniteLocal, cap });
-  // 界面#11: the 策略 under the HP line, like the reference HUD — the band this seat picked (kept all match)
+  // 界面#10: the 策略 under the HP line, like the reference HUD — the band this seat picked (kept all match)
   const band = p.bandId ? getBand(p.bandId) : null;
   const inTeam = team.has(p.playerId);
   const { click, dblClick } = clicks;

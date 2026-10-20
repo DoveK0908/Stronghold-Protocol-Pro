@@ -673,7 +673,7 @@ export function LobbyScreen() {
   const [bgOpen, setBgOpen] = useState(false);
   const [sweepOpen, setSweepOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#10)
+  const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#09)
 
   useEffect(() => {
     // Optional low-frequency checks exist only while the lobby is mounted, never during a match.

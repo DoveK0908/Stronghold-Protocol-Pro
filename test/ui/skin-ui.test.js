@@ -1,5 +1,5 @@
 // 皮肤 UI (2026-10-20, the owner): the tile shows the skin's HALF-BODY portrait (1:2, the same picture the detail panel
-// draws) at a size that fits it whole — the 立绘 is only the click-to-enlarge preview (界面#12). The name sits under the
+// draws) at a size that fits it whole — the 立绘 is only the click-to-enlarge preview (界面#11). The name sits under the
 // art instead of behind it, and 卡片视图 follows the pick at once instead of waiting for a reload.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +19,7 @@ test('a skin tile is the half-body portrait; the 立绘 is only the enlarged pre
 test('the art box is the positioning parent, so the name is not painted over', () => {
   const css = read('public/css/screens/loadout.css');
   assert.match(css, /\.lo-skin__art \{ position: relative; display: flex;/);
-  // 界面#12: a 1:2 box that fits the whole portrait, three to a row
+  // 界面#11: a 1:2 box that fits the whole portrait, three to a row
   assert.match(css, /\.lo-skin__art \{[^}]*aspect-ratio: 1 \/ 2;/);
   assert.match(css, /\.lo-skins \{ display: grid; grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/);
   assert.match(css, /\.lo-skin__art img \{ position: absolute; inset: 0;/);

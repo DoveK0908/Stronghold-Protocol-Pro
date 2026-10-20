@@ -1,4 +1,4 @@
-// U08 界面#08 卡池剩余: m.private shop slots carry how many copies of a chess are left in the pool this player draws
+// U07 界面#07 卡池剩余: m.private shop slots carry how many copies of a chess are left in the pool this player draws
 // from — the shared pool, a 分卡池 group's pool (m.playerPools) or the own 自选 stock (player/diy.js poolOf). The shop
 // card prints it bottom-right; this test pins the server half of the contract.
 import { test } from 'node:test';
