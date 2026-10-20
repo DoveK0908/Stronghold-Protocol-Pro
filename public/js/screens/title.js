@@ -54,6 +54,7 @@ export function enterSession(rawName) {
   identity.saveName(name);
   identity.setEntered(true);
   store.set((s) => ({ me: { ...s.me, name }, session: { ...s.session, entered: true } }));
+  net.setTag(identity.loadTag() || null);
   net.setName(name);
   return true;
 }

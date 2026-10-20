@@ -56,6 +56,7 @@ import { NO_PHASES } from './phaseMetrics.js';
 import { serverFullDetail } from './onlineLimit.js';
 import { NAME_RESERVED } from './ownerFile.js';
 export { sanitizeName } from '../shared/names.js';
+import { createTagRegistry, isTag } from './tags.js';
 
 /** Tunables (all overridable through the Network / SessionRegistry constructors). */
 /** Every lobby heartbeat carries the same public cluster summary: normalize it at most once per this many ms. */
@@ -128,6 +129,10 @@ export class Session {
     this.token = token;
     /** @type {string} sanitized nickname */
     this.name = name;
+    /** @type {string | null} the four digits of 名字#1234 (server/tags.js, 界面#10); null until a hello names one */
+    this.tag = null;
+    /** @type {string | null} the browser id that owns this tag's claim (never sent to other players) */
+    this.uid = null;
     /** @type {import('ws').WebSocket | null} currently bound socket */
     this.ws = null;
     /** @type {boolean} */
@@ -652,7 +657,7 @@ export class Network {
    * }} opts
    */
   constructor({ registry, handler, log = noopLog, now = Date.now, getLoadState = null, getLoadDetails = null, getClusterLoad = null, options = {},
-    metrics = NO_PHASES, onlineLimit = null, ownerFile = null }) {
+    metrics = NO_PHASES, onlineLimit = null, ownerFile = null, tags = null }) {
     this.registry = registry;
     this.handler = handler;
     this.log = log;
@@ -674,6 +679,8 @@ export class Network {
     this.onlineLimit = onlineLimit;
     /** @type {{ verify: (key: unknown) => boolean, reserved: (name: unknown) => boolean } | null} the owner file (server/ownerFile.js) */
     this.ownerFile = ownerFile;
+    /** @type {ReturnType<typeof createTagRegistry>} 名字#四位 claims (server/tags.js, 界面#10); in memory unless server/http/websocket.js passes the file one */
+    this.tags = tags || createTagRegistry({ file: null, log });
     /** first hellos of a socket since start, by outcome (/healthz reconnect.hello; helloStats) */
     this.helloCounts = { resumed: 0, fresh: 0, unknownToken: 0, inUse: 0 };
     const slices = Math.max(1, Math.min(HEARTBEAT_SLICES_MAX, Math.round(this.opts.heartbeatMs / HEARTBEAT_SLICE_MS)));
@@ -873,6 +880,18 @@ export class Network {
       this.reply(conn, errorMsg(isErrCode(admission.error) ? admission.error : ERR.INTERNAL, rid, admission.detail));
       return;
     }
+    // 界面#10: 名字#四位 — the pair is claimed by the browser that used it first (server/tags.js). A hello without a
+    // tag keeps the session's, or gets a free one for this name; a browser without a uid (an older client) is not
+    // tracked, so it can never hold a claim against anybody.
+    const uid = typeof msg.uid === 'string' ? msg.uid : null;
+    // a client that names no uid (an older browser, the test harness) keeps no tag at all: seats and match views stay
+    // exactly as they were before 界面#10
+    const tag = isTag(msg.tag) ? msg.tag : (uid ? previous?.tag || this.tags.pick(name) || '0000' : null);
+    if (uid && tag) {
+      const claim = this.tags.claim(name, tag, uid);
+      if (!claim.ok) { this.reply(conn, errorMsg(ERR.NAME_TAKEN, rid, `${name}#${tag}`)); return; }
+      this.tags.releaseOthers?.(uid, name, tag);
+    }
 
     let session = conn.session;
     let resumed = false;
@@ -904,7 +923,14 @@ export class Network {
       session.claimAt = Number.isFinite(msg.claimAt) ? msg.claimAt : null;
       session.disconnectedAt = null;
     }
+    if (previous && previous !== session && previous.tag && previous.uid && (previous.name !== name || previous.tag !== tag)) {
+      this.tags.release(previous.name, previous.tag, previous.uid);
+    } else if (session && session.tag && session.uid && (session.name !== name || session.tag !== tag)) {
+      this.tags.release(session.name, session.tag, session.uid);
+    }
     session.name = name;
+    session.tag = tag;
+    if (uid) session.uid = uid;
     session.owner = owner;
     session.lastSeen = now;
     session.addr = conn.ip;
@@ -917,7 +943,7 @@ export class Network {
     let extra = null;
     try { extra = this.handler.welcomeInfo?.() ?? null; } catch (e) { this.log.error('[net] welcomeInfo crashed', e); }
     // Keep the type first for bounded ingress inspection; optional metadata cannot replace identity fields.
-    const welcome = { t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, serverNow: now, version: PROTOCOL_VERSION, resumed };
+    const welcome = { t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag, serverNow: now, version: PROTOCOL_VERSION, resumed };
     if (session.owner) welcome.owner = true; // the settings screen's confirmation that the key worked
     if (extra && typeof extra === 'object') for (const [key, value] of Object.entries(extra)) {
       if (!Object.hasOwn(welcome, key) && key !== '__proto__') welcome[key] = value;

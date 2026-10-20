@@ -42,7 +42,7 @@ describe('language switch in the lobby', { skip: !ENABLED && 'set SP_E2E=1 (Chro
 
   // the lobby (no title screen since 2026-10-15): the labels of its ⚙ and ✎ buttons, in the language on screen
   const settingsLabel = (page) => page.$eval('.lobby-settings', (el) => el.getAttribute('aria-label'));
-  const statsLabel = (page) => page.$eval('.stats-entry', (el) => el.getAttribute('aria-label'));
+  const statsLabel = (page) => page.$eval('[data-testid="me-card"]', (el) => el.getAttribute('aria-label'));
   /** The menu's languages, [code, label] — its buttons, or the options of its list. */
   const openLanguageSettings = async (page) => {
     if (!await page.$('.modal [data-testid="lang-toggle"]')) {

@@ -263,7 +263,7 @@ const deepFreeze = (v) => {
  */
 export function matchSeats(m) {
   return m.order.map((ps) => ({
-    seat: ps.seat, playerId: ps.playerId, name: ps.name, isBot: ps.isBot, connected: false,
+    seat: ps.seat, playerId: ps.playerId, name: ps.name, ...(ps.tag ? { tag: ps.tag } : {}), isBot: ps.isBot, connected: false,
     ...(ps.isBot ? {} : { notOwned: [...ps.standIns], diy: { ...ps.diy } }),
     ...(ps.isBot && m.botBands.has(ps.playerId) ? { band: m.botBands.get(ps.playerId) } : {}),
   }));

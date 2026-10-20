@@ -480,7 +480,7 @@ export class Room {
       experimental: { ...this.experimental },
       revival: this.revivalState(),
       seats: this.seats.map((s) => (s
-        ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left, revivalVote: s.isBot ? null : s.revivalVote ?? null,
+        ? { seat: s.seat, playerId: s.playerId, name: s.name, ...(s.tag ? { tag: s.tag } : {}), isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left, revivalVote: s.isBot ? null : s.revivalVote ?? null,
           // an AI seat's designated strategy (room.setBotBand; null = it picks by itself)
           ...(s.isBot ? { band: s.band ?? null } : {}),
           ...(s.isBot && s.botPersona ? { botPersona: s.botPersona } : {}),
@@ -489,7 +489,7 @@ export class Room {
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.modded && !s.isBot ? { content: s.content || 'loading' } : {}) }
         : null)),
-      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, connected: s.connected, ...(s.owner ? { owner: true } : {}),
+      spectators: this.spectators.map((s) => ({ playerId: s.playerId, name: s.name, ...(s.tag ? { tag: s.tag } : {}), connected: s.connected, ...(s.owner ? { owner: true } : {}),
         ...(this.modded ? { content: s.content || 'loading' } : {}) })),
       ...(this.content ? { content: this.content.trusted ? {...this.content, trusted:{...this.content.trusted, consent:Object.fromEntries(this.seats.filter(x => x && !x.isBot).map(x => [x.seat,x.consentCs === this.content.cs]))}} : this.content } : {}),
       // omitted when false so a normal room.state stays identical
@@ -846,6 +846,7 @@ export class Lobby {
     let changed = !seat.connected;
     seat.connected = true;
     if (!room.match && seat.name !== session.name) { seat.name = session.name; changed = true; }
+    if (!room.match && (seat.tag || null) !== (session.tag || null)) { seat.tag = session.tag; changed = true; }
     if (!!seat.owner !== session.owner) { seat.owner = session.owner; changed = true; } // the 服主 mark (display only)
     if (!room.hostId) { this.migrateHost(room); changed = true; }
     if (changed) this.broadcastState(room);
@@ -1196,7 +1197,7 @@ export class Lobby {
     if (room.mode === 'solo') return fail(ERR.ROOM_FULL, 'solo room');
     if (MAX_SPECTATORS > 0 && room.spectators.length >= MAX_SPECTATORS) return fail(ERR.ROOM_FULL, 'no free spectator seat');
     if (cur) this.removeMember(cur, session.playerId);
-    room.spectators.push({ playerId: session.playerId, name: session.name, connected: session.connected, owner: session.owner === true });
+    room.spectators.push({ playerId: session.playerId, name: session.name, ...(session.tag ? { tag: session.tag } : {}), connected: session.connected, owner: session.owner === true });
     session.roomCode = room.code;
     session.notice = null;
     session.pendingResult = null;
@@ -2073,7 +2074,7 @@ export class Lobby {
       // a setting checked for another content is filtered to this room's data (header "Gameplay plugins")
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
-        seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected,
+        seat: s.seat, playerId: s.playerId, name: s.name, ...(s.tag ? { tag: s.tag } : {}), isBot: s.isBot, connected: s.connected,
         ...(s.botPersona ? { botPersona: s.botPersona } : {}),
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
@@ -2461,7 +2462,7 @@ export class Lobby {
   /** @returns {Seat} */
   humanSeat(idx, session) {
     return {
-      seat: idx, playerId: session.playerId, name: session.name, isBot: false, ready: false, connected: session.connected, left: false,
+      seat: idx, playerId: session.playerId, name: session.name, ...(session.tag ? { tag: session.tag } : {}), isBot: false, ready: false, connected: session.connected, left: false,
       loadout: session.loadout || null, revivalVote: null,
       ops: session.ops || null,
       notOwned: session.notOwned || null,

@@ -14,7 +14,7 @@
 // trophy count and the 头像 travel with room.card (display only). Styles: css/screens/lobby.css (.hub-ach / .ach*).
 import { useEffect, useMemo, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES } from '../../../shared/constants.js';
-import { html, Icon, MicroLabel, doctorNo } from './components.js';
+import { html, Icon, MicroLabel } from './components.js';
 import { Img, BandIcon, BondGlyph, UnitThumb, useGameData } from './gameComponents.js';
 import { chessAvatarUrl } from './assetUrls.js';
 import { data } from '../data.js';
@@ -311,7 +311,7 @@ function Plate({ me, card, s, p, done, total, gd, onAvatar, onBg }) {
         <span class="ach-card__lv" title=${t('等级')}><b class="num">${lv.lv}</b><small>LV</small></span></button>
       <span class="ach-card__who">
         <span class="ach-card__name">${me?.name || t('博士')}</span>
-        <span class="ach-card__id num">${me?.playerId != null ? `DOCTOR #${doctorNo(me.playerId)}` : 'DOCTOR'}</span>
+        <span class="ach-card__id num">${me?.name || t('博士')}${me?.tag ? `#${me.tag}` : ''}</span>
         <span class="ach-card__edits">
           <button type="button" class="ach-card__nc" onClick=${onAvatar}><${Icon} name="edit" />${t('头像')}</button>
           <button type="button" class="ach-card__nc" onClick=${onBg}><${Icon} name="edit" />${t('名片底图')}</button>

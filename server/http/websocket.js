@@ -27,6 +27,8 @@ export const WS_MAX_PAYLOAD = 64 * 1024;
  *   gameplay plugins plays in (DESIGN §32.6)
  * @returns {{ registry: SessionRegistry, lobby: Lobby, network: Network }}
  */
+import { createTagRegistry } from '../tags.js';
+
 export function createSessionStack(opts, { data, log, combatPool = null, trialPool = null, getLoadState, getLoadDetails, onlineLimit = null, ownerFile = null,
   content = null, plugins = null, hosts = null }) {
   if (opts.lobbyFactory != null && typeof opts.lobbyFactory !== 'function') throw new TypeError('invalid lobby factory');
@@ -43,7 +45,9 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   const lobby = createLobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, combatPool, trialPool, options: lobbyOptions,
     limits: onlineLimit, content, plugins, hosts, ...metrics });
   // The owner file (server/ownerFile.js): the 服主 key every hello may carry and the owner's reserved names.
-  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, ...metrics });
+  // The 名字#四位 claims (server/tags.js, 界面#10): one registry per server, on disk so a restart keeps them taken.
+  const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
+  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, ...metrics });
   return { registry, lobby, network };
 }
 

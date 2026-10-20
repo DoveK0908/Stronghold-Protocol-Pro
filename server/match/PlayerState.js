@@ -150,6 +150,8 @@ export class PlayerState {
     this.playerId = seat.playerId;
     this.seat = seat.seat;
     this.name = seat.name;
+    /** @type {string | null} 名字#1234 four digits (界面#10); null for bots and older clients */
+    this.tag = typeof seat.tag === 'string' ? seat.tag : null;
     this.isBot = !!seat.isBot;
     this.connected = this.isBot ? true : !!seat.connected;
     this.left = false;

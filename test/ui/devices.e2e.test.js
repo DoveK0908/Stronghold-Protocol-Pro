@@ -296,7 +296,7 @@ describe('multi-device (Chrome device emulation)', { skip: !ENABLED && 'set SP_E
         await page.waitForSelector('.announcement-board', { hidden: true });
       }
       // the name chip doubles as the 统计数据 entry (the ✎ rename control was removed with the dead dialog host)
-      await page.waitForSelector('.stats-entry', { visible: true });
+      await page.waitForSelector('[data-testid="me-card"]', { visible: true });
       await sleep(400);
       await page.screenshot({ path: path.join(OUT, `device-${dev}-lobby.png`) });
       assert.deepEqual(await layoutProblems(page), [], `${dev} lobby`);

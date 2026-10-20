@@ -440,7 +440,12 @@ describe('net.js', () => {
     const hello = ws().last('hello');
     const { PLAYER_CAPACITY_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/playerCapacity.js')).href);
     const { STATE_DELTA_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/stateDelta.js')).href);
-    assert.deepEqual({ ...hello, rid: 0 }, { t: 'hello', rid: 0, name: '凯尔希', version: PROTOCOL_VERSION, matchmakingVersion: MATCHMAKING_VERSION, playerCapacityVersion: PLAYER_CAPACITY_VERSION,
+    // 界面#10: every hello carries this browser's install id (the owner of its #tag claim); no tag until one is chosen
+    assert.match(hello.uid, /^[a-z0-9]{32}$/);
+    assert.equal(hello.tag, undefined);
+    const { uid: helloUid, ...rest } = hello;
+    assert.equal(helloUid.length, 32);
+    assert.deepEqual({ ...rest, rid: 0 }, { t: 'hello', rid: 0, name: '凯尔希', version: PROTOCOL_VERSION, matchmakingVersion: MATCHMAKING_VERSION, playerCapacityVersion: PLAYER_CAPACITY_VERSION,
       stateDelta: STATE_DELTA_VERSION, token: 'tok-1' });
     assert.equal(net.status, 'handshaking');
     ws().recv({ t: 'welcome', rid: hello.rid, playerId: 'p_1', token: 't', name: '凯尔希', serverNow: Date.now() });
@@ -1031,11 +1036,15 @@ describe('screen helpers', () => {
   test('boot enters only from the title screen, and the lobby name chip is the 统计数据 entry', () => {
     const main = readFileSync(path.join(PUBLIC, 'js/main.js'), 'utf8');
     assert.match(main, /const entered = identity\.wasEntered\(\) && !!savedName;/);
-    assert.match(main, /if \(entered\) net\.setName\(savedName\);/);
+    assert.match(main, /if \(entered\) \{ net\.setTag\(identity\.loadTag\(\) \|\| null\); net\.setName\(savedName\); \}/);
     assert.match(main, /const SCREENS = \{ title: TitleScreen, lobby: LobbyScreen, room: RoomScreen, game: GameScreen \};/);
     const lobby = readFileSync(path.join(PUBLIC, 'js/screens/lobby.js'), 'utf8');
-    assert.match(lobby, /class="me-chip me-chip--btn stats-entry"/);
-    assert.doesNotMatch(lobby, /me-rename/, 'the ✎ rename control is gone (its dialog host was never mounted)');
+    // 界面#10: the 统计数据 chip became the 名片 button that opens 我的信息 (the old chip asserted here is gone)
+    assert.match(lobby, /<\$\{MeCard\} me=\$\{me\} onOpen=\$\{\(\) => setInfoOpen\(true\)\} \/>/);
+    assert.doesNotMatch(lobby, /me-chip/, 'the old 统计数据 chip markup is gone');
+    const info = readFileSync(path.join(PUBLIC, 'js/ui/myInfo.js'), 'utf8');
+    assert.match(info, /data-testid="me-card"/);
+    assert.match(info, /data-testid="me-card-tag"/);
   });
 
   test('lobby: normalizeCode / parseRoomParam / difficultyInfo', async () => {

@@ -2818,3 +2818,32 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .lobmusic__file small { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: .1rem; color: var(--text-dim); }
 @media (max-width: 64rem) { .lobmusic__row { flex-wrap: wrap; } }
+
+/* 界面#10: the top bar's 名片 button (MeCard) and the 我的信息 dialog */
+.hub-topbar .me-card { --me-w: 3.05rem; position: relative; display: flex; align-items: center; gap: .12rem;
+  width: var(--me-w); height: .86rem; flex: none; padding: .06rem .14rem .06rem .06rem; overflow: hidden;
+  border: 1px solid rgba(78, 216, 175, .34); border-radius: .04rem; background: #0b1110; color: inherit;
+  text-align: left; cursor: pointer; }
+.hub-topbar .me-card:hover, .hub-topbar .me-card:focus-visible { border-color: var(--mint-400); }
+.hub-topbar .me-card > .nc-layer { z-index: 0; }
+.hub-topbar .me-card__ava { position: relative; z-index: 1; width: .74rem; height: .74rem; flex: none;
+  display: grid; place-items: center; overflow: hidden; background: #1d2423; border: 1px solid rgba(244, 247, 246, .55); }
+.hub-topbar .me-card__ava img { width: 100%; height: 100%; object-fit: cover; }
+.hub-topbar .me-card__glyph { font-size: .3rem; font-weight: 900; color: #4af2c4; }
+.hub-topbar .me-card__text { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; gap: .03rem; }
+.hub-topbar .me-card__name { display: flex; align-items: center; gap: .05rem; min-width: 0; color: #f2f5f4;
+  font-size: calc(.17 * var(--t)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hub-topbar .me-card__id { color: rgba(240, 246, 244, .86); font-size: calc(.14 * var(--t)); letter-spacing: .04em; }
+.hub-topbar .me-card__brand { position: absolute; right: .07rem; bottom: .04rem; z-index: 1; text-align: right;
+  font-size: max(calc(.055 * var(--t)), 5px); line-height: 1.15; letter-spacing: .06em; color: rgba(240, 246, 244, .5); }
+
+.me-info { display: flex; flex-direction: column; gap: .16rem; }
+.me-info__card { width: 100%; }
+.me-info__actions { display: flex; flex-wrap: wrap; gap: .1rem; }
+.me-info__rename { display: flex; align-items: flex-end; gap: .12rem; flex-wrap: wrap; }
+.me-info__field { display: flex; flex-direction: column; gap: .05rem; font-size: calc(.13 * var(--t)); color: var(--fg-2); }
+.me-info__field input { width: 2.2rem; height: .4rem; padding: 0 .12rem; background: rgba(8, 13, 11, .8);
+  border: 1px solid var(--line-2); border-radius: .03rem; color: var(--fg); font: inherit; }
+.me-info__field--tag input { width: 1rem; letter-spacing: .1em; }
+.me-info__hint { margin: 0; font-size: calc(.12 * var(--t)); color: var(--fg-3); }
+.me-info__hint.is-bad { color: var(--red-300, #ff8a8a); }

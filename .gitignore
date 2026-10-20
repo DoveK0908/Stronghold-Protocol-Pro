@@ -19,6 +19,8 @@ data/local-assets.json
 data/local-fx.json
 # download caches, upstream tables, ledgers, reports, setup state
 .cache/
+# server-side runtime state (server/tags.js 名字#四位 claims, unless SP_TAGS_FILE points elsewhere)
+/state
 # a worktree that links these folders instead of holding them: git sees a symlink as a file, which the patterns
 # above (trailing slash: directories only) do not match
 /node_modules

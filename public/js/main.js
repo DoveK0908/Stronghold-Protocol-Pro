@@ -199,7 +199,7 @@ function onWelcome(msg) {
     try { localStorage.setItem('ark.callsign', name); } catch { /* storage may be unavailable */ }
   }
   store.set({
-    me: { playerId: msg.playerId ?? null, name, token: typeof msg.token === 'string' ? msg.token : null, ...(msg.owner === true ? { owner: true } : {}) },
+    me: { playerId: msg.playerId ?? null, name, tag: typeof msg.tag === 'string' ? msg.tag : prev.me.tag ?? null, token: typeof msg.token === 'string' ? msg.token : null, ...(msg.owner === true ? { owner: true } : {}) },
     // the server's content identity (DESIGN §32): the diagnostics name it (diag.js contentLine)
     content: msg.content && typeof msg.content.vanilla === 'string' ? { vanilla: msg.content.vanilla } : null,
     // how many unofficial plugins it has (P1a — absent: none; content.js fetches the catalogue only when there are some)
@@ -530,7 +530,7 @@ async function boot() {
   // a first visit or a new tab starts on the title screen with the remembered name suggested.
   const entered = identity.wasEntered() && !!savedName;
   store.set((s) => ({
-    me: { ...s.me, name: savedName },
+    me: { ...s.me, name: savedName, tag: s.me.tag ?? (identity.loadTag() || null) },
     session: { entered },
     ui: { ...s.ui, pendingJoin },
   }));
@@ -569,7 +569,7 @@ async function boot() {
   const connectWhenReady = Promise.all([identityReady, langReady]).then(() => {
     // A first visit stays on the title screen until 进入` (screens/title.js enterSession): the socket connects with
     // the remembered name only for a tab that already passed it (a reload).
-    if (entered) net.setName(savedName);
+    if (entered) { net.setTag(identity.loadTag() || null); net.setName(savedName); }
   });
   await Promise.all([waitForFonts(1200), connectWhenReady, langReady]);
   const root = document.getElementById('app');

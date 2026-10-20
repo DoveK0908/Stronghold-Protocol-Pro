@@ -28,18 +28,15 @@ import { useHubBackdrop, HubBackdrop, HubRadar, BackdropSettings, BackdropGlyph,
 import { ResumeMatchButton, resumeLocalMatch } from '../ui/resumeMatch.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, ROOM_CODE_LEN, MAX_SEATS, MAX_SPECTATORS, modeIdFor, ERR, APP_VERSION, DEV_BUILD } from '../../../shared/constants.js';
-import { html, Button, Icon, MicroLabel, TextField, PingPill, AvatarFrame, Tooltip, Spinner, DifficultyIcon, doctorNo, confirmDialog } from '../ui/components.js';
+import { html, Button, Icon, MicroLabel, TextField, PingPill, Tooltip, Spinner, DifficultyIcon, confirmDialog } from '../ui/components.js';
 import { AnnouncementBoard, announcementRevision, announcementDismissed, dismissAnnouncement, announcementBanner, parseAnnouncements } from '../ui/announcements.js';
 import { ServerStatusModal } from '../ui/serverStatus.js';
 import { LobbyFeedback } from '../ui/lobbyFeedback.js';
 import { SiteBoards } from '../ui/siteBoards.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton, openGuide } from '../ui/guide.js';
-import { openStats } from './stats.js';
 import { AchievementEntry, AchievementPanel } from '../ui/achievements.js';
-import { TrophyBadge } from '../ui/trophies.js';
-import { useMyCard } from '../ui/playerCard.js';
-import { cardAvatarUrl } from '../ui/seatArt.js';
+import { MeCard, MyInfoDialog } from '../ui/myInfo.js';
 import { SettingsButton } from '../ui/settings.js';
 import { PwaInstallButton, FullscreenButton, fullscreen, reducedMotion } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
@@ -639,22 +636,6 @@ function HubFoot() {
   </p>`;
 }
 
-/** The top bar's name chip: the trophy badge, the name, DOCTOR #; opens 统计数据. */
-function MeChip({ me }) {
-  const card = useMyCard();
-  useData('assets');
-  const face = cardAvatarUrl(card.avatar, undefined, card.avatarLook);
-  const label = t('统计数据');
-  return html`<button type="button" class="me-chip me-chip--btn stats-entry" onClick=${openStats} title=${label} aria-label=${label}>
-    <${AvatarFrame} size="md" name=${me.name} src=${face} seat=${0} self=${true} />
-    <span class="me-chip__text">
-      <span class="me-chip__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" />${me.name || t('博士')}</span>
-      <${MicroLabel}>${me.playerId != null ? `DOCTOR #${doctorNo(me.playerId)}` : 'DOCTOR'}<//>
-    </span>
-    <${Icon} name="chart" class="me-chip__stats" />
-  </button>`;
-}
-
 /** Lobby screen component. */
 export function LobbyScreen() {
   const me = useStore((s) => s.me, shallowEqual);
@@ -692,6 +673,7 @@ export function LobbyScreen() {
   const [bgOpen, setBgOpen] = useState(false);
   const [sweepOpen, setSweepOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#10)
 
   useEffect(() => {
     // Optional low-frequency checks exist only while the lobby is mounted, never during a match.
@@ -805,7 +787,7 @@ export function LobbyScreen() {
           <span class="online-pill__dot"></span>${Number.isInteger(presence?.online) && conn.status === 'online'
             ? html`<span class="num">${presence.online}</span><span class="online-word">${t('名博士在线')}</span>` : html`<span>${t('在线人数 —')}</span>`}</span>
         <${ResumeMatchButton} />
-        <${MeChip} me=${me} />
+        <${MeCard} me=${me} onOpen=${() => setInfoOpen(true)} />
       </div>
     </header>
 
@@ -891,6 +873,7 @@ export function LobbyScreen() {
 
     <${ServerStatusModal} open=${loadOpen} online=${conn.status === 'online'} state=${conn.loadState} details=${conn.loadDetails} clusterLoad=${conn.clusterLoad} onClose=${() => setLoadOpen(false)} />
     ${overlay === 'announcements' ? html`<${LobbyAnnouncements} snapshot=${announcements} onClose=${closeAnnouncements} />` : null}
+    ${infoOpen ? html`<${MyInfoDialog} me=${me} onClose=${() => setInfoOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementPanel} me=${me} onClose=${() => setAchOpen(false)} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}
   </div>`;

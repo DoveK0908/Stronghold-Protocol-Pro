@@ -193,7 +193,7 @@ export class StubMatch {
     const summary = {
       stub: true, victory: false, roundsPassed: 0, modeId: this.modeId, difficulty: this.difficulty, seed: this.seed,
       reason: deadlinePassed ? 'timeout' : 'confirmed',
-      players: [...this.players.values()].map((p) => ({ playerId: p.playerId, seat: p.seat, name: p.name, isBot: p.isBot, lp: 0, title: null })),
+      players: [...this.players.values()].map((p) => ({ playerId: p.playerId, seat: p.seat, name: p.name, ...(p.tag ? { tag: p.tag } : {}), isBot: p.isBot, lp: 0, title: null })),
     };
     if (humansLeft) {
       this.broadcastFn(this.publicView());
@@ -219,7 +219,7 @@ export class StubMatch {
       bannedChess: [],
       bossId: null,
       players: [...this.players.values()].map((p) => ({
-        playerId: p.playerId, seat: p.seat, name: p.name, isBot: p.isBot, connected: p.isBot || (p.connected && !p.left),
+        playerId: p.playerId, seat: p.seat, name: p.name, ...(p.tag ? { tag: p.tag } : {}), isBot: p.isBot, connected: p.isBot || (p.connected && !p.left),
         alive: true, lp: 0, bandId: null, shopLevel: 1, boardCount: 0, ready: p.ready, bonds: [], fieldId: null,
         status: p.left ? 'left' : p.ready ? 'ready' : 'deciding',
       })),

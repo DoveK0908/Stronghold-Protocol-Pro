@@ -165,6 +165,8 @@ export class Net {
     this.status = 'idle';
     this.ws = null;
     this.name = null;          // desired player name (hello is sent when set)
+    this.wantTag = null;       // desired #four digits (hello is sent when either changes)
+    this.tag = null;           // the digits the server last confirmed
     this.helloName = null;     // name we sent in the hello that got the last welcome
     this.serverName = null;    // name as normalised by the server
     this.playerId = null;
@@ -328,6 +330,38 @@ export class Net {
     this._sendHello();
   }
 
+  /**
+   * Set the four digits of 名字#1234 used in `hello` (界面#10). Like setName it re-hellos a live socket; the server
+   * answers NAME_TAKEN when another browser claimed that pair first.
+   * @param {string | null} tag
+   */
+  setTag(tag) {
+    const next = typeof tag === 'string' && /^\d{4}$/.test(tag) ? tag : null;
+    const changed = next !== this.wantTag;
+    this.wantTag = next;
+    if (!this.ws || this.ws.readyState !== WS_OPEN || !this.name) return;
+    if (this.status === 'online' && !changed && this.tag === next) return;
+    this._sendHello();
+  }
+
+  /**
+   * Set name and #four digits together and send one hello (界面#10: a rename must not claim the digits under the old
+   * name first).
+   * @param {string} name
+   * @param {string | null} tag
+   */
+  setIdentity(name, tag) {
+    const n = typeof name === 'string' ? name.trim() : '';
+    if (!n) return;
+    this.name = n;
+    this.wantTag = typeof tag === 'string' && /^\d{4}$/.test(tag) ? tag : null;
+    if (!this.ws || this.ws.readyState !== WS_OPEN) {
+      if (!this.ws && !this._reconnectTimer && !this._manualClose) this.connect();
+      return;
+    }
+    this._sendHello();
+  }
+
   _onOpen() {
     this._openedAt = this.now();
     this._lastRx = this._openedAt;
@@ -412,6 +446,10 @@ export class Net {
     const rid = this._nextRid();
     const msg = { t: 'hello', rid, name: this.name, version: PROTOCOL_VERSION, matchmakingVersion: MATCHMAKING_VERSION, playerCapacityVersion: PLAYER_CAPACITY_VERSION,
       stateDelta: STATE_DELTA_VERSION };
+    // 界面#10: the four digits and the install id that owns their claim (an older server ignores both)
+    const tag = this.wantTag || null;
+    if (tag) msg.tag = tag;
+    try { msg.uid = identity.uid(); } catch { /* storage blocked: no claim ownership */ }
     let token = null;
     try { token = this.getToken(); } catch { token = null; }
     if (typeof token === 'string' && token.length > 0 && token.length <= 64) {
@@ -447,6 +485,7 @@ export class Net {
     // Compare future setName() calls against what we sent (the server may normalise the name).
     this.helloName = this._helloSentName;
     this.serverName = typeof msg.name === 'string' && msg.name ? msg.name : this._helloSentName;
+    if (typeof msg.tag === 'string' && /^\d{4}$/.test(msg.tag)) { this.tag = msg.tag; this.wantTag = msg.tag; identity.saveTag(msg.tag); }
     this.playerId = msg.playerId ?? null;
     this.attempt = 0;
     this.lastError = null;
@@ -461,6 +500,8 @@ export class Net {
     this._helloRid = null;
     this.lastError = new NetError(msg.code, msg.msg, msg.detail);
     if (msg.code === 'NAME_REJECTED') this.name = null; // wait for an explicit corrected name, not endless rejected reconnects
+    // 名字#四位 taken (界面#10): wait for the dialog to pick another pair instead of retrying the same one forever
+    if (msg.code === 'NAME_TAKEN') this.name = null;
     if (msg.code === 'SERVER_FULL') {
       // the online cap: leave this socket and try again after the server's interval (±25 %), no exponential backoff;
       // lastError stays for the banner until a welcome
@@ -804,6 +845,9 @@ export class Net {
 // its own token (never another tab's), so it can't steal a live session either.
 
 const K_NAME = 'sp.name';
+const K_TAG = 'sp.tag';        // localStorage: the player's own 名字#1234 four digits (界面#10)
+const K_UID = 'sp.uid';        // localStorage: this browser's install id, the owner of the #tag claim
+let uidCache = null;           // one per page load, so a storage-less environment still has a stable owner
 const K_TOKEN = 'sp.token';      // sessionStorage: this tab's token
 const K_WELCOME = 'sp.tokenWelcome'; // sessionStorage: { hash, at } from the first welcome for this token
 const K_RECENT = 'sp.tokens';    // localStorage: this browser's recent tokens, most recent first
@@ -1051,6 +1095,22 @@ export function createIdentity(deps = {}) {
     loadName: () => (sget(local, K_NAME) || '').slice(0, 64),
     /** @param {string} name */
     saveName: (name) => sset(local, K_NAME, String(name)),
+    /** @returns {string} remembered #four digits ('' if none) */
+    loadTag: () => (sget(local, K_TAG) || '').slice(0, 4),
+    /** @param {string} tag */
+    saveTag: (tag) => sset(local, K_TAG, String(tag)),
+    /** This browser's install id (the owner of its #tag claims): stable, created on first use. */
+    uid() {
+      if (uidCache) return uidCache;
+      let id = sget(local, K_UID);
+      if (id && /^[A-Za-z0-9_-]{8,64}$/.test(id)) { uidCache = id; return id; }
+      const bytes = new Uint8Array(16);
+      try { globalThis.crypto.getRandomValues(bytes); } catch { for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256); }
+      id = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+      sset(local, K_UID, id);
+      uidCache = id;
+      return id;
+    },
     /** Whether this tab already passed the title screen (survives reloads, not new tabs). */
     wasEntered: () => sget(session, K_ENTERED) === '1',
     /** @param {boolean} on */

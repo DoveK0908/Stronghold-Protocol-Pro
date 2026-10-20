@@ -138,6 +138,7 @@ export const ANIM = Object.freeze({ IDLE: 0, MOVE: 1, ATTACK: 2, SKILL: 3, DIE: 
 export const ERR = Object.freeze({
   BAD_MSG: 'BAD_MSG',             // malformed / unknown message
   NAME_REJECTED: 'NAME_REJECTED', // displayed nickname/callsign failed moderation
+  NAME_TAKEN: 'NAME_TAKEN',       // this 名字#四位 pair is already claimed (server/tags.js, 界面#10)
   SESSION_IN_USE: 'SESSION_IN_USE', // a local recovery candidate cannot replace the connected holder
   SERVER_FULL: 'SERVER_FULL',     // the online cap is reached (server/onlineLimit.js); a resumed session is never refused
   RATE: 'RATE',                   // rate limited
@@ -205,6 +206,7 @@ export const ERR_TEXT = {
   NOT_YOUR_TURN: N_('尚未轮到你'), ALREADY: N_('已完成该操作'), TEMP_NOT_EMPTY: N_('临时整备区不为空'), ELIMINATED: N_('你已被淘汰'),
   SPECTATOR: N_('观战中无法进行该操作'), START_RETRY: N_('有玩家连接未就绪，请重试'), INTERNAL: N_('服务器内部错误'),
   NAME_REJECTED: N_('代号含有不适宜内容或格式无效，请换一个昵称。'),
+  NAME_TAKEN: N_('这个「代号#四位数字」已经被占用，换一组再试。'),
   QUEUED: N_('正在匹配中，请先取消匹配'),
   LIMIT: N_('房间、对局或 AI 队友数量已达上限，请先退出其他房间或稍后再试'),
   MAINTENANCE: N_('服务器即将维护，暂停开启新的模拟'),

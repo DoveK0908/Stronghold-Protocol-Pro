@@ -3331,5 +3331,21 @@
   "已关闭": "Off",
   "界面设计：{author}（{site}）": "Interface design: {author} ({site})",
   "无限休整期": "Unlimited prep time",
-  "休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。": "The prep has no countdown; combat starts only after every living player presses Ready."
+  "休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。": "The prep has no countdown; combat starts only after every living player presses Ready.",
+
+  "我的信息": "My profile",
+
+  "修改头像": "Change avatar",
+
+  "修改名片": "Change name card",
+
+  "代号": "Callsign",
+
+  "编号": "Number",
+
+  "编号是名字后面的四位数字，先到先得：同一个「代号#编号」只能被一个浏览器占用。": "The number is the four digits after your callsign, first come first served: one callsign#number belongs to one browser.",
+
+  "编号必须是四位数字（1000–9999）。": "The number must be four digits (1000–9999).",
+
+  "这个「代号#四位数字」已经被占用，换一组再试。": "That callsign#number is already taken — pick another pair."
 }

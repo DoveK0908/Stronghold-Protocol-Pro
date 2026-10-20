@@ -32,7 +32,7 @@ import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.
 import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, modeIdFor } from '../../../shared/constants.js';
 import { roomCapacity } from '../../../shared/playerCapacity.js';
 import {
-  html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, confirmDialog, doctorNo, Spinner, Modal,
+  html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, confirmDialog, Spinner, Modal,
 } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { copyText } from '../ui/clipboard.js';
@@ -294,7 +294,7 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
         ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.name || t('博士')}</b>
         <${OwnerBadge} seat=${seat} />
       </span>
-      <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : `DOCTOR #${doctorNo(seat.playerId)}`}</small>
+      <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : seat.tag ? `#${seat.tag}` : ''}</small>
       ${isMe && onPickBg ? html`<button type="button" class="rseat__bg" onClick=${onPickBg} title=${t('更换名片底图')} aria-label=${t('更换名片底图')}><${Icon} name="edit" /></button>` : null}
     </div>
   </article>`;

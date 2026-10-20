@@ -93,7 +93,9 @@ describe('community UI: lobby header and shared DIY details', { skip: !enabled }
             `${a.label} overlaps ${b.label}`);
         }
         await page.screenshot({ path: new URL(`../e2e/out/lobby-header-${width}-${lang}.png`, import.meta.url).pathname });
-        await page.click('.stats-entry'); await page.waitForSelector('.st .st-tab');
+        await page.click('[data-testid="me-card"]'); await page.waitForSelector('.me-info-dlg');
+        await page.evaluate(() => [...document.querySelectorAll('.me-info__actions button')].find((b) => /统计数据/.test(b.textContent))?.click());
+        await page.waitForSelector('.st .st-tab');
         await page.click('.st-back');
         await page.waitForSelector('.st', { hidden: true });
         await page.click('.lobby-screen [data-testid="settings-btn"]'); await page.waitForSelector('.modal');

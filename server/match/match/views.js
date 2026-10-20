@@ -132,6 +132,7 @@ export class MatchViews {
         playerId: ps.playerId,
         seat: ps.seat,
         name: ps.name,
+        ...(ps.tag ? { tag: ps.tag } : {}),
         isBot: ps.isBot,
         connected: ps.isBot || (ps.connected && !ps.left),
         alive: ps.alive,
