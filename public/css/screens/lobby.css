@@ -1735,6 +1735,19 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rs-clock__sep { width: 1px; height: .9em; background: rgba(255, 255, 255, .3); }
 .rs-clock > span { font-size: max(calc(.16 * var(--t)), 11px); color: #9aa19e; }
 .rs-ping { margin: 0 2px; } .rs-ping--low { color: #8fef5a; } .rs-ping--mid { color: #ffc53d; } .rs-ping--high, .rs-ping--off { color: #ff6b6b; }
+/* 顶栏行高统一（维护者 2026-10-20）：已连接 / 服务状态 / 三个方形按钮 / 延迟 都是同一个方块高，
+   延迟挪到最末，数字用等宽字形 + 固定宽度，等待时间同理，免得每秒/每次测量把这一排顶得左右抖。 */
+.rs-top__left { --rs-ctl-h: .36rem; } /* same as .btn--square.btn--sm */
+.rs-top .latency-status { align-items: stretch; flex: none; flex-wrap: nowrap; height: var(--rs-ctl-h); }
+.rs-top .latency-status > .connection-status,
+.rs-top .latency-status > .server-load-button,
+.rs-top .rs-tools .rs-pingpill { height: var(--rs-ctl-h); min-height: 0; padding-block: 0; box-sizing: border-box; }
+.rs-top .connection-status, .rs-top .server-load-button { padding-inline: calc(7px * var(--ui)); }
+.rs-top .rs-pingpill { align-items: center; flex: none; min-height: 0; }
+.rs-top .rs-tools .latency-status > * { min-height: 0; }
+.rs-top .rs-pingpill .ping__value, .rs-top .rs-clock .num { display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
+.rs-top .rs-pingpill .ping__value { min-width: 4ch; }
+.rs-top .rs-clock .num { min-width: 5.2ch; }
 .rs-tools { display: flex; gap: .08rem; margin-left: .1rem; }
 .rs-key { display: flex; align-items: center; gap: .14rem; height: max(.56rem, 34px); padding: 0 .06rem 0 .2rem; background: rgba(28, 30, 30, .9); border: 1px solid rgba(255, 255, 255, .1); border-radius: .06rem; }
 .rs-key__k { font-size: max(calc(.17 * var(--t)), 11px); color: #b7bdbb; padding-right: .14rem; border-right: 1px solid rgba(255, 255, 255, .25); }

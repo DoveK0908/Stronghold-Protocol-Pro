@@ -857,7 +857,7 @@ export function ConnectionStatus({ status = 'idle' }) {
   return html`<span class=${`connection-status connection-status--${tone}`} role="status"><i aria-hidden="true" />${labels[status] || t('未连接')}</span>`;
 }
 
-export function PingPill({ ms, online = true, status, loadState, loadDetails, clusterLoad, scope = 'cluster', onLoadClick, loadOpen = false, class: cls }) {
+export function PingPill({ ms, online = true, status, loadState, loadDetails, clusterLoad, scope = 'cluster', onLoadClick, loadOpen = false, hidePing = false, class: cls }) {
   const ok = online && Number.isFinite(ms);
   const tier = !ok ? 'off' : ms < 60 ? 'low' : ms < 200 ? 'medium' : 'high';
   const ping = html`<span class=${cx('ping', `ping--${tier}`, cls)} title=${ok ? t('WebSocket 往返响应 {ms}ms', { ms }) : online ? t('等待新测量') : t('未连接')}>
@@ -873,7 +873,7 @@ export function PingPill({ ms, online = true, status, loadState, loadDetails, cl
   const preview = summary ? `${summary.caption} · ${labels[state]}` : details
     ? `CPU ${details.cpuPercent ?? '--'}% · ${details.rssMiB ?? '--'} MiB` : t('等待采样');
   return html`<span class="latency-status">
-    ${status !== undefined ? html`<${ConnectionStatus} status=${status} />` : null}${ping}
+    ${status !== undefined ? html`<${ConnectionStatus} status=${status} />` : null}${hidePing ? null : ping}
     ${loadState !== undefined ? html`<${Tooltip} text=${preview} placement="bottom">
       <button type="button" class=${`server-load-button server-load--${state}`} aria-label=${t('查看游戏服务开销')} aria-haspopup="dialog"
           aria-expanded=${loadOpen ? 'true' : 'false'} onClick=${onLoadClick} disabled=${!onLoadClick}>
