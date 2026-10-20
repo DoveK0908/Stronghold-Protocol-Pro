@@ -82,7 +82,7 @@ function sync() {
   }
   clearHandoff();
   if (!audio.ctx) return;
-  if (!source) {source=audio.ctx.createMediaElementSource(media);customGain=audio.ctx.createGain();customGain.gain.value=0;source.connect(customGain);customGain.connect(audio.bgmGain);}
+  if (!source) {source=audio.ctx.createMediaElementSource(media);customGain=audio.ctx.createGain();customGain.gain.value=0;source.connect(customGain);customGain.connect(audio.lobbyGain || audio.bgmGain);}
   fadeCustom(true);
   if (!media.paused) return;
   media.play().then(()=>{status=t('正在播放 · 单曲循环');notify();},()=>{status=t('点击“播放”开始音乐');notify();});
@@ -113,6 +113,8 @@ function install() {
   }).catch(() => { status = t('浏览器暂不能保存音乐，可稍后重试'); notify(); });
 }
 export const music = {
+  /** Subscribe to the player's own file (upload / toggle / reset): the 大厅音乐 card (ui/lobbyMusicPanel.js) reads it. */
+  subscribe(fn) { install(); listeners.add(fn); fn(music.snapshot()); return () => listeners.delete(fn); },
   snapshot: () => ({ name: record?.name || '', size: record?.blob?.size || 0, enabled: !!record?.enabled, paused: !!record?.paused, playing: !!media && !media.paused, status, busy }),
   async upload(file) {
     if (busy) return; install(); ++revision; busy = true; notify();

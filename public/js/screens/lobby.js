@@ -21,6 +21,7 @@
 // Texts go through t() (docs/I18N.md); the module-level tables hold msgids (N_) translated where they are shown, the
 // config.json mode texts come localized from data.js.
 
+import { LobbyMusicPanel } from '../ui/lobbyMusicPanel.js';
 import { LobbyMusicButton } from '../ui/lobbyMusic.js';
 import { Emblem } from '../ui/emblem.js';
 import { useHubBackdrop, HubBackdrop, HubRadar, BackdropSettings, BackdropGlyph, backdropTheme } from '../ui/hubBackdrop.js';
@@ -816,6 +817,7 @@ export function LobbyScreen() {
       </div>
 
       <aside class="hub-side">
+        <${LobbyMusicPanel} />
         <${AchievementEntry} onOpen=${() => setAchOpen(true)} />
         <${HubTile} icon="key" label=${t('密钥加入')} en="JOIN WITH KEY" onClick=${() => setJoinOpen(true)} />
         <${TipsPanel} />

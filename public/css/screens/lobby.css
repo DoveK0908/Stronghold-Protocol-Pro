@@ -2775,3 +2775,40 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .hub-topbar .stats-entry .avatar { --av: .72rem; }
 .hub-topbar .stats-entry .me-chip__name { font-size: calc(.2 * var(--t)); max-width: 3.1rem; }
 .hub-topbar .stats-entry .me-chip__stats { width: .26rem; height: .26rem; margin-left: .06rem; }
+
+/* 大厅音乐 card (ui/lobbyMusicPanel.js; the owner's request of 2026-10-20) — top-left, above 成就统计 */
+.lobmusic { flex: none; min-width: 0; background: linear-gradient(180deg, rgba(9, 17, 16, .9), rgba(6, 11, 10, .92));
+  border: 1px solid rgba(223, 230, 226, .16); border-top: 2px solid var(--mint-500);
+  box-shadow: 0 .06rem .22rem rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.lobmusic__head { display: flex; align-items: center; gap: .08rem; height: .44rem; padding: 0 .08rem 0 .12rem;
+  border-bottom: 1px solid rgba(223, 230, 226, .08); }
+.lobmusic[data-open="0"] .lobmusic__head { border-bottom: 0; }
+.lobmusic__icon { display: grid; place-items: center; width: .24rem; height: .24rem; flex: none; color: var(--mint-400);
+  font-size: .14rem; border: 1px solid var(--mint-a35); }
+.lobmusic__titles { display: flex; flex: 1 1 auto; align-items: baseline; gap: .08rem; min-width: 0; }
+.lobmusic__titles strong { font-size: calc(.13 * var(--t)); font-weight: 800; color: var(--text-hi); white-space: nowrap; }
+.lobmusic__titles em { font: 600 .075rem/1 ui-monospace, Consolas, monospace; letter-spacing: .16em; color: var(--text-dim);
+  font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobmusic__fold { flex: none; }
+.lobmusic__body { display: grid; gap: .08rem; padding: .1rem .12rem .12rem; }
+.lobmusic__sel select { width: 100%; height: .3rem; padding: 0 .08rem; font-size: calc(.12 * var(--t)); color: var(--text-hi);
+  background: rgba(4, 9, 8, .9); border: 1px solid rgba(223, 230, 226, .22); }
+.lobmusic__sel select:focus-visible { outline: 1px solid var(--mint-400); outline-offset: 1px; }
+.lobmusic__row { display: flex; align-items: center; gap: .06rem; min-width: 0; }
+.lobmusic__btn { display: grid; place-items: center; width: .3rem; height: .26rem; flex: none; padding: 0;
+  font-size: .105rem; letter-spacing: -.02em; color: var(--text-hi); background: rgba(12, 22, 20, .9); border: 1px solid rgba(223, 230, 226, .22);
+  cursor: pointer; transition: border-color var(--t-fast), color var(--t-fast); }
+.lobmusic__btn:hover { color: var(--mint-300); border-color: var(--mint-a35); }
+.lobmusic__btn--play { width: .34rem; height: .3rem; font-size: .12rem; color: #04120e; background: var(--mint-400); border-color: var(--mint-400); }
+.lobmusic__btn--play:hover { color: #04120e; background: var(--mint-300); }
+.lobmusic__shuffle { display: inline-flex; align-items: center; gap: .05rem; margin-left: .02rem; min-width: 0;
+  font-size: calc(.1 * var(--t)); color: var(--text-dim); cursor: pointer; white-space: nowrap; }
+.lobmusic__shuffle input { width: .12rem; height: .12rem; accent-color: var(--mint-500); }
+.lobmusic__vol { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: calc(.105 * var(--t)); color: var(--text-dim); }
+.lobmusic__vol span { flex: none; }
+.lobmusic__vol input { flex: 1 1 auto; min-width: 0; height: .16rem; accent-color: var(--mint-500); }
+.lobmusic__vol b { flex: none; min-width: .26rem; padding-right: .02rem; text-align: right; font: 700 .1rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__file { display: flex; align-items: center; gap: .08rem; min-width: 0; }
+.lobmusic__file small { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .1rem; color: var(--text-dim); }
+@media (max-width: 64rem) { .lobmusic__row { flex-wrap: wrap; } }

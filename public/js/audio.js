@@ -89,7 +89,7 @@ import { mediaUrl } from './media.js';
 import { fetchMaterial } from './materialFallback.js';
 import { normalizeVoiceLanguage } from './voiceLanguage.js';
 import { unhashedUrl } from '../../shared/assetPaths.js';
-import { pickedBgm, sanitizeBgmChoice } from './bgmChoice.js';
+import { BGM_TRACKS, pickedBgm, sanitizeBgmChoice } from './bgmChoice.js';
 
 const MAX_VOICES = 8;
 // [ASSUMED] Remake anti-spam intervals, retained at high game speeds; not official audio pool parameters (#680).
@@ -210,6 +210,18 @@ export function resolveBgm(manifest, key) {
  * The last round that plays 无畏者 (1–7); from the next round on it is 骑士之日 (8–13) — the official schedule
  * (docs/ASSETS.md "BGM"; the two tracks are the 塞壬唱片 act13side battle themes).
  */
+/**
+ * The packaged track the 大厅音乐 panel picked for the lobby ('official' / 'custom' → null: the lobby's own music, and
+ * the player's own file plays through ui/lobbyMusic.js). Ids are BGM_TRACKS' (bgmChoice.js).
+ * @param {any} manifest
+ * @param {string} id
+ */
+export function lobbyTrackOf(manifest, id) {
+  const track = BGM_TRACKS.find((t) => t.id === id)?.of(manifest?.audio?.bgm);
+  if (!track || typeof track.loop !== 'string') return null;
+  return { intro: typeof track.intro === 'string' ? track.intro : null, loop: track.loop, choice: id };
+}
+
 export const COMBAT_TRACK_SWITCH_ROUND = 7;
 
 /**
@@ -731,9 +743,13 @@ export class AudioManager {
     this.ctx = null;
     this.master = null;
     this.bgmGain = null;
+    this.lobbyGain = null;
     this.sfxGain = null;
     this.voiceGain = null;
-    this.volumes = { bgm: 0.6, sfx: 0.8, voice: 0.8, muted: false };
+    this.volumes = { bgm: 0.6, sfx: 0.8, voice: 0.8, lobby: 1, muted: false };
+    /** 大厅音乐 panel: the track the lobby plays ('official' = the manifest's own lobby music), and whether it is paused. */
+    this.lobbyPick = 'official';
+    this.lobbyPaused = false;
     this.buffers = new Map(); // url → Promise<AudioBuffer|null> (insertion order = LRU)
     this.bufBytes = new Map(); // url → decoded PCM bytes (the byte budget of the LRU, see _buffer)
     this.warned = new Set();
@@ -823,9 +839,11 @@ export class AudioManager {
       this.ctx = new AC();
       this.master = this.ctx.createGain();
       this.bgmGain = this.ctx.createGain();
+      this.lobbyGain = this.ctx.createGain();
       this.sfxGain = this.ctx.createGain();
       this.voiceGain = this.ctx.createGain();
       this.bgmGain.connect(this.master);
+      this.lobbyGain.connect(this.bgmGain); // 大厅音乐音量 (settings lobbyVolume) rides under 背景音乐
       this.sfxGain.connect(this.master);
       this.voiceGain.connect(this.master);
       this.master.connect(this.ctx.destination);
@@ -907,7 +925,7 @@ export class AudioManager {
 
   /**
    * Set channel volumes (0..1) and mute.
-   * @param {{ bgm?: number, sfx?: number, voice?: number, muted?: boolean }} v
+   * @param {{ bgm?: number, sfx?: number, voice?: number, lobby?: number, lobbyVolume?: number, muted?: boolean }} v
    */
   setVolumes(v) {
     const n = (x, d) => (Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : d);
@@ -916,6 +934,7 @@ export class AudioManager {
       bgm: n(v?.bgm, this.volumes.bgm),
       sfx: n(v?.sfx, this.volumes.sfx),
       voice: n(v?.voice, this.volumes.voice),
+      lobby: n(v?.lobbyVolume ?? v?.lobby, this.volumes.lobby),
       muted: typeof v?.muted === 'boolean' ? v.muted : this.volumes.muted,
     };
     this._applyVolumes();
@@ -953,7 +972,30 @@ export class AudioManager {
   /** The track of a BGM key: the player's pick for 休整期 / 作战 when it has one, else the manifest's (resolveBgm). */
   _bgmTrack(key) {
     const manifest = this.getManifest();
+    // 大厅音乐 panel: a packaged track instead of the lobby's own (ui/lobbyMusicPanel.js; 'custom' and 'official' keep
+    // the lobby's own music — the player's own file plays through ui/lobbyMusic.js, which overrides this key)
+    if (key === 'lobby' && this.lobbyPick && this.lobbyPick !== 'official') {
+      const pick = lobbyTrackOf(manifest, this.lobbyPick);
+      if (pick) return pick;
+    }
     return pickedBgm(manifest, key, this.bgmChoice, this.bgmChoiceFailed, this.bgmLocal) || resolveBgm(manifest, key);
+  }
+
+  /** 大厅音乐 panel: which packaged track the lobby plays ('official': the manifest's own lobby music). */
+  setLobbyPick(id) {
+    const next = typeof id === 'string' && id ? id : 'official';
+    if (next === this.lobbyPick) return;
+    this.lobbyPick = next;
+    if (this.lastBgmKey === 'lobby') this.playBgm('lobby');
+  }
+
+  /** 大厅音乐 panel: pause / resume the lobby music (the screen keeps asking for it; playBgm returns early). */
+  setLobbyPaused(on) {
+    const next = on === true;
+    if (next === this.lobbyPaused) return;
+    this.lobbyPaused = next;
+    if (next) { if (this.lastBgmKey === 'lobby' || this.wantBgm === 'lobby') { this.wantBgm = null; ++this.bgmToken; this._fadeOutBgm(); } }
+    else if (this.bgm?.key === 'lobby' || this.lastBgmKey === 'lobby') this.playBgm(this.lastBgmKey ?? 'lobby');
   }
 
   /** Decode a 自选曲 file (an object URL) into the single local slot. Resolves null on failure. */
@@ -980,7 +1022,7 @@ export class AudioManager {
   }
 
   /** Is the music silent — muted, or the BGM volume at 0? Then no BGM is downloaded (playBgm). */
-  get bgmSilent() { return this.volumes.muted || this.volumes.bgm <= 0; }
+  get bgmSilent() { return this.volumes.muted || this.volumes.bgm <= 0 || this.volumes.lobby <= 0; }
 
   /** Compatible upstream name, backed by the same listener preference (setVoiceLanguage). */
   get voiceLang() { return this.voiceLanguage; }
@@ -1025,6 +1067,7 @@ export class AudioManager {
       this.master.gain.setTargetAtTime(this.volumes.muted ? 0 : 1, t, 0.03);
       // perceptual curve
       this.bgmGain.gain.setTargetAtTime(this.volumes.bgm ** 2 * 0.55, t, 0.05);
+      this.lobbyGain.gain.setTargetAtTime(this.volumes.lobby ** 2, t, 0.05);
       this.sfxGain.gain.setTargetAtTime(this.volumes.sfx ** 2 * 0.9, t, 0.03);
       // no 0.9: a voice line is already mastered as loud as the rest of the official mix (settings 干员语音 tunes it)
       this.voiceGain.gain.setTargetAtTime(this.volumes.voice ** 2, t, 0.03);
@@ -1124,6 +1167,7 @@ export class AudioManager {
   playBgm(key) {
     try {
       this.lastBgmKey = key;
+      if (key === 'lobby' && this.lobbyPaused) { this.wantBgm = null; ++this.bgmToken; this._fadeOutBgm(); return; }
       if (this.lobbyMusicOverride?.(key)) { this.wantBgm = null; ++this.bgmToken; this._fadeOutBgm(); return; }
       if (!this.ctx) { this.wantBgm = key; return; }
       if (this.bgmSilent) {
@@ -1173,7 +1217,7 @@ export class AudioManager {
     try {
       const ctx = this.ctx;
       const gain = ctx.createGain();
-      gain.connect(this.bgmGain);
+      gain.connect(key === 'lobby' ? this.lobbyGain : this.bgmGain);
       const t0 = ctx.currentTime + 0.05;
       gain.gain.setValueAtTime(0, t0);
       gain.gain.linearRampToValueAtTime(1, t0 + FADE_S);

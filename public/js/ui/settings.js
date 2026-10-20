@@ -93,6 +93,7 @@ settingsStore.subscribe((s) => {
   audio.setVolumes(s);
   audio.setVoiceLang(s.voiceLang, s.voiceOverrides);
   audio.setBgmChoice({ prep: s.bgmPrep, combat: s.bgmCombat });
+  audio.setLobbyPick(s.lobbyTrack);
   audio.setVoiceNative(s.voiceNative);
   applyTextSize(s.textSize);
   applyUiScale(s.uiScale);
@@ -100,6 +101,7 @@ settingsStore.subscribe((s) => {
 audio.setVolumes(settingsStore.get());
 audio.setVoiceLang(settingsStore.get().voiceLang, settingsStore.get().voiceOverrides);
 audio.setBgmChoice({ prep: settingsStore.get().bgmPrep, combat: settingsStore.get().bgmCombat });
+audio.setLobbyPick(settingsStore.get().lobbyTrack);
 audio.setVoiceNative(settingsStore.get().voiceNative);
 // before the first render (main.js boot renders after its imports ran): the stored step is on screen without a flash
 applyTextSize(settingsStore.get().textSize);

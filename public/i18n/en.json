@@ -3310,5 +3310,14 @@
   "树丛": "Bushes",
   "源石流发生装置": "Originium Flow Generator",
   "沼泽控制": "Mire Control",
-  "涨潮控制": "Tide Control"
+  "涨潮控制": "Tide Control",
+  "主界面音乐": "Lobby music",
+  "官方大厅音乐": "Official lobby music",
+  "自选上传": "Your own upload",
+  "上一首": "Previous",
+  "下一首": "Next",
+  "随机播放": "Shuffle",
+  "大厅音乐音量": "Lobby music volume",
+  "展开": "Expand",
+  "音量": "Volume"
 }

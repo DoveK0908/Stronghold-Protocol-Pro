@@ -726,7 +726,7 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official' },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voice, DEFAULT_SETTINGS.voice, 'a saved profile without `voice` gets the default');
     // 语音语言: 中文 by default. en / kr are dubs (0.3.0); anything else, including the per-operator 'native', stays 中文.
@@ -739,6 +739,18 @@ describe('keyboard & settings', () => {
     assert.equal(sanitizeSettings({ bgm: 0.5 }).bondTimers, false);
     assert.equal(sanitizeSettings({ bondTimers: true }).bondTimers, true);
     assert.equal(sanitizeSettings({ bondTimers: 'yes' }).bondTimers, false);
+    // 大厅音乐面板 (ui/lobbyMusicPanel.js): official lobby track, no shuffle, full volume, card expanded
+    assert.equal(DEFAULT_SETTINGS.lobbyTrack, 'official');
+    assert.equal(DEFAULT_SETTINGS.lobbyShuffle, false);
+    assert.equal(DEFAULT_SETTINGS.lobbyVolume, 1);
+    assert.equal(DEFAULT_SETTINGS.lobbyMusicOpen, true);
+    assert.equal(sanitizeSettings({ lobbyTrack: 'knight' }).lobbyTrack, 'knight');
+    assert.equal(sanitizeSettings({ lobbyTrack: 'nonsense' }).lobbyTrack, 'official');
+    assert.equal(sanitizeSettings({ lobbyTrack: 'custom' }).lobbyTrack, 'custom');
+    assert.equal(sanitizeSettings({ lobbyShuffle: 'yes' }).lobbyShuffle, false);
+    assert.equal(sanitizeSettings({ lobbyVolume: 3 }).lobbyVolume, 1);
+    assert.equal(sanitizeSettings({ lobbyVolume: 0.35 }).lobbyVolume, 0.35);
+    assert.equal(sanitizeSettings({ lobbyMusicOpen: false }).lobbyMusicOpen, false, 'collapsed stays collapsed');
     // 显示其他玩家的皮肤 (docs/SKINS.md): on by default, and off only when the profile says so
     assert.equal(DEFAULT_SETTINGS.otherSkins, true);
     assert.equal(sanitizeSettings({ bgm: 0.5 }).otherSkins, true);
