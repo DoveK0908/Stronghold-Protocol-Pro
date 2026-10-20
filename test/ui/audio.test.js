@@ -757,6 +757,35 @@ describe('AudioManager', () => {
     assert.equal(BGM_CHOICES.at(-1), 'custom');
     assert.ok(BGM_CHOICES.every((id) => id === 'official' || id === 'custom' || pickedBgm(manifest, 'prep', { prep: id })), 'every manifest pick resolves');
   });
+  test('the 大厅音乐 pick that cannot be fetched falls back to the lobby track once — never restarts in a loop', async () => {
+    // 「一切歌就卡住」 (owner report 2026-10-20): a pick whose file is missing (上海Major is host-provided and absent in
+    // this repo) used to be resolved again and again by _startBgm's failure path, each round fetching + decoding.
+    const fw = fakeWindow();
+    const origFetch = globalThis.fetch;
+    const urls = [];
+    globalThis.fetch = async (u) => { urls.push(String(u)); const bad = String(u).includes('sp_major_pause'); return { ok: !bad, status: bad ? 404 : 200, arrayBuffer: async () => new ArrayBuffer(bad ? 0 : 8) }; };
+    const tick = () => new Promise((r) => setTimeout(r, 10));
+    const until = async (fn) => { for (let i = 0; i < 100 && !fn(); i++) await tick(); return fn(); };
+    const b = manifest.audio.bgm;
+    try {
+      const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+      a.install();
+      a.setLobbyPick('major');
+      a.playBgm('lobby');
+      fw.fire('pointerdown');
+      a.ctx.decodeAudioData = (ab, ok) => ok({ duration: 1.5 });
+      await until(() => urls.length > 0);
+      assert.ok(await until(() => a.bgm?.loopUrl === b.lobby.loop), 'the lobby keeps its own music');
+      const attempts = urls.filter((u) => u.includes('sp_major_pause')).length;
+      await new Promise((r) => setTimeout(r, 120));
+      assert.equal(urls.filter((u) => u.includes('sp_major_pause')).length, attempts, 'no restart after the failure');
+      assert.ok(attempts <= 4, `the failing file is asked for a bounded number of times (${attempts})`);
+      assert.ok(a.bgmChoiceFailed.has('major'), 'the failure is remembered');
+      // an explicit pick retries it (a host that adds the file back)
+      a.setLobbyPick('major');
+      assert.equal(a.bgmChoiceFailed.has('major'), false);
+    } finally { globalThis.fetch = origFetch; }
+  });
   test('the picks play: 休整期 / 作战 follow them at once, 联防 does not; 自选曲 plays the file; one that does not decode plays the official track', async () => {
     const fw = fakeWindow();
     const origFetch = globalThis.fetch;
