@@ -7,6 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AudioManager, lobbyTrackOf } from '../../public/js/audio.js';
 import { BGM_TRACKS } from '../../public/js/bgmChoice.js';
+import { siteCsp } from '../../server/http/csp.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -73,4 +74,15 @@ test('settings: the panel\'s picks and the wire to audio.js', () => {
   assert.doesNotMatch(panel, /music\.upload\(file\)\.catch\(\(\) => \{\}\)/, 'no silent catch left');
   const en = JSON.parse(read('public/i18n/en.json'));
   assert.equal(typeof en['浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传'], 'string');
+});
+
+test('the site policy lets the card play a blob: file, and 上海Major is not offered', () => {
+  // 「我的桌面有一个mp3文件，也没法上传」 (owner report 2026-10-20): without media-src, default-src 'self' blocked the
+  // blob: URL the card hands to <audio> for its metadata probe, so every upload failed as 「无法播放该音频」.
+  const csp = siteCsp(join(ROOT, 'public'));
+  assert.match(csp, /media-src 'self' blob:/, 'blob: media stays legal under the site policy');
+  assert.ok(!csp.includes('unsafe-eval'), 'the relaxation is only media-src');
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /x\.id !== 'lobby' && x\.id !== 'major'/, '上海Major has no shipped file — not listed');
+  assert.doesNotMatch(panel, /\['official', \.\.\.BGM_TRACKS\.filter\(\(x\) => x\.id !== 'lobby'\)\.map/, 'the 上海Major entry is gone from the picker');
 });

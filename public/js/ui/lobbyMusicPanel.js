@@ -14,7 +14,9 @@ import { useSettings, updateSettings } from './settings.js';
 import { music } from './lobbyMusic.js';
 
 /** The track names the dropdown offers; 'custom' is the player's own file (lobbyMusic.js), 'official' the lobby's own. */
-const TRACK_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby').map((x) => x.id), 'custom']);
+// 上海Major stops here: its file is host-provided (MAJOR_BGM_URL) and this repo ships no copy, so offering it in the
+// lobby list only ever produced a failed load (the owner: 「之前那个上海major的bgm没有文件就不要了」).
+const TRACK_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby' && x.id !== 'major').map((x) => x.id), 'custom']);
 
 /** The name of one column value (`lobbyTrack`). */
 export function lobbyTrackName(id, customName = '') {
