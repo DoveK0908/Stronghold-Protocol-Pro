@@ -61,6 +61,13 @@ replaces/data/announcements.json         4 B  公告板整份清空（`[]`，维
 少了前三份，换一份新基线再 apply 之后，**她不在 DIY 池里（选不到）、她的音效不被清单认领（没声音）**，
 而 `apply.mjs --check` 依然会报「全部通过，无冲突」；少了公告那份，上游的版本公告会随新基线一起回来。
 
+> **维护规则（2026-10-20 补）**：`replaces/` 与 `files/**` 是**整份快照**，不会跟基线一起演化。
+> 目标文件在基线里更新过（例如皮肤清单 266 → 276 套、`data/backups.json` 重新生成、
+> `test/sfx-oblvns.test.js` 改写）之后，必须把这些快照重新拷成当前树的内容，否则
+> `apply.mjs` 会把树**回退**成旧快照，而 `--check` 依旧「全部通过」。
+> 判据：`node mods/sakiko/apply.mjs --revert && node mods/sakiko/apply.mjs && git status --short`
+> 只应改动 `mods/sakiko/**` 自己；出现别的文件就说明快照过期了。
+
 ### 补丁格式
 
 ```json
