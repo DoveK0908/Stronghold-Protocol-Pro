@@ -19,7 +19,7 @@ test('muzzleOffset reads the Muzzle bone of the drawn model, at the strike frame
   assert.deepEqual(o, { x: 0.21, up: 0.55, angle: 0, flip: 1 });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].strike, true, 'posed at the attack clip strike frame');
-  assert.deepEqual(calls[0].names, ['Muzzle', 'MuzzlePoint', 'muzzle'], 'the same names as render/vfx/mounts.js');
+  assert.deepEqual(calls[0].names, ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle'], 'bare and front/back-prefixed bone names (mounts.js POINT_NAMES plus the F_/B_ prefixes)');
 });
 
 test('muzzleOffset is null without a model / a bone / finite numbers', () => {

@@ -25,7 +25,9 @@ const SHELL_RISE = 0.34, SHELL_UP = 5.5;
 const BOMBARD_SHELL = Object.freeze({ look: 'mortar', tint: 0xfff2d8, glow: 0xff9c33, trail: 0xffb35c, smoke: 0x3a3430, len: 1.3, width: 0.3, head: 0.56 });
 
 /** The muzzle bone names an operator skin may carry (render/vfx/mounts.js POINT_NAMES.muzzle, same order). */
-const MUZZLE_BONES = Object.freeze(['Muzzle', 'MuzzlePoint', 'muzzle']);
+// The drawable models name the muzzle with a front/back prefix (`F_Muzzle` on the front skeleton, `B_Muzzle` on the
+// back), so try the bare names too for skeletons that keep one set.
+const MUZZLE_BONES = Object.freeze(['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
 
 /**
  * Where the weapon of a drawn unit is, in tiles from its feet (`x` along the screen's right with the facing applied,
