@@ -32,8 +32,7 @@ export function MeCard({ me, onOpen }) {
       <${Img} src=${face} alt="" fallback=${html`<span class="me-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
     </span>
     <span class="me-card__text">
-      <span class="me-card__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" />${me?.name || t('博士')}</span>
-      <span class="me-card__id num" data-testid="me-card-tag">#${me?.tag || '----'}</span>
+      <span class="me-card__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" /><span class="me-card__label" data-testid="me-card-tag">${playerLabel(me?.name, me?.tag)}</span></span>
     </span>
   </button>`;
 }

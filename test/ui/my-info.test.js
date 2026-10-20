@@ -12,7 +12,8 @@ test('the lobby 名片 button: avatar + 名字#四位, opens 我的信息', () =
   const info = read('public/js/ui/myInfo.js');
   assert.match(info, /export function MeCard\(/);
   assert.match(info, /data-testid="me-card"/);
-  assert.match(info, /data-testid="me-card-tag">#\$\{me\?\.tag \|\| '----'\}/);
+  // the card prints 名字#四位 on ONE line (the same playerLabel every other display uses)
+  assert.match(info, /data-testid="me-card-tag">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}/);
   assert.ok(info.includes('<${NameCardLayer} card=${card.bg} />'), 'the name card is the button background');
   const lobby = read('public/js/screens/lobby.js');
   assert.match(lobby, /<\$\{MeCard\} me=\$\{me\} onOpen=\$\{\$?\{?\(\) => setInfoOpen\(true\)/);
@@ -67,7 +68,9 @@ test('no display still says DOCTOR #NNNN', () => {
   for (const p of ['public/js/screens/lobby.js', 'public/js/screens/room.js', 'public/js/ui/achievements.js', 'public/js/ui/myInfo.js']) {
     assert.doesNotMatch(read(p), /DOCTOR #\$\{?doctorNo/, `${p} no longer prints DOCTOR #`);
   }
-  assert.match(read('public/js/screens/room.js'), /seat\.tag \? `#\$\{seat\.tag\}` : ''/);
+  // the seat's 名片 prints 名字#四位 on the name line; bots keep AUTONOMOUS UNIT on the small line
+  assert.match(read('public/js/screens/room.js'), /playerLabel\(seat\.name, seat\.tag\)/);
+  assert.match(read('public/js/screens/room.js'), /seat\.isBot \? html`<small class="rseat__doc">AUTONOMOUS UNIT<\/small>` : null/);
   assert.match(read('public/js/ui/achievements.js'), /me\?\.tag \? `#\$\{me\.tag\}` : ''/);
 });
 

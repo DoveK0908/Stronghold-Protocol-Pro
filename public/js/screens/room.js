@@ -52,6 +52,7 @@ import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
 import { OwnerBadge, isOwnerSeat } from '../ui/ownerName.js';
+import { playerLabel } from '../ui/myInfo.js';
 import { difficultyInfo, stageLabel, stageSuffix, ProtoCard } from './lobby.js';
 import { ProtocolScene } from '../ui/protocolScene.js';
 import { usePresence, useRise, afterLeave } from '../ui/transitions.js';
@@ -290,10 +291,10 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
             <${AvatarFrame} size="sm" name=${seat.name} src=${cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
         : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} bot=${seat.isBot} />`}
       <span class="rseat__who">
-        ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.name || t('博士')}</b>
+        ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.isBot ? seat.name || t('博士') : playerLabel(seat.name, seat.tag)}</b>
         <${OwnerBadge} seat=${seat} />
       </span>
-      <small class="rseat__doc">${seat.isBot ? 'AUTONOMOUS UNIT' : seat.tag ? `#${seat.tag}` : ''}</small>
+      ${seat.isBot ? html`<small class="rseat__doc">AUTONOMOUS UNIT</small>` : null}
       ${isMe && onPickBg ? html`<button type="button" class="rseat__bg" onClick=${onPickBg} title=${t('更换名片底图')} aria-label=${t('更换名片底图')}><${Icon} name="edit" /></button>` : null}
     </div>
   </article>`;

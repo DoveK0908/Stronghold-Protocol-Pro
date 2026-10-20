@@ -100,15 +100,16 @@ test('experimental rules display room options without a revival ballot', () => {
   const switches = [];
   const visit = node => { if (Array.isArray(node)) return node.forEach(visit); if (node?.props) { if (node.props.role === 'switch') switches.push(node); visit(node.props.children); } };
   visit(view);
-  assert.equal(switches.length, 5);
+  assert.equal(switches.length, 6);
   assert.deepEqual(switches.map(node => node.props.id), ['experimental-revival', 'experimental-pool', 'experimental-multiplayer',
-    'experimental-luck-console', 'experimental-hit-softcap']);
+    'experimental-luck-console', 'experimental-hit-softcap', 'experimental-prep-unlimited']);
   assert.ok(switches.every(node => node.props.disabled));
   assert.ok(switches.slice(0, 2).every(node => node.props.checked));
   assert.equal(switches[2].props.checked, false, 'expanded rooms stay default off independently of both original rules');
   // 项目 5（原项目 7）增的两条可选开关：Luck 测试插件与限伤封顶默认关（策略阶段看敌人已由官方 #484 提供，不再有开关）。
   assert.equal(switches[3].props.checked, false, 'the Luck console stays dormant unless the room asked for it');
   assert.equal(switches[4].props.checked, false, 'the boss hit soft cap stays off: the official rule is the default');
+  assert.equal(switches[5].props.checked, false, 'unlimited prep (G05) is opt-in');
 });
 
 test('queue UI distinguishes pending vs allocated and clamps clocks', () => {
