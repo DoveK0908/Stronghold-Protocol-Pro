@@ -622,12 +622,12 @@ function LobbyAnnouncements({ snapshot, onClose }) {
     onRetry=${() => data.invalidate('announcements')} onClose=${onClose} />`;
 }
 
-/** The design credit under the feedback group (the owner's request of 2026-10-14). */
-export const UI_CREDIT = Object.freeze({ author: '雨千代chiyo', site: 'Bilibili', qq: '374360968' }); // i18n-ignore: a person's name
+/** The design credit under the feedback group (the owner's request of 2026-10-14; the QQ line went on 2026-10-20). */
+export const UI_CREDIT = Object.freeze({ author: '雨千代chiyo', site: 'Bilibili' }); // i18n-ignore: a person's name
 
 function DesignCredit() {
-  return html`<p class="hub-credit" title=${t('界面设计：{author}（{site}）。前端界面问题可加 QQ {qq} 反馈', UI_CREDIT)}>
-    ${t('界面设计')} <b>${UI_CREDIT.site}@${UI_CREDIT.author}</b><span class="hub-credit__sep" aria-hidden="true">·</span>${t('前端反馈 QQ')} <span class="num selectable">${UI_CREDIT.qq}</span>
+  return html`<p class="hub-credit" title=${t('界面设计：{author}（{site}）', UI_CREDIT)}>
+    ${t('界面设计')} <b>${UI_CREDIT.site}@${UI_CREDIT.author}</b>
   </p>`;
 }
 

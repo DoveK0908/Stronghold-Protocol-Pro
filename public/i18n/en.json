@@ -2918,7 +2918,6 @@
   "列表": "List",
   "初战告捷": "First Victory",
   "初次模拟": "First Simulation",
-  "前端反馈 QQ": "Front-end feedback QQ",
   "动态效果（云层、粒子、雷达扫描）": "Motion effects (clouds, particles, radar sweep)",
   "匹配中": "Matching",
   "千军辟易": "Thousand Routed",
@@ -3059,7 +3058,6 @@
   "独自调配阵容，按自己的节奏开始模拟": "Build your lineup alone and play at your own pace",
   "甄选干员": "Selected operators",
   "界面设计": "UI design",
-  "界面设计：{author}（{site}）。前端界面问题可加 QQ {qq} 反馈": "UI design: {author} ({site}). Report front-end issues on QQ {qq}",
   "百战不殆": "Battle-Hardened",
   "目前只有你自己看得到；服务器下次更新后，同盟里的其他博士也能看到你的选择": "Only you can see it for now; after the next server update every Doctor in the alliance will see your pick",
   "确认配置": "Confirm",
@@ -3330,5 +3328,6 @@
   "文件已不存在": "That file is gone",
   "只改变你自己听到的音乐。自选曲和主界面音乐共用本机曲库，每首最长 5 分钟。作战的官方音乐：第 1–7 回合《无畏者》，第 8 回合起《骑士之日》；联防、最终攻势和隐秘核心保持官方音乐。": "Only changes the music you hear. Your own tracks share the lobby card's local library (each up to 5 minutes). Official 作战 music: 《无畏者》 for rounds 1–7, 《骑士之日》 from round 8 on; 联防, the final assault and the hidden core keep their own tracks.",
   "已开启": "On",
-  "已关闭": "Off"
+  "已关闭": "Off",
+  "界面设计：{author}（{site}）": "Interface design: {author} ({site})"
 }
