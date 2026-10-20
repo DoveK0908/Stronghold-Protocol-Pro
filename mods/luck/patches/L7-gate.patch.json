@@ -1,0 +1,17 @@
+{
+  "name": "L7-gate.patch.json",
+  "file": "src/server-patch.mjs",
+  "about": "L7 —— 房间没有勾选「Luck 测试插件」时，补丁对整局完全惰性（2026-10-20 维护者：「一定要保证没有勾选luck插件的时候，luck插件不会影响对局」）。面板的 sandbox / 自选位 / 技能与属性 / 调度中心都是**整进程**状态：在同一进程里上一局开过 Luck、下一局没勾，这些改动会漏进下一局。这里在每局 start 时发现没勾选就整体收回（各组的 rollbackFeature，等同于总开关逐项关掉），并把倍速交回游戏自身（state.speed = null）；录制也只记开了 Luck 的对局。",
+  "hunks": [
+    {
+      "id": "L7-off-reset",
+      "find": "    Match.prototype.start = function start(...args) {\n      // the lobby builds a fresh Match per game; the speed the player chose survives across those\n      if (state.speed && state.speed !== this.gameSpeed) {",
+      "replace": "    Match.prototype.start = function start(...args) {\n      // 本局没有勾选「Luck 测试插件」（房间的实验性选项）：把进程级的改动全部收回，倍速交回游戏自己。\n      // sandbox / 自选位 / 技能与属性 / 调度中心都是整进程状态，不收回就会漏到下一局；这条保证\n      // 「没勾选 = 完全不影响对局」，即使同一进程里上一局开过 Luck。rollbackFeature 就是总开关逐项关掉走的路。\n      if (!(this.experimental && this.experimental.luckConsole === true)) {\n        for (const k of FEATURE_KEYS) {\n          try { rollbackFeature(this, state, k); } catch (e) { log.warn('luck-off reset failed', e?.message || e); }\n        }\n        state.speed = null;\n      }\n      // the lobby builds a fresh Match per game; the speed the player chose survives across those\n      if (state.speed && state.speed !== this.gameSpeed) {"
+    },
+    {
+      "id": "L7-record-gate",
+      "find": "function recordIntent(state, log, match, playerId, msg, res) {\n  if (!state.record) return;",
+      "replace": "function recordIntent(state, log, match, playerId, msg, res) {\n  if (!state.record) return;\n  // 录制也只记开了 Luck 的对局：没勾选的对局连一行日志都不写\n  if (!(match && match.experimental && match.experimental.luckConsole === true)) return;"
+    }
+  ]
+}

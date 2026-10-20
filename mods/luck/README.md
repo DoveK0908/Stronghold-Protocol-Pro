@@ -310,3 +310,4 @@ Luck 的主面板内容由 `render(v)` 画，而 `v` 取自**对局私有视图*
 2. 「设置调度」按钮在、有 `title`、旁边有 `input[type=number][min=1][max=6]`（`local.sb.level` 存本机记忆）；
 3. **服务端发出去的那份字节**里确实有 `['shopLevel', '调度中心 · 直接设置等级'` 与
    `const SHOPLEVEL = 'g.modShopLevel'`（`fetch('/mod/overlay.js')` 直接读，不受面板状态影响）。
+- `L7-gate.patch.json`：房间没有勾选「Luck 测试插件」时，补丁对整局完全惰性（每局 start 时把整进程的 sandbox / 自选位 / 技能与属性 / 调度中心收回到游戏自己的状态，倍速交回游戏，录制不写）。
