@@ -311,3 +311,22 @@ node tools/fetch-assets.mjs --offline --allow-shrink                  # 重写�
 - 每个音效 role 只放**一个**文件（sakiko 语义：清单播一个音），与 dust `soundLeaf`（最多 4 个备选、客户端随机抽）语义不同；mod 自带测试明确断言「first sound, not a list of takes」。
 - `PROJECTILE_SFX_BANKS` 的 kind 集合是**闭合**的（只有 `note` / `noteSkill`）。
 - **手改过某个被补丁覆盖的文件后，必须立刻重生成那个补丁**。`apply.mjs` 的幂等判据是「`replace` 已在文中」，某个 hunk 插进去的文本一旦被你手工改动，它的 `replace` 就不再连续 ⇒ 下一次 `apply` 会把这个 hunk **再插一遍**，产生整块重复（本项目在 `D1-audio-tests` 上真踩过一次：改写了 7 条测试却没重生成，随后 `apply` 把整块用例复制成两份，文件从 1675 行涨到 2076 行）。用 `_build\gen-patch-from-file.mjs` / `_build\regen-d1.mjs` 从 pristine 重生成，再看 `回放自检：PASS` 与 `apply.mjs --check` 全 `already`。收尾验证照旧跑一次 `--revert` + `apply` 并用 SHA256 比对，确保逐字节复现。
+
+## 维护者裁决（2026-10-18，实施于 2026-10-19 / 提交 `72a13f19`）
+
+她自己那份 `op-oblvns.js` 有三处规则与官方/PRTS 的建模不同。维护者逐条裁决如下——**这三条是本 overlay 的语义，不再回退到她的原版**：
+
+1. **S2 满月的舞会只用钢琴。** 官方允许 钢琴 ↔ 风琴 自由切换，本模式没有换音色的入口，所以 normal 形态不再按 `[ASSUMED]` 走风琴（旧行为给 normal +80 ASPD 与法术音符），与 elite 一样只读 `NOTE_S2_PIANO`；`NOTE_S2_ORGAN` 降级成 `_NOTE_S2_ORGAN` 只作记录，`attack@attack_speed` 那条风琴分支留在数据里但永不读取。
+2. **S1 新月的苏醒的扇形半角读本行 `angle` 黑盒**（每档 5 / 10 / 15），步进 = 2·half/(n−1)，八个音符关于朝向对称；`S1_FAN_FALLBACK = 15` 只在记录完全没有 `angle` 时兜底。此前硬编码 PRTS 页面的 13.125° / 3.75°，数据改档时扇形不会跟随。
+3. **`toneReplacesAttack`：技能的攻击 = 技能自己的音色。** S2/S3 持续期间（`sk.spec.attack` 覆盖攻击）攻击只发技能音符，天赋音符不再额外附送；纯增益技能仍按天赋音符出手。此前一次攻击发两个音符，把天赋叠层（每命中 +1% DEF/RES 穿透）与单次伤害一起抬高。S1 是瞬发，`end()` 在 `activate()` 内就跑完，不需要特例。
+
+`test/golden/diy.json` 因此移动了两个场景（`npm run golden:update` 重生成，`mods/sakiko/replaces/` 里同步）：diy-136（S2 不再给 normal 形态 ASPD/法术音符：击杀 13 → 12、p1 伤害 758965 → 798171）与 diy-137（技能音符取代天赋音符：耗时 204.93 → 202.1 s、ticks 6148 → 6063、rngDraws 8747 → 6764）。
+
+## 锚点漂移时的重锚（2026-10-20）
+
+0.3.2 合入后，`apply.mjs --check` 一度报 16 处 `conflict-anchor-missing`（内容在树上，只是上游把 find 的上下文改了）。处理方式与结论：
+
+- 只重锚**失效的那些 hunk**，内容与本意不变：`_build/reanchor2.mjs` 对 hunk 做行级 LCS 求「新增行」，再在当前文件里用真实上下文重写 `find`/`replace`（9 处）；剩下 4 处是函数头/注释行级别的改动（`A3-jsdoc-summary`、`C10d-1`、`C10d-9`、`C12-5`），按上游与当前文件同一区段手工重写（`_build/reanchor3.mjs`）。
+- 期间发现 `A3-jsdoc-summary` 的 `proj / fever` 字样在合并中**真的丢了**（不是锚点问题），已在 `server/sim/battle/events.js` 补回。
+- 收尾状态：`node mods/sakiko/apply.mjs --check` → 全部通过、无冲突；`op_oblvns` + `fxnote` + `sfx-oblvns` 97/97。
+- 以后改被补丁覆盖的文件，仍按上一节最后一条：改完立刻重生成补丁并跑 `--check`。

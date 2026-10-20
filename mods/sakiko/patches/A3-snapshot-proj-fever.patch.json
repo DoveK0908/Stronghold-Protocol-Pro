@@ -9,8 +9,8 @@
     },
     {
       "id": "A3-jsdoc-summary",
-      "find": "   * ammo / coins / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them,",
-      "replace": "   * ammo / coins / wolves / neg / energy / layers / charges / stand / standCut / proj / fever are display only: no sim state reads them,"
+      "find": "   * ammo / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them, and the\n   * nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it).",
+      "replace": "   * ammo / wolves / neg / energy / layers / charges / stand / standCut / proj / fever are display only: no sim state reads them, and the\n   * nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it)."
     },
     {
       "id": "A3-snapshot-build",

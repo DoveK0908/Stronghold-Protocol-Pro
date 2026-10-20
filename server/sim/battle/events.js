@@ -76,7 +76,7 @@ export class BattleEvents {
    *         feared or stunned) — display metadata (render/interp.js holds the position until then);
    *   standCut: [[id, at]] — the latest time each listed enemy's recovery was cut or ignored (_cutAttackStand), the
    *         dying ones in their death window included.
-   * ammo / wolves / neg / energy / layers / charges / stand / standCut are display only: no sim state reads them, and the
+   * ammo / wolves / neg / energy / layers / charges / stand / standCut / proj / fever are display only: no sim state reads them, and the
    * nine-field unit tuples are unchanged. bondTimers is also display only (golden canon excludes it).
    */
   snapshot({ includeUnitStats = false } = {}) {
