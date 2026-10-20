@@ -12,6 +12,7 @@ import { settingsStore } from './settingsStore.js';
 import { MaterialImage } from './materialImage.js';
 import { appearanceRecord } from './skinAssets.js';
 import { useCardAvatar } from './playerCard.js';
+import { cardAvatarUrl } from './seatArt.js';
 import {
   uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,
 } from './assetUrls.js';
@@ -285,21 +286,52 @@ function PickedFace({ playerId, then, fallback }) {
   return html`<${Img} src=${face || then} fallbackSrc=${face ? then : null} fallback=${fallback} />`;
 }
 
+let facePoolCache = null;
+/** The 5★/6★ operators a doctor's 名片干员 can be (the same deterministic pick the seat cards use). */
+function facePoolOf() {
+  if (facePoolCache) return facePoolCache;
+  const list = data.list('chess');
+  if (!list.length) return null;
+  const seen = new Set();
+  const pool = [];
+  for (const c of list) if ((c.rarity ?? 0) >= 5 && !seen.has(c.charId)) { seen.add(c.charId); pool.push(c); }
+  pool.sort((a, b) => (a.charId < b.charId ? -1 : 1));
+  facePoolCache = pool.length ? pool : null;
+  return facePoolCache;
+}
+/** The 头像 a player shows when they never picked one: the same operator by player id on every client. */
+function standInAvatar(playerId) {
+  const pool = facePoolOf();
+  if (!pool || playerId == null) return null;
+  let h = 0x811c9dc5;
+  for (const ch of String(playerId)) { h ^= ch.codePointAt(0); h = Math.imul(h, 0x01000193) >>> 0; }
+  return chessAvatarUrl(data.get('assets'), pool[h % pool.length]);
+}
+
 /**
  * Seat-coloured player avatar: band icon when a band is picked, else the player's picked 头像, else glyph/robot;
  * `prefer="avatar"` puts the picked 头像 first (a player's own cards: the draft rows, 协议启动, the settlement).
  * @param {{ player: any, size?: 'sm'|'md', self?: boolean, prefer?: 'band'|'avatar', class?: string }} props
  */
 export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band', class: cls }) {
+  useData('assets', 'chess');
   const src = player?.bandId ? bandIconUrl(data.get('assets'), player.bandId) : null;
+  // 界面#10 follow-up: a human's own 头像 (room.card, carried into the match) always wins over the band icon — draft rows,
+  // 协议启动, the in-match team panel, the settlement and the results all draw the same face
+  // the 头像 they picked, else their 名片干员 (card.charId) — the same operator their seat card shows
+  const cardPick = player?.card?.avatar || player?.card?.charId || null;
+  const ownFace = cardPick ? cardAvatarUrl(cardPick, data.get('assets'), player.card.avatarLook || '') : null;
+  // a human never shows the band icon in place of their 头像: their pick, else the room card, else the stand-in operator
+  const then = ownFace || (player?.isBot ? null : standInAvatar(player?.playerId)) || src;
+  const wantAvatar = prefer === 'avatar' || !player?.isBot;
   const glyph = [...(player?.name || '').trim()][0] || '?';
   const pending = player?.pendingDeath === true;
   const dead = !pending && (player?.alive === false || player?.status === 'dead');
   const left = player?.status === 'left';
   const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
   const fallback = player?.isBot ? html`<${Icon} name="robot" class="pavatar__bot" />` : html`<span class="pavatar__glyph">${glyph}</span>`;
-  const face = player?.isBot || player?.playerId == null || (src && prefer !== 'avatar') ? html`<${Img} src=${src} fallback=${fallback} />`
-    : html`<${PickedFace} playerId=${player.playerId} then=${src} fallback=${fallback} />`;
+  const face = player?.isBot || player?.playerId == null || !wantAvatar ? html`<${Img} src=${src} fallback=${fallback} />`
+    : html`<${PickedFace} playerId=${player.playerId} then=${then} fallback=${fallback} />`;
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>
     <span class="pavatar__img">${face}</span>

@@ -112,7 +112,7 @@ export const PLAYER_FIELDS = Object.freeze({
   ]),
   special: Object.freeze(['ready', 'connected', 'loadout', 'ops', 'skins', 'diyStock']),
   derived: Object.freeze([
-    'm', 'gd', 'playerId', 'seat', 'name', 'isBot', 'standIns', '_standInSet', 'diy', '_diyRecords', 'diyBanned', 'bonds',
+    'm', 'gd', 'playerId', 'seat', 'name', 'tag', 'card', 'isBot', 'standIns', '_standInSet', 'diy', '_diyRecords', 'diyBanned', 'bonds',
   ]),
   transient: Object.freeze([
     '_deployMap', '_deployField', '_legalityStale', '_botPrepToken', '_botPrepWork', '_lastPriv', '_botRangeRecs',
@@ -263,7 +263,7 @@ const deepFreeze = (v) => {
  */
 export function matchSeats(m) {
   return m.order.map((ps) => ({
-    seat: ps.seat, playerId: ps.playerId, name: ps.name, ...(ps.tag ? { tag: ps.tag } : {}), isBot: ps.isBot, connected: false,
+    seat: ps.seat, playerId: ps.playerId, name: ps.name, ...(ps.tag ? { tag: ps.tag } : {}), ...(ps.card ? { card: ps.card } : {}), isBot: ps.isBot, connected: false,
     ...(ps.isBot ? {} : { notOwned: [...ps.standIns], diy: { ...ps.diy } }),
     ...(ps.isBot && m.botBands.has(ps.playerId) ? { band: m.botBands.get(ps.playerId) } : {}),
   }));

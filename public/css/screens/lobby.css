@@ -2225,7 +2225,6 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .ach-card__who { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; gap: .08rem; align-self: flex-start; padding-top: .16rem; }
 .ach-card__name { font-size: .3rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 .02rem .04rem rgba(0, 0, 0, .5); }
 .ach-card__tag { margin-left: .02rem; color: rgba(255, 255, 255, .8); font-weight: 400; }
-.ach-card__id { align-self: flex-start; padding: .02rem .1rem; font-size: .19rem; color: #f0d6d8; background: rgba(120, 10, 20, .55); border-radius: .03rem; white-space: nowrap; }
 .ach-card__brand { position: absolute; right: .16rem; bottom: .12rem; z-index: 1; font-family: var(--font-display); font-size: .15rem; line-height: .95; font-weight: 600; color: rgba(255, 255, 255, .85); text-align: right; }
 /* 已获奖杯 / 获赞数, each with its badge */
 .ach-counts { display: grid; grid-template-columns: auto auto; column-gap: .12rem; row-gap: .14rem; align-items: center; padding-top: .06rem; }
@@ -2372,7 +2371,6 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .nc-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: var(--nc-shade, linear-gradient(90deg, rgba(8, 11, 11, .9), rgba(8, 11, 11, .62) 50%, rgba(8, 11, 11, .2))), var(--nc) center / cover no-repeat, #101514; }
 .ach-card.has-nc { background: #101514; --nc-shade: linear-gradient(90deg, rgba(6, 9, 9, .5), rgba(6, 9, 9, .12) 55%, transparent); }
-.ach-card.has-nc .ach-card__id { background: rgba(8, 12, 11, .62); color: #e6ecea; }
 .ach-card.has-nc .ach-card__brand { display: none; }
 .acct-me.has-nc { padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 4px; --nc-shade: linear-gradient(90deg, rgba(8, 11, 11, .82), rgba(8, 11, 11, .45) 55%, rgba(8, 11, 11, .1)); }
 .acct-me.has-nc .acct-who small, .acct-title-card.has-nc .acct-title-card__who small { color: #d6dedb; }

@@ -34,6 +34,7 @@ import { useEffect, useReducer, useRef, useState } from '../../vendor/hooks.modu
 import { PHASE } from '../../../shared/constants.js';
 import { html, Icon, Tooltip } from './components.js';
 import { PlayerAvatar, LpTower, GIcon, LocalSprite } from './gameComponents.js';
+import { playerLabel } from './myInfo.js';
 import { EmoteBubble } from './emotes.js';
 import { STATUS_META, sortedPlayers, teamFrameIds, activeBubbles } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
@@ -244,7 +245,7 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
         : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
     </button>
     <div class="team__info">
-      <span class="team__name" title=${p.name || t('博士')}>${p.name || t('博士')}</span>
+      <span class="team__name" title=${playerLabel(p.name, p.tag)}>${playerLabel(p.name, p.tag)}</span>
       <div class="team__line">
         <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
           tip=${rowLpTip(lp, cap)} />

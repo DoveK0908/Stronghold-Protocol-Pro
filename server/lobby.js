@@ -2075,6 +2075,8 @@ export class Lobby {
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
         seat: s.seat, playerId: s.playerId, name: s.name, ...(s.tag ? { tag: s.tag } : {}), isBot: s.isBot, connected: s.connected,
+        // display only: the player's room.card (头像 + 名片底图), so every client can draw their face instead of a band icon
+        ...(!s.isBot && s.card ? { card: s.card } : {}),
         ...(s.botPersona ? { botPersona: s.botPersona } : {}),
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,

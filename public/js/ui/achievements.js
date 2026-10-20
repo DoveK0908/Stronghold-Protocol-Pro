@@ -21,6 +21,7 @@ import { data } from '../data.js';
 import { peekStatsRecords, aggregateStats, countsTowardStats, selfRowOf, roundsOf, FULL_KEEP } from './stats.js';
 import { TrophyBadge } from './trophies.js';
 import { NameCardLayer, NameCardPicker } from './namecards.js';
+import { playerLabel } from './myInfo.js';
 import { useMyCard, trophyTotal, setCardBackground, setCardAvatar, setAvatarLook } from './playerCard.js';
 import { cardOperators, cardAvatarUrl, lookOptions } from './seatArt.js';
 import { AvatarPicker } from './opPicker.js';
@@ -310,8 +311,7 @@ function Plate({ me, card, s, p, done, total, gd, onAvatar, onBg }) {
         <${Img} src=${face} alt="" fallback=${html`<span class="ach-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
         <span class="ach-card__lv" title=${t('等级')}><b class="num">${lv.lv}</b><small>LV</small></span></button>
       <span class="ach-card__who">
-        <span class="ach-card__name">${me?.name || t('博士')}</span>
-        <span class="ach-card__id num">${me?.name || t('博士')}${me?.tag ? `#${me.tag}` : ''}</span>
+        <span class="ach-card__name">${playerLabel(me?.name, me?.tag)}</span>
         <span class="ach-card__edits">
           <button type="button" class="ach-card__nc" onClick=${onAvatar}><${Icon} name="edit" />${t('头像')}</button>
           <button type="button" class="ach-card__nc" onClick=${onBg}><${Icon} name="edit" />${t('名片底图')}</button>

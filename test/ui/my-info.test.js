@@ -71,7 +71,10 @@ test('no display still says DOCTOR #NNNN', () => {
   // the seat's 名片 prints 名字#四位 on the name line; bots keep AUTONOMOUS UNIT on the small line
   assert.match(read('public/js/screens/room.js'), /playerLabel\(seat\.name, seat\.tag\)/);
   assert.match(read('public/js/screens/room.js'), /seat\.isBot \? html`<small class="rseat__doc">AUTONOMOUS UNIT<\/small>` : null/);
-  assert.match(read('public/js/ui/achievements.js'), /me\?\.tag \? `#\$\{me\.tag\}` : ''/);
+  // both cards print ONE 名字#四位 line (no second, smaller ID line under the name)
+  assert.match(read('public/js/ui/achievements.js'), /<span class="ach-card__name">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}<\/span>/);
+  assert.match(read('public/js/ui/myInfo.js'), /<span class="ach-card__name" data-testid="me-info-tag">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}<\/span>/);
+  for (const p of ['public/js/ui/achievements.js', 'public/js/ui/myInfo.js']) assert.doesNotMatch(read(p), /ach-card__id/);
 });
 
 test('English strings for the dialog exist', () => {

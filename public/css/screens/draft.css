@@ -20,7 +20,7 @@
 .dorder__state { font-size: calc(.14 * var(--t)); }
 .dorder__state span { display: inline-flex; align-items: center; gap: .04rem; }
 .dorder__state .icon { width: .16rem; height: .16rem; }
-.dorder__box { position: relative; width: .6rem; height: .6rem; display: grid; place-items: center; border: 1px dashed var(--line-2); }
+.dorder__box { position: relative; width: .6rem; height: .6rem; display: grid; place-items: center; }
 .dorder__check { position: absolute; right: -.06rem; bottom: -.06rem; width: .22rem; height: .22rem; display: grid; place-items: center; background: var(--mint-500); color: var(--text-on-mint); }
 .dorder__check .icon { width: .16rem; height: .16rem; }
 .dorder__finger { width: .44rem; height: .44rem; animation: finger 1s ease-in-out infinite; }

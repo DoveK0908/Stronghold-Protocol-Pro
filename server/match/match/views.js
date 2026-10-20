@@ -133,6 +133,7 @@ export class MatchViews {
         seat: ps.seat,
         name: ps.name,
         ...(ps.tag ? { tag: ps.tag } : {}),
+        ...(ps.card ? { card: ps.card } : {}),
         isBot: ps.isBot,
         connected: ps.isBot || (ps.connected && !ps.left),
         alive: ps.alive,

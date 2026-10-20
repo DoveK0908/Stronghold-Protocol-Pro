@@ -79,8 +79,7 @@ export function MyInfoDialog({ me, onClose }) {
           <${Img} src=${face} alt="" fallback=${html`<span class="ach-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
         </button>
         <span class="ach-card__who">
-          <span class="ach-card__name">${me?.name || t('博士')}</span>
-          <span class="ach-card__id num" data-testid="me-info-tag">${playerLabel(me?.name, me?.tag)}</span>
+          <span class="ach-card__name" data-testid="me-info-tag">${playerLabel(me?.name, me?.tag)}</span>
         </span>
         <span class="ach-card__brand" aria-hidden="true">STRONGHOLD<br />PROTOCOL</span>
       </div>
