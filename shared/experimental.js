@@ -23,11 +23,19 @@ export function optionalValue(value, key) {
 }
 const optionalOn = (value, key) => optionalValue(value, key);
 
+/** 地图禁用 (玩法#03): the stage ids a room never draws, sorted and de-duplicated; nothing else rides the wire. */
+export const MAX_BANNED_STAGES = 16;
+const STAGE_ID = /^[A-Za-z0-9_]{1,64}$/;
+export function bannedStages(value) {
+  const raw = value && Array.isArray(value.bannedStages) ? value.bannedStages : [];
+  return [...new Set(raw.filter((id) => typeof id === 'string' && STAGE_ID.test(id)))].sort().slice(0, MAX_BANNED_STAGES);
+}
+
 export function isExperimental(value) {
   if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return false;
   const keys = Reflect.ownKeys(value);
-  // two rules + optional capacity + optional duck lord + the optional switches
-  if (keys.length < 2 || keys.length > 4 + EXPERIMENTAL_OPTIONAL.length) return false;
+  // two rules + optional capacity + optional duck lord + the optional switches + the stage list
+  if (keys.length < 2 || keys.length > 5 + EXPERIMENTAL_OPTIONAL.length) return false;
   for (const key of Object.keys(EXPERIMENTAL_DEFAULTS)) {
     const descriptor = Object.getOwnPropertyDescriptor(value, key);
     if (descriptor?.enumerable !== true || typeof descriptor.value !== 'boolean') return false;
@@ -39,14 +47,17 @@ export function isExperimental(value) {
     // Reflect.ownKeys also yields symbols; the optional switches are named by strings only.
     if (typeof key === 'string' && EXPERIMENTAL_OPTIONAL.includes(key)) return typeof descriptor.value === 'boolean';
     return key === 'playerCapacity' ? isPlayerCapacity(descriptor.value)
+      : key === 'bannedStages' ? Array.isArray(descriptor.value) && descriptor.value.length <= MAX_BANNED_STAGES
+        && descriptor.value.every((id) => typeof id === 'string' && STAGE_ID.test(id))
       : key === 'disableDuckLord' && typeof descriptor.value === 'boolean';
   });
 }
 
-/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean }} [value] */
+/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean, bannedStages?: string[] }} [value] */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);
+  const banned = bannedStages(value);
   return Object.freeze({ revivalEnabled: value.revivalEnabled, disableSharedPool: value.disableSharedPool,
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
     // Optional and false by default: ordinary rooms and legacy DTOs keep their two-flag shape.
@@ -56,7 +67,8 @@ export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
       const next = optionalValue(value, key);
       if (next !== EXPERIMENTAL_OPTIONAL_DEFAULTS[key]) out[key] = next;
       return out;
-    }, {}) });
+    }, {}),
+    ...(banned.length ? { bannedStages: Object.freeze(banned) } : {}) });
 }
 
 const duckLordDisabled = value => roomCapacity('coop', value) > MAX_SEATS && value.disableDuckLord === true;
@@ -69,6 +81,8 @@ export const experimentalKey = value => {
     const on = optionalValue(value, name);
     if (on !== EXPERIMENTAL_OPTIONAL_DEFAULTS[name]) key += `:${on ? '' : 'no'}${OPTIONAL_TAGS[name]}`;
   }
+  const banned = bannedStages(value);
+  if (banned.length) key += `:ban=${banned.join(',')}`;
   return key;
 };
 export const sameExperimental = (a, b) => !!a && !!b
@@ -77,4 +91,5 @@ export const sameExperimental = (a, b) => !!a && !!b
   && duckLordDisabled(a) === duckLordDisabled(b)
   // A switch this comparison forgets is silently dropped by room.setExperimental (server/lobby.js:1185), so
   // compare the optional ones explicitly rather than by object identity.
-  && EXPERIMENTAL_OPTIONAL.every(key => optionalOn(a, key) === optionalOn(b, key));
+  && EXPERIMENTAL_OPTIONAL.every(key => optionalOn(a, key) === optionalOn(b, key))
+  && bannedStages(a).join(',') === bannedStages(b).join(',');

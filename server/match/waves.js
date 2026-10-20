@@ -180,15 +180,20 @@ function scheduleRng(rng) {
 /**
  * @param {import('./gamedata.js').GameData} gd
  * @param {Function} rng
+ * @param {{ excludeStages?: string[] }} [opts] 地图禁用 (玩法#03): stage ids the room never draws. A ban that would
+ *   empty the mode's whole pool is ignored — a room always gets a stage.
  * @returns {{ stageId: string|null, factions: string[], bossId: string|null, hiddenBossId: string|null, typeSlots: string[], picks: object[] }}
  *   `factions` also carries the schedule as a non-enumerable `schedule` property ({ typeSlots, picks }), so callers
  *   that keep only the factions array (Match: buildNormalWave(gd, rng, this.factions, r)) get the official rounds.
  */
-export function setupMatchWaves(gd, rng) {
+export function setupMatchWaves(gd, rng, { excludeStages = [] } = {}) {
   // stage
   const stageIds = Array.isArray(gd.mode.stages) ? gd.mode.stages : [];
   const stagePairs = stageIds.map((id) => [id, gd.stage(id)]).filter(([, s]) => s && s.active !== false && Number(s.weight) > 0).map(([id, s]) => [id, s.weight]);
-  let stageId = stagePairs.length ? weightedPick(rng, stagePairs) : null;
+  const skip = new Set(Array.isArray(excludeStages) ? excludeStages : []);
+  const allowed = skip.size ? stagePairs.filter(([id]) => !skip.has(id)) : stagePairs;
+  const drawable = allowed.length ? allowed : stagePairs;
+  let stageId = drawable.length ? weightedPick(rng, drawable) : null;
   if (!stageId) {
     const any = Object.keys(gd.raw.stages || {}).filter((id) => gd.stage(id) && gd.stage(id).active);
     stageId = any.length ? any.sort()[0] : null;

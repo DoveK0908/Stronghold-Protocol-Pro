@@ -1,11 +1,12 @@
 import { html, Button, Modal } from './components.js';
 import { t, tc } from '../../../shared/i18n.js';
 import { MAX_SEATS } from '../../../shared/constants.js';
-import { EXPERIMENTAL_OPTIONAL, EXPERIMENTAL_OPTIONAL_DEFAULTS, optionalValue } from '../../../shared/experimental.js';
+import { EXPERIMENTAL_OPTIONAL, EXPERIMENTAL_OPTIONAL_DEFAULTS, bannedStages, optionalValue } from '../../../shared/experimental.js';
 import { PLAYER_CAPACITIES, isPlayerCapacity, roomCapacity } from '../../../shared/playerCapacity.js';
 
 export function experimentalOptions(input) {
   const capacity = roomCapacity('coop', input);
+  const banned = bannedStages(input);
   return { revivalEnabled: input?.revivalEnabled === true, disableSharedPool: input?.disableSharedPool === true,
     ...(capacity > MAX_SEATS && input?.disableDuckLord === true ? { disableDuckLord: true } : {}),
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }),
@@ -14,13 +15,16 @@ export function experimentalOptions(input) {
       const next = optionalValue(input ?? {}, key);
       if (next !== EXPERIMENTAL_OPTIONAL_DEFAULTS[key]) out[key] = next;
       return out;
-    }, {}) };
+    }, {}),
+    // 地图禁用 (玩法#03): only a non-empty list rides the wire, so an ordinary room keeps its two-flag shape
+    ...(banned.length ? { bannedStages: banned } : {}) };
 }
 
 /** Whether any option differs from a standard room's (the room's 实验性选项 button is then marked). */
 export function experimentalChanged(input) {
   const options = experimentalOptions(input);
   return options.revivalEnabled || options.disableSharedPool || !!options.disableDuckLord || !!options.playerCapacity
+    || Array.isArray(options.bannedStages) && options.bannedStages.length > 0
     || EXPERIMENTAL_OPTIONAL.some(key => options[key] !== undefined);
 }
 
@@ -30,6 +34,7 @@ export function experimentalSummary(input) {
   let rules = options.disableDuckLord ? `${summary} · ${t('禁用鸭爵策略')}` : summary;
   if (options.luckConsole) rules = `${rules} · ${t('测试插件')}`;
   if (options.bossHitSoftCap === true) rules = `${rules} · ${t('限伤改为封顶')}`;
+  if (Array.isArray(options.bannedStages) && options.bannedStages.length) rules = `${rules} · ${t('禁用战场 {n} 张', { n: options.bannedStages.length })}`;
   return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
 }
 
@@ -37,11 +42,24 @@ export function ExperimentalSummary({ value }) {
   return html`<span class="experimental-summary">${experimentalSummary(value)}</span>`;
 }
 
-export function ExperimentalOptions({ open, value, mode = 'coop', source = 'private', editable = false, busy = false, onChange, onClose }) {
+export function ExperimentalOptions({ open, value, mode = 'coop', source = 'private', editable = false, busy = false, stages = [], onChange, onClose }) {
   const options = experimentalOptions(value);
   const capacity = roomCapacity(mode, options);
+  const banned = new Set(Array.isArray(options.bannedStages) ? options.bannedStages : []);
+  const choices = (Array.isArray(stages) ? stages : []).filter(s => s && typeof s.id === 'string');
   const change = (field, checked) => {
     if (editable && !busy) onChange?.({ ...options, [field]: checked });
+  };
+  // 地图禁用 (玩法#04): the checkbox means "ban this stage", matching the heading. Never ban every stage — the
+  // click that would empty the pool is ignored, so the server always has something to draw.
+  const toggleStage = (id, disable) => {
+    if (!editable || busy) return;
+    const next = new Set(banned);
+    if (disable) next.add(id); else next.delete(id);
+    if (choices.length > 1 && choices.every(s => next.has(s.id))) next.delete(id);
+    const list = [...next].filter(x => choices.some(s => s.id === x)).sort();
+    const { bannedStages: _ignored, ...rest } = options;
+    onChange?.(list.length ? { ...rest, bannedStages: list } : rest);
   };
   const setCapacity = next => {
     if (!editable || busy || mode !== 'coop' || source === 'matchmaking' || !isPlayerCapacity(next)) return;
@@ -91,6 +109,19 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <input id="experimental-hit-softcap" type="checkbox" role="switch" checked=${options.bossHitSoftCap === true}
           disabled=${!editable || busy} onChange=${e => change('bossHitSoftCap', e.currentTarget.checked)} />
       </label>` : null}
+      ${source !== 'matchmaking' && choices.length > 1 ? html`<div class="experimental-stages">
+        <div class="experimental-stages__head">
+          <strong>${t('禁用战场')}</strong>
+          <small>${t('勾选的战场不会出现在本局；至少要保留一张。')}</small>
+        </div>
+        <div class="experimental-stages__list" role="group" aria-label=${t('禁用战场')}>
+          ${choices.map(s => html`<label key=${s.id} class=${`experimental-stage${banned.has(s.id) ? ' is-banned' : ''}`}>
+            <input type="checkbox" checked=${banned.has(s.id)} disabled=${!editable || busy}
+              onChange=${e => toggleStage(s.id, e.currentTarget.checked)} />
+            <span>${s.label || s.id}${s.note ? html`<small>${s.note}</small>` : ''}</span>
+          </label>`)}
+        </div>
+      </div>` : null}
     </div>
     <p class="experimental-options__note">${editable ? t('开局后不可更改') : t('由房间创建者设置')}</p>
   <//>`;

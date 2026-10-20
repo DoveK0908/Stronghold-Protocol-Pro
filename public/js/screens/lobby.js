@@ -89,6 +89,17 @@ export function stageLabel(id) {
 }
 
 /**
+ * The descriptive tail of a stage name after its 战场#NN mark: '战场#05(上半) 涨潮/特制水上平台' → '涨潮/特制水上平台'.
+ * Empty when the record has no extra description.
+ * @param {string} id
+ */
+export function stageSuffix(id) {
+  const rec = getStage(id);
+  if (!rec || typeof rec.name !== 'string') return '';
+  return rec.name.replace(/^(.*?#\d+(?:\s*[(（][^)）]*[)）])?)/, '').trim();
+}
+
+/**
  * The battlefield note of a difficulty (official wording): a single-stage pool is fixed ("战场固定为 战场#01"), a larger
  * one is drawn at random ("战场随机（共8张）").
  * @param {string[] | number | null | undefined} stages the mode's `stages` list (or a count)

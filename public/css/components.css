@@ -898,6 +898,20 @@
 .experimental-option input { flex: none; appearance: none; width: 36px; height: 20px; border-radius: 10px; border: 1px solid var(--line-3); background: var(--bg-3); cursor: pointer; }
 .experimental-option input::before { content: ''; display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; background: var(--text-lo); transition: transform var(--t-fast); }
 .experimental-option input:checked { border-color: var(--mint-700); background: var(--bg-2); }.experimental-option input:checked::before { background: var(--mint-400); transform: translateX(16px); }
+.experimental-stages { display: grid; gap: 10px; padding: 14px 0 4px; border-bottom: 1px solid var(--line); }
+.experimental-stages__head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.experimental-stages__head strong { font-size: max(calc(.19 * var(--t)), calc(15px * var(--ui))); color: var(--text-hi); font-weight: 500; }
+.experimental-stages__head small { color: var(--text-lo); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); line-height: 1.6; }
+.experimental-stages__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; max-height: max(calc(.9 * var(--t)), 180px); overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
+.experimental-stage { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text-hi); font-size: max(calc(.15 * var(--t)), calc(13px * var(--ui))); cursor: pointer; }
+.experimental-stage > span { display: grid; gap: 2px; }
+.experimental-stage small { color: var(--text-lo); font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); line-height: 1.4; }
+.experimental-stage.is-banned { color: var(--text-lo); border-style: dashed; }
+.experimental-stage.is-banned > span { text-decoration: line-through; }
+.experimental-stage.is-banned small { text-decoration: line-through; }
+.experimental-stage input { flex: none; appearance: none; width: 16px; height: 16px; border: 1px solid var(--line-3); background: var(--bg-2); cursor: pointer; }
+.experimental-stage input:checked { border-color: var(--mint-700); background: var(--mint-400); }
+.experimental-stage input:disabled, .experimental-stage input:disabled + span { cursor: not-allowed; }
 .experimental-option input:disabled { opacity: .65; cursor: default; }.experimental-options__note { color: var(--text-dim); font-size: 11px; padding-top: 12px; }.matchmaking__options { padding-block: 8px; }
 @media (pointer: coarse) { .server-load-button { min-height: calc(36px * var(--ui)); padding-inline: calc(9px * var(--ui)); }.experimental-option { min-height: 44px; } }
 

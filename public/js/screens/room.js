@@ -29,7 +29,7 @@
 
 import { audio } from '../audio.js';
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS, modeIdFor } from '../../../shared/constants.js';
 import { roomCapacity } from '../../../shared/playerCapacity.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, confirmDialog, doctorNo, Spinner, Modal,
@@ -44,14 +44,14 @@ import { PluginTag, isModdedRoom } from '../ui/pluginTag.js';
 import { hasScriptConsent, rememberScriptConsent } from '../content.js';
 import { net } from '../net.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
-import { data, useData } from '../data.js';
+import { data, getMode, useData } from '../data.js';
 import { CARD_PREF, cardOperators, seatPortrait, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
 import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
 import { OwnerBadge, isOwnerSeat } from '../ui/ownerName.js';
-import { difficultyInfo, ProtoCard } from './lobby.js';
+import { difficultyInfo, stageLabel, stageSuffix, ProtoCard } from './lobby.js';
 import { ProtocolScene } from '../ui/protocolScene.js';
 import { usePresence, useRise, afterLeave } from '../ui/transitions.js';
 import { ExperimentalOptions, experimentalChanged, experimentalSummary } from '../ui/experimental.js';
@@ -413,6 +413,15 @@ export function RoomScreen() {
   const myReady = !!facts.mine?.ready;
   const info = difficultyInfo(room.mode, room.difficulty);
   const big = facts.seats.length > MAX_SEATS;
+  // 地图禁用 (玩法#03): the stages this difficulty may draw, as { id, label } for the experimental dialog.
+  const stageChoices = (() => {
+    const m = DIFFICULTIES.includes(room.difficulty) ? getMode(modeIdFor(room.mode, room.difficulty)) : null;
+    const ids = Array.isArray(m?.stages) ? m.stages : [];
+    return ids.map((id) => {
+      const suffix = stageSuffix(id);
+      return { id, label: stageLabel(id) || id, note: suffix ? t(suffix) : '' };
+    });
+  })();
 
   const run = async (kind, fn) => {
     if (inFlight.current) return;
@@ -595,7 +604,7 @@ export function RoomScreen() {
       </div>
       <${QueueFlow} class="rs-searchpanel" queue=${queue} difficulty=${room.difficulty} experimental=${room.experimental} online=${online} party=${true} />
     </div>` : null}
-    <${ExperimentalOptions} open=${experimentalOpen && !queued} value=${room.experimental} mode=${room.mode} source=${room.source} editable=${facts.isHost && online} busy=${!!busy}
+    <${ExperimentalOptions} open=${experimentalOpen && !queued} value=${room.experimental} mode=${room.mode} source=${room.source} stages=${stageChoices} editable=${facts.isHost && online} busy=${!!busy}
       onChange=${experimental => run('experimental', () => net.request('room.setExperimental', { experimental }))} onClose=${() => setExperimentalOpen(false)} />
     <${ServerStatusModal} open=${loadOpen} online=${online} state=${conn.loadState} details=${conn.loadDetails} clusterLoad=${conn.clusterLoad} onClose=${() => setLoadOpen(false)} />
     ${bandSeat != null && facts.isHost && facts.seats[bandSeat]?.isBot ? html`<${BotBandPicker} seat=${facts.seats[bandSeat]} room=${room} gd=${gd}

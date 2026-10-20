@@ -3299,5 +3299,16 @@
   "剩余 {s} 秒": "{s}s remaining",
   "还剩 {n} 人未选": "{n} still choosing",
   "剩余 {n} 张": "{n} left in pool",
-  "卡池中还剩 {n} 张": "{n} more copies in the pool"
+  "卡池中还剩 {n} 张": "{n} more copies in the pool",
+  "禁用战场": "Banned battlefields",
+  "勾选的战场不会出现在本局；至少要保留一张。": "Unchecked battlefields never appear in this match; keep at least one.",
+  "禁用战场 {n} 张": "{n} battlefields banned",
+  "涨潮": "Tide",
+  "特制水上平台": "Special Water Platform",
+  "沙尘暴": "Sandstorm",
+  "土石结构": "Earthen Structures",
+  "树丛": "Bushes",
+  "源石流发生装置": "Originium Flow Generator",
+  "沼泽控制": "Mire Control",
+  "涨潮控制": "Tide Control"
 }

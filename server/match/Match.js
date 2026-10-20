@@ -529,7 +529,7 @@ export class Match {
     }
 
     // per-match setup (DESIGN §6.5)
-    const setup = setupMatchWaves(this.gd, this.rngSetup);
+    const setup = setupMatchWaves(this.gd, this.rngSetup, { excludeStages: this.experimental.bannedStages ?? [] });
     this.stageId = setup.stageId;
     this.stage = this.stageId ? this.gd.stage(this.stageId) : null;
     this.factions = setup.factions;
