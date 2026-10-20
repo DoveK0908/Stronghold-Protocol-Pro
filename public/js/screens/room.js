@@ -315,19 +315,6 @@ function SpectatorBar({ facts, myId, busy, onRemove, onSit }) {
 }
 
 /** The 「AI 队友最后选择」 switch (co-op): the host toggles it, everybody else sees its state. */
-function AiLastToggle({ option, busy, onToggle }) {
-  if (!option) return null;
-  return html`<div class="ailast">
-    <${Tooltip} text=${t('策略与机变轮选时，所有博士先于 AI 队友选择')}>
-      <button type="button" role="switch" aria-checked=${option.on ? 'true' : 'false'}
-          class=${`dpick__opt ailast__opt${option.on ? ' is-active' : ''}`} disabled=${!option.editable || !!busy}
-          onClick=${() => option.editable && onToggle(!option.on)}>
-        <${Icon} name="check" class=${option.on ? 'is-on' : ''} />${t('AI 队友最后选择')}
-      </button>
-    <//>
-    ${option.editable ? null : html`<span class="t-dim">${t('由创建者设置')}</span>`}
-  </div>`;
-}
 
 /** mm:ss of a duration in seconds. */
 const clock = (s) => `${String(Math.floor(Math.max(0, s) / 60)).padStart(2, '0')}:${String(Math.floor(Math.max(0, s)) % 60).padStart(2, '0')}`;
@@ -357,22 +344,6 @@ function RoomProtocol({ room, onClose, onPick, busy, leaving = false }) {
   </div>`;
 }
 
-/** ⚙ of the bottom pill: AI 队友最后选择 and 实验性选项 (with the current options summed up). */
-function RoomOptions({ room, facts, myId, busy, onAiLast, onExperimental, onClose, leaving = false }) {
-  useEffect(() => {
-    const away = (e) => { if (!e.target.closest?.('.rs-opts, .rs-pill__gear, .modal')) onClose(); };
-    const onKey = (e) => { if (e.key === 'Escape' && !document.querySelector('.modal')) { e.stopPropagation(); onClose(); } };
-    addEventListener('pointerdown', away); addEventListener('keydown', onKey);
-    return () => { removeEventListener('pointerdown', away); removeEventListener('keydown', onKey); };
-  }, []);
-  return html`<div class=${`rs-opts${leaving ? ' is-leaving' : ''}`} role="dialog" aria-label=${t('同盟设置')}>
-    <h4>${t('同盟设置')}${facts.isHost ? null : html`<small>${t('由创建者设置')}</small>`}</h4>
-    <${AiLastToggle} option=${aiLastOption(room, myId)} busy=${busy} onToggle=${onAiLast} />
-    <button type="button" class="rs-opt rs-opt--exp" disabled=${!!busy} onClick=${onExperimental} aria-haspopup="dialog">
-      <span>${t('实验性选项')}<small>${experimentalSummary(room.experimental)}</small></span><${Icon} name="chevronRight" /></button>
-  </div>`;
-}
-
 /** Room screen component. */
 export function RoomScreen() {
   const room = useStore((s) => s.room);
@@ -385,7 +356,6 @@ export function RoomScreen() {
   const queued = queueActive(queue);
   const [busy, setBusy] = useState(null);
   const [picker, setPicker] = useState(false);
-  const [opts, setOpts] = useState(false);
   const [experimentalOpen, setExperimentalOpen] = useState(false);
   const [loadOpen, setLoadOpen] = useState(false);
   // the open service dialog keeps the whole cluster summary on every pong (server/net.js CLUSTER_LOAD_EVERY_MS)
@@ -420,7 +390,6 @@ export function RoomScreen() {
   }, [room?.code, cardKey, JSON.stringify(mineCard ?? null), conn.status, myCard.trophies == null]);
 
   const [protoShown, protoLeaving] = usePresence(picker && !!room && roomFacts(room, me.playerId).isHost, 220);
-  const [optsShown, optsLeaving] = usePresence(opts, 160);
   const [exiting, setExiting] = useState(false);
 
   // 扩容房（8–20 席）横向排开：鼠标滚轮上下 -> 左右滚动，滚动条与拖拽照旧（社区反馈：人多了看不全）
@@ -438,6 +407,7 @@ export function RoomScreen() {
   if (!room) return null;
   const online = conn.status === 'online';
   const coop = room.mode !== 'solo';
+  const aiLast = aiLastOption(room, me.playerId);
   const facts = roomFacts(room, me.playerId);
   const myReady = !!facts.mine?.ready;
   const info = difficultyInfo(room.mode, room.difficulty);
@@ -594,17 +564,16 @@ export function RoomScreen() {
         <button type="button" class=${`rs-exp${experimentalChanged(room.experimental) ? ' is-on' : ''}`} disabled=${!!busy || queued} onClick=${() => setExperimentalOpen(true)}
           aria-haspopup="dialog" title=${experimentalSummary(room.experimental)}>
           <${Icon} name="edit" /><span><b>${t('实验性选项')}</b><small>${experimentalSummary(room.experimental)}</small></span></button>
+        ${aiLast ? html`<button type="button" class=${`rs-exp rs-exp--ai${aiLast.on ? ' is-on' : ''}`} disabled=${!aiLast.editable || !!busy || queued}
+            aria-pressed=${aiLast.on ? 'true' : 'false'} onClick=${() => aiLast.editable && setAiLast(!aiLast.on)}
+            title=${aiLast.editable ? t('策略与机变轮选时，所有博士先于 AI 队友选择') : t('由创建者设置')}>
+          <span class=${`rs-exp__switch${aiLast.on ? ' is-on' : ''}`} aria-hidden="true" /><span><b>${t('AI 队友最后选择')}</b><small>${aiLast.on ? t('已开启') : t('已关闭')}${aiLast.editable ? '' : ` · ${t('由创建者设置')}`}</small></span></button>` : null}
       </div>
       <div class="rs-foot__center">
         <p class="rs-hint">${coop ? html`<span class="rs-ready num" title=${t('已就绪')}>${facts.humans.map((s) => html`<${Icon} key=${s.playerId} name="user" class=${facts.isReady(s) ? 'is-on' : ''} />`)}<b>${facts.readyHumans}</b>/${facts.humans.length}</span>` : null}${statusLine}</p>
         <div class="rs-pill">
           <button type="button" class="rs-pill__diff" disabled=${!facts.isHost || !!busy || queued} onClick=${() => setPicker(true)}
             title=${facts.isHost ? t('更改模拟难度') : t('由创建者选择')}><${DifficultyIcon} difficulty=${room.difficulty} />${t(DIFFICULTY_NAMES[room.difficulty])}</button>
-          <button type="button" class=${`rs-pill__gear${opts ? ' is-on' : ''}`} onClick=${() => setOpts((v) => !v)} title=${t('同盟设置')} aria-label=${t('同盟设置')} aria-expanded=${opts ? 'true' : 'false'}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 2h3.4l.5 2.6 1.9.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.9 2.6.5v3.4l-2.6.5-.8 1.9 1.5 2.2-2.4 2.4-2.2-1.5-1.9.8-.5 2.6h-3.4l-.5-2.6-1.9-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.9L2 13.7v-3.4l2.6-.5.8-1.9-1.5-2.2 2.4-2.4 2.2 1.5 1.9-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill-rule="evenodd" /></svg>
-          </button>
-          ${optsShown ? html`<${RoomOptions} room=${room} facts=${facts} myId=${me.playerId} busy=${busy} onAiLast=${setAiLast}
-            onExperimental=${() => { setOpts(false); setExperimentalOpen(true); }} onClose=${() => setOpts(false)} leaving=${optsLeaving} />` : null}
         </div>
       </div>
       <div class="rs-foot__right">

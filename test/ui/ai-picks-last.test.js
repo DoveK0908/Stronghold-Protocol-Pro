@@ -36,3 +36,19 @@ test('room.js sends room.setAiPicksLast { on } and shows the switch through t();
     assert.ok(EN[zh].length > 0 && !/[一-鿿]/.test(EN[zh]), `English for ${zh}`);
   }
 });
+
+test('同盟设置 popover is gone: AI-last is a switch next to 实验性选项, the middle keeps only the difficulty pill', () => {
+  // 维护者 2026-10-20：「同盟设置就可以去掉了，中间只留这个难度选择的按钮」，AI-last 与实验性选项并排在左下
+  assert.doesNotMatch(SRC, /rs-pill__gear/, 'the gear is removed');
+  assert.doesNotMatch(SRC, /同盟设置/, 'and so is its popover title');
+  assert.match(SRC, /const aiLast = aiLastOption\(room, me\.playerId\);/);
+  assert.match(SRC, /class=\$\{`rs-exp rs-exp--ai\$\{aiLast\.on \? ' is-on' : ''\}`\}/, 'the switch sits in the footer bar');
+  assert.match(SRC, /<span class=\$\{`rs-exp__switch\$\{aiLast\.on \? ' is-on' : ''\}`\} aria-hidden="true" \/>/);
+  assert.match(SRC, /onClick=\$\{\(\) => aiLast\.editable && setAiLast\(!aiLast\.on\)\}/);
+  assert.match(SRC, /<div class="rs-foot__center">[\s\S]{0,400}class="rs-pill__diff"/, 'the pill keeps only the difficulty button');
+  assert.doesNotMatch(SRC, /function RoomOptions/);
+  assert.doesNotMatch(SRC, /function AiLastToggle/);
+  const css = readFileSync(path.join(ROOT, 'public/css/screens/lobby.css'), 'utf8');
+  assert.ok(css.includes('.rs-exp__switch.is-on'), 'the switch has a visual on state');
+  assert.doesNotMatch(css, /\.rs-opts \{/, 'the popover styles are gone');
+});
