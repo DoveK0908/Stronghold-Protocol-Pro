@@ -54,8 +54,10 @@ export function uiScaleStep(uiScale, phone) {
  *  turning the merged switch off stays off.
  *  bondTimers: selected-unit timed bond readouts (#746), off by default (a convenience HUD absent from the official
  *  game; the detail card's BondTimers block). combatMetrics: 设置「作战统计」 (PR #618), off by default: the official HUD has no such panel.
- *  设置「部署时收起商店」 (`prepDeployFold`, GitHub #602 / PR #646) is deliberately NOT offered: this fork's owner decided on
- *  2026-10-16 that picking a piece up leaves the shop bar and the camera as they are (ui/screens/game.js, the header).
+ *  设置「部署时收起商店」 (`prepDeployFold`, GitHub #602 / PR #646): picking a piece up on the own prep board folds the shop
+ *  bar and zooms to the shop-collapsed camera for the drag / direction wheel, then gives the player's own fold back. The
+ *  official default is on; this fork ships it OFF (the owner's decision of 2026-10-19: every convenience switch here is
+ *  opt-in). Only an explicit true turns it on (ui/screens/game.js, gameLogic/camera.js deployFoldsShop).
  *  officialFx: 设置「官方特效」 (0.3.0, render/vfx): 'full' (完整, this fork's default on every device — the owner's
  *  decision of 2026-10-16), 'auto' (完整 on a desktop, 精简 on a touch device — render/vfx/tier.js), 'off', 'lite'
  *  (精简); only shown when effects were extracted from the local client.
@@ -64,7 +66,7 @@ export function uiScaleStep(uiScale, phone) {
  *  otherSkins: 设置「显示其他玩家的皮肤」 (docs/SKINS.md), ON by default — draw the appearance another player chose instead
  *  of that operator's own model. A pure client preference, never sent: turning it off draws every other seat's operator
  *  model as its owner would see it (the same piece may therefore look different on two screens). */
-export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
+export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official' });
 const QUALITIES = ['high', 'medium', 'low'];
 /** The values of 设置「官方特效」 (render/vfx/tier.js OFFICIAL_FX). */
 export const OFFICIAL_FX_MODES = Object.freeze(['auto', 'off', 'lite', 'full']);
@@ -102,6 +104,7 @@ export function sanitizeSettings(raw) {
     officialDamageNumbers: typeof r.officialDamageNumbers === 'boolean' ? r.officialDamageNumbers : false,
     ammoEnergyCount: ammoEnergyCountOf(r),
     bondTimers: r.bondTimers === true,
+    prepDeployFold: r.prepDeployFold === true,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
     officialFx: OFFICIAL_FX_MODES.includes(r.officialFx) ? r.officialFx : DEFAULT_SETTINGS.officialFx,
