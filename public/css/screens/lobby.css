@@ -1740,8 +1740,9 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rs-top__left { --rs-ctl-h: .36rem; } /* same as .btn--square.btn--sm */
 .rs-top .latency-status { align-items: stretch; flex: none; flex-wrap: nowrap; height: var(--rs-ctl-h); }
 .rs-top .latency-status > .connection-status,
-.rs-top .latency-status > .server-load-button,
+.rs-top .latency-status .server-load-button,
 .rs-top .rs-tools .rs-pingpill { height: var(--rs-ctl-h); min-height: 0; padding-block: 0; box-sizing: border-box; }
+.rs-top .latency-status .tt-anchor { display: inline-flex; height: var(--rs-ctl-h); } /* the service pill sits in a Tooltip anchor */
 .rs-top .connection-status, .rs-top .server-load-button { padding-inline: calc(7px * var(--ui)); }
 .rs-top .rs-pingpill { align-items: center; flex: none; min-height: 0; }
 .rs-top .rs-tools .latency-status > * { min-height: 0; }
