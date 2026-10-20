@@ -67,7 +67,6 @@ import { installRehearsal } from './battle/rehearsal.js';
 import { recordResult, recordQuit, installStatsRecorder } from './ui/stats.js';
 import { installLoadoutSync, installOwnershipSync, installDiySync, installSkinsSync } from './ui/loadoutSync.js';
 import { startBuildGuard } from './ui/buildGuard.js';
-import { acceptDamageSnapshot } from './ui/damageBoard.js';
 import { initLang, useLang, tickerText } from './ui/lang.js';
 import { t, N_, translateWire } from '../../shared/i18n.js';
 import { recordError, installTrafficMeter } from './diag.js';
@@ -347,11 +346,6 @@ function wireNet() {
     if (selectRoute(s) === 'game' && msg.playerId === s.me?.playerId) audio.layerGain(msg.bondId, msg.add);
   });
   net.on('m.field', (msg) => store.patch('match', { field: payload(msg) }));
-  net.on('m.damage', (msg) => {
-    const s = store.get(), view = s.match.public;
-    const damage = acceptDamageSnapshot(s.match.damage, payload(msg), view?.matchId || view?.revival?.matchId);
-    if (damage !== s.match.damage) store.patch('match', { damage });
-  });
   net.on('m.result', (msg) => {
     const res = payload(msg);
     store.patch('match', { result: res });

@@ -20,7 +20,7 @@ import { html, Button, Icon, MicroLabel, DifficultyTag } from '../ui/components.
 import { useGameData, Img, UnitThumb, BandIcon, PlayerAvatar, BondGlyph, LpTower, Sprite } from '../ui/gameComponents.js';
 import { normalizeResult, fmtNum, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';
 import { data } from '../data.js';
-import { damageNumber, damageRate } from '../ui/damageBoard.js';
+import { damageNumber, damageRate } from '../ui/damageFigures.js';
 import { appearanceRecord } from '../ui/skinAssets.js';
 import { enemyIconUrl, titleIconUrl, uiUrl } from '../ui/assetUrls.js';
 import { audio } from '../audio.js';

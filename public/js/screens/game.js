@@ -89,7 +89,6 @@ import { DetailPanel, resolveDetail } from '../ui/detailPanel.js';
 import { RewardOverlay } from '../ui/rewardOverlay.js';
 import { FinalAssaultPlate, HiddenCorePlate, EndPlate, preloadBossPlateArt, bossPlateArtReady, finalPlateRows, endPlateOf } from '../ui/bossPlates.js';
 import { DownedPlate, downedDue, preloadDownedArt, downedArtReady } from '../ui/downedPlate.js';
-import { DamageBoard, uniteDamageOwners, bossDamageOwners } from '../ui/damageBoard.js';
 import { uniteBudgetInfo } from '../ui/gameLogic/phases.js';
 import { OfferOverlay, offerBlocksPrep } from '../ui/offerOverlay.js';
 import { ChoiceOverlay, spMarks } from '../ui/choiceOverlay.js';
@@ -247,7 +246,6 @@ function MatchScreen() {
   const showMetrics = metricsSetting && !modRoom && !spectator;
   useEffect(() => { if (!showMetrics) setMetricsOpen(false); }, [showMetrics]);
   const [emoteOpen, setEmoteOpen] = useState(false);
-  const [damageOpen, setDamageOpen] = useState(false);   // the 作战统计 damage board (ui/damageBoard.js)
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [drag, setDrag] = useState(null);                // { uid, kind, id } while dragging a piece
@@ -373,7 +371,7 @@ function MatchScreen() {
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
   }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
-  live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, damageOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
+  live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
   // the own prep board: the normal board, or — in the prep of a boss round — the player's half of the boss field
@@ -1535,7 +1533,6 @@ function MatchScreen() {
       }
       if (act === 'escape') {
         if (L.emoteOpen) setEmoteOpen(false);
-        else if (L.damageOpen) setDamageOpen(false);
         else if (L.pen && !L.detail) togglePenRef.current(false);
         else if (L.bondOpen) setBondOpen(null);
         else if (L.detail) setDetail(null);
@@ -1574,7 +1571,7 @@ function MatchScreen() {
         return;
       }
       if (act === 'retreat' || act === 'sell') {
-        if (!L.showPrep || !L.editable || L.drag || L.facing || L.selBusy || L.pen || L.emoteOpen || L.damageOpen || !pointer || pointer.buttons) return;
+        if (!L.showPrep || !L.editable || L.drag || L.facing || L.selBusy || L.pen || L.emoteOpen || !pointer || pointer.buttons) return;
         const uid = L.view?.pieceAtClientPoint(pointer.x, pointer.y);
         const hovered = Number.isInteger(uid) ? L.placeCtx.pieces.get(uid) : null;
         if (hovered?.piece.kind !== 'chess') return;
@@ -1635,11 +1632,6 @@ function MatchScreen() {
     field, layers, layer, who: watchWho, bondLayers: battleState?.bondLayers || null,
   });
   const stripFid = strip.fieldId;
-  // 作战统计 (ui/damageBoard.js, public issue #5 follow-up): the match's damage snapshot, the enemy/leak owners of the
-  // field on screen (联防 helpers and the 最终攻势 / 隐秘核心 boss) and the operators it counts (spawned ones included)
-  const damage = useStore((s) => s.match.damage);
-  const uniteOwners = useMemo(() => uniteDamageOwners({ pub, fieldId: stripFid, field }), [pub, stripFid, field]);
-  const bossOwners = useMemo(() => bossDamageOwners({ pub, fieldId: stripFid }), [pub, stripFid]);
   const liveLayers = (combat || settleMode) && battleState?.bondLayers ? battleState.bondLayers : null;
   // the observing pill names the player whose bonds the strip shows (the same teammate as the strip's "👁 name" tag)
   const observingName = cc && combat && watchedFid ? (!strip.self && stripFid === watchedFid ? strip.name : (players.find((p) => p.fieldId === watchedFid || ownFieldId(p.playerId) === watchedFid)?.name || t('队友'))) : null;
@@ -1661,7 +1653,6 @@ function MatchScreen() {
   // (the runner's field meta is taken before they deploy); a battle sends no bench (a prep scout does: ownerBoard)
   const popOps = cc && battleRunner && field?.local && bondOpen && bondOpen.ownerId !== myId ? battleRunner.ownerOps(bondOpen.ownerId, field.fieldId) : null;
   const spawnedOps = (evBufRef.current.get(field?.fieldId) || []).filter(e => e?.[0] === 'spawn' && e[1]?.kind === 'op').map(e => e[1]);
-  const shownOps = [...(field?.units || []), ...spawnedOps];
   const bondPop = popupView({ open: bondOpen, pub, priv, myId, field, units: popOps || spawnedOps, live: liveLayers });
   const openBond = (id, ownerId, from) => { setBondOpen((b) => toggleBond(b, id, ownerId, from)); audio.sfx('click', { volume: 0.4 }); };
   const watchingNow = combat ? (watching || field?.fieldId || home) : watching;
@@ -1814,7 +1805,7 @@ function MatchScreen() {
 
       <div class="gm__corner">
         ${showMetrics && metricsOpen ? html`<${CombatMetricsPanel} myId=${myId} onClose=${() => setMetricsOpen(false)} />` : null}
-        ${spectator ? null : html`<${EmoteWheel} open=${emoteOpen} onToggle=${(open) => { setEmoteOpen(open); if (open) setDamageOpen(false); }} onSend=${(id) => actions.emote(id)} disabled=${conn.status !== 'online'} />`}
+        ${spectator ? null : html`<${EmoteWheel} open=${emoteOpen} onToggle=${(open) => setEmoteOpen(open)} onSend=${(id) => actions.emote(id)} disabled=${conn.status !== 'online'} />`}
         ${showMetrics ? html`<button type="button" class="gm__gear gm__metrics" aria-label=${t('作战统计')} title=${t('作战统计')} aria-expanded=${metricsOpen}
           aria-controls="combat-metrics-panel" onKeyDown=${(e) => { if (e.key === ' ') e.stopPropagation(); }} onClick=${() => {
             setMetricsOpen(!metricsOpen);
@@ -1828,9 +1819,6 @@ function MatchScreen() {
         <button type="button" class="gm__gear" aria-label=${t('设置')} title=${t('设置')} onClick=${() => setSettingsOpen(true)}><${GIcon} name="gear" /></button>
         <button type="button" class="gm__gear gm__guide" aria-label=${t('玩法说明')} title=${t('玩法说明')} onClick=${() => openGuide(0)}><${Icon} name="book" /></button>
         <${FullscreenButton} class="gm__gear gm__fs" />
-        <${DamageBoard} snapshot=${damage} units=${shownOps} ownerId=${strip.ownerId} ownerName=${strip.name || players.find(p => p.playerId === strip.ownerId)?.name}
-          uniteOwners=${uniteOwners} uniteRelay=${pub?.uniteRounds === 2 || Array.isArray(pub?.uniteResult?.rounds)} bossOwners=${bossOwners} bossHidden=${pub?.phase === PHASE.HIDDEN_CORE}
-          open=${damageOpen} onToggle=${(open) => { setDamageOpen(open); if (open) setEmoteOpen(false); }} />
       </div>
 
       ${drawer ? html`<${EnemyDrawer} tab=${drawer} onTab=${setDrawer} pub=${pub} priv=${priv} onClose=${() => setDrawer(null)}

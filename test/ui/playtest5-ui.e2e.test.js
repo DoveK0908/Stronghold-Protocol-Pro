@@ -184,7 +184,7 @@ describe('user playtest #5 — UI items 8 / 9 (mock harness, headless Chrome)', 
     for (const [name, w, h, touch] of [view('844x390'), view('756x366'), view('1920x1080')]) {
       const { page, problems } = await open('phase=PREP', { w, h, touch });
       // (the 输出统计 toggle that shares the corner and its class since rel16 is the damage board's, not one of these)
-      const r = await page.evaluate(() => [...document.querySelectorAll('.gm__corner .gm__gear:not(.damage-board__toggle)')].map((b) => {
+      const r = await page.evaluate(() => [...document.querySelectorAll('.gm__corner .gm__gear')].map((b) => {
         const svg = b.querySelector('svg.icon');
         const s = svg.getBoundingClientRect(), br = b.getBoundingClientRect();
         return { cls: b.className, w: s.width, h: s.height, bw: br.width, d: svg.querySelector('path')?.getAttribute('d') };

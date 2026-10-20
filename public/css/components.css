@@ -902,7 +902,7 @@
 .experimental-stages__head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .experimental-stages__head strong { font-size: max(calc(.19 * var(--t)), calc(15px * var(--ui))); color: var(--text-hi); font-weight: 500; }
 .experimental-stages__head small { color: var(--text-lo); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); line-height: 1.6; }
-.experimental-stages__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; max-height: max(calc(.9 * var(--t)), 180px); overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
+.experimental-stages__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(220px * var(--ui))), 1fr)); gap: 8px; max-height: max(calc(.9 * var(--t)), calc(180px * var(--ui))); overflow-y: auto; scrollbar-width: thin; padding-right: 2px; }
 .experimental-stage { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line-2); background: var(--bg-3); color: var(--text-hi); font-size: max(calc(.15 * var(--t)), calc(13px * var(--ui))); cursor: pointer; }
 .experimental-stage > span { display: grid; gap: 2px; }
 .experimental-stage small { color: var(--text-lo); font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); line-height: 1.4; }
