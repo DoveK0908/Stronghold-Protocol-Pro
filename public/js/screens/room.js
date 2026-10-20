@@ -224,7 +224,7 @@ function EliteRecruit({ room, busy, onAdd }) {
   </div>`;
 }
 
-function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, onKick, onInvite, onAddBot, onAddElite, onRemoveBot, onBotBand, portraits,
+function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, onKick, onInvite, onAddBot, onAddElite, onRemoveBot, onBotBand, onMove, portraits,
   onPickCard = null, onPickAvatar = null, onPickBg = null }) {
   const [bad, setBad] = useState(null);
   const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId));
@@ -232,6 +232,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
   if (!seat) {
     const invitable = coop && !facts.spectating;
     const canAdd = coop && facts.isHost && !queued;
+    // 界面#15: a seated player may claim any empty seat before the match (8–20 seat rooms group four at a time).
+    const canMove = coop && !facts.spectating && !queued && !!facts.mine;
     return html`<article class=${`rseat rseat--empty${queued ? ' is-searching' : ''}`} style=${`--i:${index}`}>
       <span class="rseat__clip" aria-hidden="true"></span>
       <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span></header>
@@ -244,6 +246,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
             : html`<span class="rseat__wait"><small>${t('等待博士加入')}</small></span>`}
         <span class="rseat__noinfo" aria-hidden="true">NOINFO</span>
       </div>
+      ${canMove ? html`<button type="button" class="rseat__move" data-testid="seat-move" disabled=${busy === 'move'} onClick=${onMove}>
+        <span>${t('移到这里')}</span></button>` : null}
       ${canAdd ? html`<div class="rseat__adds">
         <button type="button" class="rseat__addbot" disabled=${busy === 'add'} onClick=${onAddBot}>
           <${Icon} name="robot" />${t('添加 AI 队友')}${busy === 'add' ? html`<${Spinner} size="sm" />` : null}</button>
@@ -445,6 +449,7 @@ export function RoomScreen() {
   const addBot = () => run('add', () => net.request('room.addBot', {}));
   const addElite = (persona) => run('add', () => net.request('room.addBot', { persona }));
   const removeBot = (seat) => run(`rm${seat}`, () => net.request('room.removeBot', { seat }));
+  const moveTo = (seat) => run('move', () => net.request('room.moveSeat', { seat }));
   // the host removes a human before the match (community report #17): asked first; the player may join again. The
   // confirmed player's id goes along: if they left and someone else took the seat meanwhile, the server refuses it.
   const kick = async (seat, name, playerId) => {
@@ -540,11 +545,16 @@ export function RoomScreen() {
     </header>
 
     <main class="rs-seats" ref=${bindSeatsWheel}>
-      ${facts.seats.map((s, i) => html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
-        myId=${me.playerId} myCard=${myCard} busy=${busy} gd=${gd} queued=${queued} onKick=${kick} onInvite=${() => copy('code')}
-        onAddBot=${addBot} onAddElite=${addElite} onRemoveBot=${removeBot} onBotBand=${setBandSeat} portraits=${portraits}
-        onPickCard=${cardList.length ? () => setPicking('op') : null} onPickAvatar=${cardList.length ? () => setPicking('avatar') : null}
-        onPickBg=${() => setPicking('bg')} />`)}
+      ${facts.seats.map((s, i) => {
+        const card = html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
+          myId=${me.playerId} myCard=${myCard} busy=${busy} gd=${gd} queued=${queued} onKick=${kick} onInvite=${() => copy('code')}
+          onAddBot=${addBot} onAddElite=${addElite} onRemoveBot=${removeBot} onBotBand=${setBandSeat} onMove=${() => moveTo(i)} portraits=${portraits}
+          onPickCard=${cardList.length ? () => setPicking('op') : null} onPickAvatar=${cardList.length ? () => setPicking('avatar') : null}
+          onPickBg=${() => setPicking('bg')} />`;
+        // 界面#15: in an 8–20 seat room a dashed divider every four seats shows who plays in the same group.
+        if (facts.seats.length <= 4 || i === 0 || i % 4 !== 0) return card;
+        return [html`<div key=${`sep${i}`} class="rseat-sep" data-testid="seat-group-sep"><span>${t('第 {n} 组', { n: i / 4 + 1 })}</span></div>`, card];
+      })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>
         <h2>${DIFFICULTY_NAMES[room.difficulty] ? t(DIFFICULTY_NAMES[room.difficulty]) : ''}<span class="num t-dim"> ${info.code}</span></h2>

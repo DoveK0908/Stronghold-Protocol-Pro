@@ -3338,5 +3338,7 @@
   "编号必须是四位数字（1000–9999）。": "The number must be four digits (1000–9999).",
   "这个「代号#四位数字」已经被占用，换一组再试。": "That callsign#number is already taken — pick another pair.",
   "策略 {name}": "Strategy {name}",
-  "战斗按 {n} 倍速演算（官方设定）": "Battles run at {n}x (a fixed game setting)"
+  "战斗按 {n} 倍速演算（官方设定）": "Battles run at {n}x (a fixed game setting)",
+  "移到这里": "Move here",
+  "第 {n} 组": "Group {n}"
 }

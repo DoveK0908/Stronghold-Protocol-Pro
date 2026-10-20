@@ -1774,6 +1774,17 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
   animation: sw-in 260ms var(--ease-out) backwards; animation-delay: calc(var(--i) * 60ms); }
 .rs--big .rseat { --w: max(1.7rem, 120px); }
 .rs--solo .rseat { --w: min(2.7rem, 34vw); }
+/* 界面#15: claiming an empty seat (co-op, before the match) and the four-a-group dividers of an 8–20 seat room. */
+.rseat__move { margin: .06rem 0 0; padding: .05rem .1rem; display: flex; align-items: center; justify-content: center; gap: .05rem;
+  font-size: max(calc(.11 * var(--t)), 10px); color: var(--mint-200); background: rgba(78, 216, 175, .08);
+  border: 1px dashed rgba(78, 216, 175, .45); cursor: pointer; }
+.rseat__move:hover { background: rgba(78, 216, 175, .16); border-style: solid; }
+.rseat__move[disabled] { opacity: .5; cursor: default; }
+.rseat-sep { flex: none; align-self: stretch; width: 1px; margin: .1rem .08rem .3rem; position: relative;
+  border-left: 1px dashed rgba(200, 206, 208, .55); }
+.rseat-sep span { position: absolute; left: 50%; top: .06rem; transform: translateX(-50%); writing-mode: vertical-rl;
+  font-size: max(calc(.1 * var(--t)), 9px); letter-spacing: .18em; color: rgba(200, 206, 208, .55); background: var(--bg-1); padding: .04rem 0; }
+
 .rseat__clip { position: absolute; left: 50%; top: -.14rem; width: .16rem; height: .2rem; transform: translateX(-50%); background: #3a3e3d; border: 2px solid #1a1c1c; z-index: 2; }
 .rseat.is-ready .rseat__clip { background: #4fe8c0; }
 .rseat__strip { position: relative; display: flex; align-items: center; justify-content: space-between; height: max(.26rem, 16px); padding: 0 .08rem; background: #2b2e2e; }

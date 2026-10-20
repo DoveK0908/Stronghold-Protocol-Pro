@@ -565,6 +565,9 @@ export const C2S = {
   'room.setBotBand': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), bandId: nullable(isId), $optional: ['bandId'] },
   'room.addBot': { persona: optional((v) => v === 'arturia' || v === 'lavinia') },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
+  // room.moveSeat (界面#15): a seated human moves to an empty seat before the match — rooms of 8–20 seats
+  // seat four players at a time, so the table you pick is the group you play with.
+  'room.moveSeat': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused
   'room.kick': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), playerId: isId },

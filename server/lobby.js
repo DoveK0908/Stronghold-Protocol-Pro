@@ -943,6 +943,7 @@ export class Lobby {
       case 'room.setBotBand': return this.setBotBand(session, msg);
       case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
+      case 'room.moveSeat': return this.moveSeat(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
       case 'room.rerollSetup': return this.rerollSetup(session, msg);
@@ -1303,6 +1304,33 @@ export class Lobby {
       for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
       this.broadcastState(room);
     }
+    return OK;
+  }
+
+  /**
+   * room.moveSeat {seat} (界面#15): a seated human moves to an empty seat of the same room before the match.
+   * Expanded rooms (8–20 seats) seat four players at a time, so the seat a player picks is the group they
+   * play with; the table changing un-readies everyone else, like a strategy change on an AI seat.
+   */
+  moveSeat(session, { seat }) {
+    const room = this.roomOf(session);
+    if (!room) return fail(ERR.NOT_IN_ROOM);
+    if (room.match) return fail(ERR.ROOM_STARTED);
+    if (this.roomQueued(room)) return fail(ERR.QUEUED);
+    if (room.mode === 'solo') return fail(ERR.BAD_TARGET, 'solo rooms have a single seat');
+    if (!room.admitsSeat(seat)) return fail(ERR.BAD_TARGET, 'seat outside room capacity');
+    const from = room.seats.findIndex((s) => s && !s.isBot && s.playerId === session.playerId);
+    if (from < 0) return fail(ERR.BAD_TARGET, 'not seated');
+    if (from === seat) return OK;
+    if (room.seats[seat]) return fail(ERR.BAD_TARGET, 'seat is taken');
+    this.dropReplay(room, session.playerId);
+    const moved = room.seats[from];
+    moved.seat = seat;
+    moved.ready = false;
+    room.seats[seat] = moved;
+    room.seats[from] = null;
+    for (const s of room.seats) if (s && !s.isBot && s.playerId !== room.hostId) s.ready = false;
+    this.broadcastState(room);
     return OK;
   }
 
