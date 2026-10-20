@@ -21,6 +21,7 @@
 | **L3** | `L3-shop-level-ui.patch.json` | `public/overlay.js` | 面板上的 **调度控件**：沙盒条上一个 1..6 的数字框 + 「设置调度」按钮 + 总开关页新增一行「调度中心 · 直接设置等级」。 |
 | **L4** | `L4-test-server.patch.json` | `src/server-patch.mjs` | **测试页的服务端**：资金 / 当前回合 / 回合上限 / 两个时限 / 设置敌人 / 更换地图 / 盟约层数 / 自选 boss / 出怪组合全集，以及下面的 **L4-gate**。 |
 | **L5** | `L5-test-page.patch.json` | `public/overlay.js` | **测试页的面板**：页签与页本体、搜索框的焦点与输入法、布局注入、沙盒条入口，以及下面的 **L5-gate / L5-gate2**。 |
+| **L6** | `L6-skins.patch.json` | `public/overlay.js` | 面板里的干员卡片跟随玩家所选皮肤（`v.priv.skins[charId]` → `chessPortraitUrl(assets, c, { skin })`），不再永远画默认立绘。 |
 
 （L4/L5 由 `_build/gen-luck-test.mjs` 生成 —— 那是它们唯一的真源，别手改这两个 JSON。）
 
