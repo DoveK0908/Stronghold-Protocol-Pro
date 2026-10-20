@@ -934,7 +934,13 @@ async function main() {
   if (fxClient && pluginFxExtractionAllowed(opts, missingFx, fxAnswer)) {
     const py = findPython(), venv = py && ensureVenv(py, log);
     if (venv?.ok) {
-      const r = run(venv.python, [EXTRACT_PY, '--game', fxClient.path, '--only', 'fx', '--fx-set', 'used'], { env: PY_ENV });
+      // Cosmetics' own combat prefabs live in the DOWNLOADED content (`PersistentData/Bundles/skinpack/<charId>.ab`),
+      // not in StreamingAssets/AB/Windows — passing skin bundles keeps every operator skin's effects in the index
+      // (extract.py `--skin-bundles`). Without it a --local run silently drops them.
+      const skinBundles = path.resolve(fxClient.path, '../../../../PersistentData/Bundles');
+      const fxArgs = [EXTRACT_PY, '--game', fxClient.path, '--only', 'fx', '--fx-set', 'used'];
+      if (fs.existsSync(skinBundles)) fxArgs.push('--skin-bundles', skinBundles);
+      const r = run(venv.python, fxArgs, { env: PY_ENV });
       if (r.ok) saveState({ pluginFxDeclined: '' });
     }
   }
