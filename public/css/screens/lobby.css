@@ -2817,8 +2817,6 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .hub-topbar .me-card__name { display: flex; align-items: center; gap: .05rem; min-width: 0; color: #f2f5f4;
   font-size: calc(.17 * var(--t)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hub-topbar .me-card__id { color: rgba(240, 246, 244, .86); font-size: calc(.14 * var(--t)); letter-spacing: .04em; }
-.hub-topbar .me-card__brand { position: absolute; right: .07rem; bottom: .04rem; z-index: 1; text-align: right;
-  font-size: max(calc(.055 * var(--t)), 5px); line-height: 1.15; letter-spacing: .06em; color: rgba(240, 246, 244, .5); }
 
 .me-info { display: flex; flex-direction: column; gap: .16rem; }
 .me-info__card { width: 100%; }

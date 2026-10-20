@@ -35,7 +35,6 @@ export function MeCard({ me, onOpen }) {
       <span class="me-card__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" />${me?.name || t('博士')}</span>
       <span class="me-card__id num" data-testid="me-card-tag">#${me?.tag || '----'}</span>
     </span>
-    <span class="me-card__brand" aria-hidden="true">STRONGHOLD<br />PROTOCOL</span>
   </button>`;
 }
 
