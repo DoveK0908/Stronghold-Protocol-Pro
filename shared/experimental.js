@@ -10,11 +10,13 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 //   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
 //   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 5,
 //                           off by default: the official rule stays the default)
+//   prepUnlimited           无限休整期 (玩法#05): the prep has no countdown; a co-op room enters combat only once every
+//                           living player is ready (off by default: the official timed prep stays the default)
 // The strategy draft's 本局信息 dialog and the briefing share the official enemy column (ui/matchEnemies.js, GitHub #484),
 // so there is no room switch for it any more.
-export const EXPERIMENTAL_OPTIONAL = Object.freeze(['luckConsole', 'bossHitSoftCap']);
-export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ luckConsole: false, bossHitSoftCap: false });
-const OPTIONAL_TAGS = Object.freeze({ luckConsole: 'luck', bossHitSoftCap: 'cap' });
+export const EXPERIMENTAL_OPTIONAL = Object.freeze(['luckConsole', 'bossHitSoftCap', 'prepUnlimited']);
+export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ luckConsole: false, bossHitSoftCap: false, prepUnlimited: false });
+const OPTIONAL_TAGS = Object.freeze({ luckConsole: 'luck', bossHitSoftCap: 'cap', prepUnlimited: 'prep' });
 
 /** The switch's value as the game reads it: the stored boolean, or the option's own default when absent. */
 export function optionalValue(value, key) {
@@ -53,7 +55,7 @@ export function isExperimental(value) {
   });
 }
 
-/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean, bannedStages?: string[] }} [value] */
+/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean, prepUnlimited?: boolean, bannedStages?: string[] }} [value] */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);

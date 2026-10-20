@@ -3329,5 +3329,7 @@
   "只改变你自己听到的音乐。自选曲和主界面音乐共用本机曲库，每首最长 5 分钟。作战的官方音乐：第 1–7 回合《无畏者》，第 8 回合起《骑士之日》；联防、最终攻势和隐秘核心保持官方音乐。": "Only changes the music you hear. Your own tracks share the lobby card's local library (each up to 5 minutes). Official 作战 music: 《无畏者》 for rounds 1–7, 《骑士之日》 from round 8 on; 联防, the final assault and the hidden core keep their own tracks.",
   "已开启": "On",
   "已关闭": "Off",
-  "界面设计：{author}（{site}）": "Interface design: {author} ({site})"
+  "界面设计：{author}（{site}）": "Interface design: {author} ({site})",
+  "无限休整期": "Unlimited prep time",
+  "休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。": "The prep has no countdown; combat starts only after every living player presses Ready."
 }

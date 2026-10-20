@@ -34,6 +34,7 @@ export function experimentalSummary(input) {
   let rules = options.disableDuckLord ? `${summary} · ${t('禁用鸭爵策略')}` : summary;
   if (options.luckConsole) rules = `${rules} · ${t('测试插件')}`;
   if (options.bossHitSoftCap === true) rules = `${rules} · ${t('限伤改为封顶')}`;
+  if (options.prepUnlimited === true) rules = `${rules} · ${t('无限休整期')}`;
   if (Array.isArray(options.bannedStages) && options.bannedStages.length) rules = `${rules} · ${t('禁用战场 {n} 张', { n: options.bannedStages.length })}`;
   return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
 }
@@ -108,6 +109,11 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <span><strong>${t('限伤改为封顶')}</strong><small>${t('默认关闭：开着时，本会被限伤取消的那一下不再掉 0，而是按 29 万 9999 结算（打首领的大伤害不再白打）。')}</small></span>
         <input id="experimental-hit-softcap" type="checkbox" role="switch" checked=${options.bossHitSoftCap === true}
           disabled=${!editable || busy} onChange=${e => change('bossHitSoftCap', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-prep-unlimited">
+        <span><strong>${t('无限休整期')}</strong><small>${t('休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。')}</small></span>
+        <input id="experimental-prep-unlimited" type="checkbox" role="switch" checked=${options.prepUnlimited === true}
+          disabled=${!editable || busy} onChange=${e => change('prepUnlimited', e.currentTarget.checked)} />
       </label>` : null}
       ${source !== 'matchmaking' && choices.length > 1 ? html`<div class="experimental-stages">
         <div class="experimental-stages__head">
