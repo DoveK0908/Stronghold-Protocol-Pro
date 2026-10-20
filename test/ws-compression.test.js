@@ -375,7 +375,7 @@ describe('native WebSocket compression through the complete server', { concurren
 
   test('default, environment selection and explicit option precedence', { timeout: 15000 }, async (t) => {
     const cases = [
-      ['unset defaults off', undefined, {}, false],
+      ['unset defaults on (工程#06 2026-10-20)', undefined, {}, true],
       ['environment enables PMD', 'on', {}, true],
       ['option off overrides environment on', 'on', { wsCompression: 'off' }, false],
       ['option on overrides environment off', 'off', { wsCompression: 'on' }, true],

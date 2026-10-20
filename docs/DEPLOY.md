@@ -9,7 +9,7 @@
 |---|---|
 | 服务器 CPU | 战斗在各玩家浏览器里模拟（DESIGN §14），服务器只负责回合、经济和校验：**每个房间每个作战回合约 1 ms CPU**。AI 队友 / 掉线玩家的战场由服务器模拟：作战开始时 3 个 AI 战场在开发机上约 0.2–0.5 s CPU，小主机上可能要几秒（分成 8 ms 小片执行，不会卡住其他房间）。`SP_VERIFY=all` 会复算每个真人战场，CPU 明显增加，小主机建议保持 `off` 或 `sample`。AI 布阵的试算也会消耗 CPU；原版房间可设 `SP_BOT_REHEARSAL=host`，让房主浏览器代算（见下面）。 |
 | 服务器内存 | 空闲约 100 MB，每个进行中的对局再增加几 MB。 |
-| 网络 | 4 人对局中服务器每回合下行约 0.25 MB（DESIGN §14 实测；设 `SP_WS_COMPRESSION=on` 可以对状态和战斗流消息启用 permessage-deflate 压缩，本 fork 默认关闭；上游 0.2.6 默认压缩 1 KB 以上的消息，实测一局单人对局的服务器消息从 173 KB 降到 60 KB）。首次进入游戏时浏览器要从主机下载所需的图片 / Spine 模型 / 音频（按需加载，之后走浏览器缓存），公网隧道带宽小时第一次会慢一些。0.2.6 起服务器启动后在后台给素材算内容哈希（第一次约 1–20 秒，看机器和硬盘；之后只检查大小和修改时间），下发的素材清单里每个地址带上哈希：浏览器把图片、模型和音频缓存一年，服务器更新、重新解压或 Docker 重建之后，玩家只重新下载内容真的变了的文件。哈希存在 `.cache/asset-hashes.json`，删掉会重新计算；目录不可写（例如只读的容器）时只在内存里算。 |
+| 网络 | 4 人对局中服务器每回合下行约 0.25 MB（DESIGN §14 实测）。状态和战斗流消息默认启用 permessage-deflate 压缩（2026-10-20 起改为默认开启，实测战斗快照下行 24.0 → 2.7 KB/s；要关就设 `SP_WS_COMPRESSION=off`）；上游 0.2.6 默认压缩 1 KB 以上的消息，实测一局单人对局的服务器消息从 173 KB 降到 60 KB。首次进入游戏时浏览器要从主机下载所需的图片 / Spine 模型 / 音频（按需加载，之后走浏览器缓存），公网隧道带宽小时第一次会慢一些。0.2.6 起服务器启动后在后台给素材算内容哈希（第一次约 1–20 秒，看机器和硬盘；之后只检查大小和修改时间），下发的素材清单里每个地址带上哈希：浏览器把图片、模型和音频缓存一年，服务器更新、重新解压或 Docker 重建之后，玩家只重新下载内容真的变了的文件。哈希存在 `.cache/asset-hashes.json`，删掉会重新计算；目录不可写（例如只读的容器）时只在内存里算。 |
 | 磁盘 | 素材约 720 MB（`public/assets`，含中文约 65 MB、日文约 85 MB、英文约 71 MB、韩文约 80 MB、本土语言约 18 MB 的干员语音）+ 依赖约 125 MB（`node_modules`；整合包只带运行依赖，约 65 MB）；可选的本地提取约 40 MB（`.venv-extract`）+ 约 330 MB（贴图、各战场官方场景和官方战斗特效，见第 6 节）。完整包解压后约 1.16 GB。 |
 | 玩家设备 | 支持 WebGL 的现代浏览器（Chrome / Edge / Firefox / Safari 最新版），电脑或手机平板（横屏）。老旧设备可在设置里调低画质或访问 `/?board=2d`。 |
 
@@ -181,11 +181,11 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 |---|---|---|
 | `b.snap` JSON 原样 | 2460 B | **24.0 KB/s ≈ 86 MB/小时**（每个玩家） |
 | 单帧 deflate（各自压缩） | 628 B | 6.1 KB/s |
-| permessage-deflate 共享上下文（`SP_WS_COMPRESSION=on`） | 280 B | **2.7 KB/s ≈ 9.7 MB/小时** |
+| permessage-deflate 共享上下文（默认开；`SP_WS_COMPRESSION=off` 关） | 280 B | **2.7 KB/s ≈ 9.7 MB/小时** |
 
 - 共享上下文就是 `server/wsCompression.js` 的实现：只压缩白名单里的状态帧与战斗帧（`m.public` / `m.private` / `m.state` / `m.unitStats` / `m.field` / `m.damage` / `b.start` / `b.snap` / `b.ev` / `b.ext`），凭证与未知消息永不进压缩上下文。
 - 换来的体积是 **约 8.8 倍**，代价是每连接约 144 KiB 的 zlib 状态和少量 CPU（10 Hz × 2.4 KB 的 deflate，实测量级可以忽略）。
-- 本 fork 默认 `SP_WS_COMPRESSION=off`；**改 `on` 即可**，不需要改代码。
+- 本 fork 2026-10-20 起默认开启（`resolveWsCompression` 的 bounded preset）；要关就设 `SP_WS_COMPRESSION=off`。
 - 想再省一半可以把快照降到 5 Hz（本 fork 没有这个开关；`snapshotHz` 目前只在集群配置/房间规格里，取 5/10/20）。
 
 ### 静态资源（首次之后）
@@ -196,17 +196,17 @@ powershell -ExecutionPolicy Bypass -File scripts\install-service-windows.ps1 -Re
 | `/data/assets.json` | 2.73 MB | 145 KB（brotli） | `no-cache` + ETag（未变即 304） |
 | `/data/local-assets.json` | 177 KB | 36 KB（brotli） | 同上 |
 | `/data/local-fx.json` | 2.38 MB | 211 KB（brotli） | 同上 |
-| `/assets/local/fx/index.json` | 10.67 MB | 476 KB（brotli） | `max-age=86400`（不是哈希 URL） |
+| `/data/local-fx.json`（浏览器实际读的特效清单） | 2.38 MB | 211 KB（brotli） | `no-cache` + ETag |
 
 - 静态资源本身已经是「哈希 URL + 一年 immutable + brotli」，重复访问只有 304（几百字节）。
-- `fx/index.json` 是唯一没走哈希 URL 的大文件：每个新客户端每天可能重新拉 476 KB。把它挪到 `/assets/~<hash>/local/fx/index.json` 就能变成一年缓存。
+- `public/assets/local/fx/index.json`（10.67 MB，brotli 后 476 KB）只由服务器进程读取（`server/plugins/pack.js`、`server/studio/presentationData.js`），浏览器不下载它，所以不需要哈希 URL。
 - 玩家在标题画面点「导入素材包」之后，素材直接从本机读，**完全不走服务器**——这是静态流量最大的一笔节省，包见 `tools/package.mjs --assets`（本 fork 已产出整包）。
 
 ### 按收益排序的建议
 
-1. `SP_WS_COMPRESSION=on`：约 8.8 倍下行下降，零代码。
+1. ~~`SP_WS_COMPRESSION=on`~~：已在 2026-10-20 改为默认开启（约 8.8 倍下行下降，零代码）。
 2. 让玩家导入素材包：首次之后静态流量归零（浏览器缓存以外）。
-3. `fx/index.json` 换成哈希 URL + 一年缓存：省 476 KB/客户端/天。
+3. ~~`fx/index.json` 换哈希 URL~~：已核实浏览器不读这个文件，无需处理。
 4. 低带宽模式（5 Hz 快照）：再省一半对局下行，但动作略卡；需要新增开关。
 
 ## 2. 让不在同一网络的朋友加入

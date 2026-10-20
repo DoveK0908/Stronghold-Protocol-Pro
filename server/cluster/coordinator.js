@@ -64,7 +64,7 @@ export async function startCoordinator({ nodes, build, protocol = PROTOCOL_VERSI
   try {
     await platform.refresh();
     app = await startServer({ ...options, host: options.host ?? '127.0.0.1', combatWorkers: 0, trialWorkers: 0,
-      snapshotHz: options.snapshotHz ?? 10, wsCompression: 'off', allowAsyncHandlers: true, phaseMetrics: phases,
+      snapshotHz: options.snapshotHz ?? 10, wsCompression: options.wsCompression ?? 'on', allowAsyncHandlers: true, phaseMetrics: phases,
       getClusterLoad: () => platform.publicLoad(),
       lobbyFactory: params => new ClusterLobby({ ...params, platform }) });
     sink = createReceiptSink({ platform, lobby: app.lobby, offThreadBytes: receiptWorker ? RECEIPT_OFF_THREAD_BYTES : 0, metrics: phases });

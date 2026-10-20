@@ -43,7 +43,7 @@ server/
   http/
     config.js              ROOT, served dirs, env (PORT, HOST, TRUST_PROXY, DEBUG), options handed to net.js / lobby.js
     websocket.js           session wiring (SessionRegistry → Lobby → Network), WebSocket upgrade at /ws (64 KB frames,
-                           permessage-deflate with SP_WS_COMPRESSION=on)
+                           permessage-deflate, on unless SP_WS_COMPRESSION=off)
     static.js              mounts / → public, /data/, /shared/, /sim/ (.js only), the /data.js browser stand-in, path guards,
                            the ~<hash> segment of /assets/ /fonts/ /media/ URLs stripped (immutable when it names the file)
     media.js               /media/… extension-less audio → public/assets/audio
