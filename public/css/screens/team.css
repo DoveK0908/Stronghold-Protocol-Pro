@@ -43,6 +43,9 @@
 .team__info { display: flex; flex-direction: column; gap: .02rem; min-width: 0; padding: .04rem .12rem .04rem .06rem; background: linear-gradient(90deg, rgba(8, 11, 10, .82), rgba(8, 11, 10, 0)); }
 .team__name { font-size: max(.15rem, calc(12px * var(--ui))); font-weight: 500; color: var(--text-md); max-width: 1.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px #000; }
 .team__line { display: flex; align-items: center; gap: .1rem; }
+/* 界面#11: the picked 策略 as one small line under the HP row (the avatar stays the player's own face) */
+.team__strategy { display: block; margin-top: .02rem; font-size: calc(.105 * var(--t)); line-height: 1.35;
+  color: rgba(223, 230, 226, .62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .team__line .misstag { height: .21rem; min-width: .68rem; padding-right: .08rem; }
 .team__line .misstag.has-art { width: .68rem; }
 .team__line .misstag__n { font-size: .16rem; }

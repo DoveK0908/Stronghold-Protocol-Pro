@@ -38,7 +38,7 @@ import { playerLabel } from './myInfo.js';
 import { EmoteBubble } from './emotes.js';
 import { STATUS_META, sortedPlayers, teamFrameIds, activeBubbles } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
-import { localAsset } from '../data.js';
+import { localAsset, getBand } from '../data.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
 import { KickAction, KickVoteNotice } from './kickVote.js';
 import { t } from '../../../shared/i18n.js';
@@ -232,6 +232,8 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
   const title = half ? (half === 'ALL' ? t('返回全景') : self ? t('查看自己的半场') : t('查看 {name} 的半场', { name: p.name }))
     : observe ? (self ? (observe.observing ? t('返回战场') : t('你自己')) : t('查看 {name} 的战场', { name: p.name })) : (self ? t('查看自己的阵地') : t('查看 {name} 的阵地', { name: p.name }));
   const lp = rowLp(p, pub, self ? selfLive : null, { uniteLocal, cap });
+  // 界面#11: the 策略 under the HP line, like the reference HUD — the band this seat picked (kept all match)
+  const band = p.bandId ? getBand(p.bandId) : null;
   const inTeam = team.has(p.playerId);
   const { click, dblClick } = clicks;
   return html`<div data-seat=${p.seat} class=${cx('team__row', self && 'is-self', inTeam && 'is-team', watched && 'is-watched', p.alive === false && !p.pendingDeath && 'is-dead', p.pendingDeath && 'is-pending', open && 'is-open', offline && 'is-offline')}>
@@ -254,6 +256,7 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
         ${p.bondPlan ? html`<${BondPlanTag} bondId=${p.bondPlan} compact=${true} class="team__plan" />` : null}
         ${watched && !self ? html`<span class="team__eye" title=${t('正在查看')}><${GIcon} name="eye" /></span>` : null}
       </div>
+      ${band ? html`<span class="team__strategy" title=${t('策略 {name}', { name: band.name || p.bandId })}>${t('策略')} ${band.name || p.bandId}</span>` : null}
       <${ReviveAction} pub=${pub} myId=${myId} target=${p} compact=${list} />
       <${KickAction} pub=${pub} myId=${myId} target=${p} compact=${list} />
       ${open ? html`<button type="button" class="btn btn--primary btn--sm team__ob"

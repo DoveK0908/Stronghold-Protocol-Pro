@@ -38,12 +38,17 @@
   padding: .2rem .3rem 0 .26rem; gap: .2rem; pointer-events: none;
 }
 .gtop > * { pointer-events: auto; }
-.gtop__left { display: flex; align-items: center; gap: .16rem; }
+.gtop__left { display: flex; align-items: center; gap: .12rem; }
 .gtop__meta { display: flex; flex-direction: column; align-items: flex-start; gap: .06rem; }
 /* a match with gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark */
 .gtop__mod { pointer-events: auto; }
 /* the latency pill and, beside it, the 观战席 capsule (ui/hud.js SpectatorPill: an eye + how many are watching; opens the roster) */
-.gtop__net { display: flex; align-items: center; gap: .08rem; }
+.gtop__net { display: inline-flex; align-items: stretch; gap: 0; height: .32rem;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .5); }
+/* 界面#11: 已连接 / 延迟 / 服务 read as one strip instead of three chips of different sizes */
+.gtop__net > * { height: 100%; border: 0; border-radius: 0; background: transparent; }
+.gtop__net > * + * { border-left: 1px solid var(--line); }
+.gtop__net .ping, .gtop__net .specpill { --btn-bg: transparent; --btn-bg-hover: rgba(255, 255, 255, .05); --btn-bd: transparent; padding-inline: .12rem; }
 .specpill { --btn-bg: rgba(0, 0, 0, .5); --btn-bg-hover: rgba(0, 0, 0, .66); --btn-bd: var(--line); height: .32rem; min-width: 0; padding: 0 .12rem; gap: .05rem; border-radius: 99px; }
 .specpill .btn__icon { width: .18rem; height: .18rem; color: var(--mint-500); }
 .specpill__num { font-size: .18rem; font-weight: 700; color: var(--mint-400); }
@@ -190,6 +195,9 @@
 .gtop__iconbtn:hover, .gtop__iconbtn.is-on { background: var(--mint-a20); color: var(--mint-400); border-color: var(--mint-500); }
 .gtop__iconbtn.is-on:not(.has-sprite) { opacity: .6; }
 .gtop__iconbtn .enemybtn__chev { color: #fff; }
+.gtop__speed { display: inline-flex; align-items: center; height: .32rem; padding: 0 .12rem;
+  border: 1px solid var(--line); background: rgba(0, 0, 0, .5); color: var(--mint-400);
+  font-size: .16rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .gtop__right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; justify-self: end; }
 .gtop__right .countdown { --cd-h: .7rem; filter: drop-shadow(0 0 .12rem rgba(0, 0, 0, .8)); }
 .gtop__clock { display: flex; align-items: flex-start; gap: .14rem; }

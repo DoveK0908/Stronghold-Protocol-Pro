@@ -506,6 +506,9 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const draining = ot?.state === 'drain';
   const lowLp = (Number.isFinite(lp) && lp - pending <= 5) || draining;
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
+  // 界面#11: battles are simulated at a fixed 2 game-seconds per real second (server/match/fields.js GAME_SPEED);
+  // show it while a fight is on screen so 「有时候像在加速」 has a visible, honest answer
+  const battleSpeed = phase === PHASE.COMBAT || phase === PHASE.UNITE ? 2 : null;
   const frozenSecs = Number.isFinite(frozenAt) ? remainAt(pub?.deadline, frozenAt) : null;
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
   // the latency pill also opens the server-load panel (public issue #?; UI/serverStatus.js)
@@ -555,6 +558,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     </div>
 
     <div class="gtop__right">
+      ${battleSpeed ? html`<span class="gtop__speed" data-testid="gtop-speed"
+        title=${t('战斗按 {n} 倍速演算（官方设定）', { n: battleSpeed })}>${battleSpeed}×</span>` : null}
       <div class="gtop__clock">
         ${frozenSecs != null
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
