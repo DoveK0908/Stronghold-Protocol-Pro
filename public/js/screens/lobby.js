@@ -817,9 +817,9 @@ export function LobbyScreen() {
       </div>
 
       <aside class="hub-side">
-        <${LobbyMusicPanel} />
         <${AchievementEntry} onOpen=${() => setAchOpen(true)} />
         <${HubTile} icon="key" label=${t('密钥加入')} en="JOIN WITH KEY" onClick=${() => setJoinOpen(true)} />
+        <${LobbyMusicPanel} />
         <${TipsPanel} />
         <div class="hub-contact"><div class="hub-contact__row"><${LobbyFeedback} /><${SiteBoards} /></div><${DesignCredit} /><${HubFoot} /></div>
       </aside>
