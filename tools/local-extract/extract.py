@@ -928,9 +928,11 @@ def main():
     ap.add_argument('--fx-keys', default='', metavar='K1,K2',
                     help='with --only fx: export only these effect prefabs (comma-separated keys)')
     ap.add_argument('--fx-jobs', type=int, default=0, metavar='N', help='with --only fx: worker processes (default up to 8)')
-    ap.add_argument('--skin-bundles', default='', metavar='DIR',
+    ap.add_argument('--skin-bundles', action='append', default=[], metavar='DIR',
                     help='with --only fx --fx-set used: an AB root of a newer client (its skinpack/<charId>.ab and the '
-                         'effect prefabs the skins swap in) for the skins of shared/skin-catalogue.js')
+                         'effect prefabs the skins swap in) for the skins of shared/skin-catalogue.js. Repeatable: the '
+                         'AUTOGRID client keeps some skinpacks in StreamingAssets/AB/Windows and the newest ones in '
+                         'PersistentData/Bundles, so pass both roots and the first one holding the file wins')
     ap.add_argument('--webp', action='store_true',
                     help='only write the WebP copies of the board textures and the guide pages from the PNGs already '
                          'under --out and list them in the manifest (needs Pillow, not the client)')

@@ -71,7 +71,35 @@ export function checkPluginFx(root = ROOT) {
 }
 
 /** [ASSUMED] A changed reference set may ask again; Enter/timeout never authorizes extraction. */
-export function pluginFxExtractionAllowed(opts, missing, answer = false) {
+export /**
+ * Union of the two skinpack roots the AGRID client ships (`StreamingAssets/AB/Windows/skinpack` and
+ * `PersistentData/Bundles/skinpack`) as one directory of hard links under .cache. The newer client keeps the last
+ * operator skins only in PersistentData, and `extract.py --skin-bundles` reads a single root, so the caller passes
+ * this directory: every .ab from the first root is linked, then the second root replaces the ones it also ships.
+ * Returns the directory, or null when neither root has a skinpack/.
+ */
+function skinBundleUnion(fxRoot, log) {
+  const roots = [path.join(fxRoot, 'skinpack'),
+    path.resolve(fxRoot, '../../../PersistentData/Bundles/skinpack')].filter((p) => fs.existsSync(p));
+  if (!roots.length) return null;
+  const out = path.join(ROOT, '.cache', 'skin-bundles');
+  const dir = path.join(out, 'skinpack');
+  fs.rmSync(out, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  let n = 0;
+  for (const root of roots) {
+    for (const name of fs.readdirSync(root)) {
+      if (!name.endsWith('.ab')) continue;
+      const dest = path.join(dir, name);
+      try { fs.rmSync(dest, { force: true }); } catch { /* not linked yet */ }
+      try { fs.linkSync(path.join(root, name), dest); n += 1; } catch (e) { log(`skinpack ${name}: ${e.message}`); }
+    }
+  }
+  log(`Skin bundles: ${n} .ab linked from ${roots.length} root(s) into ${out}`);
+  return out;
+}
+
+function pluginFxExtractionAllowed(opts, missing, answer = false) {
   return !opts.check && opts.local !== 'no' && (opts.local === 'force' || missing.length > 0 && (opts.yes || answer === true));
 }
 
@@ -937,9 +965,12 @@ async function main() {
       // Cosmetics' own combat prefabs live in the DOWNLOADED content (`PersistentData/Bundles/skinpack/<charId>.ab`),
       // not in StreamingAssets/AB/Windows — passing skin bundles keeps every operator skin's effects in the index
       // (extract.py `--skin-bundles`). Without it a --local run silently drops them.
-      const skinBundles = path.resolve(fxClient.path, '../../../../PersistentData/Bundles');
+      // The AGRID client keeps most skinpacks in StreamingAssets and the newest ones in PersistentData (the last
+      // three operator skins live only there). `--skin-bundles` takes one root, so build a union of the two
+      // `skinpack/` directories with hard links (PersistentData wins) and hand that over.
       const fxArgs = [EXTRACT_PY, '--game', fxClient.path, '--only', 'fx', '--fx-set', 'used'];
-      if (fs.existsSync(skinBundles)) fxArgs.push('--skin-bundles', skinBundles);
+      const skinUnion = skinBundleUnion(fxClient.path, log);
+      if (skinUnion) fxArgs.push('--skin-bundles', skinUnion);
       const r = run(venv.python, fxArgs, { env: PY_ENV });
       if (r.ok) saveState({ pluginFxDeclined: '' });
     }

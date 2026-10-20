@@ -2640,10 +2640,11 @@ def skill_entry(env, root, ek, pk, effect_refs, templates):
     return e
 
 
-def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, skin_root=None, skin_eff=None):
+def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, skin_roots=None, skin_eff=None):
     """index.json's units / projectiles / skills / skins for `unit_ids`, and every effect key they reference.
-    `skin_root` / `skin_eff`: newer bundles read for the catalogue's skins only (export_fx `skin_bundles`): their
-    skinpack/<charId>.ab, and the effect keys `eff` lacks (key → bundle under `skin_root`)."""
+    `skin_roots` / `skin_eff`: newer bundles read for the catalogue's skins only (export_fx `skin_bundles`): their
+    skinpack/<charId>.ab (looked up in each root in order — the AGRID client splits them between StreamingAssets and
+    PersistentData), and the effect keys `eff` lacks (key → bundle under one of the roots)."""
     units, projectiles, skills, skins, referenced = {}, {}, {}, {}, set()
     shared = AssetEnv(ab_root, cabs)                           # [uc]projectiles.ab and [uc]skills.ab, loaded once
     proj_roots = shared.prefabs(PROJECTILES)
@@ -2944,31 +2945,45 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, ski
         rel = SKINPACK.format(uid)
         if not cat:
             return set()
-        if skin_root is not None and (skin_root / rel).is_file():
-            rel = str(skin_root / rel)                  # absolute: AssetEnv.load_rel / Path(ab_root) / rel take it as is
-        if not (Path(ab_root) / rel).exists():
-            log(f'  skins {uid}: no {rel} — {len(cat)} catalogue skin(s) left out')
-            return set()
-        try:
-            prefabs = env.prefabs(rel, full=True)
-        except Exception as e:
-            log(f'  FAIL skins {uid}: {rel}: {e!r}')
+        # The battle prefab of a skin may live in ANY of the roots: an older client's skinpack/<charId>.ab can exist
+        # yet lack the newest skin, with the newer bundle in PersistentData. Load every candidate once, then let each
+        # skin pick the first bundle that actually holds its prefab (a --skin-bundles list may mix both layouts).
+        # Newer roots first: AssetEnv keys its container index by the bundle's internal name, so loading the older
+        # client copy of skinpack/<charId>.ab first would shadow the newer one (the skinpack roots share names).
+        bundles = []
+        for cand in [str(r / rel) for r in (skin_roots or [])] + [rel]:
+            if not (Path(ab_root) / cand).exists():
+                continue
+            if any(cand == seen for seen, _ in bundles):
+                continue
+            try:
+                bundles.append((cand, env.prefabs(cand, full=True)))
+            except Exception as e:
+                log(f'  FAIL skins {uid}: {cand}: {e!r}')
+        if not bundles:
+            log(f'  skins {uid}: no {rel} in any --skin-bundles root — {len(cat)} catalogue skin(s) left out')
             return set()
         added = set()
         for sk in cat:
             try:
-                added |= catalogue_skin(env, uid, u, rel, prefabs, sk)
+                added |= catalogue_skin(env, uid, u, bundles, sk)
             except Exception as e:                  # a skin never costs the unit its default effects
                 log(f'  FAIL skin {sk["id"]}: {e!r}')
         return added
 
-    def catalogue_skin(env, uid, u, rel, prefabs, sk):
+    def catalogue_skin(env, uid, u, bundles, sk):
         """One catalogue skin's entry (catalogue_skins); returns the effect keys it adds."""
         end = skin_prefab_container(sk['officialId'])
-        path = next((p for p in prefabs if p.lower().endswith(end)), None)
-        if path is None:
-            log(f'  skins {sk["id"]}: no battle prefab …{end} in {rel} (left out)')
+        hit = None
+        for rel, prefabs in bundles:
+            path = next((p for p in prefabs if p.lower().endswith(end)), None)
+            if path is not None:
+                hit = (rel, prefabs, path)
+                break
+        if hit is None:
+            log(f'  skins {sk["id"]}: no battle prefab …{end} in any of {len(bundles)} bundle(s) (left out)')
             return set()
+        rel, prefabs, path = hit
         pts = skin_points(env, rel, None, u.get('graphic'), container=path) or {}
         cfg = skin_behaviour(env, prefabs[path])
         replace, fakes, _ = skin_swaps(cfg.get('_replaceEffectPairs'), cfg.get('_fakeProjectileConfigs'),
@@ -3325,15 +3340,27 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
         if any(u.startswith('enemy_') for u in unit_ids) else {}
     token_idx = container_index(ab_root, (TOKEN_GLOB,), root / '.cache/fx/tokens.json', jobs, log) \
         if any(not u.startswith(('char_', 'enemy_')) for u in unit_ids) else {}
-    skin_root = Path(skin_bundles).resolve() if skin_bundles and gd['skins'] else None
+    # `skin_bundles` may be several AB roots (extract.py --skin-bundles is repeatable): the client keeps some
+    # skinpacks in StreamingAssets and the newest ones in PersistentData, so a skin is looked up in each in order.
+    roots = []
+    if skin_bundles and gd['skins']:
+        raw = skin_bundles if isinstance(skin_bundles, (list, tuple)) else [skin_bundles]
+        for i, cand in enumerate(raw):
+            if not cand:
+                continue
+            roots.append((i, Path(cand).resolve()))
+    skin_roots = [r for _, r in roots]
     skin_eff = {}
-    if skin_root is not None:
-        skin_eff = {k: rel for k, rel in container_index(skin_root, EFFECT_GLOBS, root / '.cache/fx/skin-effects.json',
-                                                         jobs, log).items() if k not in eff}
-        log(f'fx: skins: {len(skin_eff)} effect prefabs only in {skin_root}, '
-            f'{sum(1 for p in skin_root.glob(SKINPACK.format("*")))} skinpacks there')
+    for i, r in roots:
+        # absolute, so a key found under the second root still loads through (skin_roots[0] / <abs> == <abs>)
+        got = {k: str(r / rel) for k, rel in container_index(r, EFFECT_GLOBS, root / f'.cache/fx/skin-effects-{i}.json',
+                                                             jobs, log).items() if k not in eff and k not in skin_eff}
+        if got:
+            log(f'fx: skins: {len(got)} effect prefabs only in {r}, '
+                f'{sum(1 for p in r.glob(SKINPACK.format("*")))} skinpacks there')
+        skin_eff.update(got)
     units, projectiles, skills, skins, referenced = crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log,
-                                                                skin_root, skin_eff)
+                                                                skin_roots, skin_eff)
     timings['units'] = time.time() - t0
     cat = [sk for v in gd['skins'].values() for sk in v]
     if cat:
@@ -3349,7 +3376,7 @@ def export_fx(ab_root, out_root, manifest, log, selection='sample', keys=None, j
     else:                         # the used set holds the sample too (a full run never drops a key a sample has)
         wanted = set(FX_SAMPLE_KEYS) | set(FX_COVERAGE_KEYS) | referenced | generic
     where = {k: (ab_root, rel) for k, rel in eff.items()}
-    where.update({k: (skin_root, rel) for k, rel in skin_eff.items()})   # only keys the client lacks
+    where.update({k: (skin_roots[0] if skin_roots else None, rel) for k, rel in skin_eff.items()})   # only keys the client lacks
     missing = sorted(k for k in wanted if k not in where)
     for k in missing:
         log(f'  skip (no such effect prefab in this client) {k}')
