@@ -43,12 +43,17 @@
 /* a match with gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark */
 .gtop__mod { pointer-events: auto; }
 /* the latency pill and, beside it, the 观战席 capsule (ui/hud.js SpectatorPill: an eye + how many are watching; opens the roster) */
-.gtop__net { display: inline-flex; align-items: stretch; gap: 0; height: .32rem;
-  border: 1px solid var(--line); background: rgba(0, 0, 0, .5); }
-/* 界面#11: 已连接 / 延迟 / 服务 read as one strip instead of three chips of different sizes */
-.gtop__net > * { height: 100%; border: 0; border-radius: 0; background: transparent; }
-.gtop__net > * + * { border-left: 1px solid var(--line); }
-.gtop__net .ping, .gtop__net .specpill { --btn-bg: transparent; --btn-bg-hover: rgba(255, 255, 255, .05); --btn-bd: transparent; padding-inline: .12rem; }
+/* 界面#12: one rounded pill like the official HUD — signal icon + "35 ms", then the service glyph. The words
+   已连接 / 服务 正常 move into the tooltips (the dot and the icon keep their colours), so the pill is one line. */
+.gtop__net { display: inline-flex; align-items: center; gap: .1rem; height: .32rem; padding: 0 .12rem;
+  border: 1px solid var(--line); border-radius: 99px; background: rgba(0, 0, 0, .5); }
+.gtop__net > * { height: auto; border: 0; border-radius: 0; background: transparent; }
+.gtop__net > * + * { border-left: 0; }
+.gtop__net .ping, .gtop__net .specpill { --btn-bg: transparent; --btn-bg-hover: rgba(255, 255, 255, .05); --btn-bd: transparent; padding-inline: 0; }
+.gtop__net .connection-status { display: none; }
+.gtop__net .server-load { display: none; }
+.gtop__net .server-load-button { width: auto; padding: 0; }
+.gtop__net .server-load__icon { width: .17rem; height: .17rem; }
 .specpill { --btn-bg: rgba(0, 0, 0, .5); --btn-bg-hover: rgba(0, 0, 0, .66); --btn-bd: var(--line); height: .32rem; min-width: 0; padding: 0 .12rem; gap: .05rem; border-radius: 99px; }
 .specpill .btn__icon { width: .18rem; height: .18rem; color: var(--mint-500); }
 .specpill__num { font-size: .18rem; font-weight: 700; color: var(--mint-400); }
