@@ -3297,5 +3297,7 @@
   "叙拉古·脱隐后触发窗口": "Siracusa · Post-stealth proc window",
   "{n} 层 · 下一层 {s} 秒": "{n} stacks · Next expiry in {s}s",
   "剩余 {s} 秒": "{s}s remaining",
-  "还剩 {n} 人未选": "{n} still choosing"
+  "还剩 {n} 人未选": "{n} still choosing",
+  "剩余 {n} 张": "{n} left in pool",
+  "卡池中还剩 {n} 张": "{n} more copies in the pool"
 }

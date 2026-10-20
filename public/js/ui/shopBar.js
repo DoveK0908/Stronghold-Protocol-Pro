@@ -132,6 +132,8 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         <span>${c?.subProfessionName || ''}</span>
       </span>
     </span>
+    ${Number.isFinite(slot.left) ? html`<span class="scard__left" data-left=${slot.left}
+      title=${t('卡池中还剩 {n} 张', { n: slot.left })}>${t('剩余 {n} 张', { n: slot.left })}</span>` : null}
     ${willMerge ? html`<span class="scard__mergetag" title=${hint}>${t('可晋升')}</span>` : null}
     ${frozen ? html`<span class="scard__ice" aria-hidden="true"><${Icon} name="snow" /></span>` : null}
     ${armed ? html`<${ArmedTag} reason=${reason} free=${free} />` : null}

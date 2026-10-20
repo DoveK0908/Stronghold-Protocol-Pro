@@ -63,7 +63,12 @@ export class PlayerViews {
   }
 
   privateView() {
-    const slots = this.shop.slots.map((s) => (s ? { kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen } : null));
+    // U08 卡池剩余 (界面#08): a chess card shows how many copies of it are left in the pool this player draws from —
+    // the shared pool, a 分卡池 group's pool (m.playerPools) or the own 自选 stock; ps.poolOf routes all three.
+    const slots = this.shop.slots.map((s) => (s ? {
+      kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen,
+      ...(s.kind === 'chess' ? { left: this.poolOf(s.id).left(s.id) } : {}),
+    } : null));
     const offer = this.offers[0] || null;
     const free = this.shop.freeRefreshes > 0;
     const board = [];
