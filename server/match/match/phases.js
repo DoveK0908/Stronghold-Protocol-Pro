@@ -1,3 +1,5 @@
+import { isArturia, BAND as ARTURIA_BAND } from '../arturia/index.js';
+import { isLavinia, BAND as LAVINIA_BAND } from '../lavinia/index.js';
 // server/match/match/phases.js — Match methods: the round flow up to the prep — INFO_CHECK, the strategy draft
 // (BAND_DRAFT: one countdown of BAND_TURN_SECONDS per turn, 队友已选, the highlighted strategy on a timeout, skips),
 // BATTLE_CHECK and ROUND_START (the round's enemies — a normal wave or the boss pairing — planned before the players'
@@ -47,6 +49,9 @@ export class MatchPhases {
     let order = this.order.map((p) => p.playerId);
     if (!this.isSolo) this.rngDraft.shuffle(order);
     order = this.humansFirst(order);
+    // a named elite teammate commits first even with aiPicksLast; everyone else keeps their order
+    const elite = (pid) => isArturia(this, this.players.get(pid)) || isLavinia(this, this.players.get(pid));
+    order = [...order.filter(elite), ...order.filter((pid) => !elite(pid))];
     const concurrent = this.concurrentDraft();
     const skips = this.isSolo || concurrent ? 0 : this.gd.bandDraft.skipsPerPlayer;
     const untimed = this.soloUntimed;
@@ -217,6 +222,10 @@ export class MatchPhases {
    * participants/survivors (nothing is held there either: the AI seat takes its strategy all the same).
    */
   bandTaken(bandId, playerId) {
+    // a named elite's band is reserved for that persona on every path (explicit, timeout, default)
+    const others = this.order.filter((ps) => ps.playerId !== playerId);
+    if (bandId === ARTURIA_BAND && others.some((ps) => isArturia(this, ps))) return true;
+    if (bandId === LAVINIA_BAND && others.some((ps) => isLavinia(this, ps))) return true;
     if (this.capacityExperiment) return false;
     const picks = this.draft?.picks || {};
     for (const [pid, id] of Object.entries(picks)) if (pid !== playerId && id === bandId) return true;
@@ -257,6 +266,9 @@ export class MatchPhases {
    * @param {string} playerId
    */
   defaultBand(playerId) {
+    const elite = this.players.get(playerId);
+    if (isArturia(this, elite)) return ARTURIA_BAND;
+    if (isLavinia(this, elite)) return LAVINIA_BAND;
     const def = this.gd.bandDraft.timeoutBandId;
     if (!this.bandTaken(def, playerId) && (!this.disableDuckLord || this.gd.bandAllowed(def))) return def;
     return this.gd.bandIds().find((b) => !this.bandTaken(b, playerId)) || (this.disableDuckLord ? this.gd.defaultBandId : def);

@@ -3320,5 +3320,8 @@
   "大厅音乐音量": "Lobby music volume",
   "展开": "Expand",
   "音量": "Volume",
-  "浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传": "Browsers cannot play MIDI files — convert it to MP3, WAV or OGG first."
+  "浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传": "Browsers cannot play MIDI files — convert it to MP3, WAV or OGG first.",
+  "添加精英干员": "Add elite operator",
+  "阿尔图罗": "Arturia",
+  "拉维妮娅": "Lavinia"
 }

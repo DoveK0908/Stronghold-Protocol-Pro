@@ -560,7 +560,7 @@ export const C2S = {
   // the strategy an AI seat takes in the strategy draft (host, co-op, before the match; server/lobby.js setBotBand): a
   // band id, absent / null = the AI picks by itself; room.state seats[].band
   'room.setBotBand': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1), bandId: nullable(isId), $optional: ['bandId'] },
-  'room.addBot': {},
+  'room.addBot': { persona: optional((v) => v === 'arturia' || v === 'lavinia') },
   'room.removeBot': { seat: (v) => isInt(v, 0, MAX_PLAYER_CAPACITY - 1) },
   // the host removes another human before the match (server/lobby.js kick; community report #17); playerId = the one the
   // host confirmed — a seat that changed hands meanwhile is refused

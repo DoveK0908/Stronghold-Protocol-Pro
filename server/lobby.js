@@ -483,6 +483,7 @@ export class Room {
         ? { seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, ready: s.ready, connected: s.connected && !s.left, revivalVote: s.isBot ? null : s.revivalVote ?? null,
           // an AI seat's designated strategy (room.setBotBand; null = it picks by itself)
           ...(s.isBot ? { band: s.band ?? null } : {}),
+          ...(s.isBot && s.botPersona ? { botPersona: s.botPersona } : {}),
           // display only: the player's room.card and the 服主 mark (absent when none)
           ...(!s.isBot && s.card ? { card: s.card } : {}), ...(!s.isBot && s.owner ? { owner: true } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
@@ -939,7 +940,7 @@ export class Lobby {
       case 'room.setDifficulty': return this.setDifficulty(session, msg);
       case 'room.setAiPicksLast': return this.setAiPicksLast(session, msg);
       case 'room.setBotBand': return this.setBotBand(session, msg);
-      case 'room.addBot': return this.addBot(session);
+      case 'room.addBot': return this.addBot(session, msg);
       case 'room.removeBot': return this.removeBot(session, msg);
       case 'room.kick': return this.kick(session, msg);
       case 'room.start': return this.start(session);
@@ -1274,6 +1275,8 @@ export class Lobby {
     if (room.match) return fail(ERR.ROOM_STARTED);
     if (this.roomQueued(room)) return fail(ERR.QUEUED);
     this.dropReplay(room, session.playerId);
+    // 标准模拟 (FUNNY) statically disables the Laterano/Siracusa named-elite rules: do not switch to it with one seated
+    if (difficulty === 'FUNNY' && room.seats.some((x) => x?.botPersona)) return fail(ERR.BAD_TARGET);
     // a plugin mode chosen (header "Gameplay plugins") carries its own difficulty: picking one leaves it
     if (room.difficulty !== difficulty || room.content?.modeId) {
       room.difficulty = difficulty;
@@ -1503,7 +1506,7 @@ export class Lobby {
     return OK;
   }
 
-  addBot(session) {
+  addBot(session, { persona } = {}) {
     const room = this.roomOf(session);
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
@@ -1515,11 +1518,18 @@ export class Lobby {
     if (idx < 0) return fail(ERR.ROOM_FULL);
     const capped = this.botCapRefusal(room, session);
     if (capped) return capped;
+    if (persona !== undefined && !['arturia', 'lavinia'].includes(persona)) return fail(ERR.BAD_TARGET);
+    if (persona && room.seats.some((s) => s?.botPersona === persona)) return fail(ERR.ALREADY);
+    // the named elite policies fight with their own band, which the standard FUNNY mode disables
+    if (persona && room.difficulty === 'FUNNY') return fail(ERR.BAD_TARGET);
+    if (persona && room.modded) return fail(ERR.BAD_TARGET);
     const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
-    const name = BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
+    const name = persona === 'arturia' ? 'AI·阿尔图罗' // i18n-ignore: player name
+      : persona === 'lavinia' ? 'AI·拉维妮娅' // i18n-ignore: player name
+      : BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
     let playerId;
     do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
-    room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false, band: null };
+    room.seats[idx] = { seat: idx, playerId, name, isBot: true, ready: true, connected: true, left: false, band: null, ...(persona ? { botPersona: persona } : {}) };
     this.broadcastState(room);
     return OK;
   }
@@ -1572,6 +1582,8 @@ export class Lobby {
     if (this.maintenance()) return fail(ERR.MAINTENANCE);
     if (this.roomQueued(room)) return fail(ERR.QUEUED);
     if (!room.validCapacity() || !this.capacityClients(room)) return fail(ERR.BAD_MSG);
+    // re-checked at start: the room may have changed difficulty or plugins after the elite seat joined
+    if (room.seats.some((x) => x?.botPersona) && (room.difficulty === 'FUNNY' || room.modded)) return fail(ERR.BAD_TARGET);
     const humans = room.activeHumans();
     if (room.content?.trusted && humans.some(s => s.consentCs !== room.content.cs)) return fail(ERR.PLUGIN_CONSENT);
     for (const s of humans) {
@@ -2062,6 +2074,7 @@ export class Lobby {
       const own = s.isBot ? null : this.seatSettings(room, s, data);
       return {
         seat: s.seat, playerId: s.playerId, name: s.name, isBot: s.isBot, connected: s.connected,
+        ...(s.botPersona ? { botPersona: s.botPersona } : {}),
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
         ops: own ? own.ops : null,

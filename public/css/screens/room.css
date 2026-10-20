@@ -436,3 +436,13 @@
 .trusted-banner { position: fixed; top: 0; left: 0; right: 0; z-index: 90; padding: 5px 16px; background: #9b202b; color: #fff; display: flex; justify-content: space-between; gap: 12px; }
 .trusted-banner button { color: inherit; text-decoration: underline; }
 .trusted-hash { overflow-wrap: anywhere; font-family: monospace; }
+
+/* named elite AI (ADDON: elite AI port) — the second button under 添加 AI 队友 in an empty seat */
+.rseat__adds { display: flex; flex-direction: column; gap: .05rem; }
+.elite-recruit { position: relative; }
+.elite-recruit__menu { position: absolute; left: 0; right: 0; bottom: calc(100% + .04rem); z-index: 6; display: flex;
+  flex-direction: column; gap: .03rem; padding: .04rem; border: 1px solid var(--line-2); background: var(--bg-1, #0b0e0d); }
+.elite-recruit__menu button { padding: .05rem .08rem; text-align: left; border: 1px solid transparent; background: transparent;
+  color: var(--ink-0); font-size: calc(.115 * var(--t)); cursor: pointer; }
+.elite-recruit__menu button:hover:not(:disabled), .elite-recruit__menu button:focus-visible { border-color: var(--mint-700); }
+.elite-recruit__menu button:disabled { opacity: .45; cursor: default; }
