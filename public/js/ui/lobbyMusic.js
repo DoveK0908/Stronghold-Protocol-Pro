@@ -36,6 +36,8 @@ async function saved(write, value, key = 'lobby') {
 async function validate(file, maxSeconds = 0) {
   if (!file || file.size <= 0) throw Error(t('请选择有效的音频文件'));
   if (file.size > MAX_MUSIC_BYTES) throw Error(t('音乐不能超过 20MB，请选择较小的文件'));
+  // MIDI is not a browser-playable audio file: the <audio> probe cannot decode it, so say why instead of a silent no-op
+  if (/\.(mid|midi|rmi|kar)$/i.test(file.name || '') || /audio\/(midi|x-midi)$/i.test(file.type || '')) throw Error(t('浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传'));
   if (!/\.(mp3|wav|ogg|m4a|aac|flac|webm)$/i.test(file.name || '') || (file.type && !file.type.startsWith('audio/') && file.type !== 'video/webm' && file.type !== 'application/ogg')) throw Error(t('请选择 MP3、M4A、OGG、WAV 等音频文件'));
   const objectUrl = URL.createObjectURL(file), probe = new Audio(); probe.preload = 'metadata';
   try {
@@ -184,7 +186,7 @@ function BgmPick({ kind, label, value, options, onPick, busy, action }) {
     </label>
     ${value === 'custom' ? html`<div style="display:flex;align-items:center;gap:8px;padding-left:calc(4.5em + 10px);min-width:0">
       <small data-testid=${`bgm-${kind}-file`} style="flex:1;min-width:0;font-size:12px;overflow-wrap:anywhere;color:${name ? 'var(--mint,#58d9b5)' : 'var(--muted)'}">${name || t('未选择文件')}</small>
-      <input ref=${input} type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav,.aac,.flac,.webm" hidden onChange=${(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) action(() => matchMusic.upload(kind, file)); }} />
+      <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden onChange=${(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) action(() => matchMusic.upload(kind, file), 'error'); }} />
       <${Button} size="sm" disabled=${busy} onClick=${() => input.current?.click()}>${busy ? t('正在导入…') : name ? t('更换') : t('选择文件')}<//>
       ${name ? html`<${Button} size="sm" variant="secondary" disabled=${busy} onClick=${() => action(async () => { await matchMusic.remove(kind); onPick('official'); })}>${t('清除')}<//>` : null}
     </div>` : null}
@@ -221,7 +223,7 @@ export function LobbyMusicButton() {
           <strong style="display:block;font-size:15px;overflow-wrap:anywhere">${state.name||t('默认大厅音乐')}</strong>
           <small style="display:block;font-size:12px;margin-top:8px;color:var(--mint,#58d9b5)">${t(state.status)}${state.size?` · ${(state.size/1024/1024).toFixed(1)} MB`:''}</small>
         </div>
-        <input ref=${input} type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav,.aac,.flac,.webm" hidden onChange=${e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';if(file)action(()=>music.upload(file));}} />
+        <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden onChange=${e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value='';if(file)action(()=>music.upload(file));}} />
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <${Button} disabled=${state.busy} onClick=${()=>input.current?.click()}>${state.busy?t('正在导入…'):t('上传音乐')}<//>
           <${Button} disabled=${!state.name||state.busy} onClick=${()=>action(()=>music.toggle())}>${state.playing?t('暂停'):t('播放')}<//>

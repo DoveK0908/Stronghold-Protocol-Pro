@@ -31,6 +31,7 @@ const ICON = { prev: '◀◀', next: '▶▶', play: '▶', pause: '❚❚', fol
 export function LobbyMusicPanel() {
   const s = useSettings();
   const [state, setState] = useState(() => music.snapshot());
+  const [uploadError, setUploadError] = useState('');
   const input = useRef(null);
   const open = s.lobbyMusicOpen !== false;
   const pick = s.lobbyTrack || 'official';
@@ -102,8 +103,16 @@ export function LobbyMusicPanel() {
         <small>${state.name || t('未选择文件')}</small>
         <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${state.name ? t('更换') : t('选择文件')}<//>
       </div>` : null}
-      <input ref=${input} type="file" accept="audio/*,.mp3,.m4a,.ogg,.wav,.aac,.flac,.webm" hidden
-        onChange=${(e) => { const file = e.currentTarget.files?.[0]; e.currentTarget.value = ''; if (file) music.upload(file).catch(() => {}); }} />
+      ${custom && uploadError ? html`<p class="lobmusic__note is-bad" data-testid="lobby-upload-error">${uploadError}</p>` : null}
+      <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden
+        onChange=${(e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (!file) return;
+          setUploadError('');
+          // surface the reason (a MIDI file, too large, not decodable) instead of swallowing the rejection
+          music.upload(file).catch((err) => setUploadError(err?.message || t('音乐导入失败')));
+        }} />
     </div>` : null}
   </section>`;
 }

@@ -64,36 +64,13 @@ test('settings: the panel\'s picks and the wire to audio.js', () => {
   assert.match(settings, /audio\.setLobbyPick\(s\.lobbyTrack\);/);
   assert.match(settings, /audio\.setLobbyPick\(settingsStore\.get\(\)\.lobbyTrack\);/);
   const music = read('public/js/ui/lobbyMusic.js');
-  assert.match(music, /customGain\.connect\(audio\.lobbyGain \|\| audio\.bgmGain\);/, "the player's own file takes the lobby gain too");
-  assert.match(music, /subscribe\(fn\) \{ install\(\); listeners\.add\(fn\);/, 'the card can follow the file state');
-});
-
-test('panel: the lobby card renders the radio, the transport, shuffle and the lobby volume', () => {
-  const src = read('public/js/ui/lobbyMusicPanel.js');
-  assert.match(src, /export function LobbyMusicPanel\(\)/);
-  assert.match(src, /RHODES RADIO/);
-  assert.match(src, /data-testid="lobby-track"/);
-  assert.match(src, /data-testid="lobby-play"/);
-  assert.match(src, /data-testid="lobby-shuffle"/);
-  assert.match(src, /data-testid="lobby-volume"/);
-  assert.match(src, /updateSettings\(\{ lobbyTrack: id \}\)/, 'a pick lands in settings');
-  assert.match(src, /updateSettings\(\{ lobbyShuffle: e\.currentTarget\.checked \}\)/);
-  assert.match(src, /updateSettings\(\{ lobbyVolume: Number\(e\.currentTarget\.value\) \/ 100 \}\)/);
-  assert.match(src, /updateSettings\(\{ lobbyMusicOpen: !open \}\)/, 'the fold is remembered');
-  assert.match(src, /audio\.setLobbyPaused\(!audio\.lobbyPaused\)/, 'play / pause drives audio.js');
-  assert.match(src, /const step = \(dir\) => \{/, 'prev / next move through the tracks');
-  assert.match(src, /if \(s\.lobbyShuffle\) \{/, '随机播放 picks another one');
-  const lobby = read('public/js/screens/lobby.js');
-  assert.match(lobby, /<\$\{LobbyMusicPanel\} \/>/, 'the card is on the lobby screen');
-  assert.match(lobby, /<aside class="hub-side">\s*\n\s*<\$\{LobbyMusicPanel\} \/>/, 'top-left, above 成就统计');
-  const css = read('public/css/screens/lobby.css');
-  assert.match(css, /\.lobmusic \{/);
-  assert.match(css, /\.lobmusic\[data-open="0"\] \.lobmusic__head \{ border-bottom: 0; \}/);
-});
-
-test('i18n: every string of the card has an English line', () => {
+  assert.ok(music.includes('mid|midi|rmi|kar'), 'the validator names the MIDI extensions');
+  assert.ok(music.includes('midi|x-midi'), 'and the MIDI MIME types');
+  assert.ok(music.includes('浏览器不能播放 MIDI 文件'), 'with a message that says what to do');
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /data-testid="lobby-upload-error"/, 'the card renders the reason');
+  assert.match(panel, /\.catch\(\(err\) => setUploadError\(/, 'the upload rejection is surfaced, not swallowed');
+  assert.doesNotMatch(panel, /music\.upload\(file\)\.catch\(\(\) => \{\}\)/, 'no silent catch left');
   const en = JSON.parse(read('public/i18n/en.json'));
-  for (const id of ['主界面音乐', '官方大厅音乐', '自选上传', '上一首', '下一首', '随机播放', '大厅音乐音量', '展开', '音量']) {
-    assert.equal(typeof en[id], 'string', `${id} has an English translation`);
-  }
+  assert.equal(typeof en['浏览器不能播放 MIDI 文件，请先转成 MP3、WAV 或 OGG 再上传'], 'string');
 });

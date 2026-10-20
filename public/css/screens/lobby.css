@@ -2808,6 +2808,8 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .lobmusic__vol span { flex: none; }
 .lobmusic__vol input { flex: 1 1 auto; min-width: 0; height: .16rem; accent-color: var(--mint-500); }
 .lobmusic__vol b { flex: none; min-width: .26rem; padding-right: .02rem; text-align: right; font: 700 .1rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__note { margin: .02rem 0 0; font-size: calc(.095 * var(--t)); line-height: 1.35; }
+.lobmusic__note.is-bad { color: var(--danger, #ef6a6a); }
 .lobmusic__file { display: flex; align-items: center; gap: .08rem; min-width: 0; }
 .lobmusic__file small { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: .1rem; color: var(--text-dim); }
