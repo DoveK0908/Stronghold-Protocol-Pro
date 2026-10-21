@@ -105,21 +105,12 @@
 .gtop__half .lp--lg { font-size: .32rem; gap: .03rem; }
 .gtop__half .lp--lg:not(.lp--danger):not(.lp--team) .lp__val { color: #eef2f2; }
 .gtop__half .lp--lg .lp__icon { width: .34rem; height: .34rem; }
-/* the capsule plate: a grey outer frame, then the capsule's own bevelled 2 px outline in its phase colour */
-.gtop__cap { position: relative; z-index: 2; display: flex; padding: .08rem .13rem; }
-.gtop__cap::before, .gtop__cap::after { content: ''; position: absolute; pointer-events: none;
-  clip-path: polygon(.2rem 0, calc(100% - .2rem) 0, 100% .2rem, 100% calc(100% - .2rem), calc(100% - .2rem) 100%, .2rem 100%, 0 calc(100% - .2rem), 0 .2rem); }
-.gtop__cap::before { inset: 0; background: rgba(176, 184, 186, .5); }
-.gtop__cap::after { inset: 1px; background: rgba(9, 12, 12, .9); }
-.gtop__cap .capsule { position: relative; z-index: 1; isolation: isolate; justify-content: center; height: .54rem; min-width: 2.12rem; padding: 0 .28rem 0 .2rem;
-  border: 0; border-radius: 0; box-shadow: none; background: var(--cap);
-  clip-path: polygon(.15rem 0, calc(100% - .15rem) 0, 100% .15rem, 100% calc(100% - .15rem), calc(100% - .15rem) 100%, .15rem 100%, 0 calc(100% - .15rem), 0 .15rem); }
-.gtop__cap .capsule::before { content: ''; position: absolute; inset: 2px; z-index: -1;
-  background: linear-gradient(180deg, #0f1c19, #0a1412);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--cap) 14%, #0b1513), #0a1412);
-  clip-path: polygon(.14rem 0, calc(100% - .14rem) 0, 100% .14rem, 100% calc(100% - .14rem), calc(100% - .14rem) 100%, .14rem 100%, 0 calc(100% - .14rem), 0 .14rem); }
-.gtop__cap .capsule__icon { width: .4rem; height: .4rem; }
-.gtop__cap .capsule--prep .capsule__label { font-size: .28rem; letter-spacing: .1em; color: var(--mint-400); }
+/* 顶栏中段对齐官方后不再用 Pro 的八边形胶囊底板：直接露出官方 .capsule（圆角、2px 阶段色边框）。 */
+.gtop__cap { position: relative; display: flex; }
+.gtop__cap .capsule { height: .5rem; min-width: 2.2rem; }
+.gtop__cap .capsule__icon { width: .36rem; height: .36rem; }
+.gtop__cap .capsule__label { font-size: .21rem; letter-spacing: .12em; }
+.gtop__cap .capsule--prep .capsule__label { color: var(--text-hi); }
 .gtop__cap .capsule--boss { min-width: 4.2rem; }
 .gtop__cap .capsule--unite { --cap: #ff6d2e; }
 .gtop__cap .capsule--combat .capsule__kills { color: #eef1f1; }
@@ -1478,15 +1469,16 @@
    wrapper itself must not (it sits over the top bar; a later duplicate `.gm__hud > *` rule re-enabled it). */
 .gm__hud > .chud { pointer-events: none; }
 
-/* ---- 预览：把顶栏对齐官方 0.3.2 dev（单个大括号 + 单胶囊状态条）；维护者选定后再清理 ---- */
-.gtop__center.brackets { padding: 0 .1rem; gap: .1rem; }
-.gtop__center.brackets .roundbox__num { background: #e8ece9; color: #0d1110; border-radius: .04rem; padding: 0 .07rem; }
-.gtop__center.brackets .gtop__cap { margin-inline: .02rem; }
+/* ---- 顶栏中段按官方 0.3.2 dev 对齐（一个大括号 + 官方胶囊 + 白底回合数）；左上状态条保持我们的 ---- */
+.gtop__center.brackets {
+  gap: .18rem; height: .78rem; padding: 0 .24rem 0 .14rem;
+  background: linear-gradient(180deg, rgba(10, 14, 12, .92), rgba(10, 14, 12, .78));
+  border: 1px solid var(--line);
+  box-shadow: 0 .08rem .28rem rgba(0, 0, 0, .45);
+}
 .gtop__speed { display: none; }
-.gtop__center.brackets .capsule, .gtop__center.brackets .capsule::before { clip-path: none; border-radius: 99px; }
-.gtop__center.brackets .capsule { min-width: 1.9rem; height: .5rem; padding: 0 .22rem 0 .16rem; }
-.gtop__center.brackets .capsule__icon { width: .34rem; height: .34rem; }
-.gtop__center.brackets .capsule--prep .capsule__label { font-size: .24rem; letter-spacing: .08em; }
+/* 本局信息那个按钮官方是 48px 图标版；我们的贴图版 .555rem 宽出 8px，压回 48 并等比留边 */
+.gtop__center.brackets > .tt-anchor:first-child .gtop__iconbtn.has-sprite { width: .48rem; background-size: contain; }
 
 /* 设置里的语言区：按官方布局——语言下拉在标签右侧同一行、配音选项是紧凑的三列网格（末格是本土语言）。 */
 .set-list .language-options { gap: .02rem; }
