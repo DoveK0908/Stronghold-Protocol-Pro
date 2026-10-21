@@ -67,8 +67,11 @@ export function lookOptions(m, charId, kind) {
   const e2 = str(c[`${kind}E2`]);
   const out = e2 ? [{ id: '', name: N_('精英二'), src: e2 }, { id: 'e1', name: N_('精英一'), src: str(c[kind]) }]
     : [{ id: '', name: N_('精英一'), src: str(c[kind]) }];
-  const skins = m.skins && typeof m.skins === 'object' ? m.skins : {};
-  for (const [id, s] of Object.entries(skins)) if (s && s.charId === charId && str(s[kind])) out.push({ id, name: s.name || id, src: s[kind], skin: true });
+  // 皮肤在 data/assets.json 里挂在 chars[charId].skins 下（顶层 m.skins 只有老清单才有）
+  const flat = m.skins && typeof m.skins === 'object' ? m.skins : {};
+  for (const [id, s] of Object.entries(flat)) if (s && s.charId === charId && str(s[kind])) out.push({ id, name: s.name || id, src: s[kind], skin: true });
+  const nested = c.skins && typeof c.skins === 'object' ? c.skins : {};
+  for (const [id, s] of Object.entries(nested)) if (s && str(s[kind])) out.push({ id, name: s.name || id, src: s[kind], skin: true });
   return out;
 }
 
