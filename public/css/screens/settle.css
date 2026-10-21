@@ -367,6 +367,9 @@ span.settle__nexticon .icon { width: .3rem; height: .3rem; }
 .sbtn--ghost .icon { width: .3rem; height: .3rem; padding: .03rem; border-radius: .05rem; background: #e2e8e6; color: #2a2f2e; }
 .sbtn--primary { left: 15.12rem; width: 4.08rem; background: transparent; color: #062a20; font-size: calc(.38 * var(--t)); font-weight: 700; letter-spacing: .04em; }
 .sbtn__mark { width: .44rem; height: .38rem; }
+/* 结算返回按钮：用图标而不是提取出来的黑字形贴图，黑底薄荷箭头（与官方观感一致） */
+.settle__back .sbtn__mark { display: grid; place-items: center; background: #0d1110; border-radius: .06rem; color: var(--mint-400); }
+.settle__back .sbtn__mark svg, .settle__back .sbtn__mark .icon { width: .3rem; height: .3rem; transform: scaleX(-1); }
 .sbtn--primary .icon { width: .34rem; height: .34rem; }
 .sbtn:hover, .sbtn:focus-visible { filter: brightness(1.14); outline: none; }
 .sbtn:focus-visible { box-shadow: inset 0 0 0 3px #fff; }

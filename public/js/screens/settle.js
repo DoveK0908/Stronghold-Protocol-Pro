@@ -496,7 +496,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext }) {
       ${Array.isArray(milestones) && milestones.length ? html`<${LevelStrip} prog=${prog} milestones=${milestones} />` : null}
       <button type="button" ref=${nextRef} class="settle__next" onClick=${next}>
         <${SettleButtonArt} />
-        <${Sprite} k="settle/next_icon" class="settle__nexticon" fallback=${html`<span class="settle__nexticon"><${Icon} name="chevronRight" /></span>`} /><span>${t('下一步')}</span>
+        <span class="settle__nexticon"><${Icon} name="chevronRight" /></span><span>${t('下一步')}</span>
       </button>
     </div>
   </section>`;
@@ -593,7 +593,7 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
         <${SettleButtonArt} ghost=${true} /><${Icon} name="chart" /><span>${t('数据详情')}</span></button>
       <button type="button" ref=${backRef} class="sbtn sbtn--primary settle__back" onClick=${onBack}>
         <${SettleButtonArt} />
-        <${Sprite} k="settle/btn_back_icon_01" class="sbtn__mark" fallback=${html`<${Icon} name="chevronLeft" />`} /><span>${backLabel}</span></button>
+        <${Icon} name="exit" class="sbtn__mark" /><span>${backLabel}</span></button>
       <div class="ui-slot steam__slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>
     </div>
   </section>`;
