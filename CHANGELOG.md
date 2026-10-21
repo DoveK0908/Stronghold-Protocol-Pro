@@ -1,3 +1,22 @@
+## 0.3.2-pro.3 — 2026-10-21
+
+在 `0.3.2-pro.2` 之上：为「在 Linux 服务器上开服」做的适配，便携包根目录的文件名全部改成英文。
+
+### 工程与发布
+
+- 便携包根目录的启动脚本改成 ASCII 文件名，避免 Linux（区分大小写）、解压工具与网盘改名的坑：
+  `start-windows.bat`、`start-windows-sandbox.bat`、`start-linux.sh`、`start-linux-sandbox.sh`、`README-quickstart.md`。
+  包内说明同步改写，`README-quickstart.md` 里同时给出 Windows 与 Linux 的启动方式。
+- 便携包新增 **`LINUX.md`**：面向完全没接触过 Linux 的新手，按阿里云 Ubuntu 24.04 从装 Node 24、上传文件、
+  放行安全组、前台试跑、systemd 常驻、更新、Nginx + HTTPS 到常见报错，一条条写出可复制的命令。
+  `docs/LINUX.md` 是同一份文件（仓库里也放一份，方便先看再下载）。
+- `docs/DEPLOY.md` 第 4 节加了一句指路，`docs/WINDOWS.md` 的文件名与「换机器」说明跟着改。
+
+### 说明
+
+- 便携包里的 `node/` 只有 Windows 版（`node.exe`）；Linux 上用系统的 Node 24，`start-linux.sh` 已经这么写。
+- 服务器目录建议 `/opt/stronghold`（示例），`state/` 里是存档、昵称与上传头像，换机器时一起带走。
+
 ## 0.3.2-pro.2 — 2026-10-21
 
 在 `0.3.2-pro.1` 之上：跟进官方 0.3.2 开发线到 `06a92237`，并把精英 AI 的阿尔图罗升级到 v0.2.0。

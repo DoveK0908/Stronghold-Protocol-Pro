@@ -84,7 +84,7 @@ describe('make-windows-bundle.mjs: --force 只肯删空目录或上一次的包'
 
       const bundle = path.join(base, 'bundle');
       await fsp.mkdir(path.join(bundle, 'app'), { recursive: true });
-      await fsp.writeFile(path.join(bundle, 'README-开箱即用.md'), '# x');
+      await fsp.writeFile(path.join(bundle, 'README-quickstart.md'), '# x');
       await fsp.writeFile(path.join(bundle, 'LICENSE'), 'x');
       assert.equal(forceDeleteVerdict(bundle), 'bundle');
     } finally {
@@ -109,7 +109,7 @@ describe('make-windows-bundle.mjs: --force 只肯删空目录或上一次的包'
       assert.equal(forceDeleteVerdict(half), 'refuse', '只有 app 没有说明：可能是别人的目录，不删');
       const half2 = path.join(base, 'half2');
       await fsp.mkdir(half2);
-      await fsp.writeFile(path.join(half2, 'README-开箱即用.md'), '# x');
+      await fsp.writeFile(path.join(half2, 'README-quickstart.md'), '# x');
       assert.equal(forceDeleteVerdict(half2), 'refuse', '只有说明没有 app：同样不删');
 
       const file = path.join(base, 'afile');

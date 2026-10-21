@@ -344,6 +344,10 @@ volumes:
 
 ## 4. macOS / Linux 常驻
 
+> **完全没用过 Linux、只是想照做开服**：看 [LINUX.md](LINUX.md)——按阿里云 Ubuntu 24.04 从零写到 systemd 与常见问题。
+> 便携包（Releases 的 zip）根目录也带一份 `LINUX.md`，不用回仓库找。
+
+
 - 临时开服：`scripts/start.sh`（或 `npm start`），保持终端窗口打开。macOS 首次会询问是否允许 node 接受传入连接，选「允许」。
 - Linux systemd（`/etc/systemd/system/stronghold.service`，路径与用户按实际修改）：
 

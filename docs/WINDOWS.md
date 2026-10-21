@@ -6,7 +6,7 @@
 ## 1. 这份包解决什么
 
 便携包只做一件事：**让这台 Windows 电脑当服务器**——包内自带 Node、素材与生产依赖，目标机器什么都不用装，
-双击 `启动游戏.bat` 就在本机开服并自动打开浏览器，控制台会打印可以发给朋友的局域网地址
+双击 `start-windows.bat` 就在本机开服并自动打开浏览器，控制台会打印可以发给朋友的局域网地址
 （自己玩、或和同宿舍/同办公室的朋友玩）。
 
 **连别人的服务器不需要这个包**：直接用浏览器打开对方的网址就行，和你在浏览器里输网址是同一件事，
@@ -30,7 +30,7 @@ node scripts/make-windows-bundle.mjs --node-version v24.21.0 --sha256 <64 位十
 ```
 
 `--out` 请给一个**专用目录**（像上面那样指到某个父目录下的子目录）。加 `--force` 时只会删掉两种情况：
-目录是空的，或者里面就是上一次打的便携包（包根有 `README-开箱即用.md` 和 `app\`）。
+目录是空的，或者里面就是上一次打的便携包（包根有 `README-quickstart.md` 和 `app\`）。
 其余情况一律拒绝并提示 —— 免得手滑把 `--out` 指到仓库、桌面或者其它有东西的目录上，`--force` 就把它们删了。
 指向仓库本身或仓库的上级目录时更是在第一步就被挡下来。
 
@@ -43,13 +43,13 @@ node scripts/make-windows-bundle.mjs --node-version v24.21.0 --sha256 <64 位十
 node\node.exe            官方 Windows x64 便携版 Node（版本与 sha256 钉在仓库里，只取 node.exe）
 node\LICENSE-node.txt    Node 自己的许可证（MIT，与 node.exe 出自同一个官方归档）
 app\                     游戏本体：代码 + 生产依赖 + public（全部素材）+ data，完全离线
-启动游戏.bat             app\scripts\launch.mjs --no-setup
-启动游戏-插件沙箱.bat    同上，加 --scripts sandbox（脚本插件在沙箱里运行）
-README-开箱即用.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
+start-windows.bat             app\scripts\launch.mjs --no-setup
+start-windows-sandbox.bat    同上，加 --scripts sandbox（脚本插件在沙箱里运行）
+README-quickstart.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 ```
 
-把整个文件夹拷到目标电脑 —— **什么都不用安装**，双击 `启动游戏.bat` 即可（等于 `app\scripts\launch.mjs --no-setup`：
+把整个文件夹拷到目标电脑 —— **什么都不用安装**，双击 `start-windows.bat` 即可（等于 `app\scripts\launch.mjs --no-setup`：
 素材已经在包里，跳过联网准备，直接起服务器并打开浏览器）。
 卸载＝删除文件夹（不写注册表、不放系统目录）。素材约 330 MB 是硬成本，包因此比较大。
 
@@ -81,13 +81,13 @@ zip 没有任何对应关系，复用就等于把坏文件发出去；系统临�
 Linux 上是这一档）→ Windows 自带的 `Expand-Archive`。
 
 关于 `--out` 与 `--force`：`--out` 指向**仓库本身或它的上级目录**时直接拒绝；即使指到别处，`--force` 也只会在
-「目录是空的」或「里面就是上一次打的便携包（包根有 `README-开箱即用.md` 和 `app\`）」时才删除，
+「目录是空的」或「里面就是上一次打的便携包（包根有 `README-quickstart.md` 和 `app\`）」时才删除，
 其它情况一律拒绝并不动那个目录 —— 路径比较挡不住大小写、符号链接、8.3 短名这些花样，所以规则是反着写的：
 只有能确认「这就是上次的产物」才动手。
 
 ## 4. 授权（发出去之前请确认你同意）
 
-便携包把整个游戏原样带给别人，所以包根会带上本项目的声明文件，包内 `README-开箱即用.md` 也完整重复了一遍：
+便携包把整个游戏原样带给别人，所以包根会带上本项目的声明文件，包内 `README-quickstart.md` 也完整重复了一遍：
 
 > [!IMPORTANT]
 > - 本项目是玩家自制的**非官方同人作品**，与上海鹰角网络科技有限公司（Hypergryph）、Yostar 及其关联方**没有任何关系**，未获其授权或认可。
@@ -104,7 +104,7 @@ Linux 上是这一档）→ Windows 自带的 `Expand-Archive`。
 
 | 症状 | 处理 |
 |---|---|
-| 双击 `.bat` 一闪而过 | 在命令行里跑 `启动游戏.bat` 看报错，或手动运行 `node\node.exe app\scripts\launch.mjs --no-setup`（`.bat` 会在非 0 退出时暂停）。**`--no-setup` 别省**：省掉它会去联网准备素材，而且 PATH 上不一定有 `node` |
+| 双击 `.bat` 一闪而过 | 在命令行里跑 `start-windows.bat` 看报错，或手动运行 `node\node.exe app\scripts\launch.mjs --no-setup`（`.bat` 会在非 0 退出时暂停）。**`--no-setup` 别省**：省掉它会去联网准备素材，而且 PATH 上不一定有 `node` |
 | 提示找不到 node | 便携包应含 `node\node.exe`；没有就用 `--no-node` 的包，并自行安装 Node 24 LTS |
 | 端口被占用 | 关掉占用 3000 的程序（`node tools/doctor.mjs` 会指出是谁），或在启动命令后加 `--port 3001` |
 | 浏览器没自动打开 | 手动访问 `http://127.0.0.1:<端口>`；`--no-open` / `SP_NO_BROWSER=1` 会禁用自动打开 |
@@ -119,6 +119,6 @@ Linux 上是这一档）→ Windows 自带的 `Expand-Archive`。
   同时取出同一个归档里的 `LICENSE` 作为 `node\LICENSE-node.txt` 一起发出去。
 * `app\` 里只有版本库跟踪的文件 + 生产依赖 + 素材 + 3D 棋盘清单，被 `.gitignore` 排除的本机文件
   （`.env`、`.claude/`、`scripts/service.env.cmd` 等）不会进包。
-* 游戏不写注册表、不装服务；`启动游戏.bat` 内容只有几行（切到 UTF-8 代码页 → 找 `node\node.exe` →
+* 游戏不写注册表、不装服务；`start-windows.bat` 内容只有几行（切到 UTF-8 代码页 → 找 `node\node.exe` →
   跑 `app\scripts\launch.mjs --no-setup`）。
 * 想做成随开机启动的 Windows 服务，用仓库自带的 `scripts/install-service-windows.ps1`（面向整合包/源码部署，见 [DEPLOY.md](DEPLOY.md)）。

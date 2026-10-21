@@ -7,13 +7,13 @@
 //   node\node.exe            官方 Windows x64 便携版 Node（版本与 sha256 钉在下面的 NODE_PIN）
 //   node\LICENSE-node.txt    Node 自己的许可证（和 node.exe 一起从官方 zip 里取出来）
 //   app\                     游戏本体：**只收 git 跟踪的文件** + 生产依赖 + 素材，离线可玩
-//   启动游戏.bat             app\scripts\launch.mjs --no-setup
-//   启动游戏-插件沙箱.bat    the same with --scripts sandbox (script plugins in the SES sandbox, docs/PLUGINS.md §13)
-//   启动游戏.sh / 启动游戏-插件沙箱.sh  the same two launchers for Linux / macOS / WSL (system Node 24)
-//   README-开箱即用.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
+//   start-windows.bat             app\scripts\launch.mjs --no-setup
+//   start-windows-sandbox.bat    the same with --scripts sandbox (script plugins in the SES sandbox, docs/PLUGINS.md §13)
+//   start-linux.sh / start-linux-sandbox.sh  the same two launchers for Linux / macOS / WSL (system Node 24)
+//   README-quickstart.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
 //   LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 //
-// 目标机器什么都不用装：解压 → 双击 启动游戏.bat。素材约 330 MB 是硬成本，包因此较大。
+// 目标机器什么都不用装：解压 → 双击 start-windows.bat。素材约 330 MB 是硬成本，包因此较大。
 //
 // 三条硬规则（都是踩过的坑）：
 //   1. app\ 的文件清单来自 `git ls-files`，不是手写的跳过表 —— `.env` / `.venv` / `.claude` /
@@ -99,7 +99,7 @@ const HELP = `node scripts/make-windows-bundle.mjs — 生成 Windows 开箱即�
   因此 .env / .venv / .claude / scripts/service.env.cmd 这些本机文件不会被打进去。
   data/local-assets.json 存在时（本机提取过 3D 棋盘贴图）会一起收，否则贴图进了包也用不上。
 
-  不压缩、不改 index.html、不装开始界面：包里的 启动游戏.bat 就是
+  不压缩、不改 index.html、不装开始界面：包里的 start-windows.bat 就是
   \`app\\scripts\\launch.mjs --no-setup\`（素材已在包里，不需要联网准备）。
 `;
 
@@ -149,7 +149,7 @@ export function outDirIsUnsafe(out, root = ROOT) {
 }
 
 /** 上一次打的便携包长这样：包根有这份说明，还有一个 app\ 目录。 */
-const BUNDLE_MARKERS = Object.freeze(['README-开箱即用.md', 'app']);
+const BUNDLE_MARKERS = Object.freeze(['README-quickstart.md', 'app']);
 
 /**
  * `--force` 允不允许删掉这个目录？
@@ -405,25 +405,25 @@ export function bundleReadme({ version, withNode }) {
     ? `node\\node.exe            便携版 Node ${version}（官方 x64，已经 sha256 校验）
 node\\LICENSE-node.txt    Node 自己的许可证（MIT）
 app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             app\\scripts\\launch.mjs --no-setup
-启动游戏-插件沙箱.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
-启动游戏.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
-启动游戏-插件沙箱.sh     同上，并开启插件脚本沙箱
-README-开箱即用.md       本文件
+start-windows.bat             app\\scripts\\launch.mjs --no-setup
+start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
+start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
+start-linux-sandbox.sh     同上，并开启插件脚本沙箱
+README-quickstart.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
-启动游戏.bat             app\\scripts\\launch.mjs --no-setup
-启动游戏-插件沙箱.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
-启动游戏.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
-启动游戏-插件沙箱.sh     同上，并开启插件脚本沙箱
-README-开箱即用.md       本文件
+start-windows.bat             app\\scripts\\launch.mjs --no-setup
+start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
+start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
+start-linux-sandbox.sh     同上，并开启插件脚本沙箱
+README-quickstart.md       本文件
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
 （没有 node\\ 这一层：本包不带便携版 Node，请自行安装 Node 24 LTS）`;
 
-  return `# 卫戍协议：盟约 · Windows 开箱即用包
+  return `# 卫戍协议：盟约 · 开箱即用包（Windows / Linux）
 
-解压后**双击 \`启动游戏.bat\`** 即可，素材与依赖都在包里，不需要再下载任何东西。
+解压后**双击 \`start-windows.bat\`** 即可，素材与依赖都在包里，不需要再下载任何东西。
 ${nodeNeed}
 
 **不联网也能玩**：美术 / 音频 / 依赖 / 字体全部在包内，断网时用自带的 \`app\\public\\fonts\`
@@ -447,10 +447,11 @@ Noto Sans SC 这类网页字体（\`index.html\` 里那条外链这次没有改�
 ## 怎么玩
 
 \`\`\`
-本机当服务器   双击 启动游戏.bat：在这台电脑开服，浏览器自动打开；
+本机当服务器   双击 start-windows.bat：在这台电脑开服，浏览器自动打开；
                控制台会打印「发给朋友」的局域网地址（形如 http://192.168.1.23:3000）
-用脚本插件     双击 启动游戏-插件沙箱.bat：同上，脚本插件在沙箱里运行（房主在房间里选中才生效）
-在 Linux/macOS ./启动游戏.sh：同上（用系统的 Node 24；包里的 node.exe 是 Windows 版）
+用脚本插件     双击 start-windows-sandbox.bat：同上，脚本插件在沙箱里运行（房主在房间里选中才生效）
+在 Linux/macOS ./start-linux.sh：同上；Linux 上用的是系统的 Node 24（包里的 node.exe 是 Windows 版），
+               服务器还没装 Node 的话照 docs/LINUX.md 一步步做
 连别人的服务器 不需要这个包，直接用浏览器打开对方的网址就行
 \`\`\`
 
@@ -506,7 +507,7 @@ async function main() {
       return 1;
     }
     if (verdict === 'refuse') {
-      console.error(`✖ ${out} 已存在，但它既不是空目录，也不像上一次打的便携包（包根要有 README-开箱即用.md 和 app\\）。`
+      console.error(`✖ ${out} 已存在，但它既不是空目录，也不像上一次打的便携包（包根要有 README-quickstart.md 和 app\\）。`
         + '\n  为免误删，这里不会动它：请自己确认后删掉，或换一个 --out（例如 D:\\Game\\Stronghold-Protocol-Windows）。');
       return 1;
     }
@@ -579,19 +580,23 @@ async function main() {
     await fsp.copyFile(src, path.join(out, f));
   }
 
-  await fsp.writeFile(path.join(out, '启动游戏.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup %*'), 'latin1');
-  await fsp.writeFile(path.join(out, '启动游戏-插件沙箱.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup --scripts sandbox %*'), 'latin1');
-  await fsp.writeFile(path.join(out, '启动游戏.sh'), sh('--no-setup'), 'utf8');
-  await fsp.writeFile(path.join(out, '启动游戏-插件沙箱.sh'), sh('--no-setup --scripts sandbox'), 'utf8');
+  await fsp.writeFile(path.join(out, 'start-windows.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup %*'), 'latin1');
+  await fsp.writeFile(path.join(out, 'start-windows-sandbox.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup --scripts sandbox %*'), 'latin1');
+  await fsp.writeFile(path.join(out, 'start-linux.sh'), sh('--no-setup'), 'utf8');
+  await fsp.writeFile(path.join(out, 'start-linux-sandbox.sh'), sh('--no-setup --scripts sandbox'), 'utf8');
   if (!IS_WIN) {
-    await fsp.chmod(path.join(out, '启动游戏.sh'), 0o755);
-    await fsp.chmod(path.join(out, '启动游戏-插件沙箱.sh'), 0o755);
+    await fsp.chmod(path.join(out, 'start-linux.sh'), 0o755);
+    await fsp.chmod(path.join(out, 'start-linux-sandbox.sh'), 0o755);
   }
-  await fsp.writeFile(path.join(out, 'README-开箱即用.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node }), 'utf8');
+  await fsp.writeFile(path.join(out, 'README-quickstart.md'), bundleReadme({ version: nodeVersion, withNode: !!o.node }), 'utf8');
+  // Linux 新手开服指引：跟着包走，不指望玩家去翻仓库里的 docs/
+  const linuxDoc = path.join(ROOT, 'docs', 'LINUX.md');
+  if (fs.existsSync(linuxDoc)) await fsp.copyFile(linuxDoc, path.join(out, 'LINUX.md'));
+  else console.log('    ! 缺 docs/LINUX.md：包里将没有 Linux 开服说明');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
-  console.log('  双击「启动游戏.bat」即可（本机开服，浏览器自动打开）。');
+  console.log('  双击「start-windows.bat」即可（本机开服，浏览器自动打开）。');
   return 0;
 }
 
