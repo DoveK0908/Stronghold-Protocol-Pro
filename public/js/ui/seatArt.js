@@ -42,8 +42,12 @@ const str = (v) => (typeof v === 'string' && v ? v : null);
 export function lookUrl(m, charId, look = '', kind = 'avatar') {
   if (typeof charId !== 'string' || !m) return null;
   if (look && look !== 'e1') {
-    const s = m.skins && typeof m.skins === 'object' && Object.hasOwn(m.skins, look) ? m.skins[look] : null;
-    if (s && s.charId === charId && str(s[kind])) return s[kind];
+    // data/assets.json keeps skins under chars[charId].skins (flat top-level m.skins only exists in older manifests)
+    const flat = m.skins && typeof m.skins === 'object' && Object.hasOwn(m.skins, look) ? m.skins[look] : null;
+    if (flat && flat.charId === charId && str(flat[kind])) return str(flat[kind]);
+    const perChar = m.chars && m.chars[charId] && m.chars[charId].skins;
+    const nested = perChar && typeof perChar === 'object' && Object.hasOwn(perChar, look) ? perChar[look] : null;
+    if (nested && str(nested[kind])) return str(nested[kind]);
   }
   const chars = typeof m.chars === 'object' ? m.chars : null;
   const c = chars && Object.hasOwn(chars, charId) ? chars[charId] : null;
@@ -75,6 +79,21 @@ export function lookOptions(m, charId, kind) {
  */
 export function cardAvatarUrl(charId, m = data.get('assets'), look = '') {
   return lookUrl(m, charId, look, 'avatar');
+}
+
+/**
+ * 席位大图的「带场景」版本：名片干员装备了皮肤时，用该皮肤的 illustration（官方那张连背景的立绘）；
+ * 没皮肤 / 精一 / 机器人返回 null，调用方退回 seatPortrait（透明立绘）。
+ */
+export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
+  if (!seat || seat.playerId == null || seat.isBot) return null;
+  const pick = (seat.playerId === myId && myCard) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
+  const rec = pick && byChar ? byChar.get(pick) : null;
+  if (!rec) return null;
+  const mine = seat.playerId === myId && myCard;
+  const look = mine ? myLook : typeof seat.card?.look === 'string' ? seat.card.look : '';
+  if (!look || look === 'e1') return null;
+  return lookUrl(m, rec.charId, look, 'illust');
 }
 
 /**

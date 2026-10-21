@@ -46,7 +46,7 @@ import { net } from '../net.js';
 import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../store.js';
 import { data, getMode, useData } from '../data.js';
 import { avatarUrl } from '../assets.js';
-import { CARD_PREF, cardOperators, seatPortrait, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
+import { CARD_PREF, cardOperators, seatPortrait, seatIllust, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
 import { customAvatarSrc } from '../ui/playerCard.js';
 import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
@@ -263,6 +263,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
   const offline = seat.connected === false && !seat.isBot;
   const ready = seat.ready || seat.isBot || isHostSeat;
   const src = seat.isBot ? eliteAvatar(seat.botPersona) : seatPortrait(seat, portraits);
+  // 装备皮肤时席位大图改用那张连背景的 illustration（名字牌下仍是普通名片）
+  const scene = seat.isBot ? null : seatIllust(seat, portraits);
   const card = isMe ? myCard : seat.card && typeof seat.card === 'object' ? seat.card : null;
   const owner = isOwnerSeat(seat);
   const canPick = isMe && !seat.isBot && !!onPickCard;
@@ -271,8 +273,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
     <span class="rseat__clip" aria-hidden="true"></span>
     ${consent ? html`<span class="rseat__consent" data-testid="script-consented">${t('已同意')}</span>` : null}
     <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span></header>
-    <div class=${`rseat__art${canPick ? ' is-pickable' : ''}`} onClick=${canPick ? onPickCard : undefined} title=${canPick ? t('点击更换名片干员') : undefined}>
-      ${src && bad !== src ? html`<img src=${src} alt="" draggable=${false} loading="lazy" onError=${() => setBad(src)} />`
+    <div class=${`rseat__art${canPick ? ' is-pickable' : ''}${scene ? ' rseat__art--scene' : ''}`} onClick=${canPick ? onPickCard : undefined} title=${canPick ? t('点击更换名片干员') : undefined}>
+      ${(scene || src) && bad !== (scene || src) ? html`<img src=${scene || src} class=${scene ? 'is-scene' : ''} alt="" draggable=${false} loading="lazy" onError=${() => setBad(scene || src)} />`
         : html`<span class="rseat__glyph">${seat.isBot ? html`<${Icon} name="robot" />` : [...(seat.name || '?')][0]}</span>`}
       ${canPick ? html`<button type="button" class="rseat__pick" onClick=${(e) => { e.stopPropagation(); onPickCard(); }} aria-label=${t('更换名片干员')}><${Icon} name="edit" /><span>${t('更换立绘')}</span></button>` : null}
       ${isHostSeat ? html`<span class="rseat__host">${t('创建者')}</span>` : null}
