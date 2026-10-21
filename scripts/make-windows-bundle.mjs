@@ -608,7 +608,7 @@ async function main() {
   await fsp.writeFile(path.join(out, 'start-linux-sandbox.sh'), sh('--no-setup --scripts sandbox'), 'utf8');
   if (withLuck) {
     await fsp.writeFile(path.join(out, 'start-windows-luck.bat'), bat('"%NODE%" "%HERE%luck/src/launcher.mjs" --game "%HERE%app" %*'), 'latin1');
-    await fsp.writeFile(path.join(out, 'start-linux-luck.sh'), sh('--game "$HERE/app"', 'luck/src/launcher.mjs'), 'utf8');
+    await fsp.writeFile(path.join(out, 'start-linux-luck.sh'), sh('--game "$HERE/app" --no-open', 'luck/src/launcher.mjs'), 'utf8');
   }
   if (!IS_WIN) {
     for (const f of ['start-linux.sh', 'start-linux-sandbox.sh', 'start-linux-luck.sh']) {
