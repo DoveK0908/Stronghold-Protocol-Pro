@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { isSkinId, isCharId, isSkinSelection, checkSkinSelection, operatorCharIds, validateC2S, SKIN_LIMITS } from '../shared/protocol.js';
 import { makeMatch, DATA } from './match/harness.js';
 import { Battle } from '../server/sim/Battle.js';
+import { data } from '../public/js/data.js';
 import { makeBattle } from './helpers/battleHarness.js';
 import { avatarUrl, portraitUrl, illustUrl, spineEntry, hasBackSpine, unitPictureUrl, skinsOf, skinHasModel } from '../public/js/assets.js';
 import { createStore } from '../public/js/store.js';
@@ -449,4 +450,20 @@ describe('皮肤: the install channel is not in this branch', () => {
     const skins = readFileSync(path.join(ROOT, 'public/js/ui/skins.js'), 'utf8');
     assert.ok(!/skinsLocal|skins-local|data\/skins\.json|'skins'\)\.chars/.test(skins), 'the client reads the composed manifest, not a catalogue file');
   });
+});
+
+// 维护者 2026-10-21：「干员皮肤的原皮预览全部变成立绘了，应该是像皮肤一样的半身照。」
+// 精二立绘被提取进清单后（chars[].illust），默认瓦片若优先取 illust，整排皮肤里就它一张是裁过的全身画。
+test('the 默认 tile keeps the half-body portrait even when the manifest carries a 立绘', async () => {
+  const { availableSkins } = await import('../public/js/ui/skins.js');
+  const manifest = JSON.parse(readFileSync(new URL('../data/assets.json', import.meta.url), 'utf8'));
+  const withIllust = Object.entries(manifest.chars).find(([, c]) => c.illust && c.portrait);
+  assert.ok(withIllust, '清单里既有立绘又有半身像的干员');
+  const [charId, rec] = withIllust;
+  data.setContent({ id: 'f'.repeat(64), values: { assets: manifest } });
+  try {
+    const own = availableSkins(charId).find((r) => r.own);
+    assert.equal(own.portrait, rec.portrait, '默认瓦片画半身像（1:2），不是立绘');
+    assert.equal(own.illust, rec.illust, '放大预览仍取立绘');
+  } finally { data.setContent(null); }
 });

@@ -175,15 +175,15 @@ export function availableSkins(charId) {
   // The operator's OWN appearance, always the first row — even for a record the plugins wrote no `skins` under, because
   // the picker shows the section for every operator as soon as one of them has a skin (hasAnySkinChoices).
   //
-  // The art is what a plugin wrote for the operator: its 立绘 `chars[<charId>].illust` when there is one — the picture a
-  // plugin replaces for the operator itself (docs/PLUGINS.md §9), which the 默认 tile is the only place to see — else its
-  // portrait, else its avatar. Preferring the 立绘 is deliberate: a plugin may give an operator a picture and no skin at
-  // all, and that picture must be visible rather than staying in the manifest unread. The tile box is 1:2 and crops to
-  // the top, exactly as it already does for a skin that ships only an illust. Never null while the record has any of
-  // the three: an empty art box is the one thing this row must not draw.
+  // The tile art is the operator's HALF-BODY portrait, the same 1:2 picture a skin's tile draws (维护者 2026-10-21：
+  // 「干员皮肤的原皮预览全部变成立绘了，应该是像皮肤一样的半身照」). 立绘 `chars[<charId>].illust` is what the enlarged
+  // preview shows, and it is only a fallback for the tile when a plugin replaced the operator with a picture and no
+  // portrait at all (docs/PLUGINS.md §9) — never the default, or every operator whose 精二 art got extracted turns its
+  // 默认 tile into a cropped poster. Never null while the record has any of the three: an empty art box is the one
+  // thing this row must not draw.
   rows.unshift({
     id: '', name: '', group: '', playable: true,
-    portrait: ownIllust || ownPortrait, avatar: ownAvatar,
+    portrait: ownPortrait || ownIllust, avatar: ownAvatar,
     illust: ownIllust || ownPortrait, fallbackArt: false, own: true,
   });
   return rows;
