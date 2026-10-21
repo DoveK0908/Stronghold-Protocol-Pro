@@ -17,6 +17,11 @@ each player switches on for themself.
 > 我们是「清单自带 + 插件可叠加」。不进 git 的规则不变：素材在 `.cache`/`_build` 里提取，仓库只提交生成后的清单。
 ## The data: one overlay, no catalogue file
 
+> **皮肤只挂在 `chars[<charId>].skins`**（顶层的 `skins[<charId>][<skinKey>]` 是上游 0.3.2 生成器的写法，
+> 我们这棵树不支持）。2026-10-21 合入 `official/dev` 后用上游生成器重建过一次 `data/assets.json`，
+> 皮肤被写成顶层 map、客户端按 `chars[].skins` 找 → 全部皮肤消失；`test/assets.test.js` 现在有一条
+> shape 断言挡这个回归，重建清单请走 `tools/prepare-operator-skins.mjs`（它会 `delete manifest.skins`）。
+
 ```
 plugins/<id>/plugin.json
   └── assets (or a .json file):  chars[<charId>].illust ……     the operator's own 立绘 (one picture)

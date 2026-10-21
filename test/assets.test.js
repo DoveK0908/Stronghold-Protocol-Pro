@@ -121,6 +121,27 @@ describe('animation-role resolver (research 07 §5.4)', () => {
     assert.equal(resolveRoles(['Attack', 'Die', 'Idle', 'Move'], {}).run, undefined, 'no Run cycle, no role');
   });
 
+  // 皮肤只能挂在 chars[charId].skins（docs/SKINS.md）。850af9b5 那次「重建清单」用的是上游生成器，
+  // 它把皮肤写成顶层 skins[charId][skinId]，客户端按 chars[].skins 找 → 皮肤全部消失（2026-10-21 服务器上发现）。
+  describe('data/assets.json skin shape (docs/SKINS.md)', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../data/assets.json', import.meta.url), 'utf8'));
+    test('the manifest has no top-level skins map', () => {
+      assert.equal(manifest.skins, undefined, '皮肤写过顶层 skins 就会被 chars[].skins 的读者漏掉');
+    });
+    test('every skin sits under chars[charId].skins and the catalogue is not empty', () => {
+      let total = 0;
+      for (const [charId, c] of Object.entries(manifest.chars || {})) {
+        if (!c || typeof c !== 'object' || !c.skins) continue;
+        for (const [skinId, rec] of Object.entries(c.skins)) {
+          total += 1;
+          assert.ok(skinId.startsWith(`${charId}_`), `${skinId} 不属于 ${charId}`);
+          assert.ok(rec && rec.avatar, `${skinId} 缺 avatar`);
+        }
+      }
+      assert.ok(total >= 250, `皮肤只剩 ${total} 套，明显被重建清单丢过`);
+    });
+  });
+
   // The manifest (tools/fetch-assets.mjs --offline with this resolver): every model whose skeleton has a stun / Run clip
   // has the role, and every enemy with numbered skill clips has one clip per slot.
   describe('data/assets.json roles (PR #275)', () => {
