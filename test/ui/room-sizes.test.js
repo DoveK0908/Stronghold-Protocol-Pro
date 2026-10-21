@@ -28,3 +28,10 @@ test('添加精英干员 is the same block as 添加 AI 队友', () => {
   assert.match(room, /<\$\{EliteRecruit\} room=\$\{room\} busy=\$\{busy\} onAdd=\$\{onAddElite\} \/>/, 'and sits in the same column');
   assert.match(room, /<button type="button" class="rseat__addbot" aria-haspopup="menu"/, 'the elite button reuses the AI button class');
 });
+
+// 维护者 2026-10-21：「准备大厅的延迟显示有问题，一直等待新测量」——房间顶栏的 PingPill 没传 ms，
+// 于是永远停在「-- ms / 等待新测量」。大厅（lobby.js）与标题页（title.js）都传了 `conn.ping`。
+test('the room top bar feeds the measured latency into PingPill', () => {
+  const room = read('public/js/screens/room.js');
+  assert.match(room, /<\$\{PingPill\} ms=\$\{conn\.ping\} online=\$\{online\}/, 'room.js passes conn.ping like lobby.js does');
+});
