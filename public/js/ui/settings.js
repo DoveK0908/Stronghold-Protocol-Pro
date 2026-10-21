@@ -495,7 +495,7 @@ export function SettingsModal({ open, onClose }) {
     return () => { live = false; };
   }, [open]);
   const fxTier = resolveOfficialFx(s.officialFx, true);
-  return html`<${Modal} open=${open} onClose=${onClose} title=${t('设置')} micro="SETTINGS" width="7.4rem"
+  return html`<${Modal} open=${open} onClose=${onClose} title=${t('设置')} micro="SETTINGS" width="7.4rem" class="settings-modal"
                         actions=${html`<${Button} variant="secondary" icon="book" class="set-guide" onClick=${() => openGuide(0)}>${t('玩法说明')}<//>
                         <${Button} variant="primary" icon="check" onClick=${onClose}>${t('完成')}<//>`}>
     <div class="set-list">

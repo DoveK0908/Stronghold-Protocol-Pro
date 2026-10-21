@@ -31,8 +31,8 @@ export function VoiceLanguageRow() {
   const native = useSettings().voiceNative;
   return html`<${Fragment}>
     <div class="set-row language-options__row language-options__row--voice">
-      <span class="set-row__label"><${Icon} name="mic" />${t('干员配音')}<${MicroLabel}>VOICE<//></span>
-      <div class="set-seg voice-language-toggle" role="radiogroup" aria-label=${t('干员配音')} data-testid="voice-language-toggle">
+      <span class="set-row__label"><${Icon} name="mic" />${t('语音语言')}<${MicroLabel}>VOICE LANGUAGE<//></span>
+      <div class="set-seg voice-language-toggle" role="radiogroup" aria-label=${t('语音语言')} data-testid="voice-language-toggle">
         ${VOICE_OPTIONS.map(option => html`<button key=${option.code} type="button" role="radio" aria-checked=${voice === option.code ? 'true' : 'false'}
           class=${voice === option.code ? 'is-on' : ''} data-voice-lang=${option.code} onClick=${() => setVoiceLanguage(option.code)}>
           ${t(option.label)}<span class="voice-language-code">${option.micro}</span>
