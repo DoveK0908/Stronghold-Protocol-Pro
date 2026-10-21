@@ -107,6 +107,37 @@ cloudflared service install                     # 装成服务，开机自启（
 
 ---
 
+## 2b. 服务器是 Linux 时最简单的一条：面板建 tunnel，复制 token
+
+不想在服务器上敲 `login` / `create` / 写 `config.yml`，就在 Cloudflare 后台点：
+
+1. 打开 <https://one.dash.cloudflare.com/> → Networks → Tunnels → **Create a tunnel** → 选 **Cloudflared**；
+2. 起个名字（如 `stronghold`），保存后页面会给一段**带 token 的安装命令**，形如：
+
+   ```sh
+   sudo cloudflared service install eyJhIjoi...（一长串）
+   ```
+
+3. 把这段**原样**在 Ubuntu 服务器上执行：它会装好 `cloudflared` 服务并开机自启；
+4. 回到面板同一页 → **Public Hostname** → Add：
+
+   | 字段 | 填什么 |
+   |---|---|
+   | Subdomain | `game` |
+   | Domain | 你的域名 |
+   | Service · Type | `HTTP` |
+   | Service · URL | `127.0.0.1:3000` |
+
+保存后 `https://game.你的域名.com` 立刻可用，**域名固定**、不用改任何配置文件。
+以后换服务器只要在面板把这台机器重新加入 tunnel，地址不变。
+
+确认：
+
+```sh
+sudo systemctl status cloudflared --no-pager     # active (running)
+curl -I https://game.你的域名.com                 # 200
+```
+
 ## 3. Linux 服务器上跑隧道
 
 ```sh
@@ -125,6 +156,14 @@ sudo systemctl status cloudflared --no-pager
 ```
 
 游戏本体继续用 systemd 跑（见 [LINUX.md](LINUX.md)），隧道只是套在外面。
+套上隧道后建议把游戏只绑本机、并从安全组里**删掉 3000**：
+
+```ini
+# /etc/systemd/system/stronghold.service 的 [Service] 段
+Environment=PORT=3000 HOST=127.0.0.1
+```
+
+这样公网只能经 Cloudflare 进来（隧道是服务器主动外连，不需要放行任何入站端口）。
 
 ---
 
