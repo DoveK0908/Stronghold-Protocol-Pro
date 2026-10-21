@@ -33,6 +33,8 @@ export function loadBackdropPref() {
     blur: clamp(num(o.blur, 0), 0, 16),
     overlay: o.overlay !== false,
     motion: o.motion !== false,
+    // 维护者 2026-10-21：想留一张「干净」的大厅背景时可以藏掉中央的徽记与标题
+    hideCenter: o.hideCenter === true,
     videoSound: o.videoSound === true,videoPaused: o.videoPaused === true,
   };
 }
@@ -388,6 +390,7 @@ export function BackdropSettings({ bg }) {
       <label class="bgset__check"><input type="checkbox" checked=${pref.overlay} onChange=${(e) => update({ overlay: e.currentTarget.checked })} /><span>${t('叠加战术网格')}</span></label>
     </div>` : busy ? html`<p class="bgset__note">${t('图片处理中…')}</p>` : null}
     <label class="bgset__check"><input type="checkbox" checked=${pref.motion} onChange=${(e) => update({ motion: e.currentTarget.checked })} /><span>${t('动态效果（云层、粒子、雷达扫描）')}</span></label>
+    <label class="bgset__check"><input type="checkbox" checked=${pref.hideCenter} onChange=${(e) => update({ hideCenter: e.currentTarget.checked })} /><span>${t('隐藏中央徽记与标题')}</span></label>
     <p class="bgset__note">${t('图片上限 30MB；视频上限 60MB、最高 1080p，推荐横版 H.264 MP4 / WebM。仅保存在当前浏览器。视频默认静音，可搭配 ♫ 大厅音乐；切出大厅或隐藏网页会暂停视频。')}</p>
   </div>`;
 }

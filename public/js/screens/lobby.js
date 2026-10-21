@@ -795,7 +795,7 @@ export function LobbyScreen() {
     </header>
 
     <main class="hub-stage">
-      <div class="hub-center">
+      <div class=${`hub-center${bg.pref.hideCenter ? ' is-hidden' : ''}`}>
         <div class="hub-center__mark"><${HubRadar} bg=${bg} /><${Emblem} /></div>
         <div class="hub-center__en">STRONGHOLD PROTOCOL <b>ALLIANCE</b></div>
         <h1 class="hub-center__title">${t('卫戍协议：盟约')}</h1>

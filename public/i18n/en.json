@@ -3346,5 +3346,6 @@
   "头像已上传": "Avatar uploaded",
   "上传失败": "Upload failed",
   "上传失败，换一张图片再试": "Upload failed — try another image",
-  "请选择一张 4MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image under 4 MB (PNG/JPEG/WEBP)"
+  "请选择一张 4MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image under 4 MB (PNG/JPEG/WEBP)",
+  "隐藏中央徽记与标题": "Hide the centre emblem and title"
 }

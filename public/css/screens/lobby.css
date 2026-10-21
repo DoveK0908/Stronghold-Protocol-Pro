@@ -900,6 +900,8 @@
 .hub-stage { flex: 1 1 auto; min-height: 0; display: grid; padding: .1rem .36rem .36rem;
   grid-template-columns: minmax(2.6rem, 3.2rem) 1fr calc(var(--hub-entry-w) * 2 + var(--hub-gap));
   grid-template-rows: minmax(0, 1fr) auto; gap: .2rem .4rem; }
+.hub-center { transition: opacity .28s ease; }
+.hub-center.is-hidden { opacity: 0; pointer-events: none; }
 .hub-center { grid-column: 1 / -1; grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; pointer-events: none; }
 .hub-center__mark { position: relative; display: grid; place-items: center; margin-bottom: .14rem; }
