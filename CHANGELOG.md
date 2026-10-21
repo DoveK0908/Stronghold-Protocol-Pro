@@ -7,6 +7,9 @@
 - 便携包根目录的启动脚本改成 ASCII 文件名，避免 Linux（区分大小写）、解压工具与网盘改名的坑：
   `start-windows.bat`、`start-windows-sandbox.bat`、`start-linux.sh`、`start-linux-sandbox.sh`、`README-quickstart.md`。
   包内说明同步改写，`README-quickstart.md` 里同时给出 Windows 与 Linux 的启动方式。
+- 便携包新增 **`HTTPS.md`**：`http://公网IP` 下浏览器不给 Service Worker / Cache Storage，所以「导入素材包」会灰掉；
+  文档写了 cloudflared 免费隧道（quick tunnel 5 分钟、named tunnel 固定域名、Windows 服务与 Linux 安装）、
+  自签证书为什么没用，以及「Cloudflare 代理整站 + 缓存 `/assets`」这条更省流量的替代方案。
 - 便携包新增 **`LINUX.md`**：面向完全没接触过 Linux 的新手，按阿里云 Ubuntu 24.04 从装 Node 24、上传文件、
   放行安全组、前台试跑、systemd 常驻、更新、Nginx + HTTPS 到常见报错，一条条写出可复制的命令。
   `docs/LINUX.md` 是同一份文件（仓库里也放一份，方便先看再下载）。

@@ -410,6 +410,7 @@ start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sa
 start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
 start-linux-sandbox.sh     同上，并开启插件脚本沙箱
 README-quickstart.md       本文件
+LINUX.md / HTTPS.md        开服（Linux 新手）与 https / 隧道说明
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
     : `app\\                    游戏本体：server / shared / public（全部素材）/ data / scripts / tools
 start-windows.bat             app\\scripts\\launch.mjs --no-setup
@@ -417,6 +418,7 @@ start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sa
 start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
 start-linux-sandbox.sh     同上，并开启插件脚本沙箱
 README-quickstart.md       本文件
+LINUX.md / HTTPS.md        开服（Linux 新手）与 https / 隧道说明
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 
 （没有 node\\ 这一层：本包不带便携版 Node，请自行安装 Node 24 LTS）`;
@@ -593,6 +595,9 @@ async function main() {
   const linuxDoc = path.join(ROOT, 'docs', 'LINUX.md');
   if (fs.existsSync(linuxDoc)) await fsp.copyFile(linuxDoc, path.join(out, 'LINUX.md'));
   else console.log('    ! 缺 docs/LINUX.md：包里将没有 Linux 开服说明');
+  const httpsDoc = path.join(ROOT, 'docs', 'HTTPS.md');
+  if (fs.existsSync(httpsDoc)) await fsp.copyFile(httpsDoc, path.join(out, 'HTTPS.md'));
+  else console.log('    ! 缺 docs/HTTPS.md：包里将没有 https / 隧道说明');
 
   const total = await dirSize(out);
   console.log(`\n✔ 便携包已生成：${out}\n  ${total.files} 个文件 / ${MB(total.bytes)}`);
