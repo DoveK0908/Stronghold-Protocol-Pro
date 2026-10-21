@@ -454,6 +454,9 @@ All paths are URL paths relative to the site root, for example `/assets/char/ava
   chars:   { [charId]: { avatar, avatarE2?, portrait, portraitE2?, illust?, spine: { front: Spine, back?: Spine },
                          skins?: { [skinId]: { name, group?, avatar?, avatarE2?, portrait?, portraitE2?, illust?,
                                                spine?: { front: Spine, back?: Spine } } } } },
+                         // illust: the 精英二 illustration (立绘) with its painted surroundings, extracted from the
+                         // installed client by tools/local-extract/chararts.py and pointed at by
+                         // tools/prepare-char-illust.mjs (char/illust/<charId>.webp); 精英一 keeps the plain portrait
                          // illust: the full illustration (立绘) a detail view shows; skins: one record per appearance,
                          // keyed by the installation's own skin id (char_4058_pepe@sightseer#2; a cosmetic plugin writes
                          // the same map, docs/PLUGINS.md §9). Neither is emitted today: the committed manifest has no

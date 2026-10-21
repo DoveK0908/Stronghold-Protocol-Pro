@@ -95,7 +95,8 @@ export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
   if (!rec) return null;
   const mine = seat.playerId === myId && myCard;
   const look = mine ? myLook : typeof seat.card?.look === 'string' ? seat.card.look : '';
-  if (!look || look === 'e1') return null;
+  // '' = 精英二：用客户端里那张带背景的立绘（chars[].illust）；'e1' 精一无背景，保留透明立绘
+  if (look === 'e1') return null;
   return lookUrl(m, rec.charId, look, 'illust');
 }
 
