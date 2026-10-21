@@ -14,6 +14,8 @@
 
 ### 说明
 
+- 分发目录也改成 ASCII 并带版本号，维护者直接压缩这两个目录即可：
+  `Stronghold-Protocol-v<版本>-Windows/`（解压即玩，Mac/Linux 也能解）与 `Stronghold-Protocol-v<版本>-assets/`（素材包）。
 - 便携包里的 `node/` 只有 Windows 版（`node.exe`）；Linux 上用系统的 Node 24，`start-linux.sh` 已经这么写。
 - 服务器目录建议 `/opt/stronghold`（示例），`state/` 里是存档、昵称与上传头像，换机器时一起带走。
 
