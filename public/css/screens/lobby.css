@@ -1801,10 +1801,12 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rseat.is-ready .rseat__art::after { content: ''; position: absolute; inset: 50% 0 0; background: linear-gradient(180deg, transparent, rgba(47, 207, 159, .85)); pointer-events: none; }
 /* 皮肤立绘（连背景那张 illustration）：铺满整张席位卡，底部用中性暗渐变收边，不叠薄荷色 */
 .rseat__art img.is-scene { object-position: 50% 22%; filter: none; }
-.rseat__art--scene { background: #101312; }
-.rseat__art--scene::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+.rseat__art--painted { background: #101312; }
+.rseat__art--painted::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: linear-gradient(180deg, rgba(8, 12, 11, .28) 0%, rgba(8, 12, 11, 0) 22%, rgba(8, 12, 11, 0) 58%, rgba(8, 12, 11, .88) 100%); }
-.rseat.is-ready .rseat__art--scene::after { background: linear-gradient(180deg, transparent, rgba(10, 14, 13, .55)); }
+.rseat.is-ready .rseat__art--painted::after { background: linear-gradient(180deg, transparent, rgba(10, 14, 13, .55)); }
+/* 透明全身立绘（精一）：同一取景，但不铺暗底、不加中性渐变 */
+.rseat__art img.is-scene[src$='_e1.webp'] { object-position: 50% 16%; }
 .rseat__glyph { font-size: max(calc(.9 * var(--t)), 40px); font-weight: 900; color: rgba(255, 255, 255, .25); }
 .rseat__glyph .icon { width: max(1rem, 50px); height: max(1rem, 50px); }
 .rseat__host { position: absolute; top: .14rem; left: 50%; transform: translateX(-50%); z-index: 1; padding: .02rem .18rem; font-size: max(calc(.18 * var(--t)), 12px); font-weight: 800;

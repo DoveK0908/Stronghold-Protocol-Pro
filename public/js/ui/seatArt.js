@@ -52,7 +52,9 @@ export function lookUrl(m, charId, look = '', kind = 'avatar') {
   const chars = typeof m.chars === 'object' ? m.chars : null;
   const c = chars && Object.hasOwn(chars, charId) ? chars[charId] : null;
   if (!c) return null;
-  return (look === 'e1' ? null : str(c[`${kind}E2`])) || str(c[kind]);
+  // 精二默认；精一有提取出来的全身立绘（illustE1）就用它，取景才和精二一致（没有再退回半身 portrait）
+  if (look === 'e1') return kind === 'illust' ? str(c.illustE1) : str(c[kind]);
+  return str(c[`${kind}E2`]) || str(c[kind]);
 }
 
 /**
@@ -95,8 +97,7 @@ export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
   if (!rec) return null;
   const mine = seat.playerId === myId && myCard;
   const look = mine ? myLook : typeof seat.card?.look === 'string' ? seat.card.look : '';
-  // '' = 精英二：用客户端里那张带背景的立绘（chars[].illust）；'e1' 精一无背景，保留透明立绘
-  if (look === 'e1') return null;
+  // '' = 精英二：客户端里那张带背景的立绘（chars[].illust）；'e1' = 同一套取景的透明全身立绘（chars[].illustE1）
   return lookUrl(m, rec.charId, look, 'illust');
 }
 

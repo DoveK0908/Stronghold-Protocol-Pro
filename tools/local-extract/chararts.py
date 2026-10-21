@@ -64,24 +64,32 @@ def _rgba(tex_map, stem):
     return base.image.convert("RGBA")
 
 
+def _save(img, dst, label, log):
+    if max(img.size) > MAX_SIDE:
+        scale = MAX_SIDE / max(img.size)
+        img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    img.save(dst, "WEBP", quality=QUALITY, method=4)
+    log(f"[chararts] {label} {img.width}x{img.height} {os.path.getsize(dst) // 1024} KB")
+
+
 def export_char(ab_root, char_id, out_dir, log=print):
+    """Write <charId>.webp (精英二, painted) and <charId>_e1.webp (精英一, transparent) when the bundle has them."""
     bundle = os.path.join(ab_root, "chararts", char_id + ".ab")
     if not os.path.exists(bundle):
         return None
     tex_map = _textures(bundle)
-    img = _rgba(tex_map, char_id + "_2")
-    if img is None:
-        img = _rgba(tex_map, char_id + "_1")
-        if img is None:
-            return None
-    if max(img.size) > MAX_SIDE:
-        scale = MAX_SIDE / max(img.size)
-        img = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
-    os.makedirs(out_dir, exist_ok=True)
-    dst = os.path.join(out_dir, char_id + ".webp")
-    img.save(dst, "WEBP", quality=QUALITY, method=4)
-    log(f"[chararts] {char_id} {img.width}x{img.height} {os.path.getsize(dst) // 1024} KB")
-    return dst
+    e2 = _rgba(tex_map, char_id + "_2")
+    e1 = _rgba(tex_map, char_id + "_1")
+    if e2 is None and e1 is None:
+        return None
+    dst = None
+    if e2 is not None:
+        dst = os.path.join(out_dir, char_id + ".webp")
+        _save(e2, dst, char_id, log)
+    if e1 is not None:
+        _save(e1, os.path.join(out_dir, char_id + "_e1.webp"), char_id + "_e1", log)
+    return dst or os.path.join(out_dir, char_id + "_e1.webp")
 
 
 def main():
