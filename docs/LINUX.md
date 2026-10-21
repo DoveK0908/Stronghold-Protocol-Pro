@@ -115,6 +115,31 @@ sudo ufw allow 3000/tcp
 
 ---
 
+## 5b. 带 Luck 控制台启动（可选）
+
+包里自带一份 **Stronghold-Luck**（`luck/`，上游 0.1.5 加我们打的 6 个补丁），不需要再 clone 任何东西。
+它和普通启动的区别只是「谁在前台」：Luck 起一个前置服务器，再把游戏挂在它后面。
+
+```bash
+cd /root/Stronghold-Protocol-v0.3.2-pro.3
+./start-linux-luck.sh --host 127.0.0.1 --port 3000
+# 冒烟：200 才算注入成功
+curl -s -o /dev/null -w '%{http_code}
+' http://127.0.0.1:3000/mod/overlay.js
+```
+
+systemd 用它时只换 `ExecStart`：
+
+```ini
+ExecStart=/usr/bin/node /root/Stronghold-Protocol-v0.3.2-pro.3/luck/src/launcher.mjs --game /root/Stronghold-Protocol-v0.3.2-pro.3/app --host 127.0.0.1 --port 3000 --no-open
+```
+
+**要点**
+
+- 面板是**房间级**的：房间「实验性选项 → Luck 测试插件」勾了才出现，普通房间看不到；
+- 想回到不带 Luck 的版本，把 `ExecStart` 换回 `start-linux.sh` 那条；
+- 提示「游戏版本不是 0.3.0」是正常的（上游只认到 0.3.0），只要我们这里 `node mods/luck/apply.mjs --check` 全绿就照常工作。
+
 ## 6. 让它一直跑（systemd）
 
 前台窗口一关服务就停了。用 systemd 托管：

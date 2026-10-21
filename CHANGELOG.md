@@ -14,6 +14,9 @@
   放行安全组、前台试跑、systemd 常驻、更新、Nginx + HTTPS 到常见报错，一条条写出可复制的命令。
   `docs/LINUX.md` 是同一份文件（仓库里也放一份，方便先看再下载）。
 - `docs/DEPLOY.md` 第 4 节加了一句指路，`docs/WINDOWS.md` 的文件名与「换机器」说明跟着改。
+- 便携包**自带 Stronghold-Luck 控制台**：包根多了 `luck\`（上游 0.1.5 加 `mods/luck` 的 L2–L7 补丁，已经打好，
+  不用再 clone 或跑 `apply.mjs`）、`start-windows-luck.bat` / `start-linux-luck.sh`，`LINUX.md` 加了「带 Luck 启动」
+  一节（含 systemd 变体）。不带 Luck 的 `start-windows.bat` / `start-linux.sh` 保持原样。
 
 ### 说明
 
