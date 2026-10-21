@@ -57,6 +57,7 @@ import { LoadoutStats } from '../ui/loadoutStats.js';
 export { LoadoutStats, statsPreview } from '../ui/loadoutStats.js';
 import { diyCount, sanitizeDiyPicks, setPick, diySlotList, slotRecord } from '../ui/diyModel.js';
 import { t, N_ } from '../../../shared/i18n.js';
+import { SKINS_KEY, skinsStore } from '../ui/skins.js';
 import { copyText } from '../ui/clipboard.js';
 import { toast } from '../ui/toasts.js';
 
@@ -881,7 +882,10 @@ function LoadoutScreen({ st, leaving = false }) {
 
   // Every tab uses one portable preset. Legacy single-section files still import without clearing other settings.
   const ioText = io?.text ?? '';
-  const openExport = () => setIo({ mode: 'export', text: serializeOperatorPreset(loadoutStore.get()) });
+  // 皮肤 (docs/SKINS.md) live in their own store, so the preset must merge them in — exporting loadoutStore alone
+  // produced a file whose `skins` section was always empty (维护者 2026-10-21：「全部设置包括皮肤也要能导入导出」).
+  const presetState = () => ({ ...loadoutStore.get(), skins: skinsStore.get()[SKINS_KEY] || {} });
+  const openExport = () => setIo({ mode: 'export', text: serializeOperatorPreset(presetState()) });
   const openImport = () => setIo({ mode: 'import', text: '' });
   const ioCopy = async () => {
     const ok = await copyText(ioText);

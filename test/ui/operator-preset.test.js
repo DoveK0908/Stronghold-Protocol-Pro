@@ -123,3 +123,12 @@ test('blocked browser storage still leaves one coherent in-memory preset',()=>{
   const result=applyOperatorPreset(parseOperatorPreset(serializeOperatorPreset(settings())),deps,{target,persist(){throw Error('blocked')}});
   assert.equal(result.ok,true);assert.deepEqual(storedSkins(),settings().skins);assert.deepEqual(target.get().entries,settings().entries);
 });
+
+// 维护者 2026-10-21：「干员调配的导出和导入有点问题，我要全部设置包括皮肤也要能导入导出。」
+// 皮肤存在独立的 skinsStore（ui/skins.js）里，导出必须把它们并进预设，否则文件的 skins 段永远是空对象。
+test('the loadout export merges the skin store into the preset', () => {
+  const src = readFileSync(new URL('../../public/js/screens/loadout.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{ SKINS_KEY, skinsStore \} from '\.\.\/ui\/skins\.js';/);
+  assert.match(src, /const presetState = \(\) => \(\{ \.\.\.loadoutStore\.get\(\), skins: skinsStore\.get\(\)\[SKINS_KEY\] \|\| \{\} \}\);/);
+  assert.match(src, /serializeOperatorPreset\(presetState\(\)\)/, 'the export path uses the merged state');
+});
