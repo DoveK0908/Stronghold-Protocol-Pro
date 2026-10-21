@@ -55,13 +55,17 @@ function visibleChess(tier) {
 }
 function shopItems() { return data.list('items').filter((i) => !i.isGolden && i.itemType === 'EQUIP' && !i.hideInShop); }
 
+// 卡池剩余张数 (U08): the mock has no pool of its own, so remember a per-operator count here and let 买卡 deduct it.
+const mockPoolLeft = new Map();
+function leftOf(id) { if (!mockPoolLeft.has(id)) mockPoolLeft.set(id, 12); return mockPoolLeft.get(id); }
+
 function makeSlot(level) {
   const tier = Math.max(1, Math.min(level, 1 + Math.floor(rnd() * level)));
   const c = pick(visibleChess(tier));
   const base = c.price;
   const r = rnd();
   const price = r < 0.15 ? Math.max(1, base - 1) : r > 0.9 ? base + 1 : base;
-  return { kind: 'chess', id: c.chessId, price, basePrice: base, sold: false };
+  return { kind: 'chess', id: c.chessId, price, basePrice: base, sold: false, left: leftOf(c.chessId) };
 }
 function makeItemSlot() {
   const it = pick(shopItems());
@@ -217,7 +221,7 @@ function buildState() {
   for (let i = 0; i < 5; i++) slots.push(makeSlot(level));
   slots[2].sold = true;
   // make one card complete a merge
-  if (board[4]) { const c4 = data.lookup('chess', board[4].id); slots[0] = { kind: 'chess', id: c4.chessId, price: c4.price, basePrice: c4.price, sold: false }; hand[2] = chessPiece(c4); }
+  if (board[4]) { const c4 = data.lookup('chess', board[4].id); slots[0] = { kind: 'chess', id: c4.chessId, price: c4.price, basePrice: c4.price, sold: false, left: leftOf(c4.chessId) }; hand[2] = chessPiece(c4); }
   slots.push(makeItemSlot());
 
   const enemies = data.list('enemies');
@@ -650,6 +654,7 @@ async function mockRequest(t, f = {}) {
       const idx = freeHandIdx();
       if (idx < 0) fail('HAND_FULL');
       p.funds -= s.price; s.sold = true;
+      if (s.kind === 'chess') { mockPoolLeft.set(s.id, Math.max(0, leftOf(s.id) - 1)); s.left = mockPoolLeft.get(s.id); }
       p.hand[idx] = s.kind === 'item' ? itemPiece(data.lookup('items', s.id)) : chessPiece(data.lookup('chess', s.id));
       refreshPrivate(); return {};
     }

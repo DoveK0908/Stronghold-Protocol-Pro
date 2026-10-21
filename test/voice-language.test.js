@@ -59,5 +59,6 @@ test('lobby language lives only in shared settings, which retain both language c
   assert.match(controls, /data-testid="voice-language-toggle"/);
   assert.match(controls, /<\$\{LangToggle\}/);
   assert.match(controls, /trapFocus=\$\{true\}/);
-  assert.match(settings, /<\$\{LanguageSettings\}/);
+  assert.match(settings, /<\$\{LanguageSelect\}/);
+  assert.match(settings, /<\$\{VoiceLanguageRow\}/);
 });

@@ -36,7 +36,7 @@ import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
 import { detectFeatures, useMedia } from './device.js';
 import { PHONE_QUERY } from './teamLayout.js';
-import { LanguageSettings } from './languageSettings.js';
+import { LanguageSelect, VoiceLanguageRow } from './languageSettings.js';
 import { voiceLanguageStore, setVoiceLanguage } from './voiceLanguage.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
@@ -499,11 +499,10 @@ export function SettingsModal({ open, onClose }) {
                         actions=${html`<${Button} variant="secondary" icon="book" class="set-guide" onClick=${() => openGuide(0)}>${t('玩法说明')}<//>
                         <${Button} variant="primary" icon="check" onClick=${onClose}>${t('完成')}<//>`}>
     <div class="set-list">
-      <${LanguageSettings} />
-      <${Toggle} label=${tc('voice-lang', '本土语言')} micro="NATIVE VOICE" value=${s.voiceNative} onChange=${(v) => updateSettings({ voiceNative: v })} />
-      <p class="set-hint">${t('有本土语言配音时使用')}</p>
+      <${LanguageSelect} />
       <${Slider} label=${t('背景音乐')} micro="BGM" icon="play" value=${s.bgm} onInput=${(v) => updateSettings({ bgm: v })} />
       <${Slider} label=${t('干员语音')} micro="VOICE" icon="mic" value=${s.voice} onInput=${(v) => updateSettings({ voice: v })} />
+      <${VoiceLanguageRow} />
       <${Slider} label=${t('音效')} micro="SFX" icon="signal" value=${s.sfx}
                  onInput=${(v) => { updateSettings({ sfx: v }); if (!tested) { setTested(true); setTimeout(() => setTested(false), 400); audio.sfx('click'); } }} />
       <${Toggle} label=${t('静音')} micro="MUTE" value=${s.muted} onChange=${(v) => updateSettings({ muted: v })} />

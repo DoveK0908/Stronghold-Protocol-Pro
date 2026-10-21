@@ -206,7 +206,7 @@
 .gtop__iconbtn .enemybtn__chev { color: #fff; }
 .gtop__speed { display: inline-flex; align-items: center; height: .32rem; padding: 0 .12rem;
   border: 1px solid var(--line); background: rgba(0, 0, 0, .5); color: var(--mint-400);
-  font-size: .16rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  font-size: calc(.16 * var(--t)); font-weight: 700; font-variant-numeric: tabular-nums; }
 .gtop__right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; justify-self: end; }
 .gtop__right .countdown { --cd-h: .7rem; filter: drop-shadow(0 0 .12rem rgba(0, 0, 0, .8)); }
 .gtop__clock { display: flex; align-items: flex-start; gap: .14rem; }
@@ -1477,3 +1477,23 @@
 /* The combat HUD wrapper (.chud) is a transparent full-screen layer: its children take the clicks, the
    wrapper itself must not (it sits over the top bar; a later duplicate `.gm__hud > *` rule re-enabled it). */
 .gm__hud > .chud { pointer-events: none; }
+
+/* ---- 预览：把顶栏对齐官方 0.3.2 dev（单个大括号 + 单胶囊状态条）；维护者选定后再清理 ---- */
+.gtop__center.brackets { padding: 0 .1rem; gap: .1rem; }
+.gtop__center.brackets .roundbox__num { background: #e8ece9; color: #0d1110; border-radius: .04rem; padding: 0 .07rem; }
+.gtop__center.brackets .gtop__cap { margin-inline: .02rem; }
+.gtop__speed { display: none; }
+.gtop__center.brackets .capsule, .gtop__center.brackets .capsule::before { clip-path: none; border-radius: 99px; }
+.gtop__center.brackets .capsule { min-width: 1.9rem; height: .5rem; padding: 0 .22rem 0 .16rem; }
+.gtop__center.brackets .capsule__icon { width: .34rem; height: .34rem; }
+.gtop__center.brackets .capsule--prep .capsule__label { font-size: .24rem; letter-spacing: .08em; }
+
+/* 设置里的语言区：按官方布局——语言下拉在标签右侧同一行、配音选项是紧凑的三列网格（末格是本土语言）。 */
+.set-list .language-options { gap: .02rem; }
+.set-list .language-options__row { display: flex; align-items: center; justify-content: space-between; gap: .1rem; flex-wrap: nowrap; }
+.set-list .language-options .lang-select { width: auto; min-height: 0; }
+.set-list .language-options .lang-select select { width: max(.86rem, 200px); min-height: max(.22rem, 30px); padding: 0 .08rem; font-size: max(calc(.13 * var(--t)), calc(12px * var(--ui))); }
+.set-list .voice-language-toggle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: max(1.34rem, 62%); max-width: 100%; gap: 2px; }
+.set-list .voice-language-toggle > button { height: max(.24rem, 28px); padding: 0 .04rem; font-size: max(calc(.11 * var(--t)), calc(11px * var(--ui))); }
+.set-list .voice-language-toggle .voice-language-code { font-size: 8px; margin-left: .03rem; }
+.set-list .language-options__hint { display: none; }

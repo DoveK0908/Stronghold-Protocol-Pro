@@ -111,7 +111,8 @@ test('settings 语音语言: 中文 by default, 日本語 / English / 한국어 
   assert.equal(sanitizeSettings({ voiceNative: true }).voiceNative, true);
   assert.equal(sanitizeSettings({ voiceNative: 'yes' }).voiceNative, false);
   const ui = fs.readFileSync(path.join(ROOT, 'public/js/ui/settings.js'), 'utf8');
-  assert.match(ui, /<\$\{LanguageSettings\}/, 'one shared language control, not a second Japanese-only selector');
+  assert.match(ui, /<\$\{LanguageSelect\}/, 'the interface language lives in the shared control');
+  assert.match(ui, /<\$\{VoiceLanguageRow\}/, 'the voice language row is the same shared control, not a second Japanese-only selector');
   assert.match(ui, /setVoiceLanguage\(next\.voiceLang\)/, 'explicit compatible settings API updates the canonical preference');
   assert.match(ui, /audio\.setVoiceLang\(s\.voiceLang, s\.voiceOverrides\)/);
   for (const code of ['en', 'ja', 'ko', 'zh-TW']) {
