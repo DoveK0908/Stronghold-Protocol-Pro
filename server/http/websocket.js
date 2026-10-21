@@ -30,15 +30,18 @@ export const WS_MAX_PAYLOAD = 64 * 1024;
 import { createTagRegistry } from '../tags.js';
 import { createAvatarStore } from '../avatars.js';
 
+/** A per-network cap, as printed on boot ('unlimited' for 0). */
+function perNetwork(n) { return n > 0 ? n : 'unlimited'; }
+
 export function createSessionStack(opts, { data, log, combatPool = null, trialPool = null, getLoadState, getLoadDetails, onlineLimit = null, ownerFile = null,
   content = null, plugins = null, hosts = null }) {
   if (opts.lobbyFactory != null && typeof opts.lobbyFactory !== 'function') throw new TypeError('invalid lobby factory');
   if (opts.getClusterLoad != null && typeof opts.getClusterLoad !== 'function') throw new TypeError('invalid cluster load provider');
-  const netOptions = netOptionsFrom(opts);
+  const netOptions = netOptionsFrom(opts, log);
   // a room whose match runs in a match host (DESIGN §32.6) answers once the host has: promise answers (≤ 64 per socket)
   if (hosts && netOptions.allowAsyncHandlers === undefined) netOptions.allowAsyncHandlers = true;
   const registry = new SessionRegistry({ reconnectWindowMs: netOptions.reconnectWindowMs ?? NET_DEFAULTS.reconnectWindowMs });
-  const lobbyOptions = lobbyOptionsFrom(opts);
+  const lobbyOptions = lobbyOptionsFrom(opts, log);
   const createLobby = opts.lobbyFactory || (params => new Lobby(params));
   // Optional coordinator phase recorder (server/phaseMetrics.js); absent everywhere else.
   const metrics = opts.phaseMetrics ? { metrics: opts.phaseMetrics } : {};
@@ -51,6 +54,12 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   // The 名字#四位 claims (server/tags.js, 界面#09): one registry per server, on disk so a restart keeps them taken.
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
   const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, avatars, ...metrics });
+  // The caps in effect, printed once when the stack is built, so the deploy log states the configuration the server is
+  // actually running with. A global cap of 0 is printed as 0 (it rejects every room / socket); a per-network 0 is
+  // printed as "unlimited". `log` is the quiet-aware logger, so a test server stays silent.
+  log.info(`[http] limits: rooms ${lobby.opts.maxRooms} (${perNetwork(lobby.opts.maxRoomsPerAddr)}/network), `
+    + `matches ${perNetwork(lobby.opts.maxMatchesPerAddr)}/network, `
+    + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`);
   return { registry, lobby, network };
 }
 

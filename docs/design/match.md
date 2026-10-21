@@ -101,6 +101,20 @@ Equipment (research 04 §2 + addendum, 09 §1.2): 2 slots per chess; a third ite
 
 Economy/shop/pool/merge/hand rules: exactly as research 00-INDEX §3–§4 (income `min(3+r,12)`; prices by tier; refresh 1; freeze toggles all, and a successful manual refresh (paid or free) cancels it — the new cards are not frozen (DESIGN §32.14.7); sell +1; items not sellable; upgrade prices per mode with −1/round; single-player pool copies 12/14/18/16/8/5 plus measured exceptions; co-op shared operators use twice those counts, while equipment has separate shared stock (DESIGN §29.8), and so does each player's private 自选 stock (8 / 5 solo, 16 / 10 co-op — §32.14.31); elite = 3 copies; odds = copy-weighted draw over unbanned visible chess with tier ≤ level; merge 3 (风丸 2) → elite onto the consumed deployed copy's tile, else to the hand (§20.11) + reward offer of 3 **different** free chess of tier `min(level+1, 6)` (copy-weighted, including the player's stocked 自选 of that tier — one shop level before the ordinary shop, §30.23; a tier short of different chess tops up from the tier below [ASSUMED], §20.6); full hand blocks every buy / reward pick, a merge-completing one too (PRTS 卫戍协议/帮助 §手牌区, GitHub #82); overflow to temp; a free hand slot pulls the temp pieces back in at once, right → left (`PlayerState._fillHandFromTemp`); temp blocks ready).
 
+**Advisor economy (§35.13–§35.14).** With a nonempty advisor plan, `economy.level` is a minimum: complete
+merges, meet an affordable floor before fill purchases, then resume legacy leveling. `holdLevel:true` requires
+an explicit level and nonblank `economy.why`; it caps only this prep, including one-round deferrals. `keep`/`sell`
+match exact forms; `buy` and bond priority stop wanting normal copies once that elite is owned. Non-carry seats
+spend expiring funds on useful targets, freeze only unaffordable explicit buys or merge completions, search while
+a purchase remains affordable, then bank spare operators. Opt-in `freezeSearch` also searches without purchase
+funds within the prep's `maxRefreshes`, to freeze a target for next round. `items.buy` requests up to eight items.
+Advisor cleanup protects elites, tier ≥4, exact keeps, targets bought this prep and active plan-bond threshold
+members; sell unprotected clutter first, destroy cheap unequipped hand items second, fall back last. Incidental
+unequippable items must leave two hand slots; explicit requests keep one. Carry bands retain interest behavior.
+Absent/empty plans and AI takeover without an advisor retain legacy behavior (maintainer **2026-10-20**).
+This is **[ASSUMED] AI policy**, not an official economy change. Bounds and sources:
+[EXTERNAL_AI](../EXTERNAL_AI.md#advisor-mode-and-readable-observations-359).
+
 **Temp overflow (临时整备区, row 8; user playtest #3 item 3).** Passive gains that find the hand full (merge elites, grants — the operator a 突变细胞 transformation gains included, §21.1 —, battle-result rewards, equipment returned by a merged / sold / transformed carrier) overflow into an expandable queue with five visible temp slots. The first five pieces fill right-to-left; later pieces wait behind them and refill freed slots in order. No passive gain is discarded for exceeding fifteen visible bench slots (owner correction, 2026-10-14, §32.14.21). Hidden pieces participate in merges, stock accounting, reconnect state and deadline resolution; Ready is refused while any is occupied (official "直到溢出情况排除才可开始进行作战"). A temp piece is resolved — a chess sold back to the pool with its summons removed, items destroyed, a summon stack removed (it comes back at the next round start, PRTS "干员所属召唤物会于下一回合返还", §20.1) — only at the deadline of the **first prep in which its player could act on it** (`PlayerState.tempDue(piece)` vs `prepsEnded`; every write into a temp slot goes through `_putTemp`, which records it): a piece that arrived during a prep before Ready is due at that prep's end; one that arrived after Ready or during the `<休整期结束时>` effects, or outside PREP (COMBAT, 联防, SETTLE — battle-result grants, a SETTLE merge's elite, returned equipment —, the next ROUND_START, 机变) is kept, visible and usable (move to a free hand slot, place, equip, use, destroy, sell) through the **next** prep. Un-readying (`setReady(false)`) makes whatever arrived while ready due at the current prep. ROUND_START no longer wipes temp (it used to destroy what SETTLE had put there before the player ever saw it). A merge's elite whose merge consumed a deployed copy takes that copy's tile and facing (§20.11); otherwise it goes to the hand, overflowing into temp (also outside PREP). `server/match/audit.js` (`tools/matchrun.mjs --check`) tracks the arrivals itself and flags any temp piece that outlives its due prep. The UI frames the row on the board with the rule (§17.5).
 
 Pointing Stick creates at most one pending offer per alive, non-Ready player in PREP. The owner confirms it with
@@ -176,6 +190,15 @@ reserved for fallback, 64 intents, 64 KiB response, 3 consecutive failures to ma
 1000 ms child restart backoff; limits configurable. One stdio child per match, no HTTP redirects, no client-set
 endpoint/command, gameplay actions only. Test journals record replies/failures; offline replay performs no IO.
 The complete policy and scope are in [External AI API](../EXTERNAL_AI.md).
+
+Maintainer request 2026-10-19 (§35.12): the example advisor's static knowledge includes a regenerable playbook
+from the active data and a sourced community overlay. [ASSUMED] Per-seat scoring uses only announced
+bans/enemies, public teammate boards and own progress. §35.15: the band draft returns at most eight
+directions and prefers uncontended community/maintainer mains; prep collapses the same band and main into
+one candidate with `subOptions`. It does not inspect remaining stock or change execution. Mechanical facts, timing
+estimates, score weights and cross-version regeneration are specified in [AI strategy](../AI-STRATEGY.md).
+The §35.12 follow-up requires detailed sourced play for named builds: separate freeze/redeployment recipes
+check reachable core roles and distinct main thresholds, retaining current-data disagreements and substitutes.
 
 Maintainer approval 2026-10-19 (§35.9) adds owner-selected `mode: 'plan'` beside default `direct`.
 One prep plan per seat/round weights legacy procurement/lineup/placement; existing sliced rehearsal and legal

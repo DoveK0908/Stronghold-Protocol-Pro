@@ -195,22 +195,57 @@ extra plugin windows/skips add calls, elimination/short modes remove calls. This
 Answer with this envelope (no `intents` or `done`):
 
 ```json
-{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2},"items":{"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
+{"v":"sp-ai/1","id":"ai-3","plan":{"bonds":[{"id":"siracusaShip","priority":4}],"buy":["chess_char_3_01_a"],"keep":[],"sell":[],"economy":{"saveForInterest":true,"level":3,"maxRefreshes":8,"refreshAbove":2,"freezeSearch":false},"items":{"buy":["chess_item_1_01_e_a"],"keep":[],"equip":[]},"placements":[]},"usage":{"inputTokens":1500,"outputTokens":100,"cachedTokens":1000}}
 ```
 
 IDs in this example illustrate the schema, not a recommended build. Use the actual knowledge/digest IDs.
 Every plan field is optional; `{}` executes unchanged legacy. The schema and scoring choices below are
 **[ASSUMED] engineering policy**, not official strategy advice:
 
-- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to member purchase/lineup values.
-- `buy`, `keep`, `sell`: at most 32 operator IDs each; base/elite IDs match the same operator. Purchase +24,
-  owned keep +18, sell −24. Keep also joins the existing keeper set. These are soft preferences: merge, bench
-  capacity, composition and emergency space cleanup can override them. Unknown/unavailable IDs have no effect.
-- `economy`: `level` 0..6 caps the requested target (0 means no leveling); `maxRefreshes` 0..16 and
-  `refreshAbove` 0..100 bound refreshes and the gold left after them. `reserve` 0..100 overrides discretionary
+- `bonds`: at most 8 `{id, priority: 1..5}` entries; +6 points per priority to useful member purchase/lineup values.
+  Normal copies of an owned elite receive no bond priority bonus; the elite retains its lineup bonus.
+- `buy`, `keep`, `sell`: at most 32 operator IDs each. `keep` and `sell` match **exact IDs**: a normal `_a`
+  means normal copies only, `_b` means the elite only. Keep +18 and sell −24 remain scoring preferences;
+  `keep` protects owned pieces and does not itself request another copy. `buy` accepts either form, adding
+  +24 only to normal copies that progress a merge toward an unowned elite (the first copy starts progress),
+  or add a distinct plan-bond member. Neither explicit buys nor incidental prioritized bonds request copies
+  of an already owned elite. Unknown/unavailable IDs have no effect.
+- `economy`: `level` 0..6 is a minimum target for this prep, subject to funds; 0 adds no minimum. Affordable
+  floor upgrades precede fill-only purchases, but completing a merge comes first. Once reached,
+  the bot resumes its legacy upgrade curve. Only `holdLevel:true` plus `level` 1..6 and a nonblank `why`
+  (at most 360 characters, inside `economy`) caps upgrades, including free upgrades. Example:
+  `{"level":5,"holdLevel":true,"why":"Search now; reach L6 next prep at a lower price."}`.
+  Plans last one prep: a hold is also valid for a one-round delay, and must be renewed to keep holding.
+  `maxRefreshes` 0..16 and `refreshAbove` 0..100 are first-pass preferences. Expiring funds override them in
+  the final spending pass. `reserve` 0..100 overrides discretionary
   savings **only for a carry-over band**. `saveForInterest:false` releases its normal interest reserve.
-  Board filling/merges can spend the reserve. Expiring funds are never banked merely to invent interest.
-- `items`: `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max).
+  Board filling/merges can spend the reserve. Carry bands keep their existing interest logic. Non-carry seats
+  buy wanted/useful operators, freeze unaffordable explicit `buy` targets or merge completions, refresh while
+  a stocked purchase can still be afforded, then buy cheap spare operators for later sale. Incidental bond
+  members, `keep` entries and copies of owned elites never trigger freezing.
+  `freezeSearch` is an optional boolean (default false): when an eligible explicit buy target is absent and
+  unaffordable after a refresh, still search while funds cover the effective refresh cost, then freeze it if
+  found unaffordable. This extra search respects `maxRefreshes` across the entire prep (default 16, including
+  free refreshes and previous ordinary refreshes); it cannot exceed the cap through repeated spending passes.
+  Ordinary affordable-purchase searches retain §35.13's expiring-funds override. A manual refresh would discard frozen
+  offers, so those offers block further searching. Only these marked, still-disposable bench operators are
+  sold to fund a wanted purchase; deployed/equipped/now-wanted operators and merge pairs are protected.
+  Empty plans and seats without a plan retain the original legacy execution.
+
+The §35.13 spending order is maintainer guidance (2026-10-19), not official strategy text. **[ASSUMED]**
+implementation choices: existing lineup gain >2 defines usefulness; explicit buys or prioritized-bond
+members define wanted operators under the copy rules above (except exact sell targets),
+bank cheapest distinct singles with positive sale value and available shared stock, keep one free bench
+slot, and bound each extra pass to 64 actions for free-refresh/effect loops. Sale-value estimates exclude
+unexecuted sale hooks. Bank ownership is internal policy memory, reconstructed by offline replay. No hidden
+pool counts are sent to the model. Unsuitable/unaffordable offers, a full bench, preserving a freeze or the
+action bound can leave unusable funds; there is no gratuitous refresh solely to drive the loss metric to zero.
+
+- `items`: `buy` contains up to **8 item IDs** to purchase from the shop when affordable and room remains;
+  `keep` contains item IDs (32 max); `equip` contains `{id: itemId, target: operatorId}` (16 max; either
+  operator form matches its base). Purchases use the usual handlers, followed by planned or legacy equipment selection. Explicit
+  requests may leave one free hand slot; an incidental item that cannot be equipped immediately must leave
+  at least two. Equipment is attempted between purchases so carrier slots are not promised twice.
   Existing inventory, slot and effect validators remain authoritative; invalid targets revert to ordinary selection.
 - `placements`: up to 16 `{id, row, col, dir?}` preferences, rows 0..12, columns 0..10, four uppercase cardinal
   directions. A legal matching tile/direction adds 0.05 to the exposure score; normal terrain/role preferences
@@ -219,6 +254,19 @@ Every plan field is optional; `{}` executes unchanged legacy. The schema and sco
   the normal legacy/default picker finish the window. The plan's choice is checked through the same human path.
 - Optional `usage` works in **both modes**: nonnegative integer `inputTokens`, `outputTokens`, `cachedTokens`,
   each at most 1 billion. Missing usage means unknown, not a claim of zero provider consumption.
+
+**Advisor hand-room protection (§35.14).** Only a nonempty advisor plan enables this policy; legacy and
+AI takeover without an advisor retain their original execution (maintainer decision **2026-10-20**).
+An elite, tier ≥4, exact `keep` piece, explicit buy target actually purchased this prep, or member whose
+removal drops an active plan-bond threshold is protected. The last check uses the real distinct/hand/morph
+bond counting rules. For room, sell unprotected copies of owned elites first, then bank operators, then
+low-tier off-plan singles, then other unprotected pieces; within each class use lowest piece value and UID.
+Next destroy the cheapest unequipped hand item costing at most 2 (UID breaks ties); only then fall back to
+legacy cleanup if every remaining option is protected. The protection applies to bench shedding, junk sales,
+board withdrawal, end-prep room and overflow resolution. A protected piece can still be benched.
+These priorities, the cheap-item cutoff, item space margins and 32-action cleanup bound are **[ASSUMED]**
+executor policy from the maintainer's seed-11 replay, not official strategy. Prices, merge forms, bond thresholds
+and hand/overflow/freeze mechanics retain their official `activity_table.json` / PRTS sources (§6.2–6.3).
 
 Malformed plans fail atomically and clear preferences before legacy. Accepted plans reset the failure streak
 and resume the #673 prep continuation, preserving slicing, rehearsal, Ready and deadline behavior. Preferences
@@ -265,6 +313,29 @@ The original `public` and `private` views keep their exact fields. Each observat
 and `context.mode`. Digest includes named shop prices/tiers, board coordinates, bench/overflow, bond count/next
 threshold, gold and band-specific interest now/at the next threshold, level/upgrade cost and explicit `exp:null`,
 current enemy/boss previews and opponents' **public scouted boards only**. No other private view or pool counts.
+§35.13 adds `economy.expiringFunds` (0 for carry bands), effective `refreshPrice` (0 for a free charge),
+`upgradePrice` (cost to the next level), `frozenSlots` (unsold slot indices), and
+`bankOperators:[{uid,id,sellValue}]` (marked disposable bench singles; base refund before sale hooks).
+These fields and per-offer `frozen` survive the example's compact digest.
+§35.15 adds further optional fields, omitted when unknown: chess on the board, bench, overflow and shop
+gain `name`, `class` (the official profession) and `caps:{air,block,sustain,elementRecovery}` from
+`canHitFly`, `dmgType`, `position`, `stats.blockCnt`, `profession` and `subProfessionId`
+(`charChessDataDict` / `data/chess.json`). Items gain `name`. Two operators share the name 锡人, so the id
+stays the key. Bounty cards gain `killChance` when the seat strategy's `bountyKillChance` returns a finite
+number (the existing legacy exposure model, not a new combat rule) and `enemy:{hp,def,res,motion,fly,effect}`
+from the catalogue row. `compactDigest` and `compactChoices` keep these fields. `sp-ai/1` and `sp-knowledge/1`
+otherwise keep their schemas. The example's system prompt uses a slim view of the pack; the hello still
+sends the full pack, and `strategyCandidates` still reads the full local playbook. The knowledge pack explains costs,
+no EXP, carry/interest per band, normal/elite sale values, freeze consumption at next round start, and manual
+refresh cancellation. Its playbook contains a recommended data-cost schedule and a labeled measured legacy
+reference; candidate curves state stage-key tiers, inaccessible keys and public copy shares. See
+[advisor economy](AI-STRATEGY.md#advisor-economy-3513) for sources, assumptions and the offline benchmark.
+§35.11 adds own LP, operator base IDs/bonds and `stars` (1 normal, 2 elite), public factions/bans, and, in
+plan mode only, `context.matchId` (opaque, unrelated to game RNG) and `digest.feedback`. Feedback retains the
+last 256 own successful buy/sell/merge events with monotonic `seq`, `through`, the last battle's round/LP/
+LP loss/counted leaks, and the last accepted prep plan `{id,round,plan}`. Buy/sell/merge events observe the
+existing meta hooks, including legacy's execution; inventory disappearance is never called a sale. The original
+human wire views keep exactly their existing fields. Feedback is scoped to the requested seat and match.
 
 `digest.actions` enumerates current-state shortcuts as `{id:'a1',text:'buy shop slot 2 (… , 3 gold)',intent:{…}}`.
 Shop/hand indices are zero-based. Direct agents can mix raw intents and IDs in `intents`, e.g. `["a1",{"t":"g.ready","ready":true}]`.
@@ -290,15 +361,90 @@ SP_LLM_API_KEY="$YOUR_KEY" npm start
 
 `SP_LLM_BASE_URL`, `SP_LLM_MODEL`, `SP_LLM_API_KEY` are required environment values; none are logged or
 journaled. `SP_LLM_TIMEOUT_MS` defaults to 20000 (1..30000). The adapter has no default provider or model.
+`SP_LLM_MAX_TOKENS` caps one reply (default 6000, 256–32000; reasoning models spend completion tokens before the plan, so a small cap returns an empty reply); `SP_LLM_REASONING_EFFORT` (minimal / low / medium / high) is sent as `reasoning_effort` when set; `SP_LLM_DEBUG_FILE` appends one line per request with the failing stage, the reply head and the accepted plan, never the key or request headers.
 It keeps eight knowledge versions in memory as stable system prompts, with an original general-principles
-strategy prompt, and sends only the digest/choices per decision. Provider prompt caching can reuse that prefix;
+strategy prompt, and sends only compact digest/choices/continuity per decision. Provider prompt caching can reuse that prefix;
 it is provider-dependent and still requires sending the prefix with the compatible stateless chat API.
 It POSTs `/chat/completions`, uses `response_format:{type:'json_object'}`, validates the parsed plan locally,
 rejects truncation/redirects/oversized output, and forwards numeric usage only. JSON mode does not guarantee
 schema adherence ([official OpenAI documentation](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=chat)).
-[ASSUMED] Example limits: 1200 output tokens, 256 KiB provider replies, 2 MiB input frames and four concurrent
+[ASSUMED] Example limits: 6000 output tokens (`SP_LLM_MAX_TOKENS`, 256–32000), 256 KiB provider replies, 2 MiB input frames and four concurrent
 requests. Catalogue effect summaries retain at most 500 characters each. Tests use a loopback mock; no real API
 is used for repository validation.
+
+### Committed round plans and private reasoning (§35.11)
+
+The example also receives a versioned, data-derived playbook (§35.12). §35.15 sends at most eight scored
+band-draft directions, preferring uncontended community/maintainer mains, and collapses a prep band and main
+into one candidate with `subOptions` (fewer only when legal alternatives run out). See [AI strategy method and regeneration](AI-STRATEGY.md) for
+official field sources, the maintainer's 2026-10-19 community guidance, band implications, stage keys,
+public teammate contention, enemy coverage and [ASSUMED] score/timing formulas. `knowledge.playbook` is static;
+the adapter computes `strategy.candidates` from the seat digest and acknowledged prior plan. Future targets
+guide purchases but do not bypass the held/reachable three-target gate. Regenerate offline with
+`node tools/ai/playbook.mjs --data-dir data --mode mode_multi_normal`; optional `--community` and `--observation`
+JSON inputs support other versions and saved observations. Output includes input/policy hashes and score evidence.
+
+The maintainer requested this example-policy change on **2026-10-19** after the solo HARD seed-7 run kept
+changing targets, bought unrelated operators and rejected one plan. All behavior here is **[ASSUMED] advisor
+policy**, not an official strategy or a change to the generic eight-bond plan protocol or gameplay rules.
+The sources remain the local official `activity_table.json`: `autoChessData` and
+`activity.AUTOCHESS_SEASON.act2autochess`'s `bondInfoDict`, `charChessDataDict`, `shopLevelDataDict` and
+band/effect records, as described above. Public bans, visible prices, actual bond counts and band interest use
+the existing game builders. No live stock or other seat's private transactions are inspected.
+
+The model is asked for:
+
+```json
+{"why":"Complete the held pair and the nearest bond threshold.","pivot":false,"pivotReason":"","plan":{"bonds":[],"keep":[],"economy":{"maxRefreshes":2}}}
+```
+
+- `why` is at most three short sentences (stored at most 360 characters). `pivot` is a boolean;
+  `pivotReason` is one line, at most 160 characters. These are adapter-only metadata. Only `plan` reaches
+  the game's validator, legacy executor and journal; metadata is never sent to another seat.
+- Keep at most **three** targets with priorities 1..5, highest first. Candidates must already have board/bench
+  members and a completed or publicly reachable threshold. Prefer finishing thresholds, preserving pairs and
+  core units. With no candidates, build the board first. Changing the primary bond (the highest priority)
+  requires `pivot:true` and a reason (unreachable bond, strong merge, boss/enemy needs). Adding, removing or
+  reordering sub-bonds does not. Without both, retain viable old targets; removing unreachable old targets
+  produces an explicit automatic pivot reason in diagnostics.
+  An explicitly empty plan remains unweighted legacy delegation, preserving §35.9's escape hatch.
+- The example caches the last confirmed and pending prep snapshots separately per match/player/knowledge version
+  (32 seat scopes). Host acknowledgement prevents rejected/late plans being presented as accepted. Drafts and
+  failed replies do not overwrite the prep direction. Each request includes the previous accepted plan and
+  observed buy/sell/merge events, bond counts before→after, LP before→after and the last battle; current board,
+  bench and overflow are in the digest. Old choice IDs are removed. Restart/eviction loses the local baseline:
+  the host still supplies the accepted plan and retained events, but missing baseline counts are `null` and
+  `eventsComplete:false`. Event sequence gaps are likewise explicit.
+- The compact digest lists shop cost/tier/bonds, owned stars/equipment/positions, bond count/next threshold/layers,
+  gold/interest/upgrade costs, enemies/factions/boss and public teammate bond summaries. §35.15 also keeps
+  chess `name` / `class` / `caps` and item `name`, because ids alone are ambiguous, and bounty `killChance`
+  plus compact enemy stats. Choice cards retain their visible effects and prices. Raw duplicate views, geometry,
+  placement alternatives, cosmetic fields and long trait text stay out; that text lives in the slim prefix.
+  The full knowledge pack stays the hello payload. The example system prompt is the slim view, at most 200000
+  characters, and drops compact enemies only when a translated catalogue would exceed that.
+- Reachability is a conservative **estimate**: use public catalogue members eligible at the current shop level,
+  excluding public bans, plus owned/displayed copies, capped by deployment capacity (except deck-counting bonds).
+  Golden-only targets require already owned elites; special bonuses/plugin effects are not forecast. Bench
+  members are potential, not activated count. `poolOptions` counts catalogue entries, **not remaining copies**;
+  actual stock and future rolls remain unknown. This cannot guarantee a threshold will be completed.
+- Local repairs drop unknown/wrong-kind IDs, duplicate/capped entries and stale choices; clamp finite numeric
+  values to existing schema bounds (numeric strings/fractions normalize); normalize placement directions.
+  The resulting plan still passes the strict `validPlan`. Malformed structures, invalid JSON,
+  incomplete replies and transport errors still fail and use the existing bounded fallback. Bare §35.9 plans
+  remain accepted. No retry or extra provider request is introduced.
+
+Set `SP_LLM_DEBUG_FILE` to a local NDJSON path to record match/player/request/round, bounded `why`, pivot/reason,
+accepted output plan, repairs (field and dropped ID/value, up to 128 details plus total count), stage and latency.
+The plan is the adapter's validated output; the next host observation confirms acceptance. Failure entries
+may include a short reply head. Keep this file private; it contains seat strategy and model text. API keys,
+headers and the knowledge prefix are not logged. `SP_LLM_REASONING_EFFORT` optionally passes
+`minimal|low|medium|high`; provider cache hits and latency improvements are not guaranteed.
+
+Offline evaluation: `test/fixtures/llm-advisor.json` is an authored recorded mock trace of the observed failure
+patterns using synthetic IDs, not a copied official table or a real model benchmark.
+`test/match/external-llm-continuity.test.js` checks continuity, host-observed execution, isolation, pivots,
+three targets, private reasoning, repairs and prompt size. Existing transport, advisor and replay suites still
+exercise the unchanged execution path. No win-rate or real-provider latency improvement is claimed.
 
 ### Benchmarks
 
