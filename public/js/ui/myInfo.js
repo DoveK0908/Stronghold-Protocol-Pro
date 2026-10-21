@@ -1,14 +1,16 @@
 // 界面#09: the lobby's 名片 button (头像 + 名字#四位 + 名片) and the 我的信息 dialog behind it — 修改头像 / 修改名片 /
 // 统计数据 plus the 代号 and the four digits. The same name card the achievements page draws, at the top bar's height.
 import { html, Icon, Modal, Button } from './components.js';
-import { useState, useEffect } from '../../vendor/hooks.module.js';
-import { useMyCard, setCardBackground, setCardAvatar, setAvatarLook } from './playerCard.js';
+import { useState, useEffect, useRef } from '../../vendor/hooks.module.js';
+import { useMyCard, setCardBackground, setCardAvatar, setAvatarLook, setCustomAvatar, customAvatarSrc } from './playerCard.js';
 import { cardOperators, cardAvatarUrl } from './seatArt.js';
 import { NameCardLayer, NameCardPicker } from './namecards.js';
 import { AvatarPicker } from './opPicker.js';
 import { Img, useGameData } from './gameComponents.js';
 import { TrophyBadge } from './trophies.js';
 import { openStats } from '../screens/stats.js';
+import { uploadAvatar } from './customAvatar.js';
+import { toast } from './toasts.js';
 import { net, identity } from '../net.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -24,7 +26,7 @@ export function playerLabel(name, tag) {
  */
 export function MeCard({ me, onOpen }) {
   const card = useMyCard();
-  const face = cardAvatarUrl(card.avatar, undefined, card.avatarLook);
+  const face = customAvatarSrc(card) || cardAvatarUrl(card.avatar, undefined, card.avatarLook);
   return html`<button type="button" class="me-card" data-testid="me-card" onClick=${onOpen}
       title=${t('我的信息')} aria-label=${t('我的信息')}>
     <${NameCardLayer} card=${card.bg} />
@@ -50,7 +52,16 @@ export function MyInfoDialog({ me, onClose }) {
   const [draftTag, setDraftTag] = useState(me?.tag || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const face = cardAvatarUrl(card.avatar, gd.m, card.avatarLook);
+  const [busyFace, setBusyFace] = useState(false);
+  const fileRef = useRef(null);
+  const pickFile = async (file) => {
+    if (!file || busyFace) return;
+    setBusyFace(true);
+    const res = await uploadAvatar(file).catch((err) => ({ ok: false, err: String(err && err.message || err) }));
+    setBusyFace(false);
+    if (res.ok) { setCustomAvatar(res.id); toast(t('头像已上传')); } else toast(res.err || t('上传失败'), 'warn');
+  };
+  const face = customAvatarSrc(card) || cardAvatarUrl(card.avatar, gd.m, card.avatarLook);
   const tagOk = /^\d{4}$/.test(draftTag);
   const nameOk = draftName.trim().length > 0;
   const dirty = draftName.trim() !== (me?.name || '') || draftTag !== (me?.tag || '');
@@ -85,7 +96,10 @@ export function MyInfoDialog({ me, onClose }) {
       </div>
       <div class="me-info__actions">
         <button type="button" class="btn btn--ghost btn--sm" onClick=${() => setPicking('avatar')}><${Icon} name="user" />${t('修改头像')}</button>
+        <button type="button" class="btn btn--ghost btn--sm" onClick=${() => fileRef.current?.click()} disabled=${busyFace}><${Icon} name="plus" />${busyFace ? t('上传中…') : t('上传头像')}</button>
         <button type="button" class="btn btn--ghost btn--sm" onClick=${() => setPicking('bg')}><${Icon} name="edit" />${t('修改名片')}</button>
+        <input ref=${fileRef} type="file" accept="image/png,image/jpeg,image/webp" class="me-info__file" data-testid="avatar-upload"
+          onChange=${(e) => { const f = e.currentTarget.files?.[0]; e.currentTarget.value = ''; pickFile(f); }} />
         <button type="button" class="btn btn--ghost btn--sm" onClick=${() => { onClose(); openStats(); }}><${Icon} name="chart" />${t('统计数据')}</button>
       </div>
       <div class="me-info__rename">

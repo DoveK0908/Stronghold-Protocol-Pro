@@ -152,7 +152,7 @@ const CS_FILE = /^\/cs\/([0-9a-f]{16})\/([A-Za-z0-9._\/-]{1,200})$/;
  *   clientModeFromEnv()) — 'build' without a public/build/index.html logs once and serves the source page
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, rawPath: string, query: string) => Promise<void>}
  */
-export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = path.join(ROOT, 'server', 'sim'), packsDir = path.join(ROOT, 'packs'),
+export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = path.join(ROOT, 'server', 'sim'), packsDir = path.join(ROOT, 'packs'), avatarDir = null,
   pluginsDir = path.join(path.dirname(path.resolve(packsDir)), 'plugins'), packs = null, content = null, log = noopLog,
   metrics = NO_PHASES, assetIndex = null, views = null, visual = null, contents = null, codeSource = codeSourceFromEnv(),
   client = clientModeFromEnv() }) {
@@ -161,6 +161,8 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
   let vanilla = content;
   const vanillaContent = () => (vanilla ||= computeVanillaContent({ simDir, sharedDir, dataDir, shim: DATA_SHIM_JS, log: /** @type {any} */ (log) }));
   const mounts = [
+    // 玩家自传头像 (server/avatars.js): /avatar/<id>.<png|jpg|webp> —— 只服务这三类扩展名
+    ...(avatarDir ? [{ prefix: '/avatar/', name: 'avatar', dir: path.resolve(avatarDir), sniff: true }] : []),
     { prefix: '/data/', name: 'data', dir: path.resolve(dataDir) },
     { prefix: '/shared/', name: 'shared', dir: path.resolve(sharedDir) },
     // the simulation: ES modules only (no directory listings, no other file types, no Node-only loader)
@@ -325,6 +327,15 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       || (mount.deny && mount.deny.has(segments[segments.length - 1].toLowerCase())))) {
       sendError(req, res, 404, '页面不存在 · Not found');
       return;
+    }
+    // 自传头像没有扩展名的 URL（/avatar/<id>，card.avatarImg 只有 id）：按 webp → jpg → png 找那个存在的文件
+    if (mount.sniff && segments.length === 1 && !path.extname(segments[0])) {
+      for (const ext of ['.webp', '.jpg', '.png']) {
+        const candidate = path.join(mount.dir, `${segments[0]}${ext}`);
+        let st = null;
+        try { st = await fsp.stat(candidate); } catch { /* try the next */ }
+        if (st?.isFile() && candidate.startsWith(mount.dir + path.sep)) { segments[0] = `${segments[0]}${ext}`; break; }
+      }
     }
     let absPath = path.join(mount.dir, ...segments);
     if (absPath !== mount.dir && !absPath.startsWith(mount.dir + path.sep)) { sendError(req, res, 403, '禁止访问 · Forbidden'); return; }

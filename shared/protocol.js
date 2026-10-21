@@ -590,6 +590,11 @@ export const C2S = {
   // the display card (CARD_LIMITS above; server/lobby.js setCard): stored per session, copied to the player's seat
   'room.card': { charId: isCardCharId, avatar: isCardCharId, bg: isCardBg, trophies: (v) => isInt(v, 0, CARD_LIMITS.trophies),
     look: isCardLook, avatarLook: isCardLook, $optional: ['charId', 'avatar', 'bg', 'trophies', 'look', 'avatarLook'] },
+  // 自传头像 (2026-10-21, maintainer): `data` = one base64 image (PNG/JPEG/WEBP, ≤ 200KB decoded); the server sniffs the
+  // magic bytes, stores it per browser (ownerKey) and answers `me.avatar { id }`. `{ id }` alone re-claims this browser's
+  // own earlier upload after a reload (any other id is refused). The room sees it as seats[].card.avatarImg.
+  'me.avatar': { data: (v) => typeof v === 'string' && v.length > 0 && v.length <= 400000,
+    id: (v) => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v), $optional: ['data', 'id'] },
   // spectator seats (remake feature, community report #26; MAX_SPECTATORS): take one of a co-op room's spectator seats —
   // in its lobby or while its match runs — never a player seat; the host frees one by playerId (the spectator gets
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
@@ -719,6 +724,9 @@ export const S2C = [
   // presence.state { online, seq, serverNow, maintenance? } — `maintenance: true` while the limits file's switch is on
   // (server/onlineLimit.js): room.create / room.start / queue.join answer MAINTENANCE; omitted when off.
   'presence.state', 'queue.state',
+  // me.avatar { id } — the requester's own uploaded avatar was accepted (server/avatars.js); only the uploader gets it,
+  // the room sees it through room.state seats[].card.avatarImg
+  'me.avatar',
   // Expanded relay only: m.public.uniteRound (1|2), uniteRounds (2); unite.rounds / uniteResult.rounds
   // retain completed { round, fieldId, battleId, helpers, through } rows. Current field helpers <=2,
   // final uniteResult.helpers aggregates <=4 actual participants; b.result limits remain unchanged.

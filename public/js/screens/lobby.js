@@ -37,6 +37,7 @@ import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton, openGuide } from '../ui/guide.js';
 import { AchievementEntry, AchievementPanel } from '../ui/achievements.js';
 import { MeCard, MyInfoDialog } from '../ui/myInfo.js';
+import { claimAvatar } from '../ui/customAvatar.js';
 import { SettingsButton } from '../ui/settings.js';
 import { PwaInstallButton, FullscreenButton, fullscreen, reducedMotion } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
@@ -674,6 +675,8 @@ export function LobbyScreen() {
   const [sweepOpen, setSweepOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#09)
+  // 自传头像：上传过的浏览器在每次连上服务器后重认领一次（服务端按 owner 只认自己的文件）
+  useEffect(() => net.on('welcome', () => claimAvatar()), []);
 
   useEffect(() => {
     // Optional low-frequency checks exist only while the lobby is mounted, never during a match.

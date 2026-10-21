@@ -193,6 +193,7 @@ import { checkLoadout, checkLoadoutOps, cultivationCharIds, checkNotOwned, check
 import { checkSkinSelection, isSkinId, operatorCharIds } from '../shared/protocol.js';
 import { EXPERIMENTAL_DEFAULTS, experimentalOptions, isExperimental, sameExperimental } from '../shared/experimental.js';
 import { parseTestModeEnv, testModeGate, unrecognizedTestMode } from './testMode.js';
+import { ownerKey } from './tags.js';
 import { MAX_PLAYER_CAPACITY, PLAYER_CAPACITY_VERSION, roomCapacity } from '../shared/playerCapacity.js';
 import { encode, isErrCode, sendEncodedMany, sendMessage, sendRaw, sendSession, TokenBucket } from './net.js';
 import { isCompressibleType } from './wsCompression.js';
@@ -316,7 +317,8 @@ function cardCharIds(data) {
   return ids;
 }
 const sameCard = (a, b) => (a?.charId ?? '') === (b?.charId ?? '') && (a?.avatar ?? '') === (b?.avatar ?? '') && (a?.bg ?? '') === (b?.bg ?? '')
-  && (a?.trophies ?? 0) === (b?.trophies ?? 0) && (a?.look ?? '') === (b?.look ?? '') && (a?.avatarLook ?? '') === (b?.avatarLook ?? '');
+  && (a?.trophies ?? 0) === (b?.trophies ?? 0) && (a?.look ?? '') === (b?.look ?? '') && (a?.avatarLook ?? '') === (b?.avatarLook ?? '')
+  && (a?.avatarImg ?? '') === (b?.avatarImg ?? '');
 /** A card look ('' / 'e1' / a skin id) that `charId` can wear. */
 /**
  * Frozen copy of a skin selection (docs/SKINS.md), keyed by operator charId.
@@ -525,8 +527,10 @@ export class Lobby {
    *   (server/match/host/index.js; none: such a match runs here, unit tests — or, in the cluster, on the game node)
    */
   constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, combatPool = null, trialPool = null, options = {},
-    limits = null, metrics = NO_PHASES, content = null, plugins = null, hosts = null }) {
+    limits = null, metrics = NO_PHASES, content = null, plugins = null, hosts = null, avatars = null }) {
     this.combatPool = combatPool;
+    /** 玩家自传头像的库 (`server/avatars.js`), or null = 不接收 */
+    this.avatars = avatars;
     this.trialPool = trialPool;
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
@@ -953,6 +957,7 @@ export class Lobby {
       case 'room.diy': return this.diy(session, msg);
       case 'room.skins': return this.skins(session, msg);
       case 'room.card': return this.setCard(session, msg);
+      case 'me.avatar': return this.setAvatar(session, msg);
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
       case 'room.setPlugins': return this.setPlugins(session, msg);
@@ -1949,6 +1954,45 @@ export class Lobby {
   }
 
   /**
+   * me.avatar（维护者需求 2026-10-21）：上传自传头像 —— 存进 server/avatars.js 的库，写进 session 的 display card
+   * （card.avatarImg），房间里其他人通过 card.avatarImg 拿到 /avatar/<id>。只认 PNG/JPEG/WEBP 的魔数、单张 ≤ 200KB；
+   * 一个浏览器（ownerKey(uid)）只留一张，重传替换旧图。`{ id }` 是刷新后的重认领：只有本 owner 的文件认。
+   */
+  setAvatar(session, { data, id }) {
+    const store = this.avatars;
+    if (!store) return fail(ERR.BAD_MSG, 'avatars are not accepted');
+    const key = ownerKey(session.uid || '');
+    if (typeof data !== 'string' && typeof id === 'string' && store.owns(id, key)) {
+      session.avatarImg = id;
+      sendSession(session, { t: 'me.avatar', id });
+      return this._applyAvatar(session, id);
+    }
+    if (typeof data !== 'string' || !data) return fail(ERR.BAD_MSG, 'no image');
+    if (data.length > Math.ceil(200 * 1024 / 3) * 4 + 8) return fail(ERR.BAD_MSG, 'avatar too large');
+    let buf;
+    try { buf = Buffer.from(data, 'base64'); } catch { return fail(ERR.BAD_MSG, 'bad base64'); }
+    const res = store.put(buf, key);
+    if (!res.ok) return fail(ERR.BAD_MSG, res.err === 'too-large' ? 'avatar too large' : 'avatar must be png/jpg/webp');
+    session.avatarImg = res.id;
+    const sent = sendSession(session, { t: 'me.avatar', id: res.id });
+    this.log?.info?.(`[avatar] stored ${res.id} owner=${key.slice(0, 8)} sent=${sent}`);
+    return this._applyAvatar(session, res.id);
+  }
+
+  /** 把 session 的自传头像写进 display card（房内其他人在 room.state 的 seats[].card.avatarImg 里看到）。 */
+  _applyAvatar(session, id) {
+    const card = Object.freeze({ ...(session.card || {}), avatarImg: id });
+    session.card = card;
+    const room = this.roomOf(session);
+    const seat = room ? room.seatOf(session.playerId) : null;
+    if (seat && !sameCard(seat.card, card)) {
+      seat.card = card;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
    * room.card (header): merge the message into the session's display card — a field left out keeps its value, '' / 0
    * clears it; an unknown operator is BAD_MSG — and copy it to the player's seat (never a spectator's), broadcasting the
    * room state when it changed. An unchanged card costs nothing; a change beyond CARD_CHANGES per CARD_WINDOW_MS is RATE.
@@ -1971,7 +2015,11 @@ export class Lobby {
     if (id && art) next.look = art;
     if (face && faceArt) next.avatarLook = faceArt;
     if (back) next.bg = back;
+    // 自传头像不是 room.card 的字段，改名片/头像时不能把它丢掉
+    if (session.avatarImg) next.avatarImg = session.avatarImg;
     if (count > 0) next.trophies = count;
+    // 自传头像 (me.avatar) 不是 room.card 的字段：客户端不能指向别人的文件，只由服务端写进 session.avatarImg
+    if (session.avatarImg) next.avatarImg = session.avatarImg;
     const card = Object.keys(next).length ? Object.freeze(next) : null;
     if (sameCard(card, session.card)) return OK;
     let bucket = this.cardBuckets.get(session);

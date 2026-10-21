@@ -47,6 +47,7 @@ import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../stor
 import { data, getMode, useData } from '../data.js';
 import { avatarUrl } from '../assets.js';
 import { CARD_PREF, cardOperators, seatPortrait, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
+import { customAvatarSrc } from '../ui/playerCard.js';
 import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
@@ -292,8 +293,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
       ${card?.bg ? html`<${NameCardLayer} card=${card.bg} />` : null}
       ${isMe && onPickAvatar
         ? html`<button type="button" class="rseat__ava" onClick=${onPickAvatar} title=${t('更换头像')} aria-label=${t('更换头像')}>
-            <${AvatarFrame} size="sm" name=${seat.name} src=${cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
-        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} bot=${seat.isBot} />`}
+            <${AvatarFrame} size="sm" name=${seat.name} src=${customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
+        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} seat=${index} bot=${seat.isBot} />`}
       <span class="rseat__who">
         ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.isBot ? seat.name || t('博士') : playerLabel(seat.name, seat.tag)}</b>
         <${OwnerBadge} seat=${seat} />

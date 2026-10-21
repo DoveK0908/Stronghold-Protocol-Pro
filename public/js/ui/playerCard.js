@@ -31,6 +31,8 @@ export function trophyTotal(records) {
 
 /** 头像: the operator whose official avatar stands for the player ('' = none: the strategy icon / the name's glyph). */
 export const AVATAR_PREF = 'room.avatar';
+/** 自传头像 (上传的图片, server/avatars.js): its id ('16 hex'), '' = none. One per browser, kept on the server. */
+export const AVATAR_IMG_PREF = 'room.avatar.img';
 /** The looks ('' 精二, 'e1' 精一, a skin id) of the 名片干员 and of the 头像 operator. */
 export const CARD_LOOK_PREF = 'room.card.look';
 export const AVATAR_LOOK_PREF = 'room.avatar.look';
@@ -41,6 +43,7 @@ export const cardStore = createStore({
   bg: namecardOf(loadPref(NAMECARD_PREF, '')) ? loadPref(NAMECARD_PREF, '') : DEFAULT_NAMECARD,
   look: str(loadPref(CARD_LOOK_PREF, '')),
   avatarLook: str(loadPref(AVATAR_LOOK_PREF, '')),
+  avatarImg: str(loadPref(AVATAR_IMG_PREF, '')),
   trophies: null, // read from the stats on first use
 });
 
@@ -61,6 +64,12 @@ export function setCardAvatar(charId) {
   if (str(charId) !== cardStore.get().avatar) setAvatarLook('');
   savePref(AVATAR_PREF, str(charId)); cardStore.set({ avatar: str(charId) });
 }
+/** 自传头像: the uploaded image's id (server/avatars.js); '' clears it back to the official 头像. */
+export function setCustomAvatar(id) {
+  const v = typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? id : '';
+  savePref(AVATAR_IMG_PREF, v); cardStore.set({ avatarImg: v });
+}
+
 /** @param {string} look '' 精二 / 'e1' 精一 / a skin id of the 名片干员 */
 export function setCardLook(look) { savePref(CARD_LOOK_PREF, str(look)); cardStore.set({ look: str(look) }); }
 /** @param {string} look '' / 'e1' / a skin id of the 头像 operator */
@@ -90,6 +99,12 @@ export function seatCardMatches(seatCard, msg) {
     && str(c.look) === str(msg.look) && str(c.avatarLook) === str(msg.avatarLook);
 }
 
+/** The uploaded avatar of a display card (server/avatars.js id), '' when there is none. */
+export function customAvatarSrc(card) {
+  const id = card && typeof card === 'object' ? card.avatarImg : '';
+  return typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? `/avatar/${id}` : '';
+}
+
 /**
  * The official avatar a player picked: one's own pick (this browser), else their seat card's (room.state seats[].card,
  * what the server showed the room); null when none, unknown or before the data loads.
@@ -101,8 +116,11 @@ export function useCardAvatar(playerId) {
   const mine = useStore((c) => `${c.avatar}|${c.avatarLook}`, Object.is, cardStore);
   const seat = useStore((s) => {
     const card = Array.isArray(s.room?.seats) ? s.room.seats.find((x) => x && x.playerId === playerId)?.card : null;
-    return card && typeof card === 'object' ? `${str(card.avatar)}|${str(card.avatarLook)}` : '|';
+    return card && typeof card === 'object' ? `${str(card.avatar)}|${str(card.avatarLook)}|${str(card.avatarImg)}` : '||';
   });
-  const [id, look] = (self ? mine : seat).split('|');
+  const mineImg = useStore((c) => str(c.avatarImg), Object.is, cardStore);
+  const [id, look, seatImg] = (self ? mine : seat).split('|');
+  const custom = self ? mineImg : seatImg;
+  if (custom && /^[0-9a-f]{16}$/.test(custom)) return `/avatar/${custom}`;
   return cardAvatarUrl(id, undefined, look);
 }

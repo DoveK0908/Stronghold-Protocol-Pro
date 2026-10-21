@@ -3340,5 +3340,11 @@
   "策略 {name}": "Strategy {name}",
   "战斗按 {n} 倍速演算（官方设定）": "Battles run at {n}x (a fixed game setting)",
   "移到这里": "Move here",
-  "第 {n} 组": "Group {n}"
+  "第 {n} 组": "Group {n}",
+  "上传头像": "Upload avatar",
+  "上传中…": "Uploading…",
+  "头像已上传": "Avatar uploaded",
+  "上传失败": "Upload failed",
+  "上传失败，换一张图片再试": "Upload failed — try another image",
+  "请选择一张 4MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image under 4 MB (PNG/JPEG/WEBP)"
 }

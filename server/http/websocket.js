@@ -28,6 +28,7 @@ export const WS_MAX_PAYLOAD = 64 * 1024;
  * @returns {{ registry: SessionRegistry, lobby: Lobby, network: Network }}
  */
 import { createTagRegistry } from '../tags.js';
+import { createAvatarStore } from '../avatars.js';
 
 export function createSessionStack(opts, { data, log, combatPool = null, trialPool = null, getLoadState, getLoadDetails, onlineLimit = null, ownerFile = null,
   content = null, plugins = null, hosts = null }) {
@@ -42,12 +43,14 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   // Optional coordinator phase recorder (server/phaseMetrics.js); absent everywhere else.
   const metrics = opts.phaseMetrics ? { metrics: opts.phaseMetrics } : {};
   // The limits file (server/onlineLimit.js) also carries the lobby's hot-reloadable room / AI caps (Lobby.cap).
+  // 玩家自传头像 (server/avatars.js): one store per server, files on disk so a restart keeps them.
+  const avatars = opts.avatars || createAvatarStore({ dir: opts.avatarsDir, indexFile: opts.avatarsIndex, log });
   const lobby = createLobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, combatPool, trialPool, options: lobbyOptions,
-    limits: onlineLimit, content, plugins, hosts, ...metrics });
+    limits: onlineLimit, content, plugins, hosts, avatars, ...metrics });
   // The owner file (server/ownerFile.js): the 服主 key every hello may carry and the owner's reserved names.
   // The 名字#四位 claims (server/tags.js, 界面#09): one registry per server, on disk so a restart keeps them taken.
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
-  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, ...metrics });
+  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, avatars, ...metrics });
   return { registry, lobby, network };
 }
 
