@@ -129,7 +129,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/stronghold
+# 两种写法选一个：
+#   A) 直接跑 .sh —— 必须先 chmod +x（见第 4 步），否则 systemd 报 203/EXEC「Permission denied」
 ExecStart=/opt/stronghold/start-linux.sh --no-open --port 3000
+#   B) 不依赖可执行位，最稳（node 换成 `which node` 看到的绝对路径）：
+# ExecStart=/usr/bin/node /opt/stronghold/app/scripts/launch.mjs --no-open --no-setup --port 3000
 Restart=always
 RestartSec=3
 
@@ -218,7 +222,8 @@ sudo certbot --nginx -d game.example.com      # 自动配 HTTPS 证书
 |---|---|
 | 浏览器打不开、一直在转 | 安全组没放行端口；或服务没起（`systemctl status stronghold`） |
 | `node: command not found` | 第 2 步没做完，或没重开终端 |
-| `Permission denied` 跑 `.sh` | `chmod +x start-linux.sh start-linux-sandbox.sh` |
+| `Permission denied` 跑 `.sh`（systemd `status=203/EXEC`） | 解压不会保留可执行位：`chmod +x start-linux.sh start-linux-sandbox.sh`；或改用 `ExecStart=/usr/bin/node /opt/stronghold/app/scripts/launch.mjs …` |
+| `node: command not found` 但手动跑正常 | systemd 的 PATH 不含 nvm：`which node` 取绝对路径写进 ExecStart |
 | `EADDRINUSE` | 3000 被占了：`sudo ss -lptn 'sport = :3000'` 查进程，或换 `--port 3001` |
 | `EACCES` 写不进 `state/` | 目录权限不对：`sudo chown -R root:root /opt/stronghold`（或你的运行用户） |
 | 页面 404 / 样式全丢 | 传的时候漏了 `app/public`；重新完整传一遍 |
