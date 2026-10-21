@@ -396,7 +396,9 @@ export function checkButtons({ pen, penAvail, infoOpen }) {
 
 /** One official 🔍 button: the sprite when installed, a CSS look-alike (icon + chevrons) otherwise. */
 function CheckBtn({ sprite, cls, label, chev, on, disabled, onClick, testid }) {
-  const url = localAsset('ui/battle', sprite);
+  // 2026-10-21 维护者：「顶栏材质官方的更好看更清晰」。官方那张 35×29 的贴图放大到 46px 会发糊（官方参考站没装
+  // 本地素材，回退的是矢量图标，所以看起来更锐）；这里统一用矢量图标 + 同样的方块底，不再用贴图。
+  const url = null;
   return html`<button type="button" class=${cx(cls, 'tapx', url && 'has-sprite', chev && 'is-wide', on && 'is-on')}
       style=${url ? `--chk-sprite:url("${url}")` : ''} aria-label=${label} aria-disabled=${disabled ? 'true' : 'false'}
       data-sprite=${sprite} data-testid=${testid} onClick=${onClick}>
