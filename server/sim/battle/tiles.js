@@ -44,6 +44,25 @@ export class BattleTiles {
    */
   moveRedeploy(unit, r, c, { clearSp = false } = {}) {
     if (!this.relocate(unit, r, c)) return false;
+    this._announceRedeploy(unit, { clearSp });
+    return true;
+  }
+
+  /**
+   * A redeployment **on the spot**: the same new deployment `moveRedeploy` announces (deploySeq / aggroSeq / deployedAt,
+   * `deploy` { initial: false, move: true }, hence the on-deploy effects' SP, stun windows, … fire again) without moving
+   * him — nothing to relocate, or already on the tile. Owner's decision of 2026-10-22 for 乌尔比安 S3's 【返回】 when the
+   * 【移动】 found no deployable tile: 「技能结束都算重新部署」, so the return still empties the SP and then on-deploy
+   * effects (迅捷作战粮 …) reach him [ASSUMED for the official engine, which always moves him somewhere].
+   */
+  redeployInPlace(unit, { clearSp = false } = {}) {
+    if (!unit || unit.side !== 'ally' || !unit.alive || !unit.deployed) return false;
+    this._announceRedeploy(unit, { clearSp });
+    return true;
+  }
+
+  /** New deployment counters, the SP reset of a 【移动】 (`clearSp`) and the `deploy` announcement. */
+  _announceRedeploy(unit, { clearSp = false } = {}) {
     unit.deploySeq = ++this._deploySeq;
     unit.aggroSeq = unit.deploySeq;
     unit.deployedAt = this.time;
@@ -54,7 +73,6 @@ export class BattleTiles {
     }
     this._ev(['deploy', unit.id]);
     if (this._hooks.deploy) this.emit('deploy', { unit, initial: false, move: true });
-    return true;
   }
 
   /**

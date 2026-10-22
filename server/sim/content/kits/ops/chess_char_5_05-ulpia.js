@@ -16,6 +16,9 @@ export default {
   // (projectile_range); moves onto the anchor tile when deployable (a tile of his own board) and not his own (a 从不混淆的方向
   // marker keeps his tile)
   // and returns at skill end — both 【移动】, i.e. free redeploys (Battle.moveRedeploy; the return empties his SP).
+  // He never moved (anchor on his own tile while blocking, or the landing tile and the tile beyond it both closed): the
+  // end is still a 【返回】 — an in-place redeploy (Battle.redeployInPlace, owner's decision of 2026-10-22
+  // 「技能结束都算重新部署」), so on-deploy effects fire even then.
   // Knocked out while moved, he lies and redeploys on his deployment tile (Unit.downAtHome — the owner's decision of
   // 2026-10-07, a deliberate deviation from PRTS's "where it fell", DESIGN §25.17.3).
   // T1 本性的坚守: heal 100 (160 below 50 %) on every hit taken. T2 血脉的哺养: per kill +120 max HP / +30 ATK (×9),
@@ -72,6 +75,7 @@ export default {
           // else the nearest tile ahead in the skill range (straight along his direction) with an enemy on it, else the
           // farthest one. His own tile is a candidate only while he blocks ("自身所在地块（仅阻挡敌人时）"); not taken: the
           // reading of the range's own tile (6-1 starts at [0,0]) as distance 0 for the second rule (a flyer over him)
+          unit.mem.anchorNoTile = false; // set below when the anchor found no deployable tile (not the "own tile" case)
           let stop = 0;
           if (!unit.blocking.some((e) => e.alive && e.blockedBy === unit)) {
             for (let d = 1; d <= reach; d++) {
@@ -90,8 +94,9 @@ export default {
             if (e.alive) battle.applyStatus(e, 'stun', { duration: num(bb.stun), source: unit });
           }
           // ③ 【移动】 — only a change of tile moves him and leaves the 从不混淆的方向 ("若目标地块不为当前地块，会在原地部署"): an
-          // anchor on his own tile leaves him where he stands, no marker, nothing to return from [ASSUMED: the "tile one
-          // beyond the landing" is not tried when the landing is his own tile]
+          // anchor on his own tile leaves him where he stands, no marker; the skill's end is still a 【返回】 (onEnd's
+          // no-move branch: an in-place redeploy) [ASSUMED: the "tile one beyond the landing" is not tried when the
+          // landing is his own tile]
           if (stop === 0 || !unit.alive) return;
           // PRTS 备注: landing tile > the tile one beyond it > his own tile (a deployable, free, unreserved melee tile).
           // "可部署" is a tile his player may deploy on: his own board (Battle.onOwnBoard) — never the other half of a 联防 or
@@ -101,7 +106,7 @@ export default {
           // that met no enemy flew on to the right half, where no enemy ever walks, and he moved there for the whole skill
           const ok = ([r, c]) => (r !== unit.tileR || c !== unit.tileC) && battle.grid.inRect(r, c) && battle.onOwnBoard(unit.player, r, c) && battle.grid.canStand(r, c) && !battle.grid.isObstacle(r, c) && !battle.isReservedTile(r, c);
           const dest = [[sr, sc], frontOf(unit.tileR, unit.tileC, unit.dir, stop + 1)].find(ok);
-          if (dest == null) return;
+          if (dest == null) { unit.mem.anchorNoTile = true; return; }
           const home = [unit.tileR, unit.tileC];
           // the 【移动】 is a redeploy on the new tile (Battle.moveRedeploy: a new deployment, deploy effects fire again,
           // no exit) that keeps the running skill — "【移动】后仅继承下列效果：技能进度、第二天赋叠加层数"; the rest of
@@ -121,7 +126,14 @@ export default {
           unit.mem.anchorHome = null;
           // the skill over with him standing: no longer moved by it (knocked out, the flag stays for Battle._layBody)
           if (unit.alive) unit.downAtHome = false;
-          if (!h) return;
+          if (!h) {
+            // he never moved (anchor on his own tile while blocking, or no deployable tile for it): the skill still
+            // ends with a 【返回】 — owner's decision of 2026-10-22 「技能结束都算重新部署」: a redeployment on the spot,
+            // SP emptied, on-deploy effects fire (迅捷作战粮, 黄沙罗盘 …). Nothing to move, so no 从不混淆的方向.
+            unit.mem.anchorNoTile = false;
+            if (unit.alive && unit.deployed) battle.redeployInPlace(unit, { clearSp: true });
+            return;
+          }
           if (h.marker && h.marker.alive) battle.retreat(h.marker, { reason: 'expired', permanent: true });
           if (unit.alive && unit.deployed) {
             // ④ 【返回】: a 【移动】 back to his tile "【返回】时将清空技力，但仍可以享受后续由其他效果提供的技力" — the SP is
