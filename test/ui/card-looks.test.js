@@ -43,28 +43,28 @@ test('cardMessage sends a look only with its operator; seatCardMatches compares 
 });
 
 
-// 2026-10-21 维护者：席位卡「对方怎么选的就怎么显示」——皮肤（干员调配）优先于名片外观，自己的读本机 store、
-// 队友的读 room.state seat.skins；没有皮肤才回落到名片的那一档（'' 精二 / 'e1' 精一）。
-test('seatLook: the owner skin wins over the card look, own and teammate alike', () => {
+// 2026-10-22 维护者：选择「精一/精二/皮肤」必须真能切——席位卡只认「更换立绘」这一处的选择
+// （自己读本机 card.look，队友读 room.state 里的 seat.card.look）；干员调配里的皮肤不参与，
+// 否则选了皮肤就永远切不回精一/精二。
+test('seatLook: the card look wins, own and teammate alike; loadout skins stay out of the seat card', () => {
   const ctx = { myId: 'p_me', myCard: 'char_a', myLook: 'e1', mySkins: { char_a: 'char_a_x_1' } };
   const mine = { playerId: 'p_me', card: { charId: 'char_a', look: '' } };
-  assert.equal(seatLook(mine, 'char_a', ctx), 'char_a_x_1', 'own seat uses the local skin store');
+  assert.equal(seatLook(mine, 'char_a', ctx), 'e1', 'own seat follows my own card look, not the loadout skin');
   const mate = { playerId: 'p_mate', card: { charId: 'char_a', look: '' }, skins: { char_a: 'char_a_x_1' } };
-  assert.equal(seatLook(mate, 'char_a', ctx), 'char_a_x_1', 'a teammate seat uses the broadcast skins');
+  assert.equal(seatLook(mate, 'char_a', ctx), '', 'a teammate seat follows its card look and ignores seat.skins');
   const plain = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
-  assert.equal(seatLook(plain, 'char_a', ctx), 'e1', 'no skin: the card look is the answer');
+  assert.equal(seatLook(plain, 'char_a', ctx), 'e1', '精一 from a teammate');
   const auto = { playerId: 'p_me', card: { charId: 'char_a', look: '' } };
-  assert.equal(seatLook(auto, 'char_a', { ...ctx, mySkins: {} }), 'e1', 'no skin of my own: my card look');
-  assert.equal(seatLook(auto, 'char_a', { ...ctx, mySkins: {}, myLook: '' }), '', 'no skin and 精二 look');
+  assert.equal(seatLook(auto, 'char_a', { ...ctx, myLook: '' }), '', 'own seat: 精二 look');
 });
 
-test('seatIllust: a skin draws its illustration; without one it draws the card look art', () => {
+test('seatIllust: 精二/精一/皮肤 all draw the illustration of that look', () => {
   const m = { chars: { char_a: { portrait: '/p1.png', portraitE2: '/p2.png', illust: '/i2.png', illustE1: '/i1.png',
     skins: { char_a_x_1: { charId: 'char_a', name: 'X', portrait: '/sp.png', illust: '/si.png' } } } } };
   const byChar = new Map([['char_a', { charId: 'char_a' }]]);
-  const base = { byChar, m, myId: 'p_me', myCard: 'char_b', myLook: '', mySkins: { char_a: 'char_a_x_1' } };
-  const mate = { playerId: 'p_mate', card: { charId: 'char_a', look: '' }, skins: { char_a: 'char_a_x_1' } };
-  assert.equal(seatIllust(mate, base), '/si.png');
+  const base = { byChar, m, myId: 'p_me', myCard: 'char_b', myLook: '' };
+  const mateSkin = { playerId: 'p_mate', card: { charId: 'char_a', look: 'char_a_x_1' } };
+  assert.equal(seatIllust(mateSkin, base), '/si.png', 'a skin picked in 更换立绘 draws its illustration');
   const plainMate = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
   assert.equal(seatIllust(plainMate, base), '/i1.png', '精一 has its own full-body illustration');
   assert.equal(seatLook(plainMate, 'char_a', base), 'e1');

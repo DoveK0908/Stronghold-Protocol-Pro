@@ -90,13 +90,13 @@ export function cardAvatarUrl(charId, m = data.get('assets'), look = '') {
  * 席位大图的「带场景」版本：名片干员装备了皮肤时，用该皮肤的 illustration（官方那张连背景的立绘）；
  * 没皮肤 / 精一 / 机器人返回 null，调用方退回 seatPortrait（透明立绘）。
  */
-export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '', mySkins = null }) {
+export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
   if (!seat || seat.playerId == null || seat.isBot) return null;
   const mine = seat.playerId === myId && myCard;
   const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
   const rec = pick && byChar ? byChar.get(pick) : null;
   if (!rec) return null;
-  const look = seatLook(seat, rec.charId, { myId, myCard, myLook, mySkins });
+  const look = seatLook(seat, rec.charId, { myId, myCard, myLook });
   // '' = 精英二：客户端里那张带背景的立绘（chars[].illust）；'e1' = 同一套取景的透明全身立绘（chars[].illustE1）
   return lookUrl(m, rec.charId, look, 'illust');
 }
@@ -111,23 +111,23 @@ export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '', mySkins
  * card look ('' 精二 / 'e1' 精一). Own seat reads the local stores, a teammate's reads `seat.skins` / `seat.card`
  * (server/lobby.js toState), so every client draws the same thing for the same person.
  */
-export function seatLook(seat, charId, { myId, myCard, myLook = '', mySkins = null } = {}) {
+export function seatLook(seat, charId, { myId, myCard, myLook = '' } = {}) {
+  // 只认「更换立绘」这一处的选择：自己读本机 card.look，队友读广播过来的 seat.card.look。
+  // 干员调配里选的皮肤（skinsStore → room.skins）不参与席位卡：否则选了皮肤就再也切不回精一/精二
+  // （维护者 2026-10-22 在服务器上踩到「没办法切换」）。皮肤想上席位卡，就在「更换立绘」里挑一次。
   const mine = seat && seat.playerId === myId && myCard;
-  const skins = mine ? mySkins : seat && seat.skins;
-  const skin = skins && typeof skins === 'object' ? skins[charId] : null;
-  if (typeof skin === 'string' && skin) return skin;
-  if (mine) return myLook || '';
+  if (mine) return typeof myLook === 'string' ? myLook : '';
   return typeof seat?.card?.look === 'string' ? seat.card.look : '';
 }
 
-export function seatPortrait(seat, { pool, byChar, m, myId, myCard, myLook = '', mySkins = null }) {
+export function seatPortrait(seat, { pool, byChar, m, myId, myCard, myLook = '' }) {
   if (!seat || seat.playerId == null) return null;
   // seats[].card is { charId, bg, trophies } (ui/playerCard.js); a bare string is the design's original form
   const mine = seat.playerId === myId && myCard;
   const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
   const rec = pick && byChar ? byChar.get(pick) : null;
   if (rec) {
-    const look = seatLook(seat, rec.charId, { myId, myCard, myLook, mySkins });
+    const look = seatLook(seat, rec.charId, { myId, myCard, myLook });
     return (look && lookUrl(m, rec.charId, look, 'portrait')) || chessPortraitUrl(m, rec);
   }
   if (!Array.isArray(pool) || !pool.length) return null;

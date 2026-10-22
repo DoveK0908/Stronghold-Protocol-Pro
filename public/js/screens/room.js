@@ -48,7 +48,6 @@ import { data, getMode, useData } from '../data.js';
 import { avatarUrl } from '../assets.js';
 import { CARD_PREF, cardOperators, seatPortrait, seatIllust, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
 import { customAvatarSrc } from '../ui/playerCard.js';
-import { SKINS_KEY, skinsStore } from '../ui/skins.js';
 import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
@@ -277,7 +276,14 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
     ${consent ? html`<span class="rseat__consent" data-testid="script-consented">${t('已同意')}</span>` : null}
     <header class="rseat__strip"><i></i><span class="num">P${index + 1}</span></header>
     <div class=${`rseat__art${canPick ? ' is-pickable' : ''}${scene ? ` rseat__art--scene${scenePainted ? ' rseat__art--painted' : ''}` : ''}`} onClick=${canPick ? onPickCard : undefined} title=${canPick ? t('点击更换名片干员') : undefined}>
-      ${(scene || src) && bad !== (scene || src) ? html`<img src=${scene || src} class=${scene ? 'is-scene' : ''} alt="" draggable=${false} loading="lazy" onError=${() => setBad(scene || src)} />`
+      ${(scene || src) && bad !== (scene || src) ? html`<img src=${scene || src} class=${scene ? 'is-scene' : ''} alt="" draggable=${false} loading="lazy"
+        onError=${(e) => {
+          // 立绘可能没跟着素材包下发（服务器只装了 web 素材、没有本地客户端提取的 char/illust）：
+          // 先退回半身像，再不行才退回首字母字形，别让整张卡空白。
+          const img = e.currentTarget;
+          if (scene && img.dataset.fallback !== '1' && src) { img.dataset.fallback = '1'; img.classList.remove('is-scene'); img.src = src; return; }
+          setBad(scene || src);
+        }} />`
         : html`<span class="rseat__glyph">${seat.isBot ? html`<${Icon} name="robot" />` : [...(seat.name || '?')][0]}</span>`}
       ${canPick ? html`<button type="button" class="rseat__pick" onClick=${(e) => { e.stopPropagation(); onPickCard(); }} aria-label=${t('更换名片干员')}><${Icon} name="edit" /><span>${t('更换立绘')}</span></button>` : null}
       ${isHostSeat ? html`<span class="rseat__host">${t('创建者')}</span>` : null}
@@ -384,12 +390,10 @@ export function RoomScreen() {
   const myCard = useMyCard();
   const [picking, setPicking] = useState(null); // 'op' | 'avatar' | 'bg'
   // 自己选的皮肤（干员调配）在本机 store 里；队友的由服务端随 room.state 的 seat.skins 广播
-  const mySkins = useStore((s) => s[SKINS_KEY] || null, Object.is, skinsStore);
   const portraits = useMemo(() => ({
     pool: cardList.filter((c) => (c.rarity ?? 0) >= 5).sort((a, b) => (a.charId < b.charId ? -1 : 1)),
     byChar: new Map(cardList.map((c) => [c.charId, c])), m, myId: me.playerId, myCard: myCard.charId, myLook: myCard.look,
-    mySkins,
-  }), [cardList, m, me.playerId, myCard.charId, myCard.look, mySkins]);
+  }), [cardList, m, me.playerId, myCard.charId, myCard.look]);
   // tell the server (teammates see the card) once it knows room.card; a server that refuses it keeps the card local
   const cardRefused = useRef(false);
   const mineCard = room ? roomFacts(room, me.playerId).mine?.card : null;
