@@ -1,12 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PHASE } from '../../shared/constants.js';
 import { revivalReason } from '../../public/js/ui/revival.js';
 import { experimentalSummary, ExperimentalOptions } from '../../public/js/ui/experimental.js';
 import { partyQueueReason } from '../../public/js/screens/room.js';
 import { queueActive, queueTime } from '../../public/js/ui/matchmaking.js';
 import { watchTarget } from '../../public/js/ui/gameLogic.js';
-import { PlayerAvatar } from '../../public/js/ui/gameComponents.js';
+import { avatarState } from '../../public/js/ui/gameComponents.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const read = (p) => readFileSync(join(ROOT, p), 'utf8');
 
 const fixture = () => ({
   phase: PHASE.SETTLE, round: 2,
@@ -74,10 +80,22 @@ test('revival UI disables expiry, wrong phase, dead donor, disabled rule and los
 test('pending death is displayed as awaiting rescue, not finalized elimination', () => {
   const pub = fixture(), target = pub.players[1];
   assert.match(watchTarget(target, pub, 'p1').reason, /等待救援/);
-  assert.ok(!PlayerAvatar({ player: target }).props.class.includes('is-dead'));
+  // the avatar's badges come from avatarState (the component is hook-driven, so the rule is asserted directly):
+  // a pending death is NOT dead — the seat keeps the hourglass, never the ✕
+  assert.deepEqual(avatarState(target), { pending: true, dead: false, left: false });
   target.pendingDeath = false;
   assert.match(watchTarget(target, pub, 'p1').reason, /已被淘汰/);
-  assert.ok(PlayerAvatar({ player: target }).props.class.includes('is-dead'));
+  assert.deepEqual(avatarState(target), { pending: false, dead: true, left: false });
+  // and PlayerAvatar still draws exactly those two rules: is-dead from `dead`, the 等待救援 hourglass from `pending`
+  const src = read('public/js/ui/gameComponents.js');
+  assert.match(src, /const \{ pending, dead, left \} = avatarState\(player\);/);
+  assert.match(src, /dead && 'is-dead', left && 'is-left'/);
+  assert.match(src, /\$\{pending \? html`<span class="pavatar__rescue" aria-label=\$\{tr\('等待救援'\)\}/);
+  assert.match(src, /\$\{dead \? html`<span class="pavatar__x" aria-label=\$\{tr\('已淘汰'\)\}/);
+  // a departed player is not struck out as dead, a live one carries no badge, and so does a missing record
+  assert.deepEqual(avatarState({ status: 'left' }), { pending: false, dead: false, left: true });
+  assert.deepEqual(avatarState({ alive: true, status: 'alive' }), { pending: false, dead: false, left: false });
+  assert.deepEqual(avatarState(null), { pending: false, dead: false, left: false });
 });
 
 test('party matching hints require a waiting coop, host, online humans and no AI', () => {

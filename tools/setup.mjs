@@ -70,8 +70,7 @@ export function checkPluginFx(root = ROOT) {
   return pluginFxGap(installedFxReferences(root), index);
 }
 
-/** [ASSUMED] A changed reference set may ask again; Enter/timeout never authorizes extraction. */
-export /**
+/**
  * Union of the two skinpack roots the AGRID client ships (`StreamingAssets/AB/Windows/skinpack` and
  * `PersistentData/Bundles/skinpack`) as one directory of hard links under .cache. The newer client keeps the last
  * operator skins only in PersistentData, and `extract.py --skin-bundles` reads a single root, so the caller passes
@@ -99,7 +98,8 @@ function skinBundleUnion(fxRoot, log) {
   return out;
 }
 
-function pluginFxExtractionAllowed(opts, missing, answer = false) {
+/** [ASSUMED] A changed reference set may ask again; Enter/timeout never authorizes extraction. */
+export function pluginFxExtractionAllowed(opts, missing, answer = false) {
   return !opts.check && opts.local !== 'no' && (opts.local === 'force' || missing.length > 0 && (opts.yes || answer === true));
 }
 

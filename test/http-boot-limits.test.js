@@ -1,7 +1,9 @@
 // test/http-boot-limits.test.js — the caps in effect are printed once when the session stack is built.
 //
-// The line is the configuration the server is running with, not a reason for a particular rejection: a global cap of 0
-// therefore prints as 0 (it rejects every room / socket), while a per-network 0 prints as "unlimited".
+// The line states the configuration the server is running with. Every admission cap defaults to 0 = unlimited
+// (docs/CONCURRENCY-ADMISSION.md: a positive cap is compared before rejecting a count), so the out-of-the-box line reads
+// "rooms 0 (unlimited/network) … sockets 0 (unlimited/network)". The global caps are printed as the raw number (0), never
+// as the word "unlimited"; a per-network cap is printed as its number, and 0 there reads "unlimited".
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -30,21 +32,23 @@ function logLines(opts = {}) {
   return lines;
 }
 
-test('the defaults are printed as they are', () => {
+test('the defaults are printed as they are: every cap 0 = unlimited', () => {
+  assert.equal(LOBBY_DEFAULTS.maxRooms, 0);
+  assert.equal(LOBBY_DEFAULTS.maxRoomsPerAddr, 0);
+  assert.equal(LOBBY_DEFAULTS.maxMatchesPerAddr, 0);
+  assert.equal(NET_DEFAULTS.maxConnections, 0);
+  assert.equal(NET_DEFAULTS.maxConnectionsPerAddr, 0);
   const lines = logLines();
   assert.equal(lines.length, 1, 'exactly one line on boot');
-  assert.equal(lines[0], `[http] limits: rooms ${LOBBY_DEFAULTS.maxRooms} (${LOBBY_DEFAULTS.maxRoomsPerAddr}/network), `
-    + `matches ${LOBBY_DEFAULTS.maxMatchesPerAddr}/network, `
-    + `sockets ${NET_DEFAULTS.maxConnections} (${NET_DEFAULTS.maxConnectionsPerAddr}/network)`);
+  assert.equal(lines[0], '[http] limits: rooms 0 (unlimited/network), matches unlimited/network, sockets 0 (unlimited/network)');
 });
 
 test('an explicit cap is printed, and a per-network 0 reads as unlimited', () => {
-  const lines = logLines({ maxRooms: 5, maxConnections: 100, maxConnectionsPerAddr: 0, maxMatchesPerAddr: 0 });
+  const lines = logLines({ maxRooms: 5, maxRoomsPerAddr: 16, maxConnections: 100, maxConnectionsPerAddr: 0, maxMatchesPerAddr: 0 });
   assert.equal(lines[0], '[http] limits: rooms 5 (16/network), matches unlimited/network, sockets 100 (unlimited/network)');
 });
 
-test('a global 0 is printed as 0, because it rejects every room / socket', () => {
+test('a global 0 is printed as 0, the number as configured, never as the word "unlimited"', () => {
   const lines = logLines({ maxRooms: 0, maxConnections: 0 });
-  assert.match(lines[0], /rooms 0 \(16\/network\)/, 'a global room cap of 0 is not "unlimited"');
-  assert.match(lines[0], /sockets 0 \(64\/network\)/, 'a global socket cap of 0 is not "unlimited"');
+  assert.match(lines[0], /^\[http\] limits: rooms 0 \(unlimited\/network\), matches unlimited\/network, sockets 0 \(unlimited\/network\)$/);
 });

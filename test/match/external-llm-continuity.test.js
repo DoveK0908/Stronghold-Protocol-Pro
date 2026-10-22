@@ -196,6 +196,9 @@ test('host feedback observes real successful buys, sales, merges and battle resu
   const o = aiObservation(m, ps, { kind: 'prep', id: 'o' }, []);
   assert.deepEqual(o.private, ownWire); assert.deepEqual(o.public, pubWire);
   assert.equal(o.digest.feedback.through, 3); assert.equal(o.context.matchId, ai.matchId);
+  // settle() only resolves a battle (and dispatches onBattleResult) from COMBAT / UNITE
+  // (server/match/match/settle.js:16); drive the real flow there instead of settling a PREP match.
+  assert.ok(h.drive(() => m.phase === 'COMBAT' && m.round === 1, {}), `expected COMBAT, got ${m.phase}`);
   m.lastResults = new Map([[ps.playerId, { leaked: [{}, {}, { counted: false }], layerGains: {} }]]);
   m.settle(null, null);
   assert.equal(ai.feedbackFor(ps).lastBattle.leaks, 2);

@@ -309,6 +309,18 @@ function standInAvatar(playerId) {
 }
 
 /**
+ * The three badges of an avatar — a pending death is a rescue in progress, so that seat is NOT drawn as dead
+ * (`watchTarget`/`revivalReason` say 等待救援), and a departed player is neither dead nor waiting.
+ * Pure, so the rule is testable without a hook renderer (test/ui/alliance.test.js).
+ * @param {any} player the room's / match's player record
+ * @returns {{ pending: boolean, dead: boolean, left: boolean }}
+ */
+export function avatarState(player) {
+  const pending = player?.pendingDeath === true;
+  return { pending, dead: !pending && (player?.alive === false || player?.status === 'dead'), left: player?.status === 'left' };
+}
+
+/**
  * Seat-coloured player avatar: band icon when a band is picked, else the player's picked 头像, else glyph/robot;
  * `prefer="avatar"` puts the picked 头像 first (a player's own cards: the draft rows, 协议启动, the settlement).
  * @param {{ player: any, size?: 'sm'|'md', self?: boolean, prefer?: 'band'|'avatar', class?: string }} props
@@ -325,9 +337,7 @@ export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band
   const then = ownFace || (player?.isBot ? null : standInAvatar(player?.playerId)) || src;
   const wantAvatar = prefer === 'avatar' || !player?.isBot;
   const glyph = [...(player?.name || '').trim()][0] || '?';
-  const pending = player?.pendingDeath === true;
-  const dead = !pending && (player?.alive === false || player?.status === 'dead');
-  const left = player?.status === 'left';
+  const { pending, dead, left } = avatarState(player);
   const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
   const fallback = player?.isBot ? html`<${Icon} name="robot" class="pavatar__bot" />` : html`<span class="pavatar__glyph">${glyph}</span>`;
   const face = player?.isBot || player?.playerId == null || !wantAvatar ? html`<${Img} src=${src} fallback=${fallback} />`

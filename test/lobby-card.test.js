@@ -1,6 +1,8 @@
 // room.card (fork lobby, 2026-10-14): a player's display card — portrait and avatar operators, namecard background, self-reported
 // trophies — kept on the session, copied to the player's seat and shown to the room (room.state seats[].card); a real
-// operator only, rate-limited changes, never part of a match (local or cluster).
+// operator only, rate-limited changes. It rides along into a local match as display-only data on human seats
+// (PlayerState.card, maintainer 2026-10-20: the same face in-match as in the room, so teammates see each other's card);
+// it never reaches the cluster's match DTO (server/cluster/lobby.js stampMember) and no rule reads it.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Lobby, CARD_CHANGES, CARD_WINDOW_MS } from '../server/lobby.js';
@@ -142,16 +144,22 @@ test(`at most ${CARD_CHANGES} changes per ${CARD_WINDOW_MS / 1000} s per session
   assert.equal(card(a, { trophies: 100 }).error, ERR.RATE);
 });
 
-test('the card never enters a match: local seats and the cluster DTO carry none, and an edit cannot abort a pending start', async (t) => {
+test('a match gets the display card on human seats only, the cluster DTO never does, and an edit cannot abort a pending start', async (t) => {
   const local = fixture(t);
   const a = local.player(), b = local.player();
   local.card(a, { charId: AMIYA, avatar: OTHER, trophies: 3 });
   local.lobby.create(a, { mode: 'coop', difficulty: 'NORMAL' });
   local.lobby.join(b, { code: local.lobby.roomOf(a).code });
+  assert.deepEqual(local.lobby.addBot(a), { ok: true });
   local.lobby.ready(b, { ready: true });
   assert.deepEqual(local.lobby.start(a), { ok: true });
   const room = local.lobby.roomOf(a);
-  assert.ok(room.match.opts.seats.every((s) => !Object.hasOwn(s, 'card')));
+  const seats = new Map(room.match.opts.seats.map((s) => [s.playerId, s]));
+  assert.deepEqual(seats.get(a.playerId).card, { charId: AMIYA, avatar: OTHER, trophies: 3 },
+    'a human seat carries the display card (the in-match avatar, maintainer 2026-10-20)');
+  assert.ok(!Object.hasOwn(seats.get(b.playerId), 'card'), 'a human without a card grows no key');
+  const bot = room.match.opts.seats.find((s) => s.isBot);
+  assert.ok(bot && !Object.hasOwn(bot, 'card'), 'an AI seat never carries a card');
   assert.deepEqual(local.card(a, { trophies: 4 }), { ok: true }, 'a display edit is fine during a match');
   assert.deepEqual(room.seatOf(a.playerId).card, { charId: AMIYA, avatar: OTHER, trophies: 4 });
 

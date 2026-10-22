@@ -372,11 +372,18 @@ test('three times an official interval still validates, and the shared bounds sn
 });
 
 test('every while in the sim and the match names its loop cap', () => {
+  // The Elite AI addon's engine is vendored verbatim (server/match/{arturia,lavinia}/, projects.md C03, upstream
+  // HankDUMPLINGZhong/Stronghold-Protocol-AI): third-party bot code shipped as-is and replaced wholesale on a
+  // re-vendor (v0.2.0 swapped the whole policy tree), so this repo's cap annotation is not applied to it.
+  // tools/i18n.mjs's VENDORED_DIRS and test/i18n.test.js skip the same two trees for the same reason.
+  const VENDORED = new Set(['server/match/arturia', 'server/match/lavinia']);
   const missing = [];
-  const walk = (dir) => {
+  const walk = (rel) => {
+    if (VENDORED.has(rel)) return;
+    const dir = path.join(process.cwd(), rel);
     for (const name of fs.readdirSync(dir)) {
       const abs = path.join(dir, name);
-      if (fs.statSync(abs).isDirectory()) { walk(abs); continue; }
+      if (fs.statSync(abs).isDirectory()) { walk(`${rel}/${name}`); continue; }
       if (!name.endsWith('.js')) continue;
       const lines = fs.readFileSync(abs, 'utf8').split(/\n/);
       lines.forEach((line, i) => {

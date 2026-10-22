@@ -442,9 +442,19 @@ describe('the 插件 panel (ui/pluginPanel.js) and the room screen', () => {
     };
     walk('public/js/main.js');
     assert.ok(seen.has('public/js/content.js') && seen.has('public/js/cosmetics.js') && seen.has('public/js/ui/pluginTag.js'), 'the small parts are there');
-    for (const lazy of ['public/js/assets.js', 'public/js/ui/pluginPanel.js', 'shared/plugins/visual.js', 'shared/plugins/order.js']) {
+    for (const lazy of ['public/js/ui/pluginPanel.js', 'shared/plugins/visual.js', 'shared/plugins/order.js']) {
       assert.equal(seen.has(lazy), false, `${lazy} loads only when it is needed`);
     }
+    // The asset store is in the start graph since the room shows its seats' own avatars (me.avatar, then
+    // me.namecard, ui/customAvatar.js): screens/room.js imports its pure `avatarUrl`. It must stay import-pure —
+    // no manifest fetch, no PIXI, no DOM — so a vanilla page still downloads nothing asset-side until it is used
+    // (assets.js's own header: "Pure at import time"; the manifest is fetched by ready(), ui/fieldHost.js seeds or
+    // a match calls it).
+    const roomSrc = readFileSync(path.join(ROOT, 'public/js/screens/room.js'), 'utf8');
+    assert.match(roomSrc, /import \{ avatarUrl \} from '\.\.\/assets\.js';/);
+    const assetsSrc = readFileSync(path.join(ROOT, 'public/js/assets.js'), 'utf8');
+    assert.match(assetsSrc, /Pure at import time: no PIXI, no DOM access until a loader actually runs/);
+    assert.doesNotMatch(assetsSrc, /^\s*(?:await\s+)?fetch\s*\(/m, 'the manifest is fetched by ready(), never at import');
   });
 
   test('the room screen shows the tag under its title; the settings show 外观插件; the texts are in every pack', () => {

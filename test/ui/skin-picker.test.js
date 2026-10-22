@@ -83,8 +83,10 @@ describe('皮肤 picker: what one operator offers', () => {
     const rows = availableSkins(OPERATOR);
     assert.deepEqual(rows.map((r) => r.id), ['', SKIN, SKIN2, ART_ONLY]);
     assert.equal(rows[0].own, true);
-    assert.equal(rows[0].portrait, '/i/inside.png', 'the 默认 tile draws the 立绘 the plugin gives the operator');
-    assert.equal(rows[0].illust, '/i/inside.png');
+    // 维护者 2026-10-21（47c43a2c）：the 默认 tile draws the operator's HALF-BODY portrait, exactly like a skin's tile;
+    // the 立绘 is only the enlarged preview (and the tile's last resort when the record has no portrait at all).
+    assert.equal(rows[0].portrait, '/p/inside_1.png', 'the 默认 tile draws the 半身照 the operator already has');
+    assert.equal(rows[0].illust, '/i/inside.png', 'the 立绘 stays for the enlarged preview');
     assert.equal(rows[0].avatar, '/a/inside.png');
   });
 
@@ -96,10 +98,10 @@ describe('皮肤 picker: what one operator offers', () => {
     assert.equal(rows[0].illust, '/p/kalts_1.png');
   });
 
-  test('a 立绘 with no skin at all is drawn (the 默认 tile falls back 立绘 → portrait → avatar, never to an empty box)', () => {
+  test('a 立绘 with no skin at all is drawn (the 默认 tile falls back portrait → 立绘, never to an empty box)', () => {
     const rows = availableSkins(ILLUSTR_ONLY);
     assert.deepEqual(rows.map((r) => r.id), ['']);
-    assert.equal(rows[0].portrait, '/i/pepe.png', 'the picture the plugin wrote is the tile art');
+    assert.equal(rows[0].portrait, '/i/pepe.png', 'no portrait in the record: the picture the plugin wrote is the tile art');
     assert.equal(rows[0].avatar, null, 'nothing invented for a field the plugin did not write');
   });
 

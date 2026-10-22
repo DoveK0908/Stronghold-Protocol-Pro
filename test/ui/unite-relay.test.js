@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { PHASE } from '../../shared/constants.js';
 import { RESULT_LIMITS, validateC2S } from '../../shared/protocol.js';
 import { uniteRelayRound, uniteRelayKey, currentRelayField } from '../../public/js/battle/observe.js';
 import { phaseBanner, uniteResultBox } from '../../public/js/ui/gameLogic/phases.js';
 import { PhaseCapsule } from '../../public/js/ui/hud.js';
-import { uniteDamageOwners, bossDamageOwners, damageGroups, acceptDamageSnapshot } from '../../public/js/ui/damageBoard.js';
 import { createBattleRunner } from '../../public/js/battle/runner.js';
 import { createStore, initialState } from '../../public/js/store.js';
 
@@ -58,32 +57,32 @@ test('first unite never promises a second round; only an actual second relay is 
   assert.ok(text(PhaseCapsule({ pub, hud: { killed: 0, total: 7 } })).includes('联防 2/2'));
 });
 
-test('damage scope unions actual relay helpers, never leak sources, and reads the absolute ledger once', () => {
-  const pub = relay(), before = structuredClone(pub);
-  const owners = uniteDamageOwners({ pub, fieldId: 'u:2' });
-  assert.deepEqual(owners.map(p => p.playerId), ['p1', 'p2', 'p3', 'p4']);
-  const snapshot = { matchId: 'm1', round: 3, status: 'live', owners: players.map((p, i) => ({ ...p, total: (i + 1) * 100, operators: [], otherDamage: (i + 1) * 100 })) };
-  assert.equal(damageGroups(snapshot, [...owners, ...owners]).total, 1000);
-  assert.equal(acceptDamageSnapshot(snapshot, { ...snapshot, owners: snapshot.owners.slice() }, 'm1').owners.length, 5);
-  assert.deepEqual(pub, before);
-  assert.deepEqual(uniteDamageOwners({ pub: relay(1), fieldId: 'u' }).map(p => p.playerId), ['p1', 'p2']);
+test('damage readout is the official 作战统计: local-only rows, never a relay-wide ledger', () => {
+  // Pro dropped its own damage board on 2026-10-20 (界面#02: the maintainer kept the official 作战统计 and removed
+  // public/js/ui/damageBoard.js with its relay-union helpers, _build/projects.md). A player therefore reads the local
+  // meter alone — nothing here may widen to teammates, leak sources or a server snapshot.
+  assert.equal(existsSync(new URL('../../public/js/ui/damageBoard.js', import.meta.url)), false);
+  const panel = readFileSync(new URL('../../public/js/ui/combatMetrics.js', import.meta.url), 'utf8');
+  assert.match(panel, /runner\?\.combatMetrics\(\{ scope, ownerId: myId \}\)/);
+  assert.match(panel, /ownerId=\$\{r\.ownerId\}/);
+  const metrics = readFileSync(new URL('../../public/js/battle/metrics.js', import.meta.url), 'utf8');
+  assert.match(metrics, /Browser-only, read-only combat accounting\. No event history or network payloads\./);
+  assert.match(metrics, /if \(ownerId != null && r\.ownerId !== ownerId\) continue;/);
+  assert.equal(RESULT_LIMITS.players, 4);
 });
 
-test('settle/reconnect retains both helper groups without a local history and uses only final LP charges', () => {
+test('settle keeps the unite result box on the final LP charges', () => {
   const pub = { ...relay(), phase: PHASE.SETTLE, fields: [], uniteResult: { helpers: [...first.helpers, ...second.helpers], rounds: [first, second], through: 0, losses: { p1: 0, leaker: 0 } } };
-  const field = { fieldId: 'u:2', round: 3, players: second.helpers };
-  assert.equal(uniteDamageOwners({ pub, fieldId: 'u:2', field }).length, 4);
-  assert.equal(uniteDamageOwners({ pub, fieldId: 'u:2', field: { ...field, round: 2 } }), null);
   assert.equal(uniteResultBox(pub.uniteResult, 'leaker').sub, '全员无伤！');
   assert.equal(uniteResultBox({ ...pub.uniteResult, through: 2, losses: { leaker: 2 } }, 'leaker').sub, '生命值减少 −2');
   assert.equal(uniteResultBox(pub.uniteResult, 'observer'), null);
 });
 
-test('relay never widens an individual unite field or another Boss pair', () => {
-  assert.equal(uniteDamageOwners({ pub: { ...relay(), fields: [{ fieldId: 'u:2', kind: 'unite', players: ['p1', 'p2', 'p3'] }] }, fieldId: 'u:2' }), null);
-  assert.equal(uniteDamageOwners({ pub: { ...relay(), phase: PHASE.PREP }, fieldId: 'u:2' }), null);
+test('a boss field adds no relay scope of its own; result participants stay capped', () => {
   const pub = { ...relay(), phase: PHASE.FINAL_ASSAULT, fields: [{ fieldId: 'b1', kind: 'boss', players: ['p1', 'p2'] }] };
-  assert.deepEqual(bossDamageOwners({ pub, fieldId: 'b1' }).map(p => p.playerId), ['p1', 'p2']);
+  assert.equal(uniteRelayRound(pub), null, 'a boss field is not a relay');
+  assert.equal(uniteRelayKey(pub), null);
+  assert.equal(currentRelayField(pub, { fieldId: 'b1', battleId: 'battle-boss' }), true);
   assert.equal(RESULT_LIMITS.players, 4);
 });
 

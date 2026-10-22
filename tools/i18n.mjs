@@ -48,6 +48,11 @@ const CJK = /[\u3400-\u9fff\uf900-\ufaff\u3000-\u303f\uff01-\uff60]/;
 const HAN = /[\u3400-\u9fff\uf900-\ufaff]/;
 const DEFAULT_ROOTS = ['public/js', 'public/studio', 'shared', 'server'];
 const SKIP_DIRS = new Set(['node_modules', 'vendor', 'assets', 'fonts', 'dev']);
+/**
+ * Third-party code vendored verbatim and never translated: the Elite AI addon's engine (projects.md C03, upstream
+ * HankDUMPLINGZhong/Stronghold-Protocol-AI) ships its own Chinese strategy/route names and has no pack of its own.
+ */
+const VENDORED_DIRS = new Set(['server/match/arturia', 'server/match/lavinia']);
 /** Calls whose first argument is a msgid (tc: the second, keyed `context::msgid`). */
 const MSGID_CALLS = new Set(['t', 'tParts', 'N_', 'msg']);
 /**
@@ -469,6 +474,7 @@ function listFiles(paths, { sim = false } = {}) {
         if (SKIP_DIRS.has(name) || name.startsWith('.')) continue;
         const rel = path.relative(ROOT, path.join(abs, name)).split(path.sep).join('/');
         if (rel === 'server/sim' && !sim) continue;
+        if (VENDORED_DIRS.has(rel)) continue;
         visit(path.join(abs, name));
       }
     } else if (/\.(m?js)$/.test(abs)) out.push(abs);

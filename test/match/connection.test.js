@@ -73,9 +73,13 @@ test('m.private shape in PREP matches DESIGN §8.3 (pieces, slots, bonds, effect
   assert.equal(priv.funds, 4);
   assert.equal(priv.shop.slots.length, 4);
   for (const s of priv.shop.slots) {
-    assert.deepEqual(Object.keys(s).sort(), ['basePrice', 'frozen', 'id', 'kind', 'price', 'sold']);
+    // U07 卡池剩余 (界面#07): a chess card also carries how many copies of it are left in the player's pool
+    // (server/match/player/views.js privateView); an item card has no pool copy count.
+    const keys = ['basePrice', 'frozen', 'id', 'kind', 'price', 'sold', ...(s.kind === 'chess' ? ['left'] : [])];
+    assert.deepEqual(Object.keys(s).sort(), keys.sort());
     assert.equal(s.frozen, false);
     assert.ok(s.kind === 'chess' || s.kind === 'item');
+    if (s.kind === 'chess') assert.ok(Number.isInteger(s.left) && s.left >= 1, `pool stock of ${s.id}`);
   }
   assert.equal(priv.shop.rewardOffer, null);
   assert.equal(priv.personalChoice, null);

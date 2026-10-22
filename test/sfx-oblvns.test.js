@@ -348,7 +348,7 @@ describe('SKILL_SFX_BANKS (audio.mjs): 按技能细分, the sounds one SKILL own
 /** The manifest-side half of SKILL_SFX_BANKS: what the committed `data/assets.json` carries and what is on disk. */
 describe('skillSfx in the manifest and on disk', () => {
   const noManifest = !manifest && 'data/assets.json not generated (run npm run assets)';
-  const noAssets = noManifest || !existsSync(PUBLIC) ? 'public/assets missing (run npm run assets)' : false;
+  const noAssets = noManifest || !existsSync(join(PUBLIC, 'assets')) ? 'public/assets missing (run npm run assets)' : false;
   const her = () => manifest.audio.sfx.units[CHAR];
 
   test('the manifest carries it: skillSfx per skill index, /assets/audio/sfx/*.mp3', { skip: noManifest }, () => {
@@ -522,8 +522,11 @@ describe('fetch-voice-override.mjs --sfx: the jobs are the plan\'s own files', (
     ], 'only the table skills are looked at without --char');
   });
 
-  test('--char keeps the projectile kinds that operator\'s manifest entry points at', { skip: !manifest && 'data/assets.json not generated (run npm run assets)' }, () => {
-    const proj = projSfxLeaves(audio ?? indexAudio({ soundFXBanks: [] })).urls;
+  // Needs the official index (the resolved projectile URLs) as well as the committed manifest: without it `projSfxLeaves`
+  // cannot name a single kind, so the judgements below would read `proj.note` of an empty map (CI has no `.cache/`).
+  const noJobsData = noAudio || (!manifest && 'data/assets.json not generated (run npm run assets)');
+  test('--char keeps the projectile kinds that operator\'s manifest entry points at', { skip: noJobsData }, () => {
+    const proj = projSfxLeaves(audio).urls;
     const her0 = manifest?.audio?.sfx?.units?.[CHAR];
     if (!her0) return;   // a manifest without her entry: nothing to judge (the branches below cover those cases)
     // The ownership test is "does any URL of that operator's own manifest entry equal this kind's file": it needs no new
@@ -560,7 +563,7 @@ describe('fetch-voice-override.mjs --sfx: the jobs are the plan\'s own files', (
 
 describe('the manifest, the files on disk and the client', () => {
   const noManifest = !manifest && 'data/assets.json not generated (run npm run assets)';
-  const noAssets = noManifest || !existsSync(PUBLIC) ? 'public/assets missing (run npm run assets)' : false;
+  const noAssets = noManifest || !existsSync(join(PUBLIC, 'assets')) ? 'public/assets missing (run npm run assets)' : false;
   const her = () => manifest.audio.sfx.units[CHAR];
 
   test('her entry carries skills[] for all three indices, under /assets/audio/sfx/', { skip: noManifest }, () => {

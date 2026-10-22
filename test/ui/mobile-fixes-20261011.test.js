@@ -16,8 +16,11 @@ test('全屏 sits in the hub top bar beside 设置 / 玩法说明, with the expl
   assert.match(tools, /<\$\{GuideButton\}/);
   assert.match(tools, /<\$\{HubFullscreenButton\} \/>/);
   assert.match(lobby, /if \(!ok\) return html`<\$\{FullscreenButton\} class="hub-fs-btn hub-fs-btn--help" showUnavailable=\$\{true\} \/>`/);
-  // the name chip is the one 统计数据 entry of the hub
-  assert.equal((lobby.match(/onClick=\$\{openStats\}/g) || []).length, 1);
+  // the name chip is the one 名片 button (界面#10, ui/myInfo.js MeCard) — the only 统计数据 entry of the hub is inside
+  // its dialog, not a second top-bar button
+  assert.equal((lobby.match(/<\$\{MeCard\} /g) || []).length, 1);
+  assert.doesNotMatch(lobby, /openStats|统计数据/, '统计 opens from 我的信息, never from the hub top bar');
+  assert.match(source('../../public/js/ui/myInfo.js'), /onClick=\$\{\(\) => \{ onClose\(\); openStats\(\); \}\}><\$\{Icon\} name="chart" \/>\$\{t\('统计数据'\)\}/);
 });
 
 test('the hub keeps the join key, 公告, the feedback group and the queue', () => {

@@ -45,11 +45,14 @@ test('settings toggle, explanatory hint and all effect labels are translated in 
   const src = read('public/js/ui/settings.js');
   assert.match(src, /value=\$\{s\.bondTimers\} onChange=\$\{\(v\) => updateSettings\(\{ bondTimers: v \}\)\}/);
   assert.ok(src.indexOf('value=${s.bondTimers}') > src.indexOf('value=${s.ammoEnergyCount}'));
-  // the owner's 2026-10-16 decision folded 作战统计 into the damage panel: no combatMetrics toggle is offered
-  // (upstream's #746 test ordered the two; ours keeps its own settings list, so the toggle must simply be gone)
-  assert.equal(src.indexOf('value=${s.combatMetrics}'), -1);
+  // the official 作战统计 (COMBAT STATS) switch is back: commit e13d112b dropped our own damage board and restored the
+  // official setting (off by default), so it must be offered, after the bond-timer rows of our own list
+  assert.match(src, /value=\$\{s\.combatMetrics\} onChange=\$\{\(v\) => updateSettings\(\{ combatMetrics: v \}\)\}/);
+  assert.ok(src.indexOf('value=${s.combatMetrics}') > src.indexOf('value=${s.bondTimers}'));
+  assert.equal(DEFAULT_SETTINGS.combatMetrics, false, 'off by default, like the official switch');
   const ids = [...BOND_TIMERS.map(d => d.label), '盟约效果剩余时间', '{n} 层 · 下一层 {s} 秒', '剩余 {s} 秒',
-    '在选中单位的详情中显示叙拉古、萨尔贡效果的剩余时间；萨尔贡显示层数与下一层到期时间。官方界面没有这些数字。'];
+    '在选中单位的详情中显示叙拉古、萨尔贡效果的剩余时间；萨尔贡显示层数与下一层到期时间。官方界面没有这些数字。',
+    '作战统计', '打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。'];
   for (const lang of ['en', 'ja', 'ko', 'zh-TW']) {
     const pack = JSON.parse(read(`public/i18n/${lang}.json`));
     for (const id of ids) assert.ok(pack[id]?.length, `${lang}: ${id}`);

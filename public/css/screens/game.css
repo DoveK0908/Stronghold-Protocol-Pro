@@ -1488,8 +1488,8 @@
 .set-list .language-options { gap: .02rem; }
 .set-list .language-options__row { display: flex; align-items: center; justify-content: space-between; gap: .1rem; flex-wrap: nowrap; }
 .set-list .language-options .lang-select { width: auto; min-height: 0; }
-.set-list .language-options .lang-select select { width: max(.86rem, 200px); min-height: max(.22rem, 30px); padding: 0 .08rem; font-size: max(calc(.13 * var(--t)), calc(12px * var(--ui))); }
+.set-list .language-options .lang-select select { width: max(.86rem, calc(200px * var(--ui))); min-height: max(.22rem, calc(30px * var(--ui))); padding: 0 .08rem; font-size: max(calc(.13 * var(--t)), calc(12px * var(--ui))); }
 .set-list .voice-language-toggle { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: max(1.34rem, 62%); max-width: 100%; gap: 2px; }
-.set-list .voice-language-toggle > button { height: max(.24rem, 28px); padding: 0 .04rem; font-size: max(calc(.11 * var(--t)), calc(11px * var(--ui))); }
+.set-list .voice-language-toggle > button { height: max(.24rem, calc(28px * var(--ui))); padding: 0 .04rem; font-size: max(calc(.11 * var(--t)), calc(11px * var(--ui))); }
 .set-list .voice-language-toggle .voice-language-code { font-size: 8px; margin-left: .03rem; }
 .set-list .language-options__hint { display: none; }

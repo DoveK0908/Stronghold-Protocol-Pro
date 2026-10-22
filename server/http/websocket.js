@@ -58,8 +58,10 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
   const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, avatars, namecards, ...metrics });
   // The caps in effect, printed once when the stack is built, so the deploy log states the configuration the server is
-  // actually running with. A global cap of 0 is printed as 0 (it rejects every room / socket); a per-network 0 is
-  // printed as "unlimited". `log` is the quiet-aware logger, so a test server stays silent.
+  // actually running with. Every cap is 0 = unlimited by default (docs/CONCURRENCY-ADMISSION.md), so the default line
+  // reads "rooms 0 (unlimited/network) … sockets 0 (unlimited/network)": a global cap is printed as the raw number,
+  // a per-network one as its number, and 0 there as "unlimited". `log` is the quiet-aware logger, so a test server stays
+  // silent.
   log.info(`[http] limits: rooms ${lobby.opts.maxRooms} (${perNetwork(lobby.opts.maxRoomsPerAddr)}/network), `
     + `matches ${perNetwork(lobby.opts.maxMatchesPerAddr)}/network, `
     + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`);

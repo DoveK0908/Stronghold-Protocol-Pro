@@ -1250,7 +1250,7 @@
 .crop__bar { display: flex; align-items: center; gap: .1rem; width: 100%; }
 .crop__bar .icon { width: .18rem; height: .18rem; color: var(--text-lo); }
 .crop__bar input[type=range] { flex: 1; accent-color: var(--mint-400); }
-.crop__zoom { min-width: .5rem; text-align: right; color: var(--text-lo); font-size: .14rem; font-variant-numeric: tabular-nums; }
-.crop__reset { border: 1px solid var(--line); background: none; color: var(--text-hi); border-radius: 2px; padding: .04rem .1rem; font-size: .14rem; cursor: pointer; }
-.crop__hint { margin: 0; color: var(--text-lo); font-size: .13rem; }
+.crop__zoom { min-width: .5rem; text-align: right; color: var(--text-lo); font-size: calc(.14 * var(--t)); font-variant-numeric: tabular-nums; }
+.crop__reset { border: 1px solid var(--line); background: none; color: var(--text-hi); border-radius: 2px; padding: .04rem .1rem; font-size: calc(.14 * var(--t)); cursor: pointer; }
+.crop__hint { margin: 0; color: var(--text-lo); font-size: calc(.13 * var(--t)); }
 .crop__foot { display: flex; justify-content: flex-end; gap: .1rem; width: 100%; margin-top: .04rem; }

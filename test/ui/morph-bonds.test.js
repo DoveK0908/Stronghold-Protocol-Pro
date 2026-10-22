@@ -41,6 +41,41 @@ function privWith({ board = [], hand = [] } = {}) {
   return { board, hand: h, temp: new Array(GEO.TEMP_SIZE).fill(null) };
 }
 
+// ---- the components (htm vnodes walked like test/ui/watch-bonds.test.js) -------------------------------------------
+// This block must stay ABOVE the first `describe`: `node --test` starts the root suite as soon as the module registers
+// its first test, and anything registered after a top-level `await` attaches to an already-running root — it is then
+// never run and reported `cancelled` ("Promise resolution is still pending but the event loop has already resolved").
+// With every await resolved before the first registration the whole file is collected first, exactly like
+// test/ui/watch-bonds.test.js.
+// the browser data store reads the real data files from disk
+globalThis.fetch = async (url) => {
+  const name = String(url).split('/').pop();
+  try {
+    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
+    return { ok: true, status: 200, json: async () => JSON.parse(body) };
+  } catch {
+    return { ok: false, status: 404, json: async () => ({}) };
+  }
+};
+const { data } = await import('../../public/js/data.js');
+await data.loadAll('bonds', 'chess', 'items', 'assets', 'garrisons');
+const { BondPopup } = await import('../../public/js/ui/bondStrip.js');
+const { BondChips, ChessDetail, resolveDetail } = await import('../../public/js/ui/detailPanel.js');
+
+function* walk(v) {
+  if (Array.isArray(v)) { for (const x of v) yield* walk(x); return; }
+  if (!v || typeof v !== 'object') return;
+  yield v;
+  yield* walk(v.props?.children);
+}
+const hasClass = (v, c) => typeof v?.props?.class === 'string' && v.props.class.split(/\s+/).includes(c);
+const textOf = (v) => {
+  if (v == null || typeof v === 'boolean') return '';
+  if (typeof v === 'string' || typeof v === 'number') return String(v);
+  if (Array.isArray(v)) return v.map(textOf).join('');
+  return textOf(v.props?.children);
+};
+
 describe('变形同构体 — the client rule', () => {
   test('grantedBonds: the other item\'s giveBondId while a 变形同构体 is worn; nothing otherwise', () => {
     assert.deepEqual(grantedBonds([itemPiece(ISO), itemPiece(HAMMER)], getItem), ['victoriaShip']);
@@ -112,36 +147,6 @@ describe('变形同构体 — the bond popup\'s member list', () => {
     assert.deepEqual(on, [VIC[0], WEARER].sort());
   });
 });
-
-// ---- the components (htm vnodes walked like test/ui/watch-bonds.test.js) -------------------------------------------
-// the browser data store reads the real data files from disk
-globalThis.fetch = async (url) => {
-  const name = String(url).split('/').pop();
-  try {
-    const body = readFileSync(path.join(ROOT, 'data', name), 'utf8');
-    return { ok: true, status: 200, json: async () => JSON.parse(body) };
-  } catch {
-    return { ok: false, status: 404, json: async () => ({}) };
-  }
-};
-const { data } = await import('../../public/js/data.js');
-await data.loadAll('bonds', 'chess', 'items', 'assets', 'garrisons');
-const { BondPopup } = await import('../../public/js/ui/bondStrip.js');
-const { BondChips, ChessDetail, resolveDetail } = await import('../../public/js/ui/detailPanel.js');
-
-function* walk(v) {
-  if (Array.isArray(v)) { for (const x of v) yield* walk(x); return; }
-  if (!v || typeof v !== 'object') return;
-  yield v;
-  yield* walk(v.props?.children);
-}
-const hasClass = (v, c) => typeof v?.props?.class === 'string' && v.props.class.split(/\s+/).includes(c);
-const textOf = (v) => {
-  if (v == null || typeof v === 'boolean') return '';
-  if (typeof v === 'string' || typeof v === 'number') return String(v);
-  if (Array.isArray(v)) return v.map(textOf).join('');
-  return textOf(v.props?.children);
-};
 
 describe('变形同构体 — what the popup and the card show', () => {
   test('the popup: 在场 3 and 成员 3/11 — the wearer lit, tagged 同构, titled 变形同构体', () => {

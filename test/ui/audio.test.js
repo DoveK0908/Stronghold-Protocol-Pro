@@ -396,8 +396,15 @@ describe('operator battle voice', () => {
       assert.match(settings, /setVoiceLanguage\(next\.voiceLang\)/);
       assert.doesNotMatch(settings, /audio\.setVoiceLang\(s\.voiceLang\)/, 'a volume edit must not reset the selected dub');
       assert.match(settings, /audio\.setVoiceLang\(s\.voiceLang, s\.voiceOverrides\)/);
-      assert.match(settings, /<\$\{LanguageSettings\}/);
-      assert.match(control, /t\('干员配音'\)/);
+      // 界面#17 (81507063): the official settings layout — 界面语言 above 背景音乐, 语音语言 right under 干员语音; the
+      // rows themselves are the shared controls of ui/languageSettings.js, and the lobby's dialog keeps the whole
+      // section (LanguageSettings) around both.
+      assert.match(settings, /<\$\{LanguageSelect\} \/>/);
+      assert.match(settings, /<\$\{VoiceLanguageRow\} \/>/);
+      assert.ok(settings.indexOf('<${LanguageSelect} />') < settings.indexOf('value=${s.bgm}'), '界面语言 sits at the top');
+      assert.ok(settings.indexOf('<${VoiceLanguageRow} />') > settings.indexOf('value=${s.voice}'), '语音语言 under 干员语音');
+      assert.match(control, /<\$\{LanguageSettings\}/, 'the lobby dialog keeps the section');
+      assert.match(control, /t\('语音语言'\)/);
       assert.match(control, /setVoiceLanguage\(option\.code\)/);
       assert.match(settings, /audio\.setVoiceNative\(s\.voiceNative\)/);
     } finally {

@@ -1,10 +1,14 @@
 // 名片底图 (2026-10-20, the owner): only 模拟场景 + 阵营徽记 survive; the operator-skin cards and the 不使用底图
 // option are gone, and nobody with an empty pick sees a bare plate — the default is the 模拟·终极 loading card.
+// A third kind was added on 2026-10-22 (自传名片底图): `custom:<16 lowercase hex>` is the browser's own upload, served
+// back at /namecard/<id> — see public/js/ui/customNamecard.js and server/namecards.js.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { NAMECARDS, DEFAULT_NAMECARD, namecardOf, namecardSrc } from '../../public/js/ui/namecards.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(join(ROOT, p), 'utf8');
@@ -26,8 +30,32 @@ test('the picker offers exactly 模拟场景 + 阵营徽记', () => {
 
 test('an old skin id resolves to nothing, so it falls back to the default card', () => {
   const src = read('public/js/ui/namecards.js');
-  assert.match(src, /export function namecardOf\(id\) \{\n  if \(typeof id !== 'string'\) return null;\n  return BY_ID\.get\(id\) \|\| null;/);
   assert.doesNotMatch(src, /kind: 'skin'/);
+  // the shipped cards resolve by id, and the default pick is one of them
+  for (const card of NAMECARDS) assert.equal(namecardOf(card.id), card, card.id);
+  assert.equal(namecardOf(DEFAULT_NAMECARD).id, DEFAULT_NAMECARD, 'the default is a 模拟场景 card');
+  // an old operator-skin id, an empty pick, an unknown key of a known group, and a non-string: no card (the caller
+  // then falls back to DEFAULT_NAMECARD), never a made-up one
+  for (const id of ['skin:char_498_inside@kitchen#2', '', 'loading:nope', 'camp:', 'custom:', 'CAMP:yan', null, undefined, 7, {}, ['camp:yan']]) {
+    assert.equal(namecardOf(id), null, JSON.stringify(id) ?? String(id));
+  }
+});
+
+test('a 自传 upload is a `custom:<16 hex>` id served at /namecard/<id>, and nothing looser', () => {
+  const hex = '0123456789abcdef';
+  assert.deepEqual(namecardOf(`custom:${hex}`),
+    { id: `custom:${hex}`, kind: 'custom', name: null, image: `/namecard/${hex}` }, 'the server path, not an asset key');
+  // the shape server/namecards.js mints and server/lobby.js validates: 16 lower-case hex, nothing else (an id that only
+  // LOOKS like one is a 404 card, and the picker must not advertise it)
+  for (const bad of [`custom:${'a'.repeat(15)}`, `custom:${'a'.repeat(17)}`, `custom:${'A'.repeat(16)}`,
+    'custom:0123456789abcdeg', `custom:${hex}0`, `custom:/${hex}`, ` custom:${hex}`, `${hex}`]) {
+    assert.equal(namecardOf(bad), null, bad);
+  }
+  // the picture the layer draws: the custom path as written, and null for anything a url could not hold
+  assert.equal(namecardSrc(namecardOf(`custom:${hex}`)), `/namecard/${hex}`);
+  assert.equal(namecardSrc({ kind: 'custom', image: '"/><script>' }), null, 'safeUrl refuses an injected url');
+  assert.equal(namecardSrc({ kind: 'custom', image: null }), null);
+  assert.equal(namecardSrc({ kind: 'loading', assetKey: 'loading/loading_ac_abyss' }, null), null, 'no asset index: no picture');
 });
 
 test('every plate uses 模拟·终极 unless a valid pick exists', () => {

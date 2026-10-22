@@ -651,13 +651,16 @@ test('a Worker host never attaches the combat meter, even when the setting is on
   r.runner.dispose();
 });
 
-test('作战统计 stays off: settings do not offer it (fork 2026-10-16: merged into the damage board), the match hides the button unless it is on', () => {
+test('作战统计 is the official opt-in switch again (fork 2026-10-20 dropped its damage board): settings offer it, the match hides the button unless it is on', () => {
   const settings = readFileSync(new URL('../../public/js/ui/settings.js', import.meta.url), 'utf8');
   const game = readFileSync(new URL('../../public/js/screens/game.js', import.meta.url), 'utf8');
   const logic = readFileSync(new URL('../../public/js/ui/gameLogic/settings.js', import.meta.url), 'utf8');
   assert.match(logic, /combatMetrics: false/);
-  assert.doesNotMatch(settings, /micro="COMBAT STATS"/);
-  assert.match(readFileSync(new URL('../../public/js/ui/damageBoard.js', import.meta.url), 'utf8'), /\['healing', t\('治疗'\)\]/);
+  // the fork's own damage board (public/js/ui/damageBoard.js) was removed in e13d112b and the official PR #618
+  // COMBAT STATS switch restored (_build/projects.md, 原界面#02, maintainer 2026-10-20)
+  assert.match(settings, /label=\$\{t\('作战统计'\)\} micro="COMBAT STATS"/);
+  assert.match(settings, /updateSettings\(\{ combatMetrics: v \}\)/);
+  assert.throws(() => readFileSync(new URL('../../public/js/ui/damageBoard.js', import.meta.url), 'utf8'), /ENOENT/);
   assert.match(game, /setCombatMetrics\(s\?\.combatMetrics === true\)/);
   assert.match(game, /const showMetrics = metricsSetting && !modRoom && !spectator/);
   assert.match(game, /data-ui-slot="hud\.right"/);

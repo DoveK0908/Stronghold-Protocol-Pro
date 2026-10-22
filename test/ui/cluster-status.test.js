@@ -135,13 +135,16 @@ test('experimental options are room-only and lobby creation uses server defaults
   assert.match(room, /net\.request\('room\.setExperimental', \{ experimental \}\)/);
 });
 
-test('room options stay with difficulty controls rather than crowding ready actions', () => {
+test('room options sit in the footer bar, not among the ready actions', () => {
   const room = source('../../public/js/screens/room.js');
-  // 实验性选项 lives under ⚙ of the difficulty pill (RoomOptions), never among 组队匹配 / 开始模拟 / 准备就绪
-  const options = room.slice(room.indexOf('function RoomOptions('), room.indexOf('/** Room screen component. */'));
-  assert.match(options, /\{t\('实验性选项'\)\}/);
+  // 维护者 2026-10-20: 同盟设置 popover 去掉，实验性选项 与 AI 队友最后选择 并排在底栏左下，中间只留难度按钮
+  assert.doesNotMatch(room, /function RoomOptions\(|rs-pill__gear/, 'no ⚙ popover wraps the options any more');
+  const left = room.slice(room.indexOf('<div class="rs-foot__left">'), room.indexOf('<div class="rs-foot__center">'));
+  assert.match(left, /<b>\$\{t\('实验性选项'\)\}<\/b><small>\$\{experimentalSummary\(room\.experimental\)\}<\/small>/);
+  assert.match(left, /onClick=\$\{\(\) => setExperimentalOpen\(true\)\}/);
   const pill = room.slice(room.indexOf('<div class="rs-pill">'), room.indexOf('<div class="rs-foot__right">'));
-  assert.match(pill, /onExperimental=\$\{\(\) => \{ setOpts\(false\); setExperimentalOpen\(true\); \}\}/);
+  assert.match(pill, /class="rs-pill__diff"/, 'the middle keeps only the difficulty button');
+  assert.doesNotMatch(pill, /Experimental|experimental/);
   const actions = room.slice(room.indexOf('<div class="rs-foot__right">'), room.indexOf('</footer>'));
   assert.doesNotMatch(actions, /setExperimentalOpen|实验性选项/);
   assert.match(actions, /myReady \? t\('已就绪'\) : t\('准备就绪'\)/);

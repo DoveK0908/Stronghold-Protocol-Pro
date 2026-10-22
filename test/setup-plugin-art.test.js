@@ -134,6 +134,8 @@ test('full setup and dedicated operator extraction both obey explicit art consen
       },
       c: { cyan: s => s, dim: s => s, warn: s => s }, IS_WIN: false, LOCAL_ART_FALLBACK: 'fallback', EXTRACT_PY: 'extract.py', PY_ENV: {},
       cropBoardTiles() {}, localArtState: () => 'ok', localArtDetail: () => '',
+      // [ASSUMED] this fixture's client has no skinpack/, so the union adds no --skin-bundles argument
+      skinBundleUnion: () => null,
       checkPluginFx: () => [], checkPluginArt: () => extracted || c.complete ? [] : [ID], pluginFxExtractionAllowed,
     };
     await new AsyncFunction(...Object.keys(deps), source.slice(start, end))(...Object.values(deps));

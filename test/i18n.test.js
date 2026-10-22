@@ -136,11 +136,15 @@ test('the whole client, shared and the server messages: no Chinese literal left 
   // what tools/i18n.mjs scans: public/js (not dev / vendor / assets / fonts), public/studio, shared, server — server/sim only for the
   // texts it sends (msg() / ctx.toast), its own t() / N_() are other helpers
   const SKIP = new Set(['node_modules', 'vendor', 'assets', 'fonts', 'dev']);
+  // the Elite AI addon's engine is vendored verbatim (server/match/{arturia,lavinia}/, projects.md C03): third-party
+  // code with its own Chinese names and no pack — tools/i18n.mjs's VENDORED_DIRS skips it too
+  const VENDORED = new Set(['server/match/arturia', 'server/match/lavinia']);
   const files = [];
   const visit = (rel) => {
     for (const name of readdirSync(path.join(ROOT, rel)).sort()) {
       if (SKIP.has(name) || name.startsWith('.')) continue;
       const r = `${rel}/${name}`;
+      if (VENDORED.has(r)) continue;
       if (statSync(path.join(ROOT, r)).isDirectory()) visit(r);
       else if (/\.m?js$/.test(name)) files.push(r);
     }
