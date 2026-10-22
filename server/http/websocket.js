@@ -29,6 +29,7 @@ export const WS_MAX_PAYLOAD = 64 * 1024;
  */
 import { createTagRegistry } from '../tags.js';
 import { createAvatarStore } from '../avatars.js';
+import { createNamecardStore } from '../namecards.js';
 
 /** A per-network cap, as printed on boot ('unlimited' for 0). */
 function perNetwork(n) { return n > 0 ? n : 'unlimited'; }
@@ -48,12 +49,14 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   // The limits file (server/onlineLimit.js) also carries the lobby's hot-reloadable room / AI caps (Lobby.cap).
   // 玩家自传头像 (server/avatars.js): one store per server, files on disk so a restart keeps them.
   const avatars = opts.avatars || createAvatarStore({ dir: opts.avatarsDir, indexFile: opts.avatarsIndex, log });
+  // 玩家自传名片底图 (server/namecards.js): the same store shape, its own files.
+  const namecards = opts.namecards || createNamecardStore({ dir: opts.namecardsDir, indexFile: opts.namecardsIndex, log });
   const lobby = createLobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, combatPool, trialPool, options: lobbyOptions,
-    limits: onlineLimit, content, plugins, hosts, avatars, ...metrics });
+    limits: onlineLimit, content, plugins, hosts, avatars, namecards, ...metrics });
   // The owner file (server/ownerFile.js): the 服主 key every hello may carry and the owner's reserved names.
   // The 名字#四位 claims (server/tags.js, 界面#09): one registry per server, on disk so a restart keeps them taken.
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
-  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, avatars, ...metrics });
+  const network = new Network({ registry, handler: lobby, log, options: netOptions, getLoadState, getLoadDetails, getClusterLoad: opts.getClusterLoad, onlineLimit, ownerFile, tags, avatars, namecards, ...metrics });
   // The caps in effect, printed once when the stack is built, so the deploy log states the configuration the server is
   // actually running with. A global cap of 0 is printed as 0 (it rejects every room / socket); a per-network 0 is
   // printed as "unlimited". `log` is the quiet-aware logger, so a test server stays silent.

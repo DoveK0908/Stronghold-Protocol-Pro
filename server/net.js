@@ -657,7 +657,7 @@ export class Network {
    * }} opts
    */
   constructor({ registry, handler, log = noopLog, now = Date.now, getLoadState = null, getLoadDetails = null, getClusterLoad = null, options = {},
-    metrics = NO_PHASES, onlineLimit = null, ownerFile = null, tags = null, avatars = null }) {
+    metrics = NO_PHASES, onlineLimit = null, ownerFile = null, tags = null, avatars = null, namecards = null }) {
     this.registry = registry;
     this.handler = handler;
     this.log = log;
@@ -683,6 +683,8 @@ export class Network {
     this.tags = tags || createTagRegistry({ file: null, log });
     /** @type {object | null} 玩家自传头像的库 (server/avatars.js); null = 不接收 */
     this.avatars = avatars;
+    /** @type {object | null} 玩家自传名片底图的库 (server/namecards.js); null = 不接收 */
+    this.namecards = namecards;
     /** first hellos of a socket since start, by outcome (/healthz reconnect.hello; helloStats) */
     this.helloCounts = { resumed: 0, fresh: 0, unknownToken: 0, inUse: 0 };
     const slices = Math.max(1, Math.min(HEARTBEAT_SLICES_MAX, Math.round(this.opts.heartbeatMs / HEARTBEAT_SLICE_MS)));

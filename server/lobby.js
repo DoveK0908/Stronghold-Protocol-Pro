@@ -488,6 +488,9 @@ export class Room {
           ...(s.isBot && s.botPersona ? { botPersona: s.botPersona } : {}),
           // display only: the player's room.card and the 服主 mark (absent when none)
           ...(!s.isBot && s.card ? { card: s.card } : {}), ...(!s.isBot && s.owner ? { owner: true } : {}),
+          // 干员皮肤 (docs/SKINS.md): every seat's own picks, so teammates draw the card / lineup with the appearance
+          // its owner chose. Only changed entries, so a room without skins keeps the same frame as before.
+          ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}),
           // a room with gameplay plugins (header "Gameplay plugins"): has this player's page loaded and checked its content?
           ...(this.modded && !s.isBot ? { content: s.content || 'loading' } : {}) }
         : null)),
@@ -527,10 +530,12 @@ export class Lobby {
    *   (server/match/host/index.js; none: such a match runs here, unit tests — or, in the cluster, on the game node)
    */
   constructor({ registry, log = noopLog, MatchClass = DefaultMatch, getData = defaultGetData, now = Date.now, seedFn, combatPool = null, trialPool = null, options = {},
-    limits = null, metrics = NO_PHASES, content = null, plugins = null, hosts = null, avatars = null }) {
+    limits = null, metrics = NO_PHASES, content = null, plugins = null, hosts = null, avatars = null, namecards = null }) {
     this.combatPool = combatPool;
     /** 玩家自传头像的库 (`server/avatars.js`), or null = 不接收 */
     this.avatars = avatars;
+    /** 玩家自传名片底图的库 (`server/namecards.js`), or null = 不接收 */
+    this.namecards = namecards;
     this.trialPool = trialPool;
     this.registry = registry;
     /** the vanilla content set every room plays (header "Content identity"), or null */
@@ -958,6 +963,7 @@ export class Lobby {
       case 'room.skins': return this.skins(session, msg);
       case 'room.card': return this.setCard(session, msg);
       case 'me.avatar': return this.setAvatar(session, msg);
+      case 'me.namecard': return this.setNamecard(session, msg);
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
       case 'room.setPlugins': return this.setPlugins(session, msg);
@@ -1993,6 +1999,47 @@ export class Lobby {
   }
 
   /**
+   * me.namecard（维护者需求 2026-10-22）：上传自传名片底图 —— 存进 server/namecards.js 的库；房间里通过
+   * seats[].card.bg = `custom:<id>` 看到（GET /namecard/<id>）。只认 PNG/JPEG/WEBP 魔数、单张 ≤ 400KB；
+   * 一个浏览器只留一张，重传替换旧图。`{ id }` 是刷新后的重认领：只有本 owner 的文件认。
+   */
+  setNamecard(session, { data, id }) {
+    const store = this.namecards;
+    if (!store) return fail(ERR.BAD_MSG, 'name cards are not accepted');
+    const key = ownerKey(session.uid || '');
+    if (typeof data !== 'string' && typeof id === 'string' && store.owns(id, key)) {
+      session.namecard = id;
+      sendSession(session, { t: 'me.namecard', id });
+      return this._applyNamecard(session);
+    }
+    if (typeof data !== 'string' || !data) return fail(ERR.BAD_MSG, 'no image');
+    if (data.length > Math.ceil(400 * 1024 / 3) * 4 + 8) return fail(ERR.BAD_MSG, 'name card too large');
+    let buf;
+    try { buf = Buffer.from(data, 'base64'); } catch { return fail(ERR.BAD_MSG, 'bad base64'); }
+    const res = store.put(buf, key);
+    if (!res.ok) return fail(ERR.BAD_MSG, res.err === 'too-large' ? 'name card too large' : 'name card must be png/jpg/webp');
+    session.namecard = res.id;
+    sendSession(session, { t: 'me.namecard', id: res.id });
+    return this._applyNamecard(session);
+  }
+
+  /** 把自传名片底图写进 display card 的 bg（`custom:<id>`）；没有就保留原来的预设底图。 */
+  _applyNamecard(session) {
+    const prev = session.card || {};
+    const bg = session.namecard ? `custom:${session.namecard}` : prev.bg;
+    if (bg === prev.bg) return OK;
+    const card = Object.freeze({ ...prev, bg });
+    session.card = card;
+    const room = this.roomOf(session);
+    const seat = room ? room.seatOf(session.playerId) : null;
+    if (seat && !sameCard(seat.card, card)) {
+      seat.card = card;
+      this.broadcastState(room);
+    }
+    return OK;
+  }
+
+  /**
    * room.card (header): merge the message into the session's display card — a field left out keeps its value, '' / 0
    * clears it; an unknown operator is BAD_MSG — and copy it to the player's seat (never a spectator's), broadcasting the
    * room state when it changed. An unchanged card costs nothing; a change beyond CARD_CHANGES per CARD_WINDOW_MS is RATE.
@@ -2014,9 +2061,15 @@ export class Lobby {
     if (face) next.avatar = face;
     if (id && art) next.look = art;
     if (face && faceArt) next.avatarLook = faceArt;
-    if (back) next.bg = back;
-    // 自传头像不是 room.card 的字段，改名片/头像时不能把它丢掉
+    // 自传名片底图：客户端只能指向自己上传的那张（`custom:<id>`），别人的 id 退回默认底图
+    if (back) {
+      const m = /^custom:([0-9a-f]{16})$/.exec(back);
+      if (m) { if (this.namecards?.owns(m[1], ownerKey(session.uid || ''))) next.bg = back; }
+      else next.bg = back;
+    }
+    // 自传头像/名片底图不是 room.card 的字段，改名片/头像时不能把它们丢掉
     if (session.avatarImg) next.avatarImg = session.avatarImg;
+    if (!next.bg && session.namecard) next.bg = `custom:${session.namecard}`;
     if (count > 0) next.trophies = count;
     // 自传头像 (me.avatar) 不是 room.card 的字段：客户端不能指向别人的文件，只由服务端写进 session.avatarImg
     if (session.avatarImg) next.avatarImg = session.avatarImg;

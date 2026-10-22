@@ -48,6 +48,7 @@ import { data, getMode, useData } from '../data.js';
 import { avatarUrl } from '../assets.js';
 import { CARD_PREF, cardOperators, seatPortrait, seatIllust, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
 import { customAvatarSrc } from '../ui/playerCard.js';
+import { SKINS_KEY, skinsStore } from '../ui/skins.js';
 import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
@@ -382,10 +383,13 @@ export function RoomScreen() {
   const cardList = useMemo(() => cardOperators(data.list('chess')), [data.get('chess')]);
   const myCard = useMyCard();
   const [picking, setPicking] = useState(null); // 'op' | 'avatar' | 'bg'
+  // 自己选的皮肤（干员调配）在本机 store 里；队友的由服务端随 room.state 的 seat.skins 广播
+  const mySkins = useStore((s) => s[SKINS_KEY] || null, Object.is, skinsStore);
   const portraits = useMemo(() => ({
     pool: cardList.filter((c) => (c.rarity ?? 0) >= 5).sort((a, b) => (a.charId < b.charId ? -1 : 1)),
     byChar: new Map(cardList.map((c) => [c.charId, c])), m, myId: me.playerId, myCard: myCard.charId, myLook: myCard.look,
-  }), [cardList, m, me.playerId, myCard.charId, myCard.look]);
+    mySkins,
+  }), [cardList, m, me.playerId, myCard.charId, myCard.look, mySkins]);
   // tell the server (teammates see the card) once it knows room.card; a server that refuses it keeps the card local
   const cardRefused = useRef(false);
   const mineCard = room ? roomFacts(room, me.playerId).mine?.card : null;

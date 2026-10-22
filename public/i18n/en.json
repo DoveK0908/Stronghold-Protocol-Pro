@@ -3347,5 +3347,15 @@
   "上传失败": "Upload failed",
   "上传失败，换一张图片再试": "Upload failed — try another image",
   "请选择一张 4MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image under 4 MB (PNG/JPEG/WEBP)",
-  "隐藏中央徽记与标题": "Hide the centre emblem and title"
+  "隐藏中央徽记与标题": "Hide the centre emblem and title",
+  "调整头像": "Adjust avatar",
+  "请选择一张 30MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image up to 30MB (PNG/JPEG/WEBP)",
+  "调整名片底图": "Adjust name card",
+  "已取消": "Cancelled",
+  "调整大厅背景": "Adjust lobby background",
+  "调整图片": "Adjust image",
+  "拖动图片调整位置，滚轮或滑块缩放": "Drag the picture to move it; scroll or use the slider to zoom",
+  "自定义": "Custom",
+  "上传名片底图": "Upload name card",
+  "上传图片": "Upload image"
 }

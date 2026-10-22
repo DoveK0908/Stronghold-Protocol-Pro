@@ -90,13 +90,13 @@ export function cardAvatarUrl(charId, m = data.get('assets'), look = '') {
  * 席位大图的「带场景」版本：名片干员装备了皮肤时，用该皮肤的 illustration（官方那张连背景的立绘）；
  * 没皮肤 / 精一 / 机器人返回 null，调用方退回 seatPortrait（透明立绘）。
  */
-export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
+export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '', mySkins = null }) {
   if (!seat || seat.playerId == null || seat.isBot) return null;
-  const pick = (seat.playerId === myId && myCard) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
+  const mine = seat.playerId === myId && myCard;
+  const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
   const rec = pick && byChar ? byChar.get(pick) : null;
   if (!rec) return null;
-  const mine = seat.playerId === myId && myCard;
-  const look = mine ? myLook : typeof seat.card?.look === 'string' ? seat.card.look : '';
+  const look = seatLook(seat, rec.charId, { myId, myCard, myLook, mySkins });
   // '' = 精英二：客户端里那张带背景的立绘（chars[].illust）；'e1' = 同一套取景的透明全身立绘（chars[].illustE1）
   return lookUrl(m, rec.charId, look, 'illust');
 }
@@ -106,14 +106,30 @@ export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
  * the 5★/6★ operators chosen by the player id — the same on every client (null before the data loads).
  * @param {any} seat room.state seat @param {{ pool: any[], byChar: Map<string, any>, m: any, myId: any, myCard: string, myLook?: string }} ctx
  */
-export function seatPortrait(seat, { pool, byChar, m, myId, myCard, myLook = '' }) {
+/**
+ * The appearance a seat shows for one operator: the skin its OWNER picked in 干员调配 (`skins[charId]`), else the
+ * card look ('' 精二 / 'e1' 精一). Own seat reads the local stores, a teammate's reads `seat.skins` / `seat.card`
+ * (server/lobby.js toState), so every client draws the same thing for the same person.
+ */
+export function seatLook(seat, charId, { myId, myCard, myLook = '', mySkins = null } = {}) {
+  const mine = seat && seat.playerId === myId && myCard;
+  const skins = mine ? mySkins : seat && seat.skins;
+  const skin = skins && typeof skins === 'object' ? skins[charId] : null;
+  if (typeof skin === 'string' && skin) return skin;
+  if (mine) return myLook || '';
+  return typeof seat?.card?.look === 'string' ? seat.card.look : '';
+}
+
+export function seatPortrait(seat, { pool, byChar, m, myId, myCard, myLook = '', mySkins = null }) {
   if (!seat || seat.playerId == null) return null;
   // seats[].card is { charId, bg, trophies } (ui/playerCard.js); a bare string is the design's original form
-  const pick = (seat.playerId === myId && myCard) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
-  const rec = pick && byChar ? byChar.get(pick) : null;
   const mine = seat.playerId === myId && myCard;
-  const look = mine ? myLook : typeof seat.card?.look === 'string' ? seat.card.look : '';
-  if (rec) return (look && lookUrl(m, rec.charId, look, 'portrait')) || chessPortraitUrl(m, rec);
+  const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
+  const rec = pick && byChar ? byChar.get(pick) : null;
+  if (rec) {
+    const look = seatLook(seat, rec.charId, { myId, myCard, myLook, mySkins });
+    return (look && lookUrl(m, rec.charId, look, 'portrait')) || chessPortraitUrl(m, rec);
+  }
   if (!Array.isArray(pool) || !pool.length) return null;
   return chessPortraitUrl(m, pool[hash32(seat.playerId) % pool.length]);
 }

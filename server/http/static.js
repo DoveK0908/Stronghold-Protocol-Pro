@@ -152,7 +152,7 @@ const CS_FILE = /^\/cs\/([0-9a-f]{16})\/([A-Za-z0-9._\/-]{1,200})$/;
  *   clientModeFromEnv()) — 'build' without a public/build/index.html logs once and serves the source page
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse, rawPath: string, query: string) => Promise<void>}
  */
-export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = path.join(ROOT, 'server', 'sim'), packsDir = path.join(ROOT, 'packs'), avatarDir = null,
+export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = path.join(ROOT, 'server', 'sim'), packsDir = path.join(ROOT, 'packs'), avatarDir = null, namecardDir = null,
   pluginsDir = path.join(path.dirname(path.resolve(packsDir)), 'plugins'), packs = null, content = null, log = noopLog,
   metrics = NO_PHASES, assetIndex = null, views = null, visual = null, contents = null, codeSource = codeSourceFromEnv(),
   client = clientModeFromEnv() }) {
@@ -163,6 +163,8 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
   const mounts = [
     // 玩家自传头像 (server/avatars.js): /avatar/<id>.<png|jpg|webp> —— 只服务这三类扩展名
     ...(avatarDir ? [{ prefix: '/avatar/', name: 'avatar', dir: path.resolve(avatarDir), sniff: true }] : []),
+    // 玩家自传名片底图 (server/namecards.js): /namecard/<id> —— same sniffing as the avatars
+    ...(namecardDir ? [{ prefix: '/namecard/', name: 'namecard', dir: path.resolve(namecardDir), sniff: true }] : []),
     { prefix: '/data/', name: 'data', dir: path.resolve(dataDir) },
     { prefix: '/shared/', name: 'shared', dir: path.resolve(sharedDir) },
     // the simulation: ES modules only (no directory listings, no other file types, no Node-only loader)

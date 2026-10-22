@@ -4,6 +4,7 @@
 import { net } from '../net.js';
 import { cardStore } from './playerCard.js';
 import { t } from '../../../shared/i18n.js';
+import { cropFile } from './imageCropper.js';
 
 /** Longest side sent to the server: 256px square is bigger than every place an avatar shows (seat card sm, 名片). */
 const SIDE = 256;
@@ -15,22 +16,16 @@ export function avatarSrc(id) {
   return typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? `/avatar/${id}` : '';
 }
 
-/** The uploadable image of a picked file: null when it is not an image this browser can decode. */
+/** The uploadable image of a picked file: the user frames it in the cropper, then it is re-drawn at 256² (WebP). */
 async function shrink(file) {
   if (!file || !/^image\//.test(file.type || '')) return null;
   if (file.size > MAX_RAW) return null;
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) return null;
-  const side = Math.min(bitmap.width, bitmap.height);
-  const canvas = document.createElement('canvas');
-  canvas.width = SIDE; canvas.height = SIDE;
-  const cx = canvas.getContext('2d');
-  cx.imageSmoothingQuality = 'high';
-  cx.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, SIDE, SIDE);
-  bitmap.close?.();
-  const webp = canvas.toDataURL('image/webp', 0.9);
-  const url = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
-  return url.slice(url.indexOf(',') + 1);
+  const blob = await cropFile(file, { aspect: 1, outWidth: SIDE, title: t('调整头像') });
+  if (!blob) return null;
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  let bin = '';
+  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+  return btoa(bin);
 }
 
 /**

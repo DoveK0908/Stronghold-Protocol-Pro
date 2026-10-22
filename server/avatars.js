@@ -42,7 +42,7 @@ export function sniffImage(buf) {
  *           maxFiles?: number, maxTotal?: number }} [opts]
  */
 export function createAvatarStore({ dir = defaultDir(), indexFile = defaultIndexFile(), log = console,
-  now = Date.now, maxFiles = MAX_FILES, maxTotal = MAX_TOTAL } = {}) {
+  now = Date.now, maxFiles = MAX_FILES, maxTotal = MAX_TOTAL, maxBytes = MAX_BYTES } = {}) {
   /** @type {Map<string, { ext: string, bytes: number, at: number, owner: string }>} */
   const items = new Map();
   /** @type {Map<string, string>} owner -> id */
@@ -110,7 +110,7 @@ export function createAvatarStore({ dir = defaultDir(), indexFile = defaultIndex
      * @returns {{ ok: true, id: string } | { ok: false, err: 'too-large'|'bad-type' }}
      */
     put(buf, owner) {
-      if (!buf || buf.length > MAX_BYTES) return { ok: false, err: 'too-large' };
+      if (!buf || buf.length > maxBytes) return { ok: false, err: 'too-large' };
       const ext = sniffImage(buf);
       if (!ext) return { ok: false, err: 'bad-type' };
       const id = createHash('sha256').update(buf).digest('hex').slice(0, 16);

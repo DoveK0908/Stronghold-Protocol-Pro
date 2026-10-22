@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lookUrl, lookOptions } from '../../public/js/ui/seatArt.js';
+import { lookUrl, lookOptions, seatLook, seatIllust } from '../../public/js/ui/seatArt.js';
 import { cardMessage, seatCardMatches } from '../../public/js/ui/playerCard.js';
 
 const M = {
@@ -36,7 +36,36 @@ test('cardMessage sends a look only with its operator; seatCardMatches compares 
   const msg = cardMessage({ charId: 'char_a', look: 'e1', avatar: '', avatarLook: 'e1', bg: 'skin:char_a_x_1', trophies: 3 });
   assert.equal(msg.look, 'e1');
   assert.equal(msg.avatarLook, '', 'no avatar operator: no avatar look');
-  assert.equal(msg.bg, '', 'an unknown skin card is not sent');
-  assert.equal(seatCardMatches({ charId: 'char_a', look: 'e1', trophies: 3 }, msg), true);
+  // 名片底图现在有默认款（ui/namecards.js DEFAULT_NAMECARD），认不出的皮肤底图回落到默认款而不是空串
+  assert.equal(msg.bg, 'loading:abyss', 'an unknown skin card falls back to the default name card');
+  assert.equal(seatCardMatches({ charId: 'char_a', look: 'e1', bg: 'loading:abyss', trophies: 3 }, msg), true);
   assert.equal(seatCardMatches({ charId: 'char_a', trophies: 3 }, msg), false);
+});
+
+
+// 2026-10-21 维护者：席位卡「对方怎么选的就怎么显示」——皮肤（干员调配）优先于名片外观，自己的读本机 store、
+// 队友的读 room.state seat.skins；没有皮肤才回落到名片的那一档（'' 精二 / 'e1' 精一）。
+test('seatLook: the owner skin wins over the card look, own and teammate alike', () => {
+  const ctx = { myId: 'p_me', myCard: 'char_a', myLook: 'e1', mySkins: { char_a: 'char_a_x_1' } };
+  const mine = { playerId: 'p_me', card: { charId: 'char_a', look: '' } };
+  assert.equal(seatLook(mine, 'char_a', ctx), 'char_a_x_1', 'own seat uses the local skin store');
+  const mate = { playerId: 'p_mate', card: { charId: 'char_a', look: '' }, skins: { char_a: 'char_a_x_1' } };
+  assert.equal(seatLook(mate, 'char_a', ctx), 'char_a_x_1', 'a teammate seat uses the broadcast skins');
+  const plain = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
+  assert.equal(seatLook(plain, 'char_a', ctx), 'e1', 'no skin: the card look is the answer');
+  const auto = { playerId: 'p_me', card: { charId: 'char_a', look: '' } };
+  assert.equal(seatLook(auto, 'char_a', { ...ctx, mySkins: {} }), 'e1', 'no skin of my own: my card look');
+  assert.equal(seatLook(auto, 'char_a', { ...ctx, mySkins: {}, myLook: '' }), '', 'no skin and 精二 look');
+});
+
+test('seatIllust: a skin draws its illustration; without one it draws the card look art', () => {
+  const m = { chars: { char_a: { portrait: '/p1.png', portraitE2: '/p2.png', illust: '/i2.png', illustE1: '/i1.png',
+    skins: { char_a_x_1: { charId: 'char_a', name: 'X', portrait: '/sp.png', illust: '/si.png' } } } } };
+  const byChar = new Map([['char_a', { charId: 'char_a' }]]);
+  const base = { byChar, m, myId: 'p_me', myCard: 'char_b', myLook: '', mySkins: { char_a: 'char_a_x_1' } };
+  const mate = { playerId: 'p_mate', card: { charId: 'char_a', look: '' }, skins: { char_a: 'char_a_x_1' } };
+  assert.equal(seatIllust(mate, base), '/si.png');
+  const plainMate = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
+  assert.equal(seatIllust(plainMate, base), '/i1.png', '精一 has its own full-body illustration');
+  assert.equal(seatLook(plainMate, 'char_a', base), 'e1');
 });

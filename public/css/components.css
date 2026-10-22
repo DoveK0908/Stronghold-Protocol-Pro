@@ -1241,3 +1241,16 @@
 .plugin-settings__row { display: flex; gap: .1rem; align-items: center; justify-content: space-between; }
 .plugin-settings input, .plugin-settings select { color: var(--text-hi); background: var(--bg-2); border: 1px solid var(--line-2); padding: .03rem .06rem; max-width: 2rem; }
 .plugin-settings input[aria-invalid="true"] { border-color: var(--orange); }
+
+/* 图片裁剪器 (ui/imageCropper.js)：所有上传（头像 / 名片底图 / 大厅背景）共用 */
+.crop { display: flex; flex-direction: column; gap: .12rem; align-items: center; }
+.crop__stage { position: relative; overflow: hidden; background: #0a0f0e; border: 1px solid var(--line); border-radius: 3px; touch-action: none; cursor: grab; }
+.crop__stage:active { cursor: grabbing; }
+.crop__stage img { position: absolute; left: 0; top: 0; max-width: none; user-select: none; pointer-events: none; }
+.crop__bar { display: flex; align-items: center; gap: .1rem; width: 100%; }
+.crop__bar .icon { width: .18rem; height: .18rem; color: var(--text-lo); }
+.crop__bar input[type=range] { flex: 1; accent-color: var(--mint-400); }
+.crop__zoom { min-width: .5rem; text-align: right; color: var(--text-lo); font-size: .14rem; font-variant-numeric: tabular-nums; }
+.crop__reset { border: 1px solid var(--line); background: none; color: var(--text-hi); border-radius: 2px; padding: .04rem .1rem; font-size: .14rem; cursor: pointer; }
+.crop__hint { margin: 0; color: var(--text-lo); font-size: .13rem; }
+.crop__foot { display: flex; justify-content: flex-end; gap: .1rem; width: 100%; margin-top: .04rem; }

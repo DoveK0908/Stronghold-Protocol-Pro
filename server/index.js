@@ -21,6 +21,7 @@ import { DATA_SHIM_JS, createStaticHandler } from './http/static.js';
 import { createPluginRegistry } from './plugins/registry.js';
 import { computeVanillaContent } from './plugins/identity.js';
 import { defaultDir as defaultAvatarsDir } from './avatars.js';
+import { defaultDir as defaultNamecardsDir } from './namecards.js';
 import { createVisualSets } from './plugins/visualSet.js';
 import { createContentSets } from './plugins/contentSets.js';
 import { createPluginPolicy } from './plugins/policy.js';
@@ -170,13 +171,15 @@ export async function startServer(opts = {}) {
     hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
     const avatarDir = opts.avatarsDir !== undefined ? opts.avatarsDir
       : (process.env.SP_AVATARS_DIR === '' ? null : defaultAvatarsDir());
-    ({ registry, lobby, network } = createSessionStack({ ...opts, avatarsDir: avatarDir, snapshotHz }, {
+    const namecardDir = opts.namecardsDir !== undefined ? opts.namecardsDir
+      : (process.env.SP_NAMECARDS_DIR === '' ? null : defaultNamecardsDir());
+    ({ registry, lobby, network } = createSessionStack({ ...opts, avatarsDir: avatarDir, namecardsDir: namecardDir, snapshotHz }, {
       data, log, combatPool, trialPool, onlineLimit, ownerFile, content, plugins: roomSets, hosts,
       getLoadState: () => serverLoadState(healthMetrics?.snapshot?.()),
       getLoadDetails: () => publicLoadDetails(healthMetrics?.snapshot?.()),
     }));
     serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, metrics: opts.phaseMetrics,
-      avatarDir, assetIndex, views, visual, contents, ...(opts.client ? { client: opts.client } : {}) });
+      avatarDir, namecardDir, assetIndex, views, visual, contents, ...(opts.client ? { client: opts.client } : {}) });
     // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
     // once it is used (hot reload), and rooms whose host is the author or alone follow a plugin's changes by themselves
     studio = opts.studio === false ? null : createStudio({ publicDir, pluginsDir, dataDir, registry: packs, lobby, sessions: registry, log, fetch: opts.fetch });

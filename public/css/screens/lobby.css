@@ -2422,6 +2422,10 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .nc-pick__card:hover, .nc-pick__card:focus-visible { border-color: rgba(78, 216, 175, .6); outline: none; }
 .nc-pick__card.is-on { border-color: var(--mint-400); }
 .nc-pick__card.is-busy { opacity: .55; }
+.nc-pick__card--upload { width: 100%; }
+.nc-pick__card--upload .nc-pick__upload { width: 100%; min-height: 62px; justify-content: center; gap: .1rem; border: 1px dashed rgba(120,220,190,.45); color: var(--mint-300, #7fe7c9); background: rgba(12,20,18,.6); }
+.nc-pick__card--upload .nc-pick__upload .icon { width: .2rem; height: .2rem; }
+.nc-pick__card--upload:disabled { opacity: .5; cursor: default; }
 .nc-pick__on { position: absolute; right: 4px; bottom: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; color: #06231b; background: var(--mint-400); border-radius: 2px; }
 .nc-pick__foot { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid rgba(255, 255, 255, .08); }
 .nc-pick__foot small { flex: 1; min-width: 0; color: #8c9894; }

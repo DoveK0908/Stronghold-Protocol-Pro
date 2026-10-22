@@ -1,4 +1,5 @@
 import { audio } from '../audio.js';
+import { cropFile } from './imageCropper.js';
 // Lobby hub backdrop (owner's request, 2026-10-13): original procedural scenes without a sun — 夜巡 (default), 霜原,
 // 烬野, 静默 — or the player's own picture. A picture is downscaled on this device and kept in IndexedDB (never
 // uploaded); the choice and its dim / blur / overlay / motion settings are a localStorage pref. The ridges and the
@@ -62,30 +63,23 @@ const idbGet = () => withStore('readonly', (s) => s.get(KEY));
 const idbPut = (blob) => withStore('readwrite', (s) => s.put(blob, KEY));
 const idbDel = () => withStore('readwrite', (s) => s.delete(KEY));
 
-/** Decode a picked file and re-encode it at most MAX_EDGE on its longest side (JPEG). */
+/** Frame the picture (16:9) in the cropper, then store it as JPEG at most MAX_EDGE on its longest side. */
 async function shrink(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const im = new Image();
-      im.onload = () => resolve(im);
-      im.onerror = () => reject(new Error('decode'));
-      im.src = url;
-    });
-    const k = Math.min(1, MAX_EDGE / Math.max(img.naturalWidth, img.naturalHeight, 1));
-    const w = Math.max(1, Math.round(img.naturalWidth * k));
-    const h = Math.max(1, Math.round(img.naturalHeight * k));
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const g = c.getContext('2d');
-    g.fillStyle = '#0b1110'; g.fillRect(0, 0, w, h); // a transparent PNG gets the hub's ground colour
-    g.drawImage(img, 0, 0, w, h);
-    const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.86));
-    if (!blob) throw new Error('encode');
-    return blob;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const cropped = await cropFile(file, { aspect: 16 / 9, outWidth: MAX_EDGE, title: t('调整大厅背景') });
+  if (!cropped) throw new Error('cancelled');
+  const bitmap = await createImageBitmap(cropped).catch(() => null);
+  if (!bitmap) throw new Error('decode');
+  const k = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height, 1));
+  const w = Math.max(1, Math.round(bitmap.width * k));
+  const h = Math.max(1, Math.round(bitmap.height * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  g.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/jpeg', 0.86));
+  if (!blob) throw new Error('encode');
+  return blob;
 }
 
 /**

@@ -595,6 +595,10 @@ export const C2S = {
   // own earlier upload after a reload (any other id is refused). The room sees it as seats[].card.avatarImg.
   'me.avatar': { data: (v) => typeof v === 'string' && v.length > 0 && v.length <= 400000,
     id: (v) => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v), $optional: ['data', 'id'] },
+  // 自传名片底图 (2026-10-22, maintainer): the same shape as me.avatar with a 400KB decoded cap; the room sees the
+  // picture as seats[].card.bg = 'custom:<id>' (GET /namecard/<id>).
+  'me.namecard': { data: (v) => typeof v === 'string' && v.length > 0 && v.length <= 560000,
+    id: (v) => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v), $optional: ['data', 'id'] },
   // spectator seats (remake feature, community report #26; MAX_SPECTATORS): take one of a co-op room's spectator seats —
   // in its lobby or while its match runs — never a player seat; the host frees one by playerId (the spectator gets
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
@@ -727,6 +731,9 @@ export const S2C = [
   // me.avatar { id } — the requester's own uploaded avatar was accepted (server/avatars.js); only the uploader gets it,
   // the room sees it through room.state seats[].card.avatarImg
   'me.avatar',
+  // me.namecard { id } — the requester's own uploaded 名片底图 was accepted (server/namecards.js); the room sees it as
+  // seats[].card.bg = 'custom:<id>' (GET /namecard/<id>)
+  'me.namecard',
   // Expanded relay only: m.public.uniteRound (1|2), uniteRounds (2); unite.rounds / uniteResult.rounds
   // retain completed { round, fieldId, battleId, helpers, through } rows. Current field helpers <=2,
   // final uniteResult.helpers aggregates <=4 actual participants; b.result limits remain unchanged.
