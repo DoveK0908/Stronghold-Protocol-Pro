@@ -2,8 +2,9 @@
 // with the room through seats[].card.bg = `custom:<id>` (GET /namecard/<id>). The crop / zoom / pan dialog is
 // ui/imageCropper.js; the card is drawn tall behind a name plate, so the frame is 1:2.
 import { net } from '../net.js';
-import { loadPref } from '../store.js';
+import { loadPref, savePref } from '../store.js';
 import { cropFile } from './imageCropper.js';
+import { DEFAULT_NAMECARD } from './namecards.js';
 import { t } from '../../../shared/i18n.js';
 
 /** Sent to the server at most this wide (a 720×1440 WebP is ~120–250KB; the server caps 400KB). */
@@ -63,5 +64,16 @@ export function storedNamecardId() {
 
 /** Re-claim this browser's uploaded 名片底图 after a reload (the server keeps it per owner; only the owner's id is accepted). */
 export function claimNamecard(id = storedNamecardId()) {
-  if (typeof id === 'string' && /^[0-9a-f]{16}$/.test(id)) net.send('me.namecard', { id });
+  if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) return;
+  // `{ id: '' }` = this upload no longer exists on the server (deleted by hand); clear the pick so the card falls back
+  // to the preset background instead of warning on every reload.
+  const off = net.on('me.namecard', (msg) => {
+    if (msg && msg.id === '') {
+      off();
+      savePref(NAMECARD_PREF, '');
+      // 动态 import：playerCard 依赖 namecards，静态导入会形成 namecards→customNamecard→playerCard→namecards 的环。
+      import('./playerCard.js').then(({ cardStore }) => cardStore.set({ bg: DEFAULT_NAMECARD })).catch(() => {});
+    }
+  });
+  net.send('me.namecard', { id });
 }

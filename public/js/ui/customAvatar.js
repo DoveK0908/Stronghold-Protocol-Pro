@@ -2,7 +2,7 @@
 // the room shows it to everyone through the seat card's `avatarImg` (GET /avatar/<id>). The image never leaves this
 // machine's server, and a re-upload replaces the browser's previous one.
 import { net } from '../net.js';
-import { cardStore } from './playerCard.js';
+import { cardStore, setCustomAvatar } from './playerCard.js';
 import { t } from '../../../shared/i18n.js';
 import { cropFile } from './imageCropper.js';
 
@@ -54,5 +54,9 @@ export async function uploadAvatar(file) {
 
 /** Re-claim this browser's uploaded avatar after a reload (the server keeps it per owner; only the owner's id is accepted). */
 export function claimAvatar(id = cardStore.get().avatarImg) {
-  if (typeof id === 'string' && /^[0-9a-f]{16}$/.test(id)) net.send('me.avatar', { id });
+  if (typeof id !== 'string' || !/^[0-9a-f]{16}$/.test(id)) return;
+  // The server answers `{ id: '' }` when this id no longer belongs to this browser (the file was deleted); drop the
+  // stale preference instead of retrying it on every reload.
+  const off = net.on('me.avatar', (msg) => { if (msg && msg.id === '') { off(); setCustomAvatar(''); } });
+  net.send('me.avatar', { id });
 }

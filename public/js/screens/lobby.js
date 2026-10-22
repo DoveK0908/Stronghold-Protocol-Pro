@@ -677,7 +677,13 @@ export function LobbyScreen() {
   const [achOpen, setAchOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#09)
   // 自传头像：上传过的浏览器在每次连上服务器后重认领一次（服务端按 owner 只认自己的文件）
-  useEffect(() => net.on('welcome', () => { claimAvatar(); claimNamecard(); }), []);
+  // welcome 只在 hello 之后发一次，而大厅比它晚挂载（refresh 后第一次进大厅收不到），所以挂载时先认领一次，
+  // 断线重连再靠 welcome 认领一次。
+  useEffect(() => {
+    claimAvatar();
+    claimNamecard();
+    return net.on('welcome', () => { claimAvatar(); claimNamecard(); });
+  }, []);
 
   useEffect(() => {
     // Optional low-frequency checks exist only while the lobby is mounted, never during a match.

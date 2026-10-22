@@ -1968,10 +1968,17 @@ export class Lobby {
     const store = this.avatars;
     if (!store) return fail(ERR.BAD_MSG, 'avatars are not accepted');
     const key = ownerKey(session.uid || '');
-    if (typeof data !== 'string' && typeof id === 'string' && store.owns(id, key)) {
-      session.avatarImg = id;
-      sendSession(session, { t: 'me.avatar', id });
-      return this._applyAvatar(session, id);
+    if (typeof data !== 'string' && typeof id === 'string') {
+      if (store.owns(id, key)) {
+        session.avatarImg = id;
+        sendSession(session, { t: 'me.avatar', id });
+        return this._applyAvatar(session, id);
+      }
+      // 一个已经不属于本人的 id（旧浏览器的 local pref 指向被删掉的文件）不是错误：清掉它、回到默认头像，
+      // 否则每次刷新都会弹「无效的请求」（维护者 2026-10-22 在服务器上踩到）。
+      session.avatarImg = '';
+      sendSession(session, { t: 'me.avatar', id: '' });
+      return this._applyAvatar(session, '');
     }
     if (typeof data !== 'string' || !data) return fail(ERR.BAD_MSG, 'no image');
     if (data.length > Math.ceil(200 * 1024 / 3) * 4 + 8) return fail(ERR.BAD_MSG, 'avatar too large');
@@ -2007,9 +2014,15 @@ export class Lobby {
     const store = this.namecards;
     if (!store) return fail(ERR.BAD_MSG, 'name cards are not accepted');
     const key = ownerKey(session.uid || '');
-    if (typeof data !== 'string' && typeof id === 'string' && store.owns(id, key)) {
-      session.namecard = id;
-      sendSession(session, { t: 'me.namecard', id });
+    if (typeof data !== 'string' && typeof id === 'string') {
+      if (store.owns(id, key)) {
+        session.namecard = id;
+        sendSession(session, { t: 'me.namecard', id });
+        return this._applyNamecard(session);
+      }
+      // 同 me.avatar：删掉的旧图只清掉、不报错。
+      session.namecard = '';
+      sendSession(session, { t: 'me.namecard', id: '' });
       return this._applyNamecard(session);
     }
     if (typeof data !== 'string' || !data) return fail(ERR.BAD_MSG, 'no image');
