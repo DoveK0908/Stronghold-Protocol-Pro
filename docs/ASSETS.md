@@ -77,6 +77,14 @@ binding, safe file paths, Spine 3.8 animations, every atlas region, and complete
 Metadata declarations alone are not installed resources. Directory case aliases and camelCase basenames are preserved
 separately; the importer never lowercases or reconstructs a declared file stem.
 
+Some fashions (272 of the 979 atlas pages under `public/assets/skins`, as of 2026-10-22) ship **premultiplied** RGBA
+pages while their `.atlas` carries no `pma: true` line. `public/vendor/pixi-spine.js` only switches a page to
+`ALPHA_MODES.PMA` when the atlas says so, so such a page is multiplied twice and its dark edges (the eyes of
+缪尔赛思's fashions, for one) turn into black rings. `node tools/mark-skin-pma.mjs` samples every page (straight alpha
+has pixels whose colour exceeds the alpha; premultiplied pages have none), reports which atlases lack the marker, and
+`--write` appends `pma: true` without touching the pixels. Run it after re-extracting skins, operators or token models:
+`node tools/mark-skin-pma.mjs --write`（幂等，只补不删；`spine/op` 与 `spine/token` 目前都是直通 alpha，不需要标记）。
+
 The local 2026-10-08 candidate covers all **271 official fashions within the current 209-character scope**. Existing
 127 records and all installed CN/JP/EN audio are retained. The added 144 comprise 142 distinct front/rear pairs,
 one front-only model and one explicitly unified battle model (`battleModelKind: 'unified'`), not a fabricated rear file.
