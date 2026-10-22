@@ -7,10 +7,10 @@ import { cropFile } from './imageCropper.js';
 import { DEFAULT_NAMECARD } from './namecards.js';
 import { t } from '../../../shared/i18n.js';
 
-/** Sent to the server at most this wide (a 720×1440 WebP is ~120–250KB; the server caps 400KB). */
+/** Sent to the server at most this wide; the ladder in imageCropper keeps it under one 64KB WS frame. */
 const WIDTH = 720;
-/** The frame of a seat card's art well (~340×720): a name card is drawn behind the plate. */
-export const NAMECARD_ASPECT = 0.5;
+/** The plate the image is drawn behind is wide, not tall: `.rseat__plate` / `.nc-pick__card` use 600 / 186. */
+export const NAMECARD_ASPECT = 600 / 186;
 const MAX_RAW = 30 * 1024 * 1024;
 
 /** `/namecard/<id>` — the URL of an uploaded 名片底图 (id = 16 hex, server/namecards.js). */

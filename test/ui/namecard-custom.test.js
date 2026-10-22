@@ -18,3 +18,8 @@ test('namecardOf: custom:<16 hex> is a card, anything else custom is not', () =>
 test('the default card is still a preset', () => {
   assert.equal(namecardOf(DEFAULT_NAMECARD).kind, 'loading');
 });
+
+test('the name card crop is wide (the plate is 600 / 186), never a portrait frame', async () => {
+  const { NAMECARD_ASPECT } = await import('../../public/js/ui/customNamecard.js');
+  assert.ok(Math.abs(NAMECARD_ASPECT - 600 / 186) < 1e-9, `expected 600/186, got ${NAMECARD_ASPECT}`);
+});
