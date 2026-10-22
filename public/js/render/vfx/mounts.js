@@ -36,6 +36,8 @@ export const SKELETON_TILT = 30;
 /** The client's Graphic rotation (−30° about X), for a skin that does not carry its own. */
 const GRAPHIC_ROT = Object.freeze([-0.258819, 0, 0, 0.965926]);
 const DEG = Math.PI / 180;
+/** The quarter turn a directional effect takes when the unit is drawn facing down / up (see mountRotation). */
+const DIR_YAW = Object.freeze({ DOWN: -Math.PI / 2, UP: Math.PI / 2 });
 
 /** The point kind of a ParticleEffect spawn location (null = the unit's feet / the ground). */
 export function spawnKind(spawn) {
@@ -259,7 +261,12 @@ export function mountRotation(skin, kind, unit, out = [0, 0, 0, 1]) {
   // the point's local rotation l: Rz(the bone's angle) = (0, 0, sin, cos) when the bone turns it, else its own
   let lx = 0, ly = 0, lz = 0, lw = 1;
   if (p && p.followRot) {
-    const ang = b && Number.isFinite(b.angle) ? b.angle * DEG : 0;
+    // A unit drawn facing DOWN uses its Front skeleton, whose weapon points along +x, and one facing UP its Back
+    // skeleton — the direction neither model turns to. A directional effect (MUZZLE_POINT, a Special point) then gets
+    // a quarter turn about the skeleton plane's normal so it follows the deploy direction (maintainer 2026-10-22:
+    // 松果's S2 spikes pointed right while she faced down). Effects that keep the graphic rotation are unaffected.
+    const yaw = DIR_YAW[unit.dir] && (kind === 'muzzle' || kind[0] === 's') ? DIR_YAW[unit.dir] : 0;
+    const ang = (b && Number.isFinite(b.angle) ? b.angle * DEG : 0) + yaw;
     lz = Math.sin(ang / 2); lw = Math.cos(ang / 2);
   } else if (p && p.rot) {
     const r = p.rot;

@@ -354,10 +354,13 @@ export class FxWiring {
 
   /**
    * Where a view stands, as mounts.js reads it: board feet + facing, the view itself (its model's bones: the
-   * BoneFollower points) and the camera's tilt (the plane the drawn model faces).
+   * BoneFollower points) and the camera's tilt (the plane the drawn model faces). `dir` is the deploy direction
+   * (UP / RIGHT / DOWN / LEFT): a model drawn facing down uses the Front skeleton, whose weapon points along +x, so
+   * mountRotation turns a directional effect 90° to follow the unit (maintainer 2026-10-22: 松果's S2 pointed right
+   * while she faced down).
    */
   pose(v) {
-    return { x: v.x, y: v.y, z: (v.z || 0) + (v.hover || 0), left: (v.visFacing ?? v.facing ?? 1) < 0, back: typeof v._wantsBack === 'function' ? !!v._wantsBack() && !!v.entryBack : false, view: v, tilt: this._camTilt() };
+    return { x: v.x, y: v.y, z: (v.z || 0) + (v.hover || 0), left: (v.visFacing ?? v.facing ?? 1) < 0, back: typeof v._wantsBack === 'function' ? !!v._wantsBack() && !!v.entryBack : false, dir: v.dir || null, view: v, tilt: this._camTilt() };
   }
 
   /** The battle camera's tilt (degrees from straight down), or undefined (mounts.js SKELETON_TILT). */

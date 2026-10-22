@@ -97,8 +97,8 @@ describe('mount points on the drawn model (mounts.js)', () => {
   });
 
   test('the mount rotation: the Graphic tilt, the facing turn (180° about the plane\'s up) and the bone\'s angle', () => {
-    const at = (bones, flip, kind = 'muzzle', left = flip < 0) => {
-      const q = mountRotation(SKIN, kind, { x: 4, y: 11, z: 0, left, back: false, view: boneView(bones, flip) });
+    const at = (bones, flip, kind = 'muzzle', left = flip < 0, extra = {}) => {
+      const q = mountRotation(SKIN, kind, { x: 4, y: 11, z: 0, left, back: false, view: boneView(bones, flip), ...extra });
       return { x: quatRotate(q, [1, 0, 0]), y: quatRotate(q, [0, 1, 0]) };
     };
     // the bone's x axis along the screen's right: local +x stays +x, local +y is the camera's up
@@ -117,6 +117,15 @@ describe('mount points on the drawn model (mounts.js)', () => {
     // a static point: the tilt and the facing only
     r = at({}, 1, 'hit', true);
     nearV(r.x, [-1, 0, 0], 1e-6, 'HitPoint, left');
+    // deploy direction DOWN / UP: a directional point's effect takes a quarter turn about the plane's normal, so a
+    // Front model's weapon along +x points down the screen (maintainer 2026-10-22: 松果's S2 spikes pointed right)
+    r = at({ F_Muzzle: { x: 1, up: 0.6, angle: 0 } }, 1, 'muzzle', false, { dir: 'DOWN' });
+    nearV(r.x, [0, -C30, S30], 1e-6, 'DOWN: x points down the screen');
+    r = at({ F_Muzzle: { x: 1, up: 0.6, angle: 0 } }, 1, 'muzzle', false, { dir: 'RIGHT' });
+    nearV(r.x, [1, 0, 0], 1e-6, 'RIGHT: unchanged');
+    // a point that keeps the Graphic rotation (no followRot) is not turned: its prefab is pre-oriented
+    r = at({}, 1, 'hit', false, { dir: 'DOWN' });
+    nearV(r.x, [1, 0, 0], 1e-6, 'DOWN, static point: unchanged');
     assert.equal(mountRotation(SKIN, null, { x: 0, y: 0 }), null, 'FOOT / GROUND: the unit\'s own rotation');
     // which spawn locations take the point's rotation (Effect._InitLocationFromEntity)
     assert.deepEqual([3, 8, 11, 13, 18, 34].map(spawnRotationKind), ['muzzle', 's0', 's3', 's4', 's8', 's23']);
