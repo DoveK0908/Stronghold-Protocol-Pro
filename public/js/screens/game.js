@@ -658,6 +658,14 @@ function MatchScreen() {
     }
   }, [view, showPrep, priv, editable, field, combat, mode, watchingOther, watching, holdSeq, relayKey, relayFieldReady]);
 
+  // A finished field has a cosmetic tail; a paused/stalled field retains its combat pose.
+  useEffect(() => {
+    if (!view || showPrep || !field?.fieldId || field.prep) return;
+    const pf = pub?.fields?.find((f) => f.fieldId === field.fieldId);
+    const done = field.local ? battleState?.fieldId === field.fieldId && battleState.done : pf?.live === false;
+    if (done || field.live === false) view.finishBattle?.();
+  }, [view, showPrep, field, battleState?.fieldId, battleState?.done, pub?.fields]);
+
   // the round start (PR #416 by @Cromemadnd; the maintainer's confirmation from official play, 2026-10-13): the own board's
   // pieces replay their Start clip and landing sound one after another in deployment order — once per round, in 回合开始, on
   // the own board only (gameLogic roundStartReplay). After the wiring effect above, so the view already holds this state's
@@ -821,11 +829,13 @@ function MatchScreen() {
   }, [view, watchWho, field, phase]);
 
   // graceful degradation: without WebGL / the render engine the DOM view takes over — say so once per match
+  const fallbackNotified = useRef(false);
   useEffect(() => {
-    if (viewKind !== 'fallback') return;
+    if (viewKind !== 'fallback' || fallbackNotified.current) return;
     let asked = null;
     try { asked = new URLSearchParams(globalThis.location?.search || '').get('render'); } catch { asked = null; }
     if (asked === 'fallback' || globalThis.__SP_RENDER__ === 'fallback') return;
+    fallbackNotified.current = true;
     toast(t('渲染器暂时未能加载，已切换为简化视图（功能不受影响，可刷新重试）'), 'info', { ttl: 5000 });
   }, [viewKind]);
 

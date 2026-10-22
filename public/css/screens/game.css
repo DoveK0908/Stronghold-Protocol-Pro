@@ -640,6 +640,37 @@
   .combat-metrics__note { padding-top: 4px; padding-bottom: 4px; }
   .combat-metrics__note br { display: none; }
 }
+/* Phones in landscape (short touch screens: 1rem is clamped at 40 px by theme.css): the ported desktop card — 12–16 px
+   text, 340 px wide, 30 px thumbs — took 40 % of an 844 × 390 screen, about twice the HUD's own 6–7 px text, and hid
+   the battle behind it. Scale the card by the HUD's proportion instead of the desktop one: 9–12 px text, 24 px thumbs,
+   36 px touch rows, 300 px wide (文字大小 still lifts every size through --t). Desktop/tablet keep the original sizes. */
+@media (max-height: 600px) and (pointer: coarse), (max-height: 600px) and (any-pointer: coarse) {
+  .combat-metrics {
+    width: min(max(5rem, calc(300px * var(--ui))), calc(100vw - var(--sa-l) - var(--sa-r) - .48rem));
+    font-size: max(calc(.2 * var(--t)), calc(9px * var(--ui)));
+    line-height: 1.3;
+  }
+  .combat-metrics__head { padding: max(.06rem, calc(6px * var(--ui))) max(.12rem, calc(8px * var(--ui))) 0; gap: 0 calc(6px * var(--ui)); }
+  .combat-metrics__micro { font-size: max(calc(.12 * var(--t)), calc(8px * var(--ui))); }
+  .combat-metrics__head h2 { font-size: max(calc(.3 * var(--t)), calc(12px * var(--ui))); }
+  .combat-metrics__close { width: max(.3rem, calc(36px * var(--ui))); height: max(.3rem, calc(36px * var(--ui))); min-width: calc(36px * var(--ui)); min-height: calc(36px * var(--ui)); }
+  .combat-metrics__close .icon { width: max(.16rem, calc(15px * var(--ui))); height: max(.16rem, calc(15px * var(--ui))); }
+  .combat-metrics__tools { padding: max(.06rem, calc(6px * var(--ui))) max(.12rem, calc(8px * var(--ui))); gap: calc(6px * var(--ui)); }
+  .combat-metrics__scopes button { min-height: calc(36px * var(--ui)); padding: calc(2px * var(--ui)) calc(5px * var(--ui)); }
+  .combat-metrics__totals { gap: calc(6px * var(--ui)); padding: 0 max(.12rem, calc(8px * var(--ui))) max(.06rem, calc(6px * var(--ui))); }
+  .combat-metrics__totals b { font-size: max(calc(.26 * var(--t)), calc(11px * var(--ui))); }
+  .combat-metrics__legend { gap: calc(4px * var(--ui)) calc(10px * var(--ui)); padding: 0 max(.12rem, calc(8px * var(--ui))) max(.06rem, calc(6px * var(--ui))); font-size: max(calc(.16 * var(--t)), calc(8px * var(--ui))); }
+  .combat-metrics__type::before { width: calc(8px * var(--ui)); height: calc(3px * var(--ui)); }
+  .combat-metrics__list { padding: 0 max(.12rem, calc(8px * var(--ui))); }
+  .combat-metrics__row { grid-template-columns: max(.24rem, calc(14px * var(--ui))) max(.5rem, calc(24px * var(--ui))) minmax(0, 1fr); gap: calc(5px * var(--ui)); padding: max(.05rem, calc(4px * var(--ui))) 0; }
+  .combat-metrics__row > .uthumb { width: max(.5rem, calc(24px * var(--ui))); height: max(.5rem, calc(24px * var(--ui))); }
+  .combat-metrics__rank { padding-top: calc(1px * var(--ui)); }
+  .combat-metrics__bar { height: max(.04rem, calc(4px * var(--ui))); margin: calc(3px * var(--ui)) 0; }
+  .combat-metrics__values { gap: calc(4px * var(--ui)); }
+  .combat-metrics__values small { font-size: max(calc(.14 * var(--t)), calc(8px * var(--ui))); }
+  .combat-metrics__values b { font-size: max(calc(.18 * var(--t)), calc(9px * var(--ui))); }
+  .combat-metrics__note { padding: max(.06rem, calc(6px * var(--ui))) max(.12rem, calc(8px * var(--ui))); font-size: max(calc(.14 * var(--t)), calc(8px * var(--ui))); }
+}
 
 .ewheel { position: relative; }
 .ewheel__btn {

@@ -525,6 +525,16 @@ Title-count display uses the following 20-award boundary, confirmed in the offic
 
 Community UI and recovery (§29.6): DIY reuses roster stats and skill previews; Swire's coins and, with 设置「显示弹药与能量数量」 on, a 秘术师's stored attack energies (GitHub #633, PR #636) show current/cap. The lobby player chip opens statistics and the responsive header keeps optional controls from overlapping its title. Settlement's summary scrolls separately from Return. Failed board art can retry, and failed three.js imports use two bounded fresh URLs. Failed engine initialization can remount on online/visibility, at most twice consecutively, cleaning up each previous view; explicit fallback/2D stays selected.
 
+0.3.2 (§35.17, PR #664): a page reopened directly into a match can exceed the 12 s engine-import
+deadline while its module graph is still downloading. Only a timeout fallback schedules automatic retries after 2 s and then
+8 s [ASSUMED], with a two-attempt automatic budget separate from the existing two online/visibility retries. A long
+outage must not consume those event retries before connectivity or the player returns. Hidden/offline pages do not
+spend an attempt; their normal events resume recovery. Successful initialization resets both budgets. Each attempt
+cleans up the previous view, and leaving the screen cancels its timer. Explicit `?render=fallback` never retries;
+`?board=2d` still selects the 2D board inside the normal renderer. No simulation or match is restarted.
+Non-timeout failures (including missing WebGL) do not schedule automatic retries. The fallback notice is shown once
+per mounted match, not again after a loading/retry cycle. The event retry limit is independent of the delay list.
+
 Replacing a field renderer also resets the game screen's entered-view identity. Frames are buffered while the replacement loads; after subscribing, the local runner re-shows full current metadata/snapshot, or the server resends the watched field. Real local and server-streamed battles preserve the same simulation object and clock through recovery, including enemies spawned before the new renderer existed.
 
 §30.4: the HP tower retains current HP until settlement and shows pending loss separately. Shop refresh is single
@@ -691,6 +701,13 @@ enters b.progress / b.result, and a tracked battle's result and rendered events 
 (test/match/combat-metrics.test.js, test/match/runner.test.js). Ported from [xinhai-ai/Stronghold-Protocol](https://github.com/xinhai-ai/Stronghold-Protocol)
 (其公开部署分支，作者 @临夏俨然) with thanks.
 
+The card's own scale is the desktop one (12–16 px text, 340 px wide), which on a phone in landscape is out of the HUD's
+scale: `theme.css` clamps `1rem` at 40 px there, so in-match text is 6–7 px, while the ported card kept its desktop
+pixels and took 40 % of an 844 × 390 screen at twice that text size (GitHub #817). Short touch screens
+(≤ 600 px tall, coarse pointer — phones, not tablets) therefore get the HUD's proportion instead: 9–12 px text, 24 px
+thumbs, 36 px touch rows, 300 px wide (`screens/game.css`); 设置 → 文字大小 still lifts every size through `--t`.
+Desktop, tablet and mouse-driven windows keep the original sizes.
+
 ### Forge compact metadata (0.3.1)
 
 Forge import (CLI and the studio's explicit preview/import) and setup's startup/update gap preparation fetch missing
@@ -710,3 +727,7 @@ keys override and missing/invalid entries retain built-in text. Scope remains br
 room content and simulation. Pure geometry SDK helpers return frozen values and accept at most 1024 range cells.
 Forge UI mounts without an equivalent slot require an explicit manual-adaptation report, separate from script copying.
 Art/audio templates ship original CC0 sample media; the studio fills the target's first editable slot [ASSUMED].
+
+### Finished battle presentation
+
+The field view receives an explicit completion signal (`finishBattle`): the local runner's `done`, or the server's public field `live: false`. Missing snapshots and solo pause never imply completion. After rendering the final buffered snapshot/events, surviving units return to idle with temporary crowd-control and skill pose flags cleared for presentation only, retaining flight, stealth-driven forms and other persistent flags; knocked-out/dead poses remain. Official and plugin persistent effects stop, while one-shot effects advance on the presentation clock and are removed after at most two presentation seconds [ASSUMED]. Studio playback continues to use its external clock, including zero-time paused frames. This does not tick the simulation, delay results, or change golden outcomes.

@@ -141,6 +141,7 @@ import { GEO, ANIM } from '../../../shared/constants.js';
 import { fxForm } from '../../../shared/protocol.js';
 import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } from './projection.js';
 import { SnapshotBuffer, frameTime } from './interp.js';
+import { BattlePresentation } from './battlePresentation.js';
 import { TileField } from './tiles.js';
 import { UnitView, ItemView, DeviceView, FORMS, syncView } from './units.js';
 import { FxSystem, ensureDamageFonts, projSpeed } from './fx.js';
@@ -327,6 +328,9 @@ export async function createFieldView(host, options = {}) {
   // streamed fields (a spectator seat, a replica that went back to the stream): the delay follows the network's jitter
   const interp = new SnapshotBuffer({ delay: 0.1, rate: 2, adaptive: true });
   let streamDelay = interp.delay;
+  // upstream 0.3.2 (#664/#821): the battle's presentation clock — idle poses after the last event, and the cleanup of
+  // the effects a finished battle leaves behind
+  const presentation = new BattlePresentation();
   const sample = new Map();
   const meleePending = new Map(); // target id → { src, t }
   const consumedIds = new Set();  // battle ids used up by their own effect (fx `consumed`): no death particles
@@ -1513,6 +1517,7 @@ export async function createFieldView(host, options = {}) {
   function enterBattle(meta) {
     if (destroyed || !meta || typeof meta !== 'object') return false;
     holdScene(true); // before the prep views go: the cache is never "quiet" across the switch
+    presentation.reset();
     drag.reset();
     endDragVisual(false);
     cancelReplay();  // the round start's replay is a prep-board thing: none of it reaches a battle (or a scouted board)
@@ -1945,7 +1950,7 @@ export async function createFieldView(host, options = {}) {
       if (!v) v = battleView(id) || createUnknown(id, s);
       if (!v) continue;
       if (!v._seen) { v._seen = true; v.fadeIn = 0; queueBeam(v, renderT); }
-      syncView(v, s, renderT);
+      syncView(v, presentation.sample(s), renderT);
     }
     // knocked-out operators waiting to redeploy (b.snap `down`, user playtest #4 item 9): their view stays on the
     // field knocked down under a redeploy ring (UnitView.setDown) — made on the spot for one already down when this
@@ -2077,18 +2082,23 @@ export async function createFieldView(host, options = {}) {
         const renderT = interp.update(now / 1000);
         if (Number.isFinite(renderT)) {
           processEvents(renderT);
+          const justEnded = presentation.update(renderT, interp.newestT, dt);
           syncBattle(renderT);
-          windUpAttacks(renderT);
+          if (!presentation.ended) windUpAttacks(renderT);
           // content-owned projectiles (丰川祥子's notes) have no 'atk' event: they are drawn from the snapshot's
           // `proj` list instead (render/fx/notes.js syncNotes — an empty list fades them all out)
           fx.syncNotes(interp.projAt(renderT));
           // the official effects run on the battle clock (render time of the snapshots: 1× / 2×, still while paused); the
           // skill effects' per-frame part reads the views' fresh sample (render/vfx/skillfx.js sync)
-          const gdt = ofxPrevT == null ? 0 : Math.min(opts.playbackTime ? Infinity : 0.25, Math.max(0, renderT - ofxPrevT));
+          const gdt = presentation.ended ? dt : ofxPrevT == null ? 0 : Math.min(opts.playbackTime ? Infinity : 0.25, Math.max(0, renderT - ofxPrevT));
           ofxPrevT = renderT;
-          wiring.sync(views.values());
+          if (justEnded) { wiring.clear(); ofx.finish(); pluginFx.finish(); }
+          pluginFx.update(gdt);
+          if (!presentation.ended) { pluginFx.sync(views.values()); wiring.sync(views.values()); }
+          // [ASSUMED] Bound long-lived one-shots to two presentation seconds after completion.
+          if (presentation.ended && presentation.tail >= 2) { ofx.clear(); pluginFx.clear(); fx.clear(); }
           if (ofx.active) {
-            wiring.tick();
+            if (!presentation.ended) wiring.tick();
             if (opts.playbackTime) advanceEffectClock(ofx, gdt); else ofx.update(gdt);
           }
         }
@@ -2202,6 +2212,7 @@ export async function createFieldView(host, options = {}) {
     /** Enemy preview pen: a list in m.private.nextEnemies shape, or null to empty it (setPrep does this itself). */
     setPen(list) { if (destroyed) return false; setPenList(Array.isArray(list) ? list : null); return true; },
     enterBattle,
+    finishBattle() { if (!destroyed && mode === 'battle') presentation.finish(); },
     pushSnapshot,
     pushEvents,
     /**
