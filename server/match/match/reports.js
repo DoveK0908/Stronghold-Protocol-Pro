@@ -118,6 +118,8 @@ export class MatchReports {
   /** A boss field's accepted client result: each player's bossDamage is at least what the server credited them. */
   _bossResultDamage(f, result) {
     for (const pid of f.players) if (result.perPlayer[pid]) result.perPlayer[pid].bossDamage = Math.max(result.perPlayer[pid].bossDamage || 0, f.bossBy[pid] || 0);
+    // 项目 4: browser-authoritative boss fields — the settlement's per-operator ledger comes from this accepted result.
+    this._damageFromResult?.(f, result);
   }
 
   /**

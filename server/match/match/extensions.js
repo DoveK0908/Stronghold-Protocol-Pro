@@ -66,6 +66,47 @@ export class MatchExtensions {
     return false; // Match sends the complete permitted round ledger, not per-field raw-score broadcasts.
   }
 
+  /**
+   * 项目 4 (2026-10-22): client-authoritative boss fields never stream damage rows to the server (`_onDamageRows`
+   * is server-combat only), so the settlement's Boss 关伤害 ledger would stay at the empty rows `_beginDamage`
+   * seeded — every owner 0. A boss field's accepted result carries the same per-player / per-operator numbers the
+   * client already reports for 造成伤害 (`perPlayer[].damageDealt|unitStats`), so fold it into the board once.
+   * Only the boss/hidden scopes use it: a normal round's rows ride the server side (or not at all in client mode).
+   */
+  _damageFromResult(f, result) {
+    if (!this.clientCombat || this.disposed || this.ended || !f || !result || f.appliedDamageResult) return false;
+    if (this.round !== this.damageBoard.round || f.kind !== this.damageBoard.phase) return false;
+    if (f.kind !== 'boss' && f.kind !== 'hidden') return false;
+    const per = result.perPlayer && typeof result.perPlayer === 'object' ? result.perPlayer : null;
+    if (!per) return false;
+    const owners = [];
+    for (const pid of f.players) {
+      const p = per[pid];
+      if (!p || typeof p !== 'object') continue;
+      const operators = [];
+      let sum = 0;
+      for (const u of Array.isArray(p.unitStats) ? p.unitStats : []) {
+        if (!u || u.kind !== 'op') continue;
+        const damage = Number(u.dmg) || 0;
+        const healing = Number(u.heal) || 0;
+        if (damage <= 0 && healing <= 0) continue;
+        sum += damage;
+        operators.push({ key: JSON.stringify([pid, u.uid ?? `unit:${u.defId ?? '?'}`]), uid: Number.isSafeInteger(u.uid) ? u.uid : null,
+          defId: typeof u.defId === 'string' ? u.defId : null, damage, healing });
+      }
+      const total = Math.max(0, Number(p.damageDealt) || 0);
+      const healing = Math.max(0, Number(p.healingDone) || 0);
+      owners.push({ playerId: pid, total: Math.max(total, sum), healing, operators,
+        otherDamage: Math.max(0, total - sum), otherHealing: 0 });
+    }
+    if (!owners.length) return false;
+    const gt = Math.max(0, Number(result.time) || 0);
+    const ok = this.damageBoard.replaceField({ matchId: this.battlePrefix, round: this.round, phase: f.kind,
+      kind: f.kind, fieldId: f.fieldId, gt, owners, final: true });
+    if (ok) { f.appliedDamageResult = true; this._damageDirty = true; }
+    return ok;
+  }
+
   _sampleDamage(force = false, final = false) {
     if (this.clientCombat || this.damageBoard.status !== 'live') return;
     const now = this.sched.now();
