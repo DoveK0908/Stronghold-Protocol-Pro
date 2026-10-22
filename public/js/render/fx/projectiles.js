@@ -98,7 +98,15 @@ export class FxProjectiles {
     pr.x0 = src.x + ux * hand; pr.y0 = src.y + uy * hand; pr.z0 = bodyZ(cam, src, SHOT_HEIGHT.launch);
     // the shot leaves the weapon (the model's Muzzle bone as the attack clip poses it), not the middle of the sprite
     const mo = muzzleOffset(src);
-    pr.ox = mo ? mo.x : 0; pr.oy = mo ? -mo.up : 0;
+    if (mo) { pr.ox = mo.x; pr.oy = -mo.up; }
+    else {
+      // The model is not drawn yet (its Spine is still loading: spineReady false) or carries no muzzle bone. Firing
+      // from (0, 0) put the shot in the middle of the sprite; aim from the weapon side at chest height instead, which
+      // is where the fist/weapon sits on every operator's E0/E2 art.
+      const head = Number.isFinite(src._headTiles) && src._headTiles > 0 ? src._headTiles : 1.2;
+      pr.ox = ((src.visFacing ?? src.facing ?? 1) < 0 ? -1 : 1) * 0.14;
+      pr.oy = -0.36 * head;
+    }
     pr.tx = tgt.x; pr.ty = tgt.y; pr.tz = look === 'shell' ? feetZ(tgt) : bodyZ(cam, tgt, SHOT_HEIGHT.aim);
     pr.t = 0; pr.fade = 0; pr.hit = false; pr.emit = Math.random(); pr.ang = Math.atan2(-uy, ux);   // ≈ on screen (rows run up)
     pr.dur = clamp(dist / projSpeed(kind) / this._ts(), 0.04, 1.5);

@@ -31,7 +31,10 @@ test('muzzleOffset is null without a model / a bone / finite numbers', () => {
 
 test('the shot origin and the muzzle flash both take the offset, scaled from tiles to pixels', () => {
   const src = readSource();
-  assert.match(src, /const mo = muzzleOffset\(src\);\n\s*pr\.ox = mo \? mo\.x : 0; pr\.oy = mo \? -mo\.up : 0;/, 'attack() records it');
+  assert.match(src, /const mo = muzzleOffset\(src\);/, 'attack() asks the model for the muzzle');
+  assert.match(src, /if \(mo\) \{ pr\.ox = mo\.x; pr\.oy = -mo\.up; \}/, 'a drawn model: the muzzle bone wins');
+  assert.match(src, /pr\.ox = \(\(src\.visFacing \?\? src\.facing \?\? 1\) < 0 \? -1 : 1\) \* 0\.14;/, 'no model yet: the weapon side, not the middle');
+  assert.match(src, /pr\.oy = -0\.36 \* head;/, 'no model yet: chest height');
   assert.match(src, /if \(pr\.ox \|\| pr\.oy\) \{ p\.x \+= pr\.ox \* p\.s; p\.y \+= pr\.oy \* p\.s; \}/, '_shotPoint applies it in screen space');
   assert.match(src, /const p = this\._shotPoint\(pr, 0, cam, this\._g\);/, 'the muzzle flash starts where the shot does');
   assert.match(src, /if \(k < pr\.rise && \(pr\.ox \|\| pr\.oy\)\)/, 'a mortar shell leaves the barrel, not the body');

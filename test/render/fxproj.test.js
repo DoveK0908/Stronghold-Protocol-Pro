@@ -158,6 +158,21 @@ describe('particles', () => {
 });
 
 describe('shots', () => {
+  test('a shot whose model is not drawn yet leaves from the weapon side, not the middle of the sprite', () => {
+    const a = unit(1, 3, 10), b = unit(2, 9, 10, { isEnemy: true });
+    const { fx } = makeFx({ views: [a, b] });
+    fx.attack(a, b, 'arrow');
+    const pr = fx.projs[0];
+    assert.ok(pr.ox > 0, `right-facing: weapon side (${pr.ox})`);
+    assert.ok(pr.oy < 0, `chest height, not the feet (${pr.oy})`);
+    assert.ok(Math.abs(pr.oy) < 0.6 * 1.2, 'not the top of the sprite either');
+    // a left-facing unit fires from its other side
+    const l = unit(3, 3, 10, { visFacing: -1 }), t = unit(4, 9, 10, { isEnemy: true });
+    const fx2 = makeFx({ views: [l, t] }).fx;
+    fx2.attack(l, t, 'arrow');
+    assert.ok(fx2.projs[0].ox < 0, `left-facing: mirrored (${fx2.projs[0].ox})`);
+  });
+
   test('flight time = distance / sim speed / clock rate; homing on the moving target; one arrival burst', () => {
     FX.setSimProjectileSpeeds(null);
     const a = unit(1, 3, 10), b = unit(2, 9, 10, { isEnemy: true });
