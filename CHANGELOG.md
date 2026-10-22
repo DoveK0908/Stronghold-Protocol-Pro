@@ -1,3 +1,34 @@
+## 0.3.2-pro.5 — 2026-10-22
+
+在 `0.3.2-pro.4` 之上：跟进官方 `dev`（`06a92237..218647c6`）与精英 AI 阿尔图罗 v0.2.2，并把 GitHub Actions
+从第一次推送起就没绿过的 26 个失败逐条修掉。
+
+### 玩法与 AI
+
+- **阿尔图罗 v0.2.2（内容#03）**：拉特兰引擎从 `team27-early-three` 换成 `team28-vision-difficulty`，多人另有
+  `coop-eleven-boss-specials`；新增 17 个联赛/围剿策略模块（`lateranoCoopBoss*`、`lateranoBossFormation` 等）。
+  官方基线：单人绝境 28/28、终极 20/28，补充 14/14、7/14；二人 13/56、四人 13/56。
+- **简化棋盘冷启动恢复（官方 #664）**：页面被直接重开、或回退视图超时后，客户端按 `RECOVERY_DELAYS_MS` 自动重试，
+  不需要切标签页或还原窗口。
+- **战斗结束后的待机与特效清理（官方 #821）**：新增 `render/battlePresentation.js`；结束瞬间清接线、收尾官方与插件特效，
+  2 秒后把长寿命的一次性特效一起清掉。
+
+### 界面
+
+- **手机横屏的作战统计（官方 #817）**：短屏 + 触摸设备上按 HUD 比例渲染（300 px 宽、9–12 px 文字、24 px 头像、
+  36 px 行）；桌面与平板保持原尺寸。
+- 该块与 `界面大小` 的约定对齐：所有像素下限仍写 `calc(Npx * var(--ui))`。
+
+### 工程
+
+- **CI 转绿**：修 26 个从第一次推送起就失败的测试（历次重构留下的旧断言），并修 3 个真 bug——
+  `shared/plugins/ui.js` 的意图类型漏了 `me.avatar`/`me.namecard`、`tools/setup.mjs` 的 `export` 放错函数导致
+  `pluginFxExtractionAllowed` 无法导入、裁剪器与设置语言行的字号没跟 `--t`/`--ui`。
+- 测试与工具：`tools/i18n.mjs` 与 `test/i18n.test.js` 一起跳过逐字 vendored 的 `server/match/{arturia,lavinia}`；
+  `test/plugins/loopCaps.test.js` 同样跳过；素材缺失时（CI checkout 无 `public/assets/**`、Windows 无 `python3`）
+  `setup-plugin-*` 与 `sfx-oblvns` 改为双向守卫；`test/ui/combat-metrics-mobile.test.js` 跟随本 fork 的 `--ui` 写法。
+- 官方 `#823`：官方边界扫描复用 `RegexReader`，`shared/plugins/textNumber.js` 与 `officialBounds.js` 跟着更新。
+
 ## 0.3.2-pro.4 — 2026-10-22
 
 在 `0.3.2-pro.3` 之上：房间里的席位卡改成「按对方自己的选择显示」，并把头像、名片底图、大厅背景三个上传入口

@@ -4,7 +4,7 @@
 
 《明日方舟》季节性自走棋塔防玩法「卫戍协议：盟约」的**非官方同人复刻**：浏览器即开即玩，单人、1–4 人合作，或在好友房里扩展到最多 20 人。
 
-![version](https://img.shields.io/badge/version-0.3.2--pro.4-2ea44f)
+![version](https://img.shields.io/badge/version-0.3.2--pro.5-2ea44f)
 ![license](https://img.shields.io/badge/code%20license-GPL--3.0--or--later-blue)
 ![node](https://img.shields.io/badge/node-24-339933)
 
