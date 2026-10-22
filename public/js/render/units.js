@@ -1325,7 +1325,15 @@ export class UnitView {
     const sk = sp && sp.skeleton;
     if (!sk || typeof sk.findBone !== 'function') return null;
     let b = null;
-    for (const n of Array.isArray(names) ? names : [names]) if (n && (b = boneOf(sk, n))) break;
+    for (const n of Array.isArray(names) ? names : [names]) {
+      if (!n) continue;
+      // a RegExp matches any bone name (a muzzle bone some operators name GunPoint / Muzzle_01): the first in order
+      if (n instanceof RegExp) {
+        const list = Array.isArray(sk.bones) ? sk.bones : [];
+        b = list.find((bone) => n.test(String((bone && bone.data && bone.data.name) || ''))) || null;
+      } else b = boneOf(sk, n);
+      if (b) break;
+    }
     if (!b) return null;
     const hit = strike && typeof a.strikePose === 'function' ? a.strikePose() : null;
     if (hit) b = bonePose(sp, b, hit.anim, hit.time) || b;

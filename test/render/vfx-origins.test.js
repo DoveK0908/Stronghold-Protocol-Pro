@@ -44,7 +44,8 @@ function boneView(bones, flip = 1) {
     boneOffset(names, out, strike) {
       calls.push({ names: [...names], strike: !!strike });
       for (const n of names) {
-        const b = bones[n];
+        const key = n instanceof RegExp ? Object.keys(bones).find((k) => n.test(k)) : n;
+        const b = key ? bones[key] : null;
         if (b) { out.x = b.x * flip; out.up = b.up; out.angle = b.angle ?? 0; out.flip = flip; return out; }
       }
       return null;
@@ -78,9 +79,21 @@ describe('mount points on the drawn model (mounts.js)', () => {
     const bare = boneView({ Muzzle: { x: 0.6, up: 0.5, angle: 0 } });
     nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false, view: bare, tilt: 30 }),
       [4 - 10 + 0.6, 11 - 9 + 0.5 * C30, -0.5 * S30], 1e-9, 'a skinless unit shoots from its Muzzle bone');
-    assert.deepEqual(bare.calls[0].names, ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
+    assert.deepEqual(bare.calls[0].names.slice(0, 9), ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
+    assert.ok(bare.calls[0].names.slice(9).every((n) => n instanceof RegExp), 'then patterns for operator-specific bone names');
     // the same unit with no model drawn keeps the generic muzzle point over its feet
     nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false }), [-6, 2 + 0.4 * 0.866, -0.4 * 0.5], 1e-9, 'no model');
+  });
+
+  test('a skin point whose bone the skeleton does not carry falls back to the model own muzzle, then to the skin offset', () => {
+    const u = { x: 4, y: 11, z: 0, left: false, back: false, tilt: 30 };
+    // the skin names F_Muzzle, the drawn model only has GunPoint (some operators name their own bone)
+    const alt = boneView({ GunPoint: { x: 0.5, up: 0.4, angle: 0 } });
+    nearV(unitPoint(SKIN, 'muzzle', { ...u, view: alt }), [-6 + 0.5, 2 + 0.4 * C30, -0.4 * S30], 1e-9, 'pattern bone');
+    assert.ok(alt.calls[0].names.includes('F_Muzzle'), 'the skin bone is asked for first');
+    assert.ok(alt.calls[1].names.some((n) => n instanceof RegExp), 'then the patterns');
+    // no bone at all: the skin static offset, not a generic point over the feet
+    nearV(unitPoint(SKIN, 'muzzle', { ...u, view: boneView({}) }), [-6 + 0.907, 2 - 0.151, -0.028], 1e-9, 'static offset');
   });
 
   test('the mount rotation: the Graphic tilt, the facing turn (180° about the plane\'s up) and the bone\'s angle', () => {

@@ -179,6 +179,9 @@ function boneNames(kind) {
   const base = POINT_NAMES[kind] || [];
   const out = [];
   for (const n of base) out.push(n, `F_${n}`, `B_${n}`);
+  // last resort: bone names some operators/skins use instead of the client's Muzzle (`GunPoint`, `Muzzle_01`, …)
+  if (kind === 'muzzle') out.push(/muzzle/i, /gunpoint/i, /firepoint/i);
+  else if (kind === 'head') out.push(/^(F_|B_)?head(anchor|point)?$/i);
   return out;
 }
 
@@ -208,7 +211,11 @@ export function unitPoint(skin, kind, unit, out = [0, 0, 0]) {
   // unit's drawn skeleton still has the bone the client's BoneFollower follows — read the muzzle/hit/head bone straight
   // off the model (with the skeleton's F_/B_ front/back prefixes). Without this every default operator shot from a
   // generic point over its feet, i.e. the middle of the sprite.
-  const b = p ? liveBone(p, unit) : (kind && unit.view ? liveBone({ bones: boneNames(kind) }, unit) : null);
+  let b = p ? liveBone(p, unit) : null;
+  // A skin point whose BoneFollower bone the drawn skeleton does not carry (a skin naming it differently) still fires
+  // from the model's own muzzle bone: the point's `pos` is the prefab's edit-time Default pose, which the client resets
+  // at run time, so using it puts the shot in the middle of the sprite.
+  if (!b && kind && unit.view && (!p || p.bones)) b = liveBone({ bones: boneNames(kind) }, unit);
   if (b) {
     const t = (Number.isFinite(unit.tilt) ? unit.tilt : SKELETON_TILT) * DEG;
     out[0] += b.x; out[1] += b.up * Math.cos(t); out[2] -= b.up * Math.sin(t);
