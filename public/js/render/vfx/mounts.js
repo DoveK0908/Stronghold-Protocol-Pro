@@ -227,8 +227,12 @@ export function unitPoint(skin, kind, unit, out = [0, 0, 0]) {
     out[1] += o[1] * k;
     out[2] += o[2] * k;
   } else if (kind) {
-    // no such point: a plausible fallback over the feet (hit ≈ a third of a tile up, muzzle a little higher, head ×2)
-    const h = kind === 'head' ? 0.75 : kind === 'muzzle' ? 0.4 : 0.3;
+    // No such point and no bone to follow (578 of the 787 skin records in the extracted index carry no Muzzle point; a
+    // model that is not drawn yet has no bone either). A muzzle at 0.4 tiles straight up sits in the middle of the
+    // sprite, which read as "every ranged operator fires from its centre": put it in front of the chest instead
+    // (hand height ≈ two thirds of a tile, a third of a tile towards the facing side).
+    const h = kind === 'head' ? 0.75 : kind === 'muzzle' ? 0.62 : 0.3;
+    if (kind === 'muzzle') out[0] += (unit.left ? -0.3 : 0.3) * k;
     out[1] += h * 0.866 * k; out[2] -= h * 0.5 * k;
   }
   return out;

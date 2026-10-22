@@ -82,7 +82,7 @@ describe('mount points on the drawn model (mounts.js)', () => {
     assert.deepEqual(bare.calls[0].names.slice(0, 9), ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
     assert.ok(bare.calls[0].names.slice(9).every((n) => n instanceof RegExp), 'then patterns for operator-specific bone names');
     // the same unit with no model drawn keeps the generic muzzle point over its feet
-    nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false }), [-6, 2 + 0.4 * 0.866, -0.4 * 0.5], 1e-9, 'no model');
+    nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false }), [-6 + 0.3, 2 + 0.62 * 0.866, -0.62 * 0.5], 1e-9, 'no model');
   });
 
   test('a skin point whose bone the skeleton does not carry falls back to the model own muzzle, then to the skin offset', () => {
