@@ -1588,6 +1588,19 @@ export class FxWiring {
   }
 
   /**
+   * A piece arriving on the bench (bought, a reward, a grant) — the arrival flash only, never `deploy()`.
+   * `deploy()` also starts a passive skill's loops and the deploy talents; nothing stops those when the piece is
+   * later deployed, so they stayed behind in 待部署区 (维护者 2026-10-22: 斯卡蒂 / 伊内丝 有特效残留).
+   */
+  arrive(v) {
+    if (!v || !this.idx || !this.ofx.active || v.isEnemy) return false;
+    const u = this.unitOf(v);
+    const m = u ? this.mode(u, v) : null;
+    const key = lc(m?.overrideStartEffect) || lc(u?.startEffect) || this.idx.generic?.birth?.char;
+    return !!(key && this.playOn(key, v, {}));
+  }
+
+  /**
    * b.ev 'spawn' (an enemy, a summon, an operator's first deploy — its 'deploy' follows): the unit's deploy talents
    * (TalentFx.deployed, once per life: an enemy's AppearSyncedTalent auras, its birth effects). Returns true when drawn.
    */

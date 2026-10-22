@@ -924,7 +924,7 @@ export async function createFieldView(host, options = {}) {
           // an operator that just arrived on the bench — bought, a reward, a grant — lands there (PR #416); a summon that comes
           // with its owner's placement does not, nor does an item
           if (e.piece.kind === 'chess') landPiece(v, 'buy');
-          fx.deploy(v);
+          fx.arrive(v);   // 待部署区的到达闪光；deploy() 会启动被动技能的 loop，之后不会停，会留在格子上
         }
       } else {
         const prevHome = v._home;

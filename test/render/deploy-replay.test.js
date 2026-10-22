@@ -201,3 +201,14 @@ test('render/app.js wiring: landings in setPrep, the replay schedule, its timers
   assert.match(body('    destroy() {\n      if (destroyed) return;'), /cancelReplay\(\);/);
   assert.match(src, /audio: opts\.audio \|\| null,/, 'the views reach the audio manager');
 });
+
+test('a bench arrival flashes only: no passive loops start in 待部署区 (斯卡蒂 / 伊内丝 residue)', () => {
+  const app = readFileSync(path.join(ROOT, 'public/js/render/app.js'), 'utf8');
+  const wire = readFileSync(path.join(ROOT, 'public/js/render/vfx/wiring.js'), 'utf8');
+  // 买到的干员落到待部署区：只放到达闪光
+  assert.match(app, /if \(e\.piece\.kind === 'chess'\) landPiece\(v, 'buy'\);\s*fx\.arrive\(v\);/);
+  const arrive = wire.slice(wire.indexOf('  arrive(v) {'), wire.indexOf('  arrive(v) {') + 460);
+  assert.ok(arrive.length > 100, 'arrive() exists');
+  assert.doesNotMatch(arrive, /skills\.deployed|talents\.deployed/, 'arrive() must not start passive loops or talents');
+  assert.match(arrive, /generic\?\.birth\?\.char/, 'arrive() falls back to the generic birth flash');
+});
