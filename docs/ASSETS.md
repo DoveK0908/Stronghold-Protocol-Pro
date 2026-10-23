@@ -83,7 +83,9 @@ pages while their `.atlas` carries no `pma: true` line. `public/vendor/pixi-spin
 缪尔赛思's fashions, for one) turn into black rings. `node tools/mark-skin-pma.mjs` samples every page (straight alpha
 has pixels whose colour exceeds the alpha; premultiplied pages have none), reports which atlases lack the marker, and
 `--write` appends `pma: true` without touching the pixels. Run it after re-extracting skins, operators or token models:
-`node tools/mark-skin-pma.mjs --write`（幂等，只补不删；`spine/op` 与 `spine/token` 目前都是直通 alpha，不需要标记）。
+`node tools/mark-skin-pma.mjs --write
+
+页面如果是从 PRTS（旧提取器的 `min(RGB, A)` 钳制产物）下载的，RGB 已被压暗、宽白处发灰（皮肤「黑眼圈」的来源）；`node tools/unpremultiply-pages.mjs --write public/assets/skins` 会把它们按 `RGB / (A/255)` 近似还原成直通 alpha 并删掉 atlas 里的 `pma:` 行（钳制不可逆，只能近似）。官方 PR #668 的口径是：提取器直接写直通页、atlas 不写 pma。`（幂等，只补不删；`spine/op` 与 `spine/token` 目前都是直通 alpha，不需要标记）。
 
 The local 2026-10-08 candidate covers all **271 official fashions within the current 209-character scope**. Existing
 127 records and all installed CN/JP/EN audio are retained. The added 144 comprise 142 distinct front/rear pairs,
