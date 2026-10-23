@@ -16,7 +16,7 @@ import { t } from '../../../shared/i18n.js';
  *   first tile (autoLabel), which picks ''.
  */
 export function OperatorPicker({ title, micro, current, list, m, faceOf = (c) => chessAvatarUrl(m, c), autoLabel, autoTitle, autoIcon = 'refresh',
-  note = null, onPick, onClose, looks = null }) {
+  note = null, onPick, onClose, looks = null, picked = null }) {
   const [q, setQ] = useState('');
   const [star, setStar] = useState(0);
   const needle = q.trim().toLowerCase();
@@ -32,9 +32,12 @@ export function OperatorPicker({ title, micro, current, list, m, faceOf = (c) =>
     </div>
     ${looks ? html`<${LookBar} m=${m} charId=${current} looks=${looks} />` : null}
     <div class="cardpick__grid">
-      <button type="button" class=${`cardpick__op cardpick__op--auto${!current ? ' is-on' : ''}`} onClick=${() => onPick('')} title=${autoTitle}>
+      <button type="button" class=${`cardpick__op cardpick__op--auto${!current && !picked?.on ? ' is-on' : ''}`} onClick=${() => onPick('')} title=${autoTitle}>
         <span class="cardpick__img"><${Icon} name=${autoIcon} /></span><span class="cardpick__name">${autoLabel}</span></button>
-      ${shown.map((c) => html`<button key=${c.charId} type="button" class=${`cardpick__op${current === c.charId ? ' is-on' : ''}`} onClick=${() => onPick(c.charId)} title=${c.name}>
+      ${picked ? html`<button key="picked" type="button" class=${`cardpick__op${picked.on ? ' is-on' : ''}`} onClick=${picked.onPick} title=${picked.title}>
+        <span class="cardpick__img"><img src=${picked.src} alt="" draggable=${false} /></span>
+        <span class="cardpick__name">${picked.label}</span></button>` : null}
+      ${shown.map((c) => html`<button key=${c.charId} type="button" class=${`cardpick__op${!picked?.on && current === c.charId ? ' is-on' : ''}`} onClick=${() => onPick(c.charId)} title=${c.name}>
         <span class="cardpick__img"><img src=${faceOf(c)} alt="" loading="lazy" draggable=${false} /></span>
         <span class="cardpick__name">${c.name}</span>${c.rarity ? html`<span class=${`cardpick__star r${c.rarity}`}>${c.rarity}★</span>` : null}</button>`)}
     </div>
@@ -57,13 +60,15 @@ function LookBar({ m, charId, looks }) {
 }
 
 /**
- * The 头像 picker: an operator's official avatar stands for the doctor (room.card avatar); 默认 = none (the strategy icon,
- * else the name's first letter).
- * @param {{ current: string, list: any[], m: any, onPick: (charId: string) => void, onClose: Function, looks?: any }} props
+ * The 头像 picker: 默认 / 干员官方头像 / 自传图片 (three ways to fill the one avatar slot) stand for the doctor
+ * (room.card avatar / avatarImg); 默认 = none (the strategy icon, else the name's first letter).
+ * @param {{ current: string, list: any[], m: any, onPick: (charId: string) => void, onClose: Function, looks?: any,
+ *   uploaded?: null | { src: string, on: boolean, onPick: Function } }} props
  */
-export function AvatarPicker({ current, list, m, onPick, onClose, looks = null }) {
+export function AvatarPicker({ current, list, m, onPick, onClose, looks = null, uploaded = null }) {
   return html`<${OperatorPicker} title=${t('头像')} micro="AVATAR" current=${current} list=${list} m=${m} faceOf=${(c) => cardAvatarUrl(c.charId, m)} looks=${looks}
     autoLabel=${t('默认')} autoTitle=${t('不使用头像：显示策略图标或名字首字')} autoIcon="user"
+    picked=${uploaded ? { src: uploaded.src, label: t('上传的图片'), title: t('换成上次上传的那张图'), on: !!uploaded.on, onPick: uploaded.onPick } : null}
     note=${CARD_SYNC ? t('选择后，同盟里的博士都会看到这个头像') : t('目前只有你自己看得到；服务器下次更新后，同盟里的其他博士也能看到你的选择')}
     onPick=${onPick} onClose=${onClose} />`;
 }

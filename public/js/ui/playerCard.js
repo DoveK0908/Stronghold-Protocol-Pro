@@ -33,6 +33,12 @@ export function trophyTotal(records) {
 export const AVATAR_PREF = 'room.avatar';
 /** 自传头像 (上传的图片, server/avatars.js): its id ('16 hex'), '' = none. One per browser, kept on the server. */
 export const AVATAR_IMG_PREF = 'room.avatar.img';
+/**
+ * 上次上传的自传头像 id, kept even while the card shows an official 头像 instead (维护者 2026-10-23: 头像 是三选一的
+ * 一格 — 默认 / 干员官方头像 / 自传图片 — 所以换成官方头像只是「不用」上传的那张, 并不是删掉它; 头像选择器还留着
+ * 一格让玩家换回来). '' = never uploaded. 不上行: room.card 里的 avatarImg 只表示「现在显示的那张」.
+ */
+export const AVATAR_IMG_SAVED_PREF = 'room.avatar.img.saved';
 /** The looks ('' 精二, 'e1' 精一, a skin id) of the 名片干员 and of the 头像 operator. */
 export const CARD_LOOK_PREF = 'room.card.look';
 export const AVATAR_LOOK_PREF = 'room.avatar.look';
@@ -44,6 +50,7 @@ export const cardStore = createStore({
   look: str(loadPref(CARD_LOOK_PREF, '')),
   avatarLook: str(loadPref(AVATAR_LOOK_PREF, '')),
   avatarImg: str(loadPref(AVATAR_IMG_PREF, '')),
+  avatarImgSaved: str(loadPref(AVATAR_IMG_SAVED_PREF, '')),
   trophies: null, // read from the stats on first use
 });
 
@@ -59,15 +66,25 @@ export function setCardOperator(charId) {
   if (str(charId) !== cardStore.get().charId) setCardLook('');
   savePref(CARD_PREF, str(charId)); cardStore.set({ charId: str(charId) });
 }
-/** @param {string} charId '' = none */
+/**
+ * @param {string} charId '' = none
+ *
+ * 头像 是三选一的一格: 默认 / 干员官方头像 / 自传图片。选了官方头像 (或默认) 就把「现在显示自传图」的标记清掉 —
+ * 否则 customAvatarSrc 一直排在前面, 玩家点了别的头像也完全没反应 (维护者 2026-10-23: 调整头像连自己都不生效)。
+ * 上传的那张图本身不删 (AVATAR_IMG_SAVED_PREF), 头像选择器里还有一格可以换回来。
+ */
 export function setCardAvatar(charId) {
   if (str(charId) !== cardStore.get().avatar) setAvatarLook('');
   savePref(AVATAR_PREF, str(charId)); cardStore.set({ avatar: str(charId) });
+  if (cardStore.get().avatarImg) setCustomAvatar('');
 }
 /** 自传头像: the uploaded image's id (server/avatars.js); '' clears it back to the official 头像. */
 export function setCustomAvatar(id) {
   const v = typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? id : '';
-  savePref(AVATAR_IMG_PREF, v); cardStore.set({ avatarImg: v });
+  savePref(AVATAR_IMG_PREF, v);
+  const patch = { avatarImg: v };
+  if (v && cardStore.get().avatarImgSaved !== v) { savePref(AVATAR_IMG_SAVED_PREF, v); patch.avatarImgSaved = v; }
+  cardStore.set(patch);
 }
 
 /** @param {string} look '' 精二 / 'e1' 精一 / a skin id of the 名片干员 */
@@ -87,8 +104,10 @@ export function useMyCard() {
 export function cardMessage(card) {
   const trophies = Number.isSafeInteger(card?.trophies) ? Math.max(0, Math.min(1_000_000, card.trophies)) : 0;
   const charId = str(card?.charId), avatar = str(card?.avatar);
+  const img = str(card?.avatarImg);
   return { charId, avatar, bg: namecardOf(card?.bg) ? card.bg : DEFAULT_NAMECARD, trophies,
-    look: charId ? str(card?.look) : '', avatarLook: avatar ? str(card?.avatarLook) : '' };
+    look: charId ? str(card?.look) : '', avatarLook: avatar ? str(card?.avatarLook) : '',
+    avatarImg: /^[0-9a-f]{16}$/.test(img) ? img : '' };
 }
 
 /** Whether a seat's card (room.state seats[].card) already says what `msg` would. */
@@ -96,7 +115,8 @@ export function seatCardMatches(seatCard, msg) {
   const c = seatCard && typeof seatCard === 'object' ? seatCard : {};
   return str(c.charId) === msg.charId && str(c.avatar) === msg.avatar && str(c.bg) === msg.bg
     && (Number.isSafeInteger(c.trophies) ? c.trophies : 0) === msg.trophies
-    && str(c.look) === str(msg.look) && str(c.avatarLook) === str(msg.avatarLook);
+    && str(c.look) === str(msg.look) && str(c.avatarLook) === str(msg.avatarLook)
+    && str(c.avatarImg) === str(msg.avatarImg);
 }
 
 /** The uploaded avatar of a display card (server/avatars.js id), '' when there is none. */

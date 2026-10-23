@@ -523,6 +523,8 @@ export const CARD_LIMITS = Object.freeze({ idLength: 48, trophies: 1_000_000 });
 const isCardCharId = (v) => v === '' || (isStr(v, CARD_LIMITS.idLength) && /^char_[0-9a-z_]+$/.test(v));
 const isCardLook = (v) => v === '' || v === 'e1' || (isStr(v, CARD_LIMITS.idLength) && /^char_[0-9a-z_]+$/.test(v));
 const isCardBg = (v) => v === '' || (isStr(v, CARD_LIMITS.idLength) && /^[a-z0-9][a-z0-9_:\-\/]*$/i.test(v));
+// 自传头像 (me.avatar) 的 id: '' 表示不带头像, 否则是 16 个十六进制字符
+const isCardAvatarImg = (v) => v === '' || (typeof v === 'string' && /^[0-9a-f]{16}$/.test(v));
 
 const target = (v) => {
   if (!v || typeof v !== 'object') return false;
@@ -587,9 +589,14 @@ export const C2S = {
   // picks its seat had when it started; during a match they are stored for the next one: ROOM_STARTED)
   'room.diy': { picks: isDiyPicks },
 
-  // the display card (CARD_LIMITS above; server/lobby.js setCard): stored per session, copied to the player's seat
+  // the display card (CARD_LIMITS above; server/lobby.js setCard): stored per session, copied to the player's seat.
+  // `avatarImg` (2026-10-23, maintainer): the uploaded self-portrait the card shows — '' clears it (back to the operator
+  // avatar or the name glyph). It is the same 16-hex id `me.avatar` answers with, and the server only accepts one this
+  // browser owns; without it a client that dropped its upload could never make the room forget it (the entry used to be
+  // filled from session.avatarImg alone, so 调整头像 silently kept showing the old picture to everyone).
   'room.card': { charId: isCardCharId, avatar: isCardCharId, bg: isCardBg, trophies: (v) => isInt(v, 0, CARD_LIMITS.trophies),
-    look: isCardLook, avatarLook: isCardLook, $optional: ['charId', 'avatar', 'bg', 'trophies', 'look', 'avatarLook'] },
+    look: isCardLook, avatarLook: isCardLook, avatarImg: isCardAvatarImg,
+    $optional: ['charId', 'avatar', 'bg', 'trophies', 'look', 'avatarLook', 'avatarImg'] },
   // 自传头像 (2026-10-21, maintainer): `data` = one base64 image (PNG/JPEG/WEBP, ≤ 200KB decoded); the server sniffs the
   // magic bytes, stores it per browser (ownerKey) and answers `me.avatar { id }`. `{ id }` alone re-claims this browser's
   // own earlier upload after a reload (any other id is refused). The room sees it as seats[].card.avatarImg.

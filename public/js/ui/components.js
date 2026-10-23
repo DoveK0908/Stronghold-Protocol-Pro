@@ -737,19 +737,25 @@ export function Spinner({ size = 'md', label, tone = 'mint', class: cls }) {
 const SEAT_HUES = [162, 196, 38, 280];
 /**
  * Square avatar frame with bracket corners. Falls back to a glyph (first letter / robot).
- * @param {{ name?: string, src?: string, size?: 'sm'|'md'|'lg'|'xl', seat?: number, host?: boolean, bot?: boolean,
+ * @param {{ name?: string, src?: string, fallback?: string, size?: 'sm'|'md'|'lg'|'xl', seat?: number, host?: boolean, bot?: boolean,
  *   self?: boolean, ready?: boolean, offline?: boolean, dead?: boolean, empty?: boolean, class?: string }} props
+ *   `fallback`: shown when `src` fails to load (a stale 自传头像 id whose picture the server no longer has, then the
+ *   operator's official avatar still shows instead of a blank frame — 维护者 2026-10-23).
  */
-export function AvatarFrame({ name = '', src, size = 'md', seat = 0, host, bot, self, ready, offline, dead, empty, class: cls }) {
-  const [badSrc, setBadSrc] = useState(null);
-  const imgOk = !!src && badSrc !== src;
+export function AvatarFrame({ name = '', src, fallback, size = 'md', seat = 0, host, bot, self, ready, offline, dead, empty, class: cls }) {
+  // sources that failed: the first one that has not (src, then fallback) draws, so a broken custom picture degrades once
+  const [bad, setBad] = useState(null);
+  const chain = [src, fallback].filter((s) => !!s);
+  const shown = bad && bad.length ? chain.find((s) => !bad.includes(s)) : chain[0];
+  const imgOk = !!shown;
   const hue = SEAT_HUES[((seat | 0) % 4 + 4) % 4];
   const glyph = [...(name || '').trim()][0] || '?';
+  const fail = () => setBad((prev) => (prev && prev.includes(shown) ? prev : [...(prev || []), shown]));
   return html`<div class=${cx('avatar', `avatar--${size}`, 'brackets', host && 'is-host', bot && 'is-bot', self && 'is-self',
       ready && 'is-ready', offline && 'is-offline', dead && 'is-dead', empty && 'is-empty', cls)} style=${`--seat-hue:${hue}`}>
     <div class="avatar__img">
       ${empty ? html`<${Icon} name="plus" class="avatar__empty" />`
-        : imgOk ? html`<${MaterialImage} src=${src} alt="" draggable=${false} onError=${() => setBadSrc(src)} />`
+        : imgOk ? html`<${MaterialImage} src=${shown} alt="" draggable=${false} onError=${fail} />`
         : bot ? html`<${Icon} name="robot" class="avatar__bot" />`
         : html`<span class="avatar__glyph">${glyph}</span>`}
     </div>

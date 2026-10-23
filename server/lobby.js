@@ -2057,7 +2057,7 @@ export class Lobby {
    * clears it; an unknown operator is BAD_MSG — and copy it to the player's seat (never a spectator's), broadcasting the
    * room state when it changed. An unchanged card costs nothing; a change beyond CARD_CHANGES per CARD_WINDOW_MS is RATE.
    */
-  setCard(session, { charId, avatar, bg, trophies, look, avatarLook }) {
+  setCard(session, { charId, avatar, bg, trophies, look, avatarLook, avatarImg }) {
     const known = cardCharIds(this.safeData());
     if ((charId && !known.has(charId)) || (avatar && !known.has(avatar))) return fail(ERR.BAD_MSG, 'unknown operator');
     const prev = session.card || {};
@@ -2065,6 +2065,9 @@ export class Lobby {
     const id = charId === undefined ? prev.charId : charId, back = bg === undefined ? prev.bg : bg;
     const face = avatar === undefined ? prev.avatar : avatar;
     const count = trophies === undefined ? prev.trophies : trophies;
+    // 自传头像: '' 清掉 (换回官方头像 / 默认), 否则必须是本人上传的那张 (session.avatarImg 只是服务端记着的最新的
+    // 一张, room.card 说了算 — 客户端换头像时要把这张一起带下来, 否则别人一直看到旧图, 维护者 2026-10-23)
+    if (avatarImg !== undefined) session.avatarImg = this.avatars?.owns(avatarImg, ownerKey(session.uid || '')) ? avatarImg : '';
     // a look sent must fit its operator; a stored one the operator change no longer fits is dropped
     const data = this.safeData();
     if ((look && !lookFits(data, id, look)) || (avatarLook && !lookFits(data, face, avatarLook))) return fail(ERR.BAD_MSG, 'skin of another operator');
@@ -2080,12 +2083,10 @@ export class Lobby {
       if (m) { if (this.namecards?.owns(m[1], ownerKey(session.uid || ''))) next.bg = back; }
       else next.bg = back;
     }
-    // 自传头像/名片底图不是 room.card 的字段，改名片/头像时不能把它们丢掉
+    // 自传头像/名片底图在 room.card 里是可选字段，消息没提到时不能把它们丢掉
     if (session.avatarImg) next.avatarImg = session.avatarImg;
     if (!next.bg && session.namecard) next.bg = `custom:${session.namecard}`;
     if (count > 0) next.trophies = count;
-    // 自传头像 (me.avatar) 不是 room.card 的字段：客户端不能指向别人的文件，只由服务端写进 session.avatarImg
-    if (session.avatarImg) next.avatarImg = session.avatarImg;
     const card = Object.keys(next).length ? Object.freeze(next) : null;
     if (sameCard(card, session.card)) return OK;
     let bucket = this.cardBuckets.get(session);

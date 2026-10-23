@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lookUrl, lookOptions, seatLook, seatIllust } from '../../public/js/ui/seatArt.js';
-import { cardMessage, seatCardMatches } from '../../public/js/ui/playerCard.js';
+import { cardMessage, seatCardMatches, cardStore, setCardAvatar, setCustomAvatar, customAvatarSrc } from '../../public/js/ui/playerCard.js';
 
 const M = {
   chars: {
@@ -68,4 +68,32 @@ test('seatIllust: 精二/精一/皮肤 all draw the illustration of that look', 
   const plainMate = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
   assert.equal(seatIllust(plainMate, base), '/i1.png', '精一 has its own full-body illustration');
   assert.equal(seatLook(plainMate, 'char_a', base), 'e1');
+});
+
+// 2026-10-23 维护者：「在准备大厅调整头像连自己都不生效」——头像 是三选一的一格（默认 / 干员官方头像 / 自传图片），
+// 自传图片曾经一直排在前面，于是换成官方头像后界面完全不变，队友也一直看到旧图；清掉自传图片则根本发不出去。
+test('头像 is one slot: picking an official avatar drops the uploaded picture and tells the room about it', () => {
+  const id = '0123456789abcdef';
+  setCustomAvatar(id);
+  assert.equal(cardStore.get().avatarImg, id, '上传后立刻生效');
+  assert.equal(cardStore.get().avatarImgSaved, id, '上传的 id 留着，选择器还能换回来');
+  assert.equal(customAvatarSrc(cardStore.get()), `/avatar/${id}`);
+  assert.equal(cardMessage(cardStore.get()).avatarImg, id, 'room.card 里带上这张图');
+
+  setCardAvatar('char_a');
+  assert.equal(cardStore.get().avatar, 'char_a');
+  assert.equal(cardStore.get().avatarImg, '', '选了官方头像就必须把自传图片让开，否则界面毫无变化');
+  assert.equal(customAvatarSrc(cardStore.get()), '', '换成官方头像后画的是干员头像');
+  assert.equal(cardStore.get().avatarImgSaved, id, '图本身没删，还能换回上传的那张');
+  assert.equal(cardMessage(cardStore.get()).avatarImg, '', 'room.card 里清掉，队友也跟着换');
+
+  setCustomAvatar(cardStore.get().avatarImgSaved);
+  assert.equal(cardStore.get().avatarImg, id, '选择器里那一格能换回上传的图片');
+
+  setCardAvatar('');
+  assert.equal(cardStore.get().avatarImg, '', '默认 也把自传图片让开');
+  assert.equal(cardMessage({ ...cardStore.get(), avatarImg: 'nonsense' }).avatarImg, '', '非法 id 不上行');
+  const base = { charId: '', avatar: '', bg: 'loading:abyss', trophies: 0, look: '', avatarLook: '' };
+  assert.equal(seatCardMatches({ ...base, avatarImg: id }, { ...base, avatarImg: '' }), false, 'avatarImg 变了就算没同步');
+  assert.equal(seatCardMatches({ ...base, avatarImg: id }, { ...base, avatarImg: id }), true);
 });

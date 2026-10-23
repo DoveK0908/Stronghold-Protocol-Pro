@@ -59,6 +59,36 @@ test('room.card wire shape: optional charId / avatar / bg ids ("" clears) and an
   bad({ bg: 'x'.repeat(49) }, 'bg');
   bad({ bg: 7 }, 'bg');
   for (const trophies of [-1, 1.5, CARD_LIMITS.trophies + 1, '5', null]) bad({ trophies }, 'trophies');
+  // 自传头像 (me.avatar) 的那张图：'' 清掉，否则 16 个十六进制字符
+  ok({ avatarImg: '' });
+  ok({ avatarImg: '0123456789abcdef' });
+  for (const avatarImg of ['0123456789ABCDEF', '0123', 7, null]) bad({ avatarImg }, 'avatarImg');
+});
+
+// 2026-10-23 维护者：「在准备大厅调整头像连自己都不生效」。自传头像原先只由 session.avatarImg 回填进 room.card，客户端
+// 既带不上也清不掉 —— 换成官方头像后队友永远看到旧图。现在 room.card 自己就能说明用哪张。
+test('room.card carries the 自传头像: "" clears it, and an id this browser does not own cannot stick', (t) => {
+  const MINE = '0123456789abcdef', THEIRS = 'fedcba9876543210';
+  const { lobby, player, states, card } = fixture(t, { extra: { avatars: { owns: (id) => id === MINE } } });
+  const a = player(), b = player();
+  assert.deepEqual(card(a, { avatarImg: MINE }), { ok: true });
+  assert.deepEqual(a.card, { avatarImg: MINE });
+  assert.deepEqual(lobby.create(a, { mode: 'coop', difficulty: 'NORMAL' }), { ok: true });
+  const room = lobby.roomOf(a);
+  assert.deepEqual(lobby.join(b, { code: room.code }), { ok: true });
+  assert.deepEqual(states(b).at(-1).seats[0].card, { avatarImg: MINE }, 'the room sees the uploaded picture');
+  // 换成官方头像：客户端把这张一起带下来，队友那边的旧图必须消失
+  assert.deepEqual(card(a, { avatar: AMIYA, avatarImg: '' }), { ok: true });
+  assert.deepEqual(a.card, { avatar: AMIYA });
+  assert.deepEqual(states(b).at(-1).seats[0].card, { avatar: AMIYA });
+  // 别人的 id 不接受（也绝不留在名片上）
+  assert.deepEqual(card(a, { avatarImg: THEIRS }), { ok: true });
+  assert.equal(a.card.avatarImg, undefined);
+  // 消息不提这个字段时保留原值
+  assert.deepEqual(card(a, { avatarImg: MINE }), { ok: true });
+  assert.deepEqual(card(a, { bg: 'bg_1' }), { ok: true });
+  assert.equal(a.card.avatarImg, MINE);
+  assert.equal(a.card.bg, 'bg_1');
 });
 
 test('a card follows the session into rooms, shows on human seats only and changes are broadcast to the room', (t) => {

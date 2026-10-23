@@ -48,7 +48,7 @@ import { data, getMode, useData } from '../data.js';
 import { avatarUrl } from '../assets.js';
 import { CARD_PREF, cardOperators, seatPortrait, seatIllust, cardAvatarUrl, lookOptions } from '../ui/seatArt.js';
 import { customAvatarSrc } from '../ui/playerCard.js';
-import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
+import { CARD_SYNC, useMyCard, setCardOperator, setCardAvatar, setCustomAvatar, setCardBackground, setCardLook, setAvatarLook, cardMessage, seatCardMatches } from '../ui/playerCard.js';
 import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
@@ -304,8 +304,8 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
       ${card?.bg ? html`<${NameCardLayer} card=${card.bg} />` : null}
       ${isMe && onPickAvatar
         ? html`<button type="button" class="rseat__ava" onClick=${onPickAvatar} title=${t('更换头像')} aria-label=${t('更换头像')}>
-            <${AvatarFrame} size="sm" name=${seat.name} src=${customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
-        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} seat=${index} bot=${seat.isBot} />`}
+            <${AvatarFrame} size="sm" name=${seat.name} src=${customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} fallback=${customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
+        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} fallback=${!seat.isBot && customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} bot=${seat.isBot} />`}
       <span class="rseat__who">
         ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.isBot ? seat.name || t('博士') : playerLabel(seat.name, seat.tag)}</b>
         <${OwnerBadge} seat=${seat} />
@@ -399,12 +399,25 @@ export function RoomScreen() {
   const mineCard = room ? roomFacts(room, me.playerId).mine?.card : null;
   const known = (id) => (id && portraits.byChar.has(id) ? id : '');
   const cardMsg = cardMessage({ ...myCard, charId: known(myCard.charId), avatar: known(myCard.avatar) });
-  const cardKey = `${cardMsg.charId}|${cardMsg.avatar}|${cardMsg.bg}|${cardMsg.trophies}|${cardMsg.look}|${cardMsg.avatarLook}`;
+  const cardKey = `${cardMsg.charId}|${cardMsg.avatar}|${cardMsg.bg}|${cardMsg.trophies}|${cardMsg.look}|${cardMsg.avatarLook}|${cardMsg.avatarImg}`;
+  // one retry after a 限流/超时: the card is still pending, so re-run the effect with the newest message
+  const [cardRetry, setCardRetry] = useState(0);
   useEffect(() => {
     if (!CARD_SYNC || cardRefused.current || !room || room.inMatch || conn.status !== 'online' || myCard.trophies == null) return;
     if (!roomFacts(room, me.playerId).mine || seatCardMatches(mineCard, cardMsg)) return;
-    net.request('room.card', cardMsg).catch(() => { cardRefused.current = true; });
-  }, [room?.code, cardKey, JSON.stringify(mineCard ?? null), conn.status, myCard.trophies == null]);
+    // 连点名片选择器时只发最后一张: 220ms 的防抖把一串改动合成一次请求 (服务端 CARD_CHANGES = 6 / 10 秒)
+    const id = setTimeout(() => {
+      net.request('room.card', cardMsg).catch((err) => {
+        // 只有「服务器不认这张名片」才永久放弃 (旧版本 / 字段校验失败); 限流与超时只是这一次没成, 稍后重发最新的那张.
+        // 从前这里一律置 refused, 于是快速改几次名片 (3 秒内 7 次) 撞上 RATE 之后整局都不再同步, 队友永远停在旧名片
+        // (维护者 2026-10-23: 名片/头像同步还是有问题).
+        if (err?.code === 'BAD_MSG') { cardRefused.current = true; return; }
+        if (!alive.current) return;
+        if (err?.code === 'RATE' || err?.code === 'TIMEOUT' || err?.code === 'OFFLINE') setTimeout(() => setCardRetry((x) => x + 1), 1_200);
+      });
+    }, 220);
+    return () => clearTimeout(id);
+  }, [room?.code, cardKey, JSON.stringify(mineCard ?? null), conn.status, myCard.trophies == null, cardRetry]);
 
   const [protoShown, protoLeaving] = usePresence(picker && !!room && roomFacts(room, me.playerId).isHost, 220);
   const [exiting, setExiting] = useState(false);
@@ -638,6 +651,8 @@ export function RoomScreen() {
       onPick=${(id) => { setCardOperator(id); if (!id || lookOptions(m, id, 'portrait').length < 2) setPicking(null); }} onClose=${() => setPicking(null)} />` : null}
     ${picking === 'avatar' ? html`<${AvatarPicker} current=${myCard.avatar} list=${cardList} m=${m}
       looks=${{ kind: 'avatar', current: myCard.avatarLook, onLook: (look) => { setAvatarLook(look); setPicking(null); } }}
+      uploaded=${myCard.avatarImgSaved ? { src: `/avatar/${myCard.avatarImgSaved}`, on: !!myCard.avatarImg,
+        onPick: () => { setCustomAvatar(myCard.avatarImgSaved); setPicking(null); } } : null}
       onPick=${(id) => { setCardAvatar(id); if (!id || lookOptions(m, id, 'avatar').length < 2) setPicking(null); }} onClose=${() => setPicking(null)} />` : null}
     ${picking === 'bg' ? html`<${NameCardPicker} current=${myCard.bg} onPick=${setCardBackground} onClose=${() => setPicking(null)} />` : null}
     ${protoShown ? html`<${RoomProtocol} room=${room} busy=${busy} onClose=${() => setPicker(false)} onPick=${setDifficulty} leaving=${protoLeaving} />` : null}
