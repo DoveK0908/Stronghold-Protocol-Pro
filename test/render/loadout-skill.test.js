@@ -54,7 +54,8 @@ describe('Spine actor + audio use the equipped skill', () => {
     spine: { acquire: async () => ({ animations: names }), release() {} },
   };
   async function actorFor(skillIndex) {
-    const ctx = fakeViewCtx(fake.P, { assets, cam });
+    const assets2 = assets;
+    const ctx = fakeViewCtx(fake.P, { assets: assets2, cam });
     const v = new UnitView(ctx, { id: 1, side: 'ally', kind: 'op', defId: 'chess_char_5_07_a', spine: 'char_350_surtr', tier: 5, x: 5, y: 10, maxHp: 1000, skillIndex });
     await tick(); await tick();
     assert.ok(v.actor, 'spine actor built');
@@ -75,7 +76,9 @@ describe('Spine actor + audio use the equipped skill', () => {
   test('default / unknown index: the primary skill clip', async () => {
     assert.equal((await actorFor(undefined)).roles.skill.loop, 'Skill_3_Loop');
     assert.equal((await actorFor(2)).roles.skill.loop, 'Skill_3_Loop');
-    assert.equal((await actorFor(1)).roles.skill.loop, 'Skill_3_Loop', 'no clip for S2 in the model: primary');
+    // 伊内丝: a model that ships only one skill's clips (Skill_2_*) must not stand in them for another equipped skill
+    // — S1 (淬影突袭) would then hold S2's stance all battle.
+    assert.equal((await actorFor(1)).roles.skill, null, 'no clip for S2 in the model: no skill clip at all');
   });
 
   // PR #275 (@xcdoge): the slot an enemy ability casts (render/app.js `case 'cast'` → UnitView.setSkillSlot) swaps its

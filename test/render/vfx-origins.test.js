@@ -80,7 +80,8 @@ describe('mount points on the drawn model (mounts.js)', () => {
     nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false, view: bare, tilt: 30 }),
       [4 - 10 + 0.6, 11 - 9 + 0.5 * C30, -0.5 * S30], 1e-9, 'a skinless unit shoots from its Muzzle bone');
     assert.deepEqual(bare.calls[0].names.slice(0, 9), ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
-    assert.ok(bare.calls[0].names.slice(9).every((n) => n instanceof RegExp), 'then patterns for operator-specific bone names');
+    assert.ok(bare.calls[0].names.slice(9).some((n) => n instanceof RegExp), 'then operator-specific names and patterns (OriginMuzzle, Gun, Weapon, hands)');
+    assert.ok(bare.calls[0].names.includes('F_OriginMuzzle') && bare.calls[0].names.includes('F_Weapon'), 'the names skins actually use');
     // the same unit with no model drawn keeps the generic muzzle point over its feet
     nearV(unitPoint(null, 'muzzle', { x: 4, y: 11, z: 0, left: false, back: false }), [-6 + 0.3, 2 + 0.62 * 0.866, -0.62 * 0.5], 1e-9, 'no model');
   });

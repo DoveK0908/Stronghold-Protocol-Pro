@@ -181,9 +181,14 @@ function boneNames(kind) {
   const base = POINT_NAMES[kind] || [];
   const out = [];
   for (const n of base) out.push(n, `F_${n}`, `B_${n}`);
-  // last resort: bone names some operators/skins use instead of the client's Muzzle (`GunPoint`, `Muzzle_01`, …)
-  if (kind === 'muzzle') out.push(/muzzle/i, /gunpoint/i, /firepoint/i);
-  else if (kind === 'head') out.push(/^(F_|B_)?head(anchor|point)?$/i);
+  // Last resort: the names operators and skins actually use besides `Muzzle`. The client's BoneFollower reads a bone
+  // per prefab point, but the extracted index has no point for 578 of 787 skins, so the bone has to be found by name:
+  // `F_OriginMuzzle` (伊内丝's 蝶舞华章), `F_Gun` / `F_Weapon` (德克萨斯, 隐现's 甜品大奖) and the hands when nothing
+  // better exists. Without these the shot leaves from the chest, i.e. the middle of the sprite.
+  if (kind === 'muzzle') {
+    for (const n of ['OriginMuzzle', 'Gun', 'Weapon', 'HandHold', 'R_Hand', 'L_Hand', 'MuzzlePoint']) out.push(n, `F_${n}`, `B_${n}`);
+    out.push(/originmuzzle/i, /muzzle/i, /gunpoint/i, /firepoint/i, /weapon/i, /(^|_)gun$/i, /handhold|_hand$/i);
+  } else if (kind === 'head') out.push(/^(F_|B_)?head(anchor|point)?$/i);
   return out;
 }
 

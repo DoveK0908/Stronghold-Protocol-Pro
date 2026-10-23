@@ -483,9 +483,15 @@ export class SpineActor {
   /** The unit's own roles (the manifest's, its skill slot's clip and the Run cycle applied) under the form in force. */
   _applyRoles() {
     const anims = this.entry?.anims || {};
-    const clip = Number.isInteger(this.skillIndex) && anims.skills ? anims.skills[String(this.skillIndex)] : null;
+    const hasIndex = Number.isInteger(this.skillIndex);
+    const skills = anims.skills && typeof anims.skills === 'object' ? anims.skills : null;
+    const clip = hasIndex && skills ? skills[String(this.skillIndex)] : null;
     const run = this.runMode && anims.run ? anims.run : null;
-    const base = clip || run ? { ...anims } : anims;
+    const base = clip || run || (hasIndex && skills && !clip) ? { ...anims } : anims;
+    // An equipped skill whose model ships no clip set of its own must NOT stand in the clip set the model's primary
+    // skill defines: 伊内丝's model carries only Skill_2_* (暗夜无明 switches her to the ranged stance), so on S1
+    // (淬影突袭, no clips of its own) she would otherwise hold S2's stance and look like she is casting S2 all battle.
+    if (hasIndex && skills && !clip) base.skill = null;
     if (clip) base.skill = clip;
     if (run) base.move = run;
     this.baseRoles = base;
