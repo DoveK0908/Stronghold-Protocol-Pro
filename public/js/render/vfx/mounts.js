@@ -186,8 +186,13 @@ export function boneNames(kind) {
   // `F_OriginMuzzle` (伊内丝's 蝶舞华章), `F_Gun` / `F_Weapon` (德克萨斯, 隐现's 甜品大奖) and the hands when nothing
   // better exists. Without these the shot leaves from the chest, i.e. the middle of the sprite.
   if (kind === 'muzzle') {
+    // A bone with muzzle in its name is the model's own marker for where a shot leaves, whatever it is called — and the
+    // one thing the client itself names (`F_OriginMuzzle` on 伊内丝's 蝶舞华章, `F_Darts_Muzzle` on 断崖, a bare `F_Muzzle`
+    // everywhere else) — so it is tried BEFORE the weapon / hand guesses. `boneOffset` skips a marker that sits on the
+    // skeleton's origin in its setup pose (隐现's `F_Muzzle`, which is where the sprite's feet are) and keeps going.
+    out.push(/originmuzzle/i, /muzzle/i, /gunpoint/i, /firepoint/i);
     for (const n of ['OriginMuzzle', 'Gun', 'Weapon', 'HandHold', 'R_Hand', 'L_Hand', 'MuzzlePoint']) out.push(n, `F_${n}`, `B_${n}`);
-    out.push(/originmuzzle/i, /muzzle/i, /gunpoint/i, /firepoint/i, /weapon/i, /(^|_)gun$/i, /handhold|_hand$/i);
+    out.push(/weapon/i, /(^|_)gun$/i, /handhold|_hand$/i);
   } else if (kind === 'head') out.push(/^(F_|B_)?head(anchor|point)?$/i);
   return out;
 }

@@ -631,6 +631,46 @@ const POSE_SKELETONS = new WeakMap();
 /** Bones by name per skeleton (spine's findBone walks every bone): a skeleton's bones keep their identity. */
 const BONES = new WeakMap();
 
+/**
+ * How far a bone sits from its skeleton's origin in the SETUP pose (no clip applied), in skeleton units — the test for a
+ * muzzle point that is only a marker bone: several skeletons carry `F_Muzzle` as a bone the weapon never follows
+ * (隐现's sits at local (0, −486.5) under `Front`, i.e. exactly on the origin, and only the Attack clip swings it out), so
+ * reading it gives the unit's feet — "the effect comes out of the middle of the sprite". NaN for a bone whose data has
+ * no setup transform (a test double): nothing to judge, so the caller keeps it.
+ * Cached per bone data: a skeleton's bone data never changes.
+ */
+const SETUP_ORIGIN = new WeakMap();
+function setupOriginDist(bone) {
+  const bd = bone && bone.data;
+  if (!bd || !Number.isFinite(bd.x) || !Number.isFinite(bd.y)) return NaN;
+  const had = SETUP_ORIGIN.get(bd);
+  if (had !== undefined) return had;
+  const chain = [];
+  for (let it = bd, guard = 0; it && guard < 64; it = it.parent, guard++) chain.unshift(it);
+  let x = 0, y = 0, r = 0, sx = 1, sy = 1;
+  for (const it of chain) {
+    const rr = (r + (it.rotation || 0)) * (Math.PI / 180);
+    const cos = Math.cos(rr), sin = Math.sin(rr);
+    // the translation is in the PARENT's scale (spine: parent.world · translate · rotate · scale)
+    const lx = (it.x || 0) * sx, ly = (it.y || 0) * sy;
+    x += lx * cos - ly * sin;
+    y += lx * sin + ly * cos;
+    r += it.rotation || 0;
+    sx *= Number.isFinite(it.scaleX) ? it.scaleX : 1;
+    sy *= Number.isFinite(it.scaleY) ? it.scaleY : 1;
+  }
+  const d = Math.hypot(x, y);
+  SETUP_ORIGIN.set(bd, d);
+  return d;
+}
+
+/** Is this bone a marker that sits on the skeleton's origin in its setup pose (0.02 of the model's height)? */
+function originMarker(bone, height) {
+  const d = setupOriginDist(bone);
+  if (!Number.isFinite(d)) return false;
+  return d <= (Number.isFinite(height) && height > 0 ? height * 0.02 : 1);
+}
+
 /** A skeleton's bone by name (cached), or null. */
 function boneOf(sk, name) {
   let m = BONES.get(sk);
@@ -1342,14 +1382,23 @@ export class UnitView {
     const sp = a && this.spineReady && !this.destroyed ? a.spine : null;
     const sk = sp && sp.skeleton;
     if (!sk || typeof sk.findBone !== 'function') return null;
+    const height = sk.data && Number.isFinite(sk.data.height) ? sk.data.height : NaN;
     let b = null;
+    // A bone that sits on the skeleton's ORIGIN in its setup pose is a marker the weapon does not follow (隐现's
+    // `F_Muzzle` is exactly there; only the Attack clip swings it out): a shot read off it leaves from the feet, i.e. the
+    // middle of the sprite, which this path exists to fix. Pass over it and take the next candidate — and when the list
+    // has nothing else, answer null rather than that marker, so the caller falls through to its own wider scan
+    // (render/vfx/mounts.js unitPoint asks `boneNames(kind)`, whose patterns reach `F_Funnel_Muzzle_A1`).
     for (const n of Array.isArray(names) ? names : [names]) {
       if (!n) continue;
       // a RegExp matches any bone name (a muzzle bone some operators name GunPoint / Muzzle_01): the first in order
       if (n instanceof RegExp) {
         const list = Array.isArray(sk.bones) ? sk.bones : [];
-        b = list.find((bone) => n.test(String((bone && bone.data && bone.data.name) || ''))) || null;
-      } else b = boneOf(sk, n);
+        b = list.find((bone) => n.test(String((bone && bone.data && bone.data.name) || '')) && !originMarker(bone, height)) || null;
+      } else {
+        const bone = boneOf(sk, n);
+        b = bone && !originMarker(bone, height) ? bone : null;
+      }
       if (b) break;
     }
     if (!b) return null;
@@ -1473,6 +1522,11 @@ export class UnitView {
       if (nm && /muzzle/i.test(nm)) muzzleBones.push({ bone: b, nm });
     }
     if (muzzleBones.length) {
+      // A marker bone the weapon never follows sits on the skeleton's origin in its setup pose (隐现's `F_Muzzle`, 惊蛰,
+      // 普罗旺斯): a shot off it leaves from the feet. Only fall back to one when the model has nothing else.
+      const height = sk.data && Number.isFinite(sk.data.height) ? sk.data.height : NaN;
+      const usable = muzzleBones.filter((x) => !originMarker(x.bone, height));
+      const list = usable.length ? usable : muzzleBones;
       // Front and back sets share the name: the set whose `F_` / `B_` prefix the visible slots use is the one drawn
       let prefix = '';
       for (const s of sk.slots || []) {
@@ -1481,8 +1535,8 @@ export class UnitView {
         const m = /^([FB])_/i.exec(String((s.data && s.data.name) || ''));
         if (m) { prefix = m[1].toUpperCase(); break; }
       }
-      const pick = (want) => muzzleBones.find((x) => x.nm.toUpperCase().startsWith(want));
-      const b = (prefix && pick(prefix + '_')) || muzzleBones[0];
+      const pick = (want) => list.find((x) => x.nm.toUpperCase().startsWith(want));
+      const b = (prefix && pick(prefix + '_')) || list[0];
       this._muzzleName = b.nm;
       return b.bone;
     }

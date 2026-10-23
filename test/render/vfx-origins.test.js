@@ -486,6 +486,32 @@ describe('UnitView.boneOffset (render/units.js)', () => {
     v.spineReady = false;
     assert.equal(v.boneOffset(['F_Muzzle']), null, 'no model drawn');
   });
+
+  // 隐现's `F_Muzzle` is a marker bone her weapon never follows: under `Front` it sits at local (0, −486.5), i.e. exactly
+  // on the skeleton's origin — the sprite's feet — and only the Attack clip swings it out. A shot read off it leaves from
+  // the middle of the sprite, which is exactly the report this whole path exists to fix, so the name list must skip such
+  // a bone and keep looking (`boneNames('muzzle')` lists the patterns first, then the weapon / hand guesses).
+  test("a muzzle bone parked on the skeleton origin in its setup pose is passed over for the next one", () => {
+    /** A bone whose setup transform is where it sits when nothing is posed (x/y in skeleton units, y down). */
+    const marker = (name, x, y) => ({ data: { name, x, y, rotation: 0, scaleX: 1, scaleY: 1, parent: null }, matrix: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 } });
+    const idle = { data: { height: 667 } };   // 0.02 of it = 13.3 units: 0 is a marker, 676 is not
+    const bones = [marker('F_Muzzle', 0, 0), marker('F_Funnel_Muzzle_A1', 461, 494)];
+    const sk = { data: idle, bones, findBone(n) { return bones.find((b) => b.data.name === n) || null; }, slots: [] };
+    const v = makeView().v;
+    v.actor.spine.skeleton = sk;
+    v._muzzleName = undefined;
+    // the exact name is skipped (it is on the origin) …
+    const o = v.boneOffset(['F_Muzzle', 'F_Funnel_Muzzle_A1']);
+    assert.ok(o, 'still found one');
+    assert.equal(v._muzzleBone(sk).data.name, 'F_Funnel_Muzzle_A1', 'the marker is not where the weapon is');
+    // … and a model whose ONLY muzzle is such a marker keeps it: better than a generic point over the feet
+    const only = { data: idle, bones: [bones[0]], findBone(n) { return n === 'F_Muzzle' ? bones[0] : null; }, slots: [] };
+    assert.equal(only.findBone('F_Muzzle'), bones[0]);
+    const w = makeView().v;
+    w.actor.spine.skeleton = only;
+    w._muzzleName = undefined;
+    assert.ok(w._muzzleBone(only), 'a lone marker bone is still used');
+  });
 });
 
 // With the local client's art and extraction (assets fetched, extract.py --only fx): a skin's static Muzzle is its bone
