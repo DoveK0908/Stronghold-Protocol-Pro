@@ -1922,26 +1922,45 @@ def bb_ability_names(v):
 
 def graph_effects(state, ek):
     """The effect keys of an Odin-serialized action graph (a SerializedState JSON string): [(node type, field, key)…]
-    — the node type without its namespace (CreateEffect, CreateBuff, …), the field naming the key."""
+    — the node type without its namespace (CreateEffect, CreateBuff, …), the field naming the key. Keys under a unit
+    mode condition (a CheckUnitCurrentMode node, §33.20) carry a 4th item, `('mode', index)` in its `_succeedNodes` and
+    `('notmode', index)` in its `_failNodes`, so a caller that knows the unit's modes can gate the key by mode — the
+    client plays one branch or the other (伊内丝's talent 2 buff: mode 1 (S2) → ines_range_02, else ines_range_01)."""
     try:
         nodes = json.loads(state) if isinstance(state, str) and state[:1] in '[{' else None
     except ValueError:
         return []
     out = []
 
-    def walk(v, typ):
+    def gate_of(v):
+        """The mode gate an IfElse node's branches carry: (index, negated) or None (not a unit mode condition)."""
+        c = v.get('_conditionNode') if isinstance(v, dict) else None
+        if not isinstance(c, dict) or 'CheckUnitCurrentMode' not in str(c.get('$type') or ''):
+            return None
+        idx = c.get('_checkCurModeIndex')
+        return (idx, False) if isinstance(idx, int) and not isinstance(idx, bool) else None
+
+    def walk(v, typ, gate=None):
         if isinstance(v, dict):
             typ = str(v.get('$type') or typ).split('+')[-1]
+            g = gate_of(v)
+            if g is not None:                       # its branches' keys play only in (succeed) / outside (fail) that mode
+                walk(v.get('_succeedNodes'), typ, (g[0], False))
+                walk(v.get('_failNodes'), typ, (g[0], True))
+                for k, x in v.items():
+                    if k not in ('_succeedNodes', '_failNodes') and isinstance(x, (dict, list)):
+                        walk(x, typ, gate)
+                return
             for k, x in v.items():
                 if isinstance(x, str) and ek(x):
-                    out.append((typ, k, ek(x)))
+                    out.append((typ, k, ek(x)) + ((gate,) if gate else ()))
                 elif isinstance(x, list) and x and all(isinstance(y, str) for y in x):
-                    out.extend((typ, k, ek(y)) for y in x if ek(y))
+                    out.extend((typ, k, ek(y)) + ((gate,) if gate else ()) for y in x if ek(y))
                 elif isinstance(x, (dict, list)):
-                    walk(x, typ)
+                    walk(x, typ, gate)
         elif isinstance(v, list):
             for x in v:
-                walk(x, typ)
+                walk(x, typ, gate)
     walk(nodes, '')
     return out
 
@@ -1995,9 +2014,12 @@ def graph_links(state):
 
 def template_uses(tkey, template, on, buff):
     """The uses of a buff template's action graph (a buff_templates() entry): its CreateEffect nodes play at their buff
-    event (BUFF_EVENT_ROLES; a target's buff starts when the target is hit), the buffs it creates loop."""
+    event (BUFF_EVENT_ROLES; a target's buff starts when the target is hit), the buffs it creates loop. A key under a
+    unit mode condition carries it: `modeGateIdx` (the mode index it needs, §33.20) or `notModeGateIdx` (the one it
+    must not be in) — own_entries() turns the index into the unit's mode name."""
     uses = []
-    for event, typ, field, key in template.get('graph', []):
+    for row in template.get('graph', []):
+        event, typ, field, key = row[:4]
         role = BUFF_EVENT_ROLES.get(event, 'trigger')
         if typ.startswith(('CreateBuff', 'CreateNoSourceBuff', 'CreateLineEffect')) or field == 'overrideEffectKey':
             role = 'loop'
@@ -2005,9 +2027,36 @@ def template_uses(tkey, template, on, buff):
             role = 'range'
         if on == 'targets' and role == 'start':
             role = 'hit'
-        uses.append({'role': role, 'keys': [key], 'from': f'template {tkey}', 'event': event, 'action': typ,
-                     **({'on': on} if on else {}), 'buff': buff})
+        gate = row[4] if len(row) > 4 and isinstance(row[4], (list, tuple)) else None
+        u = {'role': role, 'keys': [key], 'from': f'template {tkey}', 'event': event, 'action': typ,
+             **({'on': on} if on else {}), 'buff': buff}
+        if gate:
+            u['notModeGateIdx' if gate[1] else 'modeGateIdx'] = gate[0]
+        uses.append(u)
     return uses
+
+
+def name_mode_gates(uses, modes):
+    """The uses with their unit mode conditions named: a `modeGate` / `notModeGate` index (graph_effects) becomes the
+    name of that unit mode. The client plays a gated key only while its owner is in that mode (or only outside it) —
+    伊内丝's talent 2 buff puts ines_range_02 only in S2, ines_range_01 in every other mode (DESIGN §33.20)."""
+    names = [m.get('name') if isinstance(m, dict) else None for m in modes or []]
+    out = []
+    for x in uses or []:
+        if not isinstance(x, dict):
+            out.append(x)
+            continue
+        y = dict(x)
+        for field, out_field in (('modeGate', 'modeGate'), ('modeGateIdx', 'modeGate'),
+                                 ('notModeGate', 'notModeGate'), ('notModeGateIdx', 'notModeGate')):
+            if field in y:
+                idx = y.pop(field)
+                nm = idx if isinstance(idx, str) else \
+                    names[idx] if isinstance(idx, int) and not isinstance(idx, bool) and 0 <= idx < len(names) else None
+                if nm:
+                    y[out_field] = nm
+        out.append(y)
+    return out
 
 
 def behaviour_uses(cls, fields, ek, templates=None, node=None, ability=None):
@@ -2103,9 +2152,13 @@ def behaviour_uses(cls, fields, ek, templates=None, node=None, ability=None):
                         add([bb['valueStr']], name_role(ek(bb['valueStr'])), f'{f}.blackboard', on=on,
                             buff=b.get('buffKey') or None, bb=bb.get('key'), by='name', life=life)
             if isinstance(v, dict) and isinstance(v.get('SerializedState'), str):
-                for typ, field, key in graph_effects(v['SerializedState'], ek):
+                for row in graph_effects(v['SerializedState'], ek):
+                    typ, field, key = row[:3]
                     role = 'loop' if field == 'overrideEffectKey' or typ.startswith('CreateBuff') else 'start'
-                    add([key], role, f'{f} {typ}', action=typ)
+                    # a key under a unit mode condition keeps it (own_entries names the mode)
+                    gate = row[3] if len(row) > 3 and isinstance(row[3], (list, tuple)) else None
+                    add([key], role, f'{f} {typ}', action=typ,
+                        **({'notModeGateIdx' if gate[1] else 'modeGateIdx': gate[0]} if gate else {}))
     return uses
 
 
@@ -2518,8 +2571,8 @@ def buff_templates(env, ek):
                 for it in ((t.get('eventToActions') or {}).get('_items') or []):
                     ev = event_name(BUFF_EVENTS, it.get('key')) or it.get('key')
                     state = (it.get('value') or {}).get('SerializedState')
-                    for typ, field, key in graph_effects(state, ek):
-                        graph.append([ev, typ, field, key])
+                    for row in graph_effects(state, ek):
+                        graph.append([ev, row[0], row[1], row[2]] + ([list(row[3])] if len(row) > 3 and row[3] else []))
                     ab, sw, cr = graph_links(state)
                     abilities += [[ev] + x for x in ab]
                     switches += [[ev] + x for x in sw]
@@ -2844,6 +2897,10 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, ski
         gk = lambda o: (id(o.assets_file), o.path_id)  # noqa: E731
         mode_names = [m.get('name') for m in u['modes']]
         mode_name = lambda i: mode_names[i] if isinstance(i, int) and not isinstance(i, bool) and 0 <= i < len(mode_names) else None  # noqa: E731
+
+        def gated(x):
+            """A use with its mode condition still an index — crawl_units names them all once the unit is built."""
+            return dict(x)
         built = []
         for r in roots:
             e = node_entry(env, r['go'], ekn, pk, effect_refs, templates, node_name=lambda go, nm: paths.get(gk(go), nm),
@@ -2906,7 +2963,7 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, ski
             else:
                 if not r.get('mode'):
                     t['_sigs'].setdefault(sig, len(t['nodes']))
-                t['uses'] += [{**x, **({'mode': r['mode']} if r.get('mode') else {})} for x in e['uses']]
+                t['uses'] += [{**gated(x), **({'mode': r['mode']} if r.get('mode') else {})} for x in e['uses']]
                 t['abilities'] += e['abilities']
             t['nodes'].append(node)
             t['effects'] |= set(e['effects'])
@@ -3062,13 +3119,26 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, ski
             u['skills'] = {sid: skills[sid] for sid in sorted(sids) if sid in skills}
             # an enemy's own skills (their nodes in its prefab; keys like `1` repeat across enemies: not in index.skills)
             for key, entry in sorted(enemy_skills(env, found_skills).items()):
+                entry['uses'] = name_mode_gates(entry.get('uses'), u['modes'])
+                entry['roles'] = roles_of(entry['uses'])
                 u['skills'].setdefault(key, entry)
+            # a skill behaviour's own mode conditions (a SerializedState graph) name this unit's modes too
+            for sid, entry in u['skills'].items():
+                if entry.get('uses'):
+                    entry['uses'] = name_mode_gates(entry['uses'], u['modes'])
+                    entry['roles'] = roles_of(entry['uses'])
             # v3: its talents, common / general abilities and trait, our data's talent ids, its Spine-event effects
             roots, paths, own_tpls, own_named = u.pop('_roots'), u.pop('_paths'), u.pop('_templates'), u.pop('_named')
             tal, abl = own_entries(uid, u, env, roots, paths, own_tpls, own_named)
             if tal:
+                for t in tal.values():                       # a buff graph's CheckUnitCurrentMode gates: index → mode name
+                    t['uses'] = name_mode_gates(t['uses'], u['modes'])
+                    t['roles'] = roles_of(t['uses'])
                 u['talents'] = tal
             if abl:
+                for a in abl:
+                    a['uses'] = name_mode_gates(a['uses'], u['modes'])
+                    a['roles'] = roles_of(a['uses'])
                 u['abilities'] = abl
             if (gd.get('talentKeys') or {}).get(uid):
                 u['talentKeys'] = gd['talentKeys'][uid]

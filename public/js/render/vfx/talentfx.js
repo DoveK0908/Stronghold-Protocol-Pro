@@ -132,17 +132,17 @@ export class TalentFx {
   }
 
   /** The one-shot rows of a binding: start / range rows that are not loops, its attacks' casts (on the owner). */
-  _shots(b, v, { attacks = true } = {}) {
+  _shots(U, b, v, { attacks = true } = {}) {
     let drew = false;
     const rows = [...b.plan.start, ...b.plan.range].filter((e) => e.hold !== 'skill' && !isPost(e));
     if (attacks) for (const a of b.plan.attacks) rows.push(...a.cast, ...a.range);
-    for (const e of uniq(rows)) if (this._play(e, v)) drew = true;
+    for (const e of uniq(rows)) if (this._gateOk(U, e) && this._play(e, v)) drew = true;
     return drew;
   }
 
   /** The loop entries a binding keeps while it is in force (hold 'skill'), placed on the owner. */
-  _loopsOf(b) {
-    return [...b.plan.loop, ...b.plan.start, ...b.plan.range].filter((e) => e.hold === 'skill' && !isPost(e));
+  _loopsOf(U, b) {
+    return [...b.plan.loop, ...b.plan.start, ...b.plan.range].filter((e) => e.hold === 'skill' && !isPost(e) && this._gateOk(U, e));
   }
 
   /**
@@ -176,7 +176,7 @@ export class TalentFx {
     const mem = U.layerN || (U.layerN = new Map());
     const was = mem.get(b.id);
     mem.set(b.id, n);
-    if (was !== undefined && n > was) this._shots(b, v, { attacks: false });
+    if (was !== undefined && n > was) this._shots(U, b, v, { attacks: false });
     const keep = new Set(order.slice(0, n));
     return loops.filter((e) => !order.includes(e.key) || keep.has(e.key));
   }
@@ -204,7 +204,7 @@ export class TalentFx {
     if (!first || !this.active()) return false;
     let drew = false;
     for (const b of U.binds) {
-      if (b.when === 'deploy' && this._modeOk(U, b)) { if (this._shots(b, v)) drew = true; U.act.set(b.id, true); }
+      if (b.when === 'deploy' && this._modeOk(U, b)) { if (this._shots(U, b, v)) drew = true; U.act.set(b.id, true); }
       else if (triggerKinds(b).includes('born') && this._fire(U, b, v)) drew = true;
     }
     return drew;
@@ -222,8 +222,8 @@ export class TalentFx {
 
   /** A triggered node casts: its rows once (held rows for a cast, loops for TRIGGER_HOLD_S). */
   _fire(U, b, v) {
-    let drew = this._shots(b, v);
-    for (const e of uniq(this._loopsOf(b))) {
+    let drew = this._shots(U, b, v);
+    for (const e of uniq(this._loopsOf(U, b))) {
       const h = this._play(e, v, { loop: true });
       if (h) { drew = true; this._later(TRIGGER_HOLD_S, () => h.stop()); }
     }
@@ -309,7 +309,7 @@ export class TalentFx {
       for (const b of reborn) {
         const manual = b.class === 'ManualTriggerRebornTalent';
         if ((form === 'revived') !== manual || b.class === 'RallyPointRebornTalent') continue;
-        if (manual) { if (this._shots(b, v, { attacks: false })) drew = true; continue; }
+        if (manual) { if (this._shots(U, b, v, { attacks: false })) drew = true; continue; }
         for (const e of uniq(b.plan.end)) if (this._play(e, v)) drew = true;
         for (const e of uniq([...b.plan.loop, ...b.plan.start, ...b.plan.range].filter(isPost))) {
           const life = lifeOf(e.life, U.rec?.talents?.bb, b.bb);
@@ -357,6 +357,18 @@ export class TalentFx {
     return false;
   }
 
+  /**
+   * Whether one of a binding's rows may play now: a row under a buff graph's CheckUnitCurrentMode gate (index v3 `modeGate`
+   * / `notModeGate`) plays only while the unit is in that mode — or only while it is outside it. 伊内丝's talent 2 buff
+   * creates ines_range_02 only in S2 and ines_range_01 otherwise: her S1 keeps the 影哨 (one row) and never the S2 one.
+   */
+  _gateOk(U, e) {
+    if (!e.modeGate && !e.notModeGate) return true;
+    const name = this._modeName(U);
+    if (e.modeGate) return e.modeGate === name;
+    return e.notModeGate !== name;
+  }
+
   sync(views) {
     const active = this.active();
     if (!active) {
@@ -376,11 +388,11 @@ export class TalentFx {
       for (const b of U.binds) {
         const on = this._inForce(U, b, v, now);
         const was = !!U.act.get(b.id);
-        if (on && !was && b.when !== 'deploy') this._shots(b, v, { attacks: false });
+        if (on && !was && b.when !== 'deploy') this._shots(U, b, v, { attacks: false });
         if (!on && was) for (const e of uniq(b.plan.end)) this._play(e, v);
         U.act.set(b.id, on);
         if (!on) continue;
-        for (const e of this._layerLoops(U, b, v, this._loopsOf(b))) want.set(`${e.key}|${e.at}`, e);
+        for (const e of this._layerLoops(U, b, v, this._loopsOf(U, b))) want.set(`${e.key}|${e.at}`, e);
       }
       for (const e of U.post) want.set(`${e.key}|${e.at}`, e);
       if (U.inv && now < U.inv.until) for (const e of U.inv.entries) want.set(`${e.key}|${e.at}`, e);

@@ -314,6 +314,28 @@ export class SkillFx {
     return slotKey(e, DIRS[this.w._dirIndex(e.directionType, v)]);
   }
 
+  /** The mode name a view is in now (FxWiring.mode: its skill's, a form's, else Default), once per frame per view. */
+  _modeName(v) {
+    if (this._gateAt !== this.frame) { this._gateAt = this.frame; this._gateNames = new Map(); }
+    const id = idOf(v);
+    if (this._gateNames.has(id)) return this._gateNames.get(id);
+    const u = this.w.unitOf(v);
+    const name = u ? this.w.mode(u, v)?.name ?? null : null;
+    this._gateNames.set(id, name);
+    return name;
+  }
+
+  /**
+   * Whether a row's unit mode condition holds (index v3 `modeGate` / `notModeGate`, from a buff graph's
+   * CheckUnitCurrentMode node): the client plays that key only while the unit is in the mode, or only while it is not.
+   * 伊内丝's talent 2 buff puts ines_range_02 (the 3-row 领域) on in S2 and ines_range_01 (the 1-row 影哨) otherwise.
+   */
+  _gateOk(e, v) {
+    if (!e.modeGate && !e.notModeGate) return true;
+    const name = this._modeName(v);
+    return e.modeGate ? e.modeGate === name : e.notModeGate !== name;
+  }
+
   /**
    * Play an entry on a view; held ones (skill / ready / deploy) follow the unit's mount point and are never dropped. A
    * held entry whose prefab does not loop (index.json prefabs[key].looping false: a buff's or a long ability's one-shot
@@ -321,6 +343,7 @@ export class SkillFx {
    */
   _play(e, v, o = {}) {
     if (!v) return null;
+    if (!o.force && !this._gateOk(e, v)) return null;   // a buff graph's mode condition (CheckUnitCurrentMode)
     const k = this._key(e, v);
     if (!k) return null;
     const held = e.hold === 'skill' || e.hold === 'ready' || e.hold === 'cast';

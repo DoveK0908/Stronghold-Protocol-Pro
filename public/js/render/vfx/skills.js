@@ -566,7 +566,8 @@ export function dirFamilies(uses) {
   const groups = new Map();
   uses.forEach((u, i) => {
     if (!isObj(u) || u.ability || !Array.isArray(u.keys) || u.keys.length !== 1 || (Array.isArray(u.slots) && u.slots.some(Boolean))) return;
-    const g = [u.from, u.event, u.action, u.buff, u.node, u.on, u.role, u.mode].map((x) => (x == null ? '' : String(x))).join('|');
+    const g = [u.from, u.event, u.action, u.buff, u.node, u.on, u.role, u.mode, u.modeGate, u.notModeGate]
+      .map((x) => (x == null ? '' : String(x))).join('|');
     if (!groups.has(g)) groups.set(g, []);
     groups.get(g).push(i);
   });
@@ -818,7 +819,8 @@ function entryOf(key, role, u, prefabs, describe) {
   // (v2: a group list's `group` / `groups`, a replace group's `anim`, the MultiHit choice flags, an enemy copy's `mode`)
   // (v3: a buff use's `life`, an emitter use's `projectileKey`)
   for (const f of ['node', 'ability', 'list', 'startEvent', 'endEvent', 'directionType', 'event', 'action', 'buff', 'on',
-    'group', 'groups', 'anim', 'useLoopHitEffect', 'useRandomHitEffect', 'keepBaseHitEffect', 'oncePerTarget', 'mode', 'life', 'projectileKey']) {
+    'group', 'groups', 'anim', 'useLoopHitEffect', 'useRandomHitEffect', 'keepBaseHitEffect', 'oncePerTarget', 'mode', 'life',
+    'projectileKey', 'modeGate', 'notModeGate']) {
     if (u[f] != null) e[f] = u[f];
   }
   // where it sits on its owner: index v2's prefab summary (`spawn` / `follow`), without loading the descriptor
