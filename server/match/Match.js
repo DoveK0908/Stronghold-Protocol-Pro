@@ -208,6 +208,9 @@
 //   * 投票移出 (the owner's rule of 2026-10-17, kickVote.js): in SP_DRAFT / PREP the connected humans may vote out a seat
 //     under the offline takeover above (g.kickVote / g.kickBallot, majority); a passed vote removes it like the AFK
 //     rule — m.removed { reason: 'kicked' }, m.notice kickPassed instead of afkRemoved, opts.onRemove, onLeave.
+//   * 局内投票开启二倍速 (the owner's rule of 2026-10-23, speedVote.js): in every live phase before SETTLE the connected
+//     humans may agree, unanimously, to run the rest of the match twice as fast (g.speedVote / g.speedBallot); the boost
+//     lands on the next battle (speedBoostPending → startCombat doubles gameSpeed), never on the battle in flight.
 //
 // Code layout: this file keeps the constructor (options, seats, the per-match setup, the state fields); the methods
 // live in server/match/match/, one module per concern, and are installed on Match.prototype below in a fixed order,
@@ -226,6 +229,7 @@
 //   phases.js        INFO_CHECK, BAND_DRAFT (the strategy draft), BATTLE_CHECK, ROUND_START
 //   setupVote.js     the INFO_CHECK opening reroll vote (重刷本局) and its transactional setup replacement
 //   kickVote.js      投票移出: the vote to remove a teammate under the offline takeover
+//   speedVote.js     局内投票开启二倍速: the unanimous vote for 2× combat speed from the next battle
 //   spDraft.js       SP_DRAFT (机变) and the rolls the meta effects ask for (bounties, item ids, pools)
 //   prep.js          PREP: its start, the AI seats' sliced preps, Ready, the deadline, its end
 //   combat.js        battle construction, COMBAT (both modes), the per-field results, then 联防 or SETTLE
@@ -270,6 +274,7 @@ import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchKickVote } from './match/kickVote.js';
+import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
@@ -578,6 +583,14 @@ export class Match {
     this._kickVoteSeq = 0;
     this._kickFailed = new Map();
     this._kickVoteAt = new Map();
+    // 局内投票开启二倍速 (speedVote.js): the open vote, its id sequence, playerId → the round a vote from it failed,
+    // playerId → last proposal ms, and whether this match already runs at 2× / owes the boost to its next battle
+    this.speedVote = null;
+    this._speedVoteSeq = 0;
+    this._speedFailedRound = null;
+    this._speedVoteAt = new Map();
+    this.speedBoost = false;
+    this.speedBoostPending = false;
     this._turnTimer = null;
     this._pubDirty = false;
     this._pubTimer = null;
@@ -640,7 +653,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchExtensions]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchExtensions]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

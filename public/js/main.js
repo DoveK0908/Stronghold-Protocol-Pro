@@ -284,6 +284,9 @@ const VOTE_NOTICE = {
   kickPassed: (m) => [t('{name} 已被投票移出对局', { name: typeof m.name === 'string' && m.name ? m.name : t('博士') }), 'info'],
   kickFailed: (m) => [m.reason === 'timeout' ? t('移出投票超时，未通过') : t('移出投票未通过'), 'info'],
   kickCancelled: (m) => [m.reason === 'reconnected' ? t('该玩家已重新连接，移出投票取消') : t('移出投票已取消'), 'info'],
+  speedPassed: () => [t('二倍速投票通过：本局接下来的战斗以二倍速进行'), 'success'],
+  speedFailed: (m) => [m.reason === 'timeout' ? t('二倍速投票超时，未通过') : t('二倍速投票未通过'), 'info'],
+  speedCancelled: (m) => [m.reason === 'alreadyOn' ? t('二倍速已开启，投票作废') : t('二倍速投票已取消'), 'info'],
 };
 
 function wireNet() {

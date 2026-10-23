@@ -14,6 +14,13 @@
 .team-kick { color: var(--amber); border-left-color: var(--amber); }
 .team-kick__actions { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: .06rem; }
 .sp-coarse .team-kick__actions .btn, .sp-coarse .team-kick-action .btn { min-height: 40px; min-width: 56px; padding: 0 12px; font-size: 14px; }
+/* 局内投票开启二倍速 (ui/speedVote.js): the propose button, the open vote (mint, like the other boosts) and the 2× badge */
+.team-speed { pointer-events: auto; display: flex; flex-wrap: wrap; align-items: center; gap: .04rem .12rem; margin-top: .04rem; max-width: 2.75rem; }
+.team-speed .btn { min-height: .32rem; }
+.team-speed--on { color: var(--mint-400); font-size: .14rem; }
+.team-speed--on > .icon { width: .19rem; height: .19rem; }
+.team-speed-vote { color: var(--mint-400); }
+.sp-coarse .team-speed .btn { min-height: 40px; min-width: 56px; padding: 0 12px; font-size: 14px; }
 .team-rescue-action { display: flex; flex-direction: column; align-items: flex-start; gap: .02rem; margin-top: .04rem; max-width: 1.8rem; }
 .team-rescue-action > small { color: var(--text-dim); font-size: .11rem; line-height: 1.35; }
 .team-rescue-action .btn { min-height: .32rem; }

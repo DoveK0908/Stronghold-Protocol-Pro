@@ -78,6 +78,8 @@ export class MatchCombat {
   }
 
   startCombat() {
+    // 局内投票开启二倍速 (speedVote.js): the boost lands on this battle, the first one after the vote passed
+    this.applySpeedBoost();
     if (this.clientCombat) { this._startCombatClient(); return; }
     this.phase = PHASE.COMBAT;
     const alive = this.alivePlayers();

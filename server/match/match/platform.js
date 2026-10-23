@@ -146,6 +146,7 @@ export class MatchPlatform {
       // (setupVote.js, kickVote.js).
       this._dropSetupVoter(playerId);
       this._kickVoteMemberGone(playerId);
+      this._speedVoteMemberGone(playerId);
       // a paused solo battle resumes (the server takes the field over; nobody is left to resume it)
       this._resume();
       if (this.clientCombat) this._authorityLost(ps, 'disconnect');
@@ -217,6 +218,7 @@ export class MatchPlatform {
       ps.autoplay = false;
       ps.offlineAutoplay = false;
       this._kickVoteMemberGone(playerId);
+      this._speedVoteMemberGone(playerId);
       this.watchers.delete(playerId);
       this.localViews.delete(playerId);
       if (this.ended) return;

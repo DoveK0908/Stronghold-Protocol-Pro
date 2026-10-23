@@ -30,12 +30,13 @@
 
 import { PHASE } from '../../shared/constants.js';
 import { SharedPool, createItemPools, createPoolGroups } from './pool.js';
+import { SPEED_BOOST } from './match/speedVote.js';
 
 /**
  * Checkpoint layout version. A document of another version is refused (the match is dropped, server/persist/).
  * Raise it whenever a saved field is added, removed or changes its meaning, or the restore rules below change.
  */
-export const SNAPSHOT_VERSION = 1;
+export const SNAPSHOT_VERSION = 2;
 
 /** Phases whose state is fully serializable (see the header). */
 export const SNAPSHOT_PHASES = Object.freeze([PHASE.INFO_CHECK, PHASE.BAND_DRAFT, PHASE.SP_DRAFT, PHASE.ROUND_START, PHASE.PREP]);
@@ -70,6 +71,8 @@ export const MATCH_FIELDS = Object.freeze({
     'errors', 'errorCount', 'simErrors', 'simErrorLog', 'localStats', 'watchPref', 'lastResults', '_revival',
     'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
     '_botEmotesSettledRound',
+    // 局内投票开启二倍速 (speedVote.js): whether this match already runs at 2× and whether its next battle owes the boost
+    'speedBoost', 'speedBoostPending',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'poolGroups', 'playerItemPools',
@@ -92,8 +95,9 @@ export const MATCH_FIELDS = Object.freeze({
     'localViews', 'unitePlan', '_normalAliveCount', '_uniteRelay', 'uniteResultView', '_uniteLeftKey', '_uniteBounds',
     'teamLp', 'bossPool', '_turnToken', '_botPath', '_botTraits', '_workerBotPrepOwner', '_botEmotesMerges', 'overtimeApplied',
     'bossOvertimeStartReal', '_finalEnding', '_bossStartAt', 'lastResultMsg', '_uniteBudget', 'onCheckpoint', 'replayRound',
-    // the reroll proposal marks and the kick vote (setupVote.js, kickVote.js): a restore drops them
+    // the reroll proposal marks and the votes (setupVote.js, kickVote.js, speedVote.js): a restore drops them
     '_setupProposals', 'kickVote', '_kickVoteSeq', '_kickFailed', '_kickVoteAt',
+    'speedVote', '_speedVoteSeq', '_speedFailedRound', '_speedVoteAt',
     // 0.3.1 plugin offer windows (offers.js): a window is a live popup + a resume callback, so a restore drops it — the
     // round continues without the window (the same rule as every other timer). `test` is the room's test-console flag.
     'offers', 'offerWin', '_offerTimers', '_offerResume', 'offerSeq', '_offerResumeTimer', 'test',
@@ -350,6 +354,8 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
   if (typeof createRngFromState !== 'function') throw new TypeError('restoreMatch: createRngFromState required');
   const now = m.sched.now();
   for (const k of MATCH_FIELDS.saved) if (Object.hasOwn(doc.match, k)) m[k] = decodeValue(doc.match[k]);
+  // 局内投票开启二倍速 (speedVote.js): the constructor rebuilt `gameSpeed` from opts — a boosted match restores at 2×
+  if (m.speedBoost || m.speedBoostPending) m.gameSpeed = Math.min(200, m.gameSpeed * SPEED_BOOST);
   m.round = Number(doc.round) | 0;
   m.phase = doc.phase;
   m.ended = false;
@@ -398,7 +404,7 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
   Object.assign(m, {
     paused: false, _pausedAt: 0, overtimeAt: 0, deadline: 0, setupVote: null, kickVote: null, _phaseTimer: null, _infoAdvanceTimer: null,
     _turnTimer: null, _pubTimer: null, _pubDirty: false, _lastPubAt: -Infinity, _lastPubJson: '', _prepEndQueued: false,
-    _turnToken: 0, _progressTimer: null, _bossPubTimer: null, _bossClock: null, _bossClockOn: false, _poolTimer: null,
+    speedVote: null, _turnToken: 0, _progressTimer: null, _bossPubTimer: null, _bossClock: null, _bossClockOn: false, _poolTimer: null,
     pacer: null, runner: null, fields: [], unitePlan: null, teamLp: null, bossPool: null, _botPath: null, lastResultMsg: null,
   });
   m.watchers.clear();

@@ -31,6 +31,9 @@ function randomIntent(rng, m, ps) {
     // the shape-only pass calls this with `m = {}`: the player list is optional there
     case 'g.kickVote': return { t, targetId: rng.pick([...(m.players?.keys?.() ?? []), 'unknown']) };
     case 'g.kickBallot': return { t, voteId: m.kickVote?.id ?? 1 + rng.int(10), agree: rng() < 0.5 };
+    // 局内投票开启二倍速 (speedVote.js)
+    case 'g.speedVote': return { t };
+    case 'g.speedBallot': return { t, voteId: m.speedVote?.id ?? 1 + rng.int(10), agree: rng() < 0.5 };
     case 'g.band': return { t, bandId: rng() < 0.8 ? rng.pick(BANDS) : rng.pick(['constructor', '__proto__', 'band_x', 'a'.repeat(64)]) };
     case 'g.buy': return { t, slot: rng.int(16) };
     case 'g.sell': case 'g.destroy': return { t, uid: uid() };

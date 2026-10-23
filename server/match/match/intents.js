@@ -23,6 +23,9 @@ export class MatchIntents {
       // 投票移出 an offline seat under AI takeover (kickVote.js)
       case 'g.kickVote': return this.requestKickVote(ps, msg.targetId);
       case 'g.kickBallot': return this.answerKickVote(ps, msg.voteId, msg.agree);
+      // 局内投票开启二倍速 (speedVote.js)
+      case 'g.speedVote': return this.requestSpeedVote(ps);
+      case 'g.speedBallot': return this.answerSpeedVote(ps, msg.voteId, msg.agree);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // the strategy highlighted in the draft screen (what a timed-out turn takes, timeoutBand)
