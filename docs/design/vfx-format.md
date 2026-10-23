@@ -1856,3 +1856,35 @@ Sources: local official v3 index/prefabs; `pkgrps/btl_pfb_tokens_0.ab` mode `_re
 `SwitchToMelee/Range`; `skill_table.json` (`skchr_wildmn_2`, `skchr_yu_3`, `skchr_mlyss_3`); official client
 `CastEffectOptions.CreateEffect`, `ParticleEffect.FaceTo`, `YuS3EffectBehaviour.OnPlay` and
 `YuS3EffectWithEdgeBehaviour` (addresses and replay evidence in history §34.31). No sim rules change.
+
+### 33.19 The current-mode gate of buff templates (`modeGate` / `notModeGate`)
+
+A buff template's action graph is not flat: an `IfElse` node whose `_conditionNode` is `CheckUnitCurrentMode`
+(`_checkCurModeIndex: N`) runs `_succeedNodes` only while the owner is in mode index `N` and `_failNodes` otherwise.
+伊内丝 is the case the maintainer reported: `ines_t_2`'s ON_BUFF_START is
+`IfElse(CheckContainsBuff ines_s_3[deck])` → `FinishBuff`, else `IfElse(CheckUnitCurrentMode 1)` →
+`CreateBuff overrideEffectKey: ines_range_02` (three wall bands) in S2, `ines_range_01` (one band, the 影哨) in every
+other mode. Because `units.char_4087_ines.modes` is `Default, S2, S3`, index 1 is S2: with skill 1 equipped the
+character is in `Default` and must show one band, yet a flattened extraction emitted both under
+`Modes/Default/Body/Talents/2` and the three-band aura never went away.
+
+So `fx.py` keeps the gate instead of flattening it:
+
+- `graph_effects()` walks both branches and tags every key it finds with `(modeIndex, negated)`;
+  `buff_templates()` stores it as a 5th element of the action row and `template_uses()`/`behaviour_uses()` turn it into
+  `modeGateIdx` / `notModeGateIdx` on the use;
+- `crawl_units()` resolves the index against the unit's own `modes` (`name_mode_gates()`, idempotent) and writes
+  **`modeGate`** / **`notModeGate`** — mode *names*, never the existing `mode` field, which is the mode of the node's
+  own directory and is assigned separately (and would otherwise overwrite the gate);
+- `skills.js entryOf()` carries the two fields into the plan entry, `skillfx._gateOk()` / `talentfx._gateOk()` compare
+  them with the mode name the authority selected (`wiring.mode()`), so a gated effect is neither shown nor given a
+  loop in a mode it does not belong to.
+
+Twelve template events in the client carry such a gate (`ines_t_2`, `mlyss_wtrman_s_1/s_2/s_3[effect_trigger]`,
+`trap_dhsb_t_1`, `enemy_cnvfire[passive]`, `crzjdg_a[sand_effect_manager]`, `blaze2_t_2`, `typhon_t_1`,
+`enemy_sydonq_t[freeze_shield]`/`[shield_effect]`, `enemy_syskad_t[berserk]`); the index version stays 3 — the fields
+are additive and old consumers ignore them.
+
+Sources: `config/buff_template_holder.ab` (`ines_t_2` event 0, dumped action graph); local v3 index
+`units.char_4087_ines.talents["2"].uses`; the client's own `ines_range_01` (one `wall_*` pair) vs `ines_range_02`
+(three) prefabs. No sim rules change.

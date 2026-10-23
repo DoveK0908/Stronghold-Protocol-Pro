@@ -1923,7 +1923,7 @@ def bb_ability_names(v):
 def graph_effects(state, ek):
     """The effect keys of an Odin-serialized action graph (a SerializedState JSON string): [(node type, field, key)…]
     — the node type without its namespace (CreateEffect, CreateBuff, …), the field naming the key. Keys under a unit
-    mode condition (a CheckUnitCurrentMode node, §33.20) carry a 4th item, `('mode', index)` in its `_succeedNodes` and
+    mode condition (a CheckUnitCurrentMode node, §33.19) carry a 4th item, `('mode', index)` in its `_succeedNodes` and
     `('notmode', index)` in its `_failNodes`, so a caller that knows the unit's modes can gate the key by mode — the
     client plays one branch or the other (伊内丝's talent 2 buff: mode 1 (S2) → ines_range_02, else ines_range_01)."""
     try:
@@ -2015,7 +2015,7 @@ def graph_links(state):
 def template_uses(tkey, template, on, buff):
     """The uses of a buff template's action graph (a buff_templates() entry): its CreateEffect nodes play at their buff
     event (BUFF_EVENT_ROLES; a target's buff starts when the target is hit), the buffs it creates loop. A key under a
-    unit mode condition carries it: `modeGateIdx` (the mode index it needs, §33.20) or `notModeGateIdx` (the one it
+    unit mode condition carries it: `modeGateIdx` (the mode index it needs, §33.19) or `notModeGateIdx` (the one it
     must not be in) — own_entries() turns the index into the unit's mode name."""
     uses = []
     for row in template.get('graph', []):
@@ -2039,7 +2039,7 @@ def template_uses(tkey, template, on, buff):
 def name_mode_gates(uses, modes):
     """The uses with their unit mode conditions named: a `modeGate` / `notModeGate` index (graph_effects) becomes the
     name of that unit mode. The client plays a gated key only while its owner is in that mode (or only outside it) —
-    伊内丝's talent 2 buff puts ines_range_02 only in S2, ines_range_01 in every other mode (DESIGN §33.20)."""
+    伊内丝's talent 2 buff puts ines_range_02 only in S2, ines_range_01 in every other mode (DESIGN §33.19)."""
     names = [m.get('name') if isinstance(m, dict) else None for m in modes or []]
     out = []
     for x in uses or []:

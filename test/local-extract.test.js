@@ -124,7 +124,7 @@ print(json.dumps({'nodes': [[n, a, r['m_PathID']] for n, a, r in nodes], 'pick':
     assert.equal(out.pick, 41, 'the Front skeleton (the fetched tokens use Front / Spine too)');
   });
 
-  test('merge_alpha: the [alpha] texture as A, else the page\'s own alpha; the main RGB stays straight (never clamped to A)', { skip: spawnSync(PY, ['-c', 'import PIL']).status !== 0 && 'no Pillow' }, () => {
+  test('merge_alpha: the [alpha] texture as A with its premultiplied RGB taken back to straight; an own-alpha page is straight already', { skip: spawnSync(PY, ['-c', 'import PIL']).status !== 0 && 'no Pillow' }, () => {
     const out = py(`
 from PIL import Image
 rgb = Image.new('RGB', (2, 1)); rgb.putdata([(200, 100, 50), (90, 90, 90)])
@@ -132,8 +132,13 @@ alpha = Image.new('RGB', (2, 1)); alpha.putdata([(128, 128, 128), (255, 255, 255
 rgba = Image.new('RGBA', (2, 1)); rgba.putdata([(60, 200, 10, 100), (0, 0, 0, 0)])
 print(json.dumps({'split': list(e.merge_alpha(rgb, alpha).getdata()), 'own': list(e.merge_alpha(rgba, None).getdata()),
   'opaque': list(e.merge_alpha(rgb, None).getdata())}))`);
-    assert.deepEqual(out.split, [[200, 100, 50, 128], [90, 90, 90, 255]], 'A from the [alpha] texture, the main RGB as it is');
-    assert.deepEqual(out.own, [[60, 200, 10, 100], [0, 0, 0, 0]], 'an RGBA page keeps its own alpha and RGB (the newer tokens: _UseAlphaTex 0)');
+    // The client's split-alpha pages keep a *premultiplied* _MainTex (RGB = straight × A): the same art read from the
+    // 2048 own-alpha page of the same skin comes back at 3 %–25 % of its colour at faint alphas (744 split pages of
+    // 1475, no exception). Written out as-is, PIXI premultiplies it *again* on upload and every semi-transparent edge
+    // darkens — the 黑眼圈 of the 夏卉 skins. So A comes from the [alpha] texture and the RGB is divided back by it
+    // (clamped at 255: 100 × 255/128 = 199, 200 × 255/128 = 398 → 255).
+    assert.deepEqual(out.split, [[255, 199, 100, 128], [90, 90, 90, 255]], 'A from the [alpha] texture, the RGB unpremultiplied');
+    assert.deepEqual(out.own, [[60, 200, 10, 100], [0, 0, 0, 0]], 'an RGBA page keeps its own alpha and RGB (own-alpha: _UseAlphaTex 0, already straight)');
     assert.deepEqual(out.opaque, [[200, 100, 50, 255], [90, 90, 90, 255]], 'no alpha anywhere: opaque');
   });
 
