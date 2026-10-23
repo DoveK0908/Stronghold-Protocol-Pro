@@ -77,6 +77,21 @@ binding, safe file paths, Spine 3.8 animations, every atlas region, and complete
 Metadata declarations alone are not installed resources. Directory case aliases and camelCase basenames are preserved
 separately; the importer never lowercases or reconstructs a declared file stem.
 
+### 皮肤 Spine 页面必须从客户端重提取（直通 alpha）
+
+`tools/prepare-operator-skins.mjs` 的 PRTS 皮肤插件产物把页面写成了**预乘 alpha 并用 `min(RGB, A)` 钳制**过，钳掉的
+色阶不可逆：眼睛周围会留下暗圈（「黑眼圈」），事后无论剥 `pma:` 还是按 `RGB / (A/255)` 近似还原都补不回来。官方
+#668 已把提取器改成直通 alpha（本仓 `tools/local-extract/extract.py` 的 `merge_alpha()` / `normalize_atlas()` 同口径）。
+
+修法：用客户端 `skinpack/<charId>.ab` 里的战斗 prefab 重提取，一皮肤一份：
+
+    .venv-extract/Scripts/python.exe tools/local-extract/skinspines.py         --assets data/assets.json --out public/assets/skins         --skin-bundles "<…>/StreamingAssets/AB/Windows"         --skin-bundles "<…>/PersistentData/Bundles"         [--only char_249_mlyss_ambienceSynesthesia_6]
+
+它按 `dyn/battle/prefabs/skins/character/<charId>/<skinId>.prefab` 找 Front/Back 的 Spine 渲染器，写出
+`<skinId>/{front,back}/<skinId>.skel|.atlas|<skinId>.png`（页名与 atlas 首行统一成我们的皮肤 id），只覆盖 Spine
+三件套，不动 `portrait/illustration/avatar.png`。素材不进 git，改完要重启服务（`/assets/~<hash>/…` 会重算）并
+`Ctrl+Shift+R`；服务器用素材热修包替换 `app/public/assets/skins/**` 后重启。
+
 Some fashions (272 of the 979 atlas pages under `public/assets/skins`, as of 2026-10-22) ship **premultiplied** RGBA
 pages while their `.atlas` carries no `pma: true` line. `public/vendor/pixi-spine.js` only switches a page to
 `ALPHA_MODES.PMA` when the atlas says so, so such a page is multiplied twice and its dark edges (the eyes of
