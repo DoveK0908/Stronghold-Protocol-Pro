@@ -38,6 +38,11 @@ export function muzzleBones() { return boneNames('muzzle'); }
  * Where the weapon of a drawn unit is, in tiles from its feet (`x` along the screen's right with the facing applied,
  * `up` along the model), read off the live Spine pose at the attack clip's strike frame. Null when no model is drawn
  * (2D board, a unit without a skeleton, a harness) — the caller then keeps the old body-centred launch point.
+ *
+ * ⚠ Shots no longer use this: a model-space offset in tiles ignores the camera's scale and tilt at the shooter's depth,
+ * which is exactly why the old "one offset, computed once at fire time" version could sit off the weapon. The live
+ * path is `_launchOffsetLive` (canvas pixels, re-measured every frame); this stays exported because it is the public
+ * "where is the weapon, in tiles" query of the effect layer, and `test/render/fx-muzzle.test.js` pins it.
  */
 export function muzzleOffset(view) {
   if (!view || typeof view.boneOffset !== 'function') return null;
@@ -67,6 +72,72 @@ export class FxProjectiles {
     const p = this._proj(view.x, view.y, (view.z || 0) + (view.hover || 0), out);
     p.y -= (view._headTiles || 1.2) * frac * p.s;
     return p;
+  }
+
+  /**
+   * The barrel correction of one shot: how many canvas pixels the shot's own start point must be moved to sit on the
+   * shooter's weapon. Returns `this._launchO` (`{ dx, dy }`, always finite: anything that cannot be measured leaves 0).
+   * Read it at once — the scratch projection object `_launchB` is shared.
+   *
+   * The base is `pr.x0/y0/z0`, the very point `_shotPoint` projects at k = 0, so the measured delta puts the head
+   * EXACTLY on the weapon bone at launch and fades it out to 0 by the time the shot reaches the target.
+   *
+   * Why every frame, and why a screen delta instead of a world point:
+   *   · `UnitView.muzzlePoint()` is already canvas pixels (the model is an upright billboard with the camera's scale
+   *     and tilt baked in), so the correction is a plain subtraction in one space at the current camera;
+   *   · a delta frozen at fire time is only true for the camera of that frame — the shot then flies carrying a stale
+   *     offset, which is what left shots in the middle of the sprite once the view scrolled;
+   *   · ⚠ do NOT turn this into a `cam.unproject()` world point: solving a bone's canvas point back into world space
+   *     depends on conventions (which space `matrixWorld` is in, the y sign) that put effects in the world's
+   *     top-left corner. A same-space delta needs none of that.
+   *
+   * A model that is not drawn (no skeleton, still loading, a harness) has no muzzle point; the fallback `attack()`
+   * measured in tiles onto the record (`ox`/`oy`: the model's own bone offset, else the `±0.14` / `-0.36 × head`
+   * body-side guess) is applied instead — still through the camera's scale, so it behaves as it always did.
+   */
+  _launchOffsetLive(pr, out) {
+    out.dx = 0; out.dy = 0;
+    const src = pr.src;
+    if (!src || src.destroyed || src.alive === false) return out;
+    const base = this.ctx.cam().project(pr.x0, pr.y0, pr.z0, this._launchB);
+    if (!base) return out;
+    let mp = null;
+    try { if (typeof src.muzzlePoint === 'function') mp = src.muzzlePoint(); } catch { mp = null; }
+    let dx, dy;
+    if (mp && Number.isFinite(mp.x) && Number.isFinite(mp.y)) {
+      dx = mp.x - base.x; dy = mp.y - base.y;
+      pr.bone = mp.bone || null;
+    } else {
+      dx = (pr.ox || 0) * base.s; dy = (pr.oy || 0) * base.s;
+    }
+    // ⚠ a NaN here is not a visible error in PIXI, it is an effect drawn off-screen: give up on the correction instead
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return out;
+    out.dx = dx; out.dy = dy;
+    return out;
+  }
+
+  /**
+   * The same correction for ranged effects that have no projectile record (beams, 炎佑's fire jet): the caller passes
+   * the ALREADY PROJECTED point it is about to draw from (`_bodyPt` / `_chest`'s out object). Result in
+   * `this._viewMuzzleO` — `has` says whether the real bone was used — and it must be read at once, before the next
+   * projection reuses the caller's scratch object.
+   *
+   * ⚠ Take the drawn point, never re-project a world height for it: `_bodyPt` raises the point by a SCREEN lift
+   * (`p.y -= head * frac * p.s`), which is not `cam.project(x, y, bodyZ(...))` under a perspective camera — the two
+   * differ by tens of px away from the screen centre (≈48 px at the front rank, and the whole depth of the field at the
+   * far corner, measured), so a correction computed against the wrong base would put the flash that far off the weapon.
+   */
+  _viewMuzzleOffset(view, base) {
+    const o = this._viewMuzzleO || (this._viewMuzzleO = { dx: 0, dy: 0, has: false });
+    o.dx = 0; o.dy = 0; o.has = false;
+    if (!view || !base || !Number.isFinite(base.x) || !Number.isFinite(base.y)) return o;
+    let mp = null;
+    try { if (typeof view.muzzlePoint === 'function') mp = view.muzzlePoint(); } catch { mp = null; }
+    if (!mp || !Number.isFinite(mp.x) || !Number.isFinite(mp.y)) return o;
+    const dx = mp.x - base.x, dy = mp.y - base.y;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return o;
+    o.dx = dx; o.dy = dy; o.has = true;
+    return o;
   }
 
   // ---- projectiles -----------------------------------------------------------------------------------------
@@ -101,17 +172,19 @@ export class FxProjectiles {
     const look = spec.look;
     pr.kind = kind; pr.spec = spec; pr.src = src; pr.tgt = tgt; pr.rise = 0;
     pr.x0 = src.x + ux * hand; pr.y0 = src.y + uy * hand; pr.z0 = bodyZ(cam, src, SHOT_HEIGHT.launch);
-    // the shot leaves the weapon (the model's Muzzle bone as the attack clip poses it), not the middle of the sprite
+    // The shot leaves the weapon, not the middle of the sprite. While the model is drawn this is re-measured every
+    // frame from the live bone in canvas pixels (`_launchOffsetLive`); the tile offset below is only the fallback for a
+    // model that is not drawn yet (its Spine is still loading: spineReady false) or carries no muzzle bone.
     const mo = muzzleOffset(src);
     if (mo) { pr.ox = mo.x; pr.oy = -mo.up; }
     else {
-      // The model is not drawn yet (its Spine is still loading: spineReady false) or carries no muzzle bone. Firing
-      // from (0, 0) put the shot in the middle of the sprite; aim from the weapon side at chest height instead, which
-      // is where the fist/weapon sits on every operator's E0/E2 art.
+      // Firing from (0, 0) put the shot in the middle of the sprite; aim from the weapon side at chest height instead,
+      // which is where the fist/weapon sits on every operator's E0/E2 art.
       const head = Number.isFinite(src._headTiles) && src._headTiles > 0 ? src._headTiles : 1.2;
       pr.ox = ((src.visFacing ?? src.facing ?? 1) < 0 ? -1 : 1) * 0.14;
       pr.oy = -0.36 * head;
     }
+    pr.bone = null;
     pr.tx = tgt.x; pr.ty = tgt.y; pr.tz = look === 'shell' ? feetZ(tgt) : bodyZ(cam, tgt, SHOT_HEIGHT.aim);
     pr.t = 0; pr.fade = 0; pr.hit = false; pr.emit = Math.random(); pr.ang = Math.atan2(-uy, ux);   // ≈ on screen (rows run up)
     pr.dur = clamp(dist / projSpeed(kind) / this._ts(), 0.04, 1.5);
@@ -195,12 +268,22 @@ export class FxProjectiles {
     this.projs.length = w;
   }
 
-  /** Screen point of a straight / lobbed shot at flight fraction k (a parabola of height `arc` over the line). */
+  /**
+   * Screen point of a straight / lobbed shot at flight fraction k (a parabola of height `arc` over the line).
+   *
+   * The head starts on the shooter's weapon and is pulled back onto the plain flight line as it flies (`w = 1 - k`):
+   * at k = 0 the correction is the whole barrel offset, at k = 1 it is 0, so the shot still lands exactly on the target
+   * instead of arriving `0.14` tiles to the side. Boomerangs and shells do the same on their own paths.
+   */
   _shotPoint(pr, k, cam, out) {
     const x = pr.x0 + (pr.tx - pr.x0) * k, y = pr.y0 + (pr.ty - pr.y0) * k;
     const z = pr.z0 + (pr.tz - pr.z0) * k + (pr.arc ? pr.arc * 4 * k * (1 - k) : 0);
     const p = cam.project(x, y, z, out);
-    if (pr.ox || pr.oy) { p.x += pr.ox * p.s; p.y += pr.oy * p.s; }
+    const w = 1 - k;
+    if (w > 0) {
+      const o = this._launchOffsetLive(pr, this._launchO);
+      if (o.dx || o.dy) { p.x += o.dx * w; p.y += o.dy * w; }
+    }
     return p;
   }
 
@@ -370,8 +453,13 @@ export class FxProjectiles {
     }
     const p = cam.project(x, y, z, this._p);
     const q = cam.project(x, y, zq, this._q);
-    // the shell climbs out of the barrel, not out of the middle of the sprite
-    if (k < pr.rise && (pr.ox || pr.oy)) { p.x += pr.ox * p.s; p.y += pr.oy * p.s; q.x += pr.ox * q.s; q.y += pr.oy * q.s; }
+    // the shell climbs out of the barrel, not out of the middle of the sprite — and the correction is spent by the time
+    // the rise ends, so a shell already on its way down is drawn where it really is
+    if (k < pr.rise) {
+      const o = this._launchOffsetLive(pr, this._launchO || (this._launchO = { dx: 0, dy: 0 }));
+      const w = 1 - k / pr.rise;
+      if (o.dx || o.dy) { p.x += o.dx * w; p.y += o.dy * w; q.x += o.dx * w; q.y += o.dy * w; }
+    }
     const s = p.s, px = p.x, py = p.y;
     const seg = Math.hypot(px - q.x, py - q.y);
     if (seg > 0.5) pr.ang = Math.atan2(py - q.y, px - q.x);
@@ -485,6 +573,10 @@ export class FxProjectiles {
     if (src && this.rich) {
       // the shot leaves her upwards: a muzzle flash and a streak climbing out of sight
       const p = this._bodyPt(src, SHOT_HEIGHT.launch, this._g);
+      // the flash sits on her weapon, not on the estimated launch point: same correction as a beam's. The base is `p`,
+      // the point drawn — its screen lift is not the same as projecting a world height through a perspective camera.
+      const mo = this._viewMuzzleOffset(src, p);
+      if (mo.has) { p.x += mo.dx; p.y += mo.dy; }
       const s = p.s;
       this.particle('muzzle', p.x, p.y, { tint: 0xffc27a, life: 0.1, s0: (s / 64) * 0.6, s1: (s / 64) * 0.8, a0: 1, a1: 0, rot: -Math.PI / 2, anchorX: 0.19 });
       this.particle('glow', p.x, p.y, { tint: 0xffb35c, life: 0.14, s0: (s / 128) * 0.5, s1: (s / 128) * 0.9, a0: 0.9, a1: 0 });

@@ -147,6 +147,14 @@ export function syncView(v, s, t) {
 /** World step (x = col, y = row) of a direction. */
 export const DIR_STEP = Object.freeze({ UP: [0, 1], RIGHT: [1, 0], DOWN: [0, -1], LEFT: [-1, 0] });
 const nowMs = () => (globalThis.performance ? globalThis.performance.now() : Date.now());
+/**
+ * How long a measured muzzle point stays usable (ms). Once the impostor parks a unit's Spine in its atlas the display's
+ * transform is the atlas' space, not the unit's, so the point cannot be solved there any more (see
+ * `UnitView.muzzlePoint`): the last good measurement is reused for this long. Deliberately long — a standing unit's
+ * muzzle hardly moves, and a one-frame-stale point on the weapon reads far better than the body-centred guess it
+ * replaces; what it must not do is carry a point over from the previous battle or deployment. 1 s is enough for both.
+ */
+export const MUZZLE_CACHE_MS = 1000;
 /** Units with no art in the game data drawn as an ice diamond: 圣聆初雪 S2's frozen protection point (保护目标（冻结状态）, PRTS
  *  无头像; data/assets.json has no avatar or model for it, so the token fallback showed 圣聆初雪's own face) — the marker of a
  *  frozen gate. */
@@ -783,6 +791,11 @@ export class UnitView {
     this.body.addChild(this.fallback);
     this.actor = null;
     this.spineReady = false;
+    // Muzzle-bone lookup state (muzzlePoint / _muzzleBone below): the bone name found for the CURRENT skeleton
+    // (`undefined` = not looked up yet, `''` = this skeleton has none) and the last solved canvas point. The skeleton
+    // changes on a Front ⇄ Back swap / a skin change, so both are reset where the actor is replaced (_acquireSpine).
+    this._muzzleName = undefined;
+    this._muzzleCache = null;
     this._modelDirty = false;            // died / stood up since the last frame: update() checks Front ⇄ Back (_syncModel)
     this._pendingDeployElapsed = null;  // elapsed game seconds until a late model can continue Start
     this._landUntil = 0;                 // a prep landing (land) owns the Start clip until then (ms, performance clock)
@@ -998,6 +1011,11 @@ export class UnitView {
       if (swap) this._dropActor();
       this.actor = actor;
       this._actorEntry = entry;
+      // The muzzle-bone lookup is cached per skeleton. A Front ⇄ Back swap, a knocked-out / stood-up model or a skin
+      // change brings DIFFERENT bones under the same names: an old name would either not be found (the shot falls back
+      // to the body) or, worse, find an unrelated bone of the same name and put the flash somewhere else entirely.
+      this._muzzleName = undefined;
+      this._muzzleCache = null;
       this.baseTint = (!entry.local && ALIAS_TINT[id]) || 0xffffff;   // the web alias of a local-only model
       this.body.addChild(this.actor.spine);
       this.spineReady = true;
@@ -1349,6 +1367,144 @@ export class UnitView {
     out.angle = m ? Math.atan2(-m.b, m.a) * (180 / Math.PI) : (typeof b.getWorldRotationX === 'function' ? -b.getWorldRotationX() : 0);
     out.flip = flip;
     return out;
+  }
+
+  /**
+   * Where the weapon of this unit is on the CANVAS right now — `{ x, y, bone }` in stage pixels, the point a
+   * procedural shot or a beam must start from — or null when no model is drawn (2D board, a unit without a skeleton,
+   * a harness): the caller then keeps its body-centred launch point.
+   *
+   * Why canvas pixels rather than tiles: the muzzle point is the bone's position in the drawn model, and the model is
+   * an upright screen billboard with the camera's scale and tilt already baked in. Solving it once, in the same
+   * space as `cam.project` of the shooter's feet, is what makes the per-frame screen offset in fx/projectiles.js
+   * (`_launchOffsetLive`) a plain subtraction — no unprojection, no assumptions about which space a bone's
+   * `matrixWorld` lives in.
+   *
+   * Two things must be read exactly as the runtime poses them:
+   *   · the pose: a shared walk image advances the clip without posing the hidden live skeleton, so the bone is read
+   *     from the same pose the model draws (`bonePose`, as `boneOffset` does);
+   *   · the transform: `worldX/worldY`/`matrix.tx/ty` are SKELETON space, and the skeleton's own scale is already
+   *     inside them — multiplying by `skeleton.scaleX/scaleY` again counts it twice.
+   */
+  muzzlePoint() {
+    const a = this.actor;
+    const sp = a && a.spine ? a.spine : null;
+    const sk = sp ? sp.skeleton : null;
+    if (!sk) return null;
+    // A parked Spine (the impostor takes it out of `body` into its atlas) has the ATLAS container's transform, not the
+    // unit's, so `toGlobal` cannot be used on it: the pose is solved in the model's own coordinates and re-applied
+    // through this unit's transforms instead (see the branch below). Getting a null here would push the whole unit onto
+    // the body-centred guess, and the impostor threshold is trivially hit — every unit of a crowded field, and every
+    // unit of a headless run.
+    const direct = !!sp.parent && (!this.body || sp.parent === this.body);
+    const bone = this._muzzleBone(sk);
+    if (!bone) return null;
+    const posed = (!a._applied && !a.frozen) ? (bonePose(sp, bone) || bone) : bone;
+    // the name lives on `bone.data.name` (the bone object has no `.name` of its own in this runtime)
+    const name = String((posed.data && posed.data.name) || this._muzzleName || '');
+    let mx = NaN, my = NaN;
+    if (Number.isFinite(posed.worldX) && Number.isFinite(posed.worldY)) { mx = posed.worldX; my = posed.worldY; }
+    else if (posed.matrix && Number.isFinite(posed.matrix.tx) && Number.isFinite(posed.matrix.ty)) { mx = posed.matrix.tx; my = posed.matrix.ty; }
+    if (!direct) {
+      // Parked in the impostor atlas: `sp.toGlobal` would run through the ATLAS container, which has nothing to do with
+      // where this unit stands, so it is useless here. What is still sound is the bone's own position — `worldX/worldY`
+      // is SKELETON space, posed by the same `actor.update` that drew the parked image — and the scale the image was
+      // drawn at (`imp.cur`, the `sc` of this frame's update). `Atlas.draw` puts the model into the slot with scale `sc`
+      // and the sprite's anchor on the slot's model origin, so a bone lands at `flip*sc*mx, sc*modelKY*my` in the BODY's
+      // own coordinates: the same numbers the pre-rendered image shows, every frame. (Solving it through the parked
+      // container instead yields the atlas-space point — hundreds of px off — and returning null pushes the whole crowd
+      // onto the body-centred guess, which is the bug this exists to fix. The impostor threshold is trivially hit: every
+      // unit of a crowded field, and every unit of a headless run.)
+      const imp = this.imp;
+      const sc = imp ? (Number.isFinite(imp.cur) ? imp.cur : imp.sc) : 0;
+      if (imp && sc > 0 && Number.isFinite(mx) && Number.isFinite(my) && this.body && typeof this.body.toGlobal === 'function') {
+        const flip = this.modelFlip();
+        let g = null;
+        try { g = this.body.toGlobal({ x: flip * sc * mx, y: sc * this.modelKY * my }); } catch { /* a test double */ }
+        if (g && Number.isFinite(g.x) && Number.isFinite(g.y)) {
+          this._muzzleCache = { x: g.x, y: g.y, bone: name, t: nowMs() };
+          return { x: g.x, y: g.y, bone: name };
+        }
+      }
+      // no usable atlas state (a clip too large for the slot is bypassing it, or no body yet): the last measurement is
+      // still where the player sees the weapon for a moment — but only for MUZZLE_CACHE_MS, because the camera and the
+      // unit keep moving and a stale canvas point would drift off the model.
+      const c = this._muzzleCache;
+      return c && nowMs() - c.t <= MUZZLE_CACHE_MS ? { x: c.x, y: c.y, bone: c.bone } : null;
+    }
+    // skeleton space → canvas: toGlobal refreshes the parent chain even for a skeleton the compositor did not walk
+    let gp = null;
+    if (typeof sp.toGlobal === 'function') { try { gp = sp.toGlobal({ x: mx, y: my }); } catch { /* a test double */ } }
+    const wt = sp.worldTransform;
+    let wx, wy;
+    if (gp && Number.isFinite(gp.x) && Number.isFinite(gp.y)) { wx = gp.x; wy = gp.y; }
+    else if (wt && Number.isFinite(wt.a) && Number.isFinite(wt.tx) && Number.isFinite(wt.ty)) {
+      wx = wt.a * mx + (Number.isFinite(wt.c) ? wt.c * my : 0) + wt.tx;
+      wy = (Number.isFinite(wt.b) ? wt.b * mx : 0) + (Number.isFinite(wt.d) ? wt.d * my : my) + wt.ty;
+    } else {
+      wx = mx * sp.scale.x + sp.position.x;
+      wy = my * sp.scale.y + sp.position.y;
+    }
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) return null;
+    this._muzzleCache = { x: wx, y: wy, bone: name, t: nowMs() };
+    return { x: wx, y: wy, bone: name };
+  }
+
+  /**
+   * The bone a shot leaves this model from, cached in `_muzzleName` (the skeleton's bone set never changes).
+   *
+   * Two passes, in this order because a weapon's own marker is the most reliable answer:
+   *   1. any bone whose NAME matches /muzzle/i, scanned over `sk.bones` — a muzzle bone is often a bare marker bone
+   *      with no slot at all (隐现 / 惊蛰 / 普罗旺斯 all carry `F_Muzzle` with no slot), so a slot-only scan can never
+   *      find it and falls back to the weapon's grip point instead. Front and back skeletons usually both have one:
+   *      the `F_` / `B_` prefix seen on the visible slots picks the drawn set.
+   *   2. by slot keyword. `gun` first (隐现's `C_Gun_W_Hand3` beats `F_T_R_Hand3`), then the other weapon names, then
+   *      staffs (an 术师 / 辅助 casts from the staff head, which is closer to the real launch point than the hand) and
+   *      `hand` last: it is everywhere, so it must never win over a weapon node.
+   */
+  _muzzleBone(sk) {
+    if (this._muzzleName !== undefined) {
+      if (!this._muzzleName) return null;
+      try { return typeof sk.findBone === 'function' ? sk.findBone(this._muzzleName) : boneOf(sk, this._muzzleName); } catch { return null; }
+    }
+    const muzzleBones = [];
+    for (const b of sk.bones || []) {
+      const nm = String((b.data && b.data.name) || '');
+      if (nm && /muzzle/i.test(nm)) muzzleBones.push({ bone: b, nm });
+    }
+    if (muzzleBones.length) {
+      // Front and back sets share the name: the set whose `F_` / `B_` prefix the visible slots use is the one drawn
+      let prefix = '';
+      for (const s of sk.slots || []) {
+        if (!s || !s.bone) continue;
+        if (s.color && s.color.a === 0) continue;
+        const m = /^([FB])_/i.exec(String((s.data && s.data.name) || ''));
+        if (m) { prefix = m[1].toUpperCase(); break; }
+      }
+      const pick = (want) => muzzleBones.find((x) => x.nm.toUpperCase().startsWith(want));
+      const b = (prefix && pick(prefix + '_')) || muzzleBones[0];
+      this._muzzleName = b.nm;
+      return b.bone;
+    }
+    const KEYS = ['muzzle', 'gun', 'weapon', 'bow', 'arrow', 'staff', 'wand', 'rod', 'cane', 'hand'];
+    let best = '', bestScore = 1e9;
+    for (const slot of sk.slots || []) {
+      const bn = slot && slot.bone;
+      if (!bn) continue;
+      // a transparent slot draws nothing: posing a bone of it puts the flash where the model has no weapon at all
+      if (slot.color && slot.color.a === 0) continue;
+      const nm = String((bn.data && bn.data.name) || '');
+      if (!nm) continue;
+      const low = nm.toLowerCase();
+      const rank = KEYS.findIndex((k) => low.includes(k));
+      if (rank < 0) continue;
+      // both the front and the back set match; the lower score wins — earlier keyword (×10), the drawn `F_` set (−3)
+      const score = rank * 10 - (/^f_/i.test(nm) ? 3 : 0);
+      if (score < bestScore) { bestScore = score; best = nm; }
+    }
+    this._muzzleName = best;
+    if (!best) return null;
+    try { return typeof sk.findBone === 'function' ? sk.findBone(best) : boneOf(sk, best); } catch { return null; }
   }
 
   /**
@@ -2355,6 +2511,9 @@ export class UnitView {
       return;
     }
     if (imp.bypass) this._impBypass(false);
+    // the scale this frame's slot image is drawn at — muzzlePoint solves the parked weapon with it (Spine atlases keep
+    // the skeleton outside the unit's transform: `sc` is the only link left to where the model shows)
+    imp.cur = sc;
     imp.acc += animDt;
     const frame = this.ctx.frameNo ? this.ctx.frameNo() : 0;
     // the view's slot in this frame's update order (app.js impostorSlot) spreads the refreshes evenly over the interval;

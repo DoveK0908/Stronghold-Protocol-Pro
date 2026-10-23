@@ -27,7 +27,16 @@ export class FxBeams {
       bm.t += dt;
       if (bm.t >= bm.dur || !bm.a || !bm.b) continue;
       // a chain bounce leaves the previous target where the shot met it (its chest), a beam leaves the shooter's hands
-      this._bodyPt(bm.a, bm.chain ? SHOT_HEIGHT.aim : SHOT_HEIGHT.launch, p); const px = p.x, py = p.y, s = p.s;
+      this._bodyPt(bm.a, bm.chain ? SHOT_HEIGHT.aim : SHOT_HEIGHT.launch, p);
+      // …and a beam that is not a bounce leaves the shooter's WEAPON: the chest-height estimate above is only the base
+      // point, corrected to the muzzle bone in canvas pixels (a caster's staff, a sniper's barrel). The base is `p`
+      // itself — the exact point that gets drawn — because the screen lift `_bodyPt` applied is not re-derivable from a
+      // world height. Read `o` at once: `p`/`q` are copied out right after.
+      if (!bm.chain) {
+        const o = this._viewMuzzleOffset(bm.a, p);
+        if (o.has) { p.x += o.dx; p.y += o.dy; }
+      }
+      const px = p.x, py = p.y, s = p.s;
       this._bodyPt(bm.b, SHOT_HEIGHT.aim, q);
       const k = 1 - bm.t / bm.dur;
       const segs = 7;
@@ -130,6 +139,11 @@ export class FxBeams {
       // the jet: from the dragon's chest onto the target (its chest; the disc centre without a target view)
       if (sv) {
         this._chest(sv, m);
+        // the breath leaves the dragon's mouth/weapon, not its chest centre — the same canvas-pixel correction a beam
+        // gets (`has` false for a view without a skeleton, and then `m` is the old chest point); the base is `m`, the
+        // point actually drawn, not a re-projection of its world height
+        const mo = this._viewMuzzleOffset(sv, m);
+        if (mo.has) { m.x += mo.dx; m.y += mo.dy; }
         const mx = m.x, my = m.y;
         if (tv && tv.alive !== false) this._chest(tv, q); else { q.x = cx; q.y = cy - s * 0.15; }
         const tx = q.x, ty = q.y;

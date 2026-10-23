@@ -77,6 +77,11 @@ export class FxSystem {
     this._p = { x: 0, y: 0, s: 0, depth: 0 };
     this._q = { x: 0, y: 0, s: 0, depth: 0 };
     this._g = { x: 0, y: 0, s: 0, depth: 0 };
+    // scratch for the muzzle correction (fx/projectiles.js): the projected base of a shot, the canvas-pixel delta
+    // of a projectile, and the same delta for a beam/jet (reused so a per-frame measurement allocates nothing)
+    this._launchB = { x: 0, y: 0, s: 0, depth: 0 };
+    this._launchO = { dx: 0, dy: 0 };
+    this._viewMuzzleO = { dx: 0, dy: 0, has: false };
   }
 
   /** Remove everything (battle reset). */
@@ -166,7 +171,7 @@ export class FxSystem {
 }
 
 const FX_PARTS = [FxParticles, FxProjectiles, FxNotes, FxBeams, FxLocks, FxNumbers, FxRings, FxArrivals, FxSim, FxZones];
-const FX_METHOD_ORDER = ["quality","load","maxParticles","rich","_room","_ts","_groundZ","particle","_o","_freeParticle","_updateParticles","_proj","_onGround","_chest","_bodyPt","burst","attack","_takeProj","_dressProj","_releaseProj","_updateProjs","syncNotes","_takeNote","_freeNote","_noteFired","_noteOwner","_noteGone","_noteZ","_updateNotes","_shotPoint","_stepShot","_stepBoomerang","_stepMortar","_mote","_puff","_muzzle","_impact","_catch","mortar","_landed","_beam","_updateBeams","_flame","_freeFlame","_updateFlames","_lock","_touchLocks","_nearestLock","_releaseLock","_freeLock","_updateLocks","damage","_slash","heal","officialNumber","number","_growFits","_numSlotPx","_layoutNums","_layoutNumsOnce","_sizeNum","_fadeNum","_takeNum","_releaseNum","_updateNums","ring","_updateRings","skill","_aura","_updateAuras","deploy","promote","death","crateBreak","_viewOf","_where","_point","simFx","explosion","smoke","streak","strike","numberAt","_updateLabels","zone","_freeZone","_updateZones","tileFlash","_updateTileFlashes","flashScreen","snowfall","leak","pop","_updatePops"];
+const FX_METHOD_ORDER = ["quality","load","maxParticles","rich","_room","_ts","_groundZ","particle","_o","_freeParticle","_updateParticles","_proj","_onGround","_chest","_bodyPt","_launchOffsetLive","_viewMuzzleOffset","burst","attack","_takeProj","_dressProj","_releaseProj","_updateProjs","syncNotes","_takeNote","_freeNote","_noteFired","_noteOwner","_noteGone","_noteZ","_updateNotes","_shotPoint","_stepShot","_stepBoomerang","_stepMortar","_mote","_puff","_muzzle","_impact","_catch","mortar","_landed","_beam","_updateBeams","_flame","_freeFlame","_updateFlames","_lock","_touchLocks","_nearestLock","_releaseLock","_freeLock","_updateLocks","damage","_slash","heal","officialNumber","number","_growFits","_numSlotPx","_layoutNums","_layoutNumsOnce","_sizeNum","_fadeNum","_takeNum","_releaseNum","_updateNums","ring","_updateRings","skill","_aura","_updateAuras","deploy","promote","death","crateBreak","_viewOf","_where","_point","simFx","explosion","smoke","streak","strike","numberAt","_updateLabels","zone","_freeZone","_updateZones","tileFlash","_updateTileFlashes","flashScreen","snowfall","leak","pop","_updatePops"];
 
 for (const key of FX_METHOD_ORDER) {
   let found = null;
