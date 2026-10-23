@@ -657,23 +657,56 @@ def _text_bytes(text_asset):
 
 
 def merge_alpha(rgb, alpha):
-    """Straight RGBA page: the main texture's RGB unchanged, A from its [alpha] texture (the split pages:
-    _UseAlphaTex 1), else the main texture's own alpha (the newer RGBA pages: _UseAlphaTex 0). The client's Spine pages
-    are straight: the local-client skin pages (char_249_mlyss_ambienceSynesthesia_6: 16.3% of the semi-transparent
-    pixels have max(RGB) > A, which premultiplied data cannot) and the two enemy pages (119/116 of ~10.7k); the
-    downloaded pages are straight too. The extractor writes them as they are and the atlas carries no `pma`: PIXI
-    premultiplies once on upload. A page that really were premultiplied would need RGB / (A / 255) here when A > 0
-    (unpremultiply; RGB × A is the straight-to-premultiplied direction), or `pma: true` in the atlas — the old
-    extractor's `min(RGB, A)` clamp did neither, which darkened the semi-transparent art."""
+    """Straight RGBA page: A from the page's own alpha (the RGBA pages: _UseAlphaTex 0) or from its [alpha] texture (the
+    split pages: _UseAlphaTex 1), and RGB straight either way — a split page's RGB is premultiplied in the client and is
+    divided by A here (see below).
+
+    The two kinds of page differ in how the client stores their colour, measured on the shipped bundles:
+
+    * own-alpha pages (_UseAlphaTex 0) are straight; they carry real colour under their soft edges (a half-transparent
+      pixel is lighter than 0.5 × A, which premultiplied data cannot be).
+    * split-alpha pages (_UseAlphaTex 1) are premultiplied: the art under an edge is already RGB × A. Compared against
+      the full-resolution art of the same drawing (char_291_aglina_summer#5: the 2048 page is own-alpha), the 512
+      page's RGB sits at 3 %–25 % of the artwork wherever A < 192 — A/255 × the art, i.e. premultiplied. All 744 split
+      pages of the 426 skin bundles behave this way; none is straight.
+
+    Writing a premultiplied page out unchanged darkens it: PIXI premultiplies once more on upload (the atlas carries no
+    `pma`, and pixi-spine 4.0.6 never sets `alphaMode` from the atlas text), so every soft edge is multiplied by A
+    twice. That is the 黑眼圈 of 安洁莉娜's 夏卉 page (its eyes are soft-alpha art) while 缪尔赛思 stayed clean (her
+    pages are own-alpha, straight). Dividing by A restores the straight colour the renderer expects.
+
+    The old extractor's `min(RGB, A)` clamp did neither direction — it darkened the straight pages too."""
     from PIL import Image
     r, g, b = rgb.convert('RGB').split()
     if alpha is not None:
         a = alpha.convert('L').resize(rgb.size)
+        r, g, b = _unpremultiply(r, g, b, a)
     elif rgb.mode in ('RGBA', 'LA', 'PA') or 'transparency' in rgb.info:
         a = rgb.convert('RGBA').getchannel('A')
     else:
         a = Image.new('L', rgb.size, 255)
     return Image.merge('RGBA', (r, g, b, a))
+
+
+def _unpremultiply(r, g, b, a):
+    """RGB / (A / 255) for a premultiplied page: fully opaque pixels are unchanged, a fully transparent one becomes
+    black (its colour is gone and nothing draws it), everything between is scaled back up and clamped at 255."""
+    from PIL import Image
+    al = a.load()
+    out = []
+    for ch in (r, g, b):
+        src = ch.load()
+        dst = Image.new('L', ch.size)
+        dp = dst.load()
+        w, h = ch.size
+        lut = [min(255, round(v * 255 / av)) if av else 0 for av in range(256) for v in range(256)]
+        for y in range(h):
+            for x in range(w):
+                av = al[x, y]
+                v = src[x, y]
+                dp[x, y] = v if av == 255 else (lut[av * 256 + v] if av else 0)
+        out.append(dst)
+    return tuple(out)
 
 
 def _is_page_line(lines, i):

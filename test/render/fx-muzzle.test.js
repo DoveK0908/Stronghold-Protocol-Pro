@@ -4,7 +4,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { muzzleOffset } from '../../public/js/render/fx/projectiles.js';
+import { muzzleOffset, muzzleBones } from '../../public/js/render/fx/projectiles.js';
+import { boneNames } from '../../public/js/render/vfx/mounts.js';
 
 test('muzzleOffset reads the Muzzle bone of the drawn model, at the strike frame', () => {
   const calls = [];
@@ -19,7 +20,20 @@ test('muzzleOffset reads the Muzzle bone of the drawn model, at the strike frame
   assert.deepEqual(o, { x: 0.21, up: 0.55, angle: 0, flip: 1 });
   assert.equal(calls.length, 1);
   assert.equal(calls[0].strike, true, 'posed at the attack clip strike frame');
-  assert.deepEqual(calls[0].names, ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle'], 'bare and front/back-prefixed bone names (mounts.js POINT_NAMES plus the F_/B_ prefixes)');
+  assert.deepEqual(calls[0].names, boneNames('muzzle'), 'the very same candidate list the official-effect layer uses (render/vfx/mounts.js)');
+});
+
+test('the weapon bones of the official-effect layer are what the procedural shots look for too', () => {
+  const names = boneNames('muzzle');
+  // The two lists had drifted apart: mounts.js grew `OriginMuzzle` / `Gun` / `Weapon` / the hands and the fuzzy name
+  // patterns (伊内丝's `F_OriginMuzzle`, 德克萨斯's `F_Gun`), while this path still tried the bare `Muzzle` names only —
+  // so those operators kept shooting from the middle of the sprite.
+  for (const n of ['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'OriginMuzzle', 'F_OriginMuzzle', 'Gun', 'F_Gun', 'Weapon', 'HandHold', 'R_Hand', 'L_Hand']) {
+    assert.ok(names.includes(n), `${n} is tried`);
+  }
+  assert.ok(names.some((n) => n instanceof RegExp && n.test('F_GunPoint')), 'a weapon bone named off-pattern still matches');
+  assert.ok(!names.some((n) => n instanceof RegExp && n.test('HeadPoint')), 'the muzzle patterns do not swallow the head bone');
+  assert.equal(muzzleBones().length, names.length, 'muzzleBones() is that list, not a copy that can drift again');
 });
 
 test('muzzleOffset is null without a model / a bone / finite numbers', () => {

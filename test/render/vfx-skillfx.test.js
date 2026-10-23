@@ -280,6 +280,22 @@ describe('skill events', () => {
     w.skill(u, false);
     assert.deepEqual(spawned, []);
   });
+
+  // (伊内丝: fielded with 淬影突袭 S1 she still played 暗夜无明 S2's lasting loops — a unit's record is resolved once
+  // per battle id and the id is reused by the next fight, so the previous skill's plan outlived its unit)
+  test('a battle id that answers another skill drops the old record: its loops stop, the new plan plays', async () => {
+    const { w, handles, view, frame } = await setup();
+    const first = view(1, 'char_100_foo', 5, { skill: 0 });   // skchr_foo_1: a lasting buff loop
+    frame();
+    w.skill(first, true);
+    assert.equal(live(handles, 'foo_s1_buff').length, 1);
+    // the next fight: the same battle id, another skill (no field reset — the view is rebuilt under it)
+    const second = view(1, 'char_100_foo', 5, { skill: 1 });   // skchr_foo_2: no loop of its own
+    frame();
+    assert.equal(live(handles, 'foo_s1_buff').length, 0, 'the previous skill\'s loop is gone');
+    assert.equal(w.skill(second, true), true);
+    assert.equal(live(handles, 'foo_s1_buff').length, 0, 'and it does not come back with the new skill');
+  });
 });
 
 describe('attacks while the skill is on', () => {

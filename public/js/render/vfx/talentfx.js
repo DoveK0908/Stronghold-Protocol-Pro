@@ -42,6 +42,8 @@ const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
 const LAYER_EVENTS = new Set(['ON_BUFF_START', 'ON_BUFF_TRIGGER']);
 
 const idOf = (v) => v?.info?.id ?? v?.id;
+/** The equipped skill index of a view (talents.js skillIndexOf: a 自选 pick's, else its own); null when it says nothing. */
+const skillOf = (v) => (Number.isInteger(v?.info?.diy?.skillIndex) ? v.info.diy.skillIndex : Number.isInteger(v?.info?.skillIndex) ? v.info.skillIndex : null);
 const uniq = (list) => { const seen = new Set(); return list.filter((e) => { const k = `${e.key}|${e.at}|${e.hold}`; if (seen.has(k)) return false; seen.add(k); return true; }); };
 /** A use carried by a reborn talent's own buffs (`RebornTalent._buffs`): it plays after the stand-up. */
 const isPost = (e) => /^\w*RebornTalent\._buffs\b/.test(e.from || '');
@@ -62,12 +64,22 @@ export class TalentFx {
 
   // ---- resolution -------------------------------------------------------------------------------------------------
 
-  /** The record of a battle unit, or null when none of its talents or abilities can play. */
+  /**
+   * The record of a battle unit, or null when none of its talents or abilities can play. The bindings depend on the
+   * equipped skill (`talentBindings` keeps the nodes valid with it), and a battle id outlives one fight, so a record
+   * whose skill changed is dropped and resolved again (the same rule as SkillFx.of — a stale one kept a skill's
+   * talent loops running after the unit was fielded with another skill).
+   */
   of(v) {
     if (!v || !this.w.idx) return null;
     const id = idOf(v);
     if (id == null) return null;
     let U = this.units.get(id);
+    if (U && U.skillIndex !== skillOf(v)) {
+      this._stopAll(U);
+      U = undefined;
+      this.units.delete(id);
+    }
     if (U === undefined) {
       U = null;
       const info = v.info || null;
@@ -80,7 +92,7 @@ export class TalentFx {
         const binds = all.filter((b) => (bindable(b).ok || b.when === 'attack') && !this.w.funnels?.owns(key, b));
         if (binds.length) {
           U = {
-            id, key, v, binds, rec, standing: false, born: false,
+            id, key, v, binds, rec, skillIndex: skillOf(v), standing: false, born: false,
             loops: new Map(),   // `${key}|${at}` → { h, e }
             act: new Map(),     // binding id → on last frame
             mem: new Map(),     // binding id → toggle memory

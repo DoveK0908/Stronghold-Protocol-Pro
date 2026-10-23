@@ -77,13 +77,10 @@ binding, safe file paths, Spine 3.8 animations, every atlas region, and complete
 Metadata declarations alone are not installed resources. Directory case aliases and camelCase basenames are preserved
 separately; the importer never lowercases or reconstructs a declared file stem.
 
-### 皮肤 Spine 页面必须从客户端重提取（直通 alpha）
+### 皮肤 Spine 页面必须从客户端重提取（拆页要反预乘）
 
-`tools/prepare-operator-skins.mjs` 的 PRTS 皮肤插件产物把页面写成了**预乘 alpha 并用 `min(RGB, A)` 钳制**过，钳掉的
-色阶不可逆：眼睛周围会留下暗圈（「黑眼圈」），事后无论剥 `pma:` 还是按 `RGB / (A/255)` 近似还原都补不回来。官方
-#668 已把提取器改成直通 alpha（本仓 `tools/local-extract/extract.py` 的 `merge_alpha()` / `normalize_atlas()` 同口径）。
-
-修法：用客户端 `skinpack/<charId>.ab` 里的战斗 prefab 重提取，一皮肤一份：
+2026-10-23 前，皮肤页是 PRTS 皮肤插件产物：旧提取器写了**预乘 alpha 并用 `min(RGB, A)` 钳制**过的页面，钳掉的色阶
+不可逆，眼睛周围留下暗圈（「黑眼圈」）。修法是从客户端 `skinpack/<charId>.ab` 重提取，一皮肤一份：
 
     .venv-extract/Scripts/python.exe tools/local-extract/skinspines.py         --assets data/assets.json --out public/assets/skins         --skin-bundles "<…>/StreamingAssets/AB/Windows"         --skin-bundles "<…>/PersistentData/Bundles"         [--only char_249_mlyss_ambienceSynesthesia_6]
 
@@ -92,15 +89,35 @@ separately; the importer never lowercases or reconstructs a declared file stem.
 三件套，不动 `portrait/illustration/avatar.png`。素材不进 git，改完要重启服务（`/assets/~<hash>/…` 会重算）并
 `Ctrl+Shift+R`；服务器用素材热修包替换 `app/public/assets/skins/**` 后重启。
 
-Some fashions (272 of the 979 atlas pages under `public/assets/skins`, as of 2026-10-22) ship **premultiplied** RGBA
-pages while their `.atlas` carries no `pma: true` line. `public/vendor/pixi-spine.js` only switches a page to
-`ALPHA_MODES.PMA` when the atlas says so, so such a page is multiplied twice and its dark edges (the eyes of
-缪尔赛思's fashions, for one) turn into black rings. `node tools/mark-skin-pma.mjs` samples every page (straight alpha
-has pixels whose colour exceeds the alpha; premultiplied pages have none), reports which atlases lack the marker, and
-`--write` appends `pma: true` without touching the pixels. Run it after re-extracting skins, operators or token models:
-`node tools/mark-skin-pma.mjs --write
+#### 两类页面的 alpha 语义不同（`merge_alpha` 的判据）
 
-页面如果是从 PRTS（旧提取器的 `min(RGB, A)` 钳制产物）下载的，RGB 已被压暗、宽白处发灰（皮肤「黑眼圈」的来源）；`node tools/unpremultiply-pages.mjs --write public/assets/skins` 会把它们按 `RGB / (A/255)` 近似还原成直通 alpha 并删掉 atlas 里的 `pma:` 行（钳制不可逆，只能近似）。官方 PR #668 的口径是：提取器直接写直通页、atlas 不写 pma。`（幂等，只补不删；`spine/op` 与 `spine/token` 目前都是直通 alpha，不需要标记）。
+客户端皮肤 Spine 的材质分两种，`tools/local-extract/extract.py` 的 `merge_alpha()` 对它们必须区别对待：
+
+* **own-alpha 页**（材质 `_UseAlphaTex: 0.0`，没有 `[alpha]` 贴图）：RGB 是直通色，A 取页自己的 alpha，原样写出。
+* **split-alpha 页**（`_UseAlphaTex: 1.0`，另有 `<tex>[alpha]` 灰度图）：**RGB 在客户端里已经是 RGB × A**。实测
+  `char_291_aglina_summer#5` 的 512 页与同图 2048 own-alpha 版对比，A < 192 处的 RGB 只有原画的 3 %–25 %，正是
+  A/255 × 原画；426 个皮肤包里的 744 个拆页页**无一例外**。这种页必须 `RGB / (A/255)` 反预乘后写出。
+
+写错方向的后果：PIXI 上传时会预乘一次，预乘数据再被乘一次 alpha，所有软边被压暗两次 —— 眼睛、睫毛这些半透明
+重灾区就成了「黑眼圈」。缪尔赛思的皮肤页恰好都是 own-alpha（直通）所以一直正常，安洁莉娜的夏卉是 split-alpha
+（预乘）所以坏得最明显。
+
+**`pma: true` 不是解**：`public/vendor/pixi-spine.js`（4.0.6）在 `PIXI.Assets` 这条加载路径上从不把 atlas 的
+`pma` 行传到 `baseTexture`（`h.pma && (f.alphaMode = PMA)` 那段在不被走的加载器里），实测有无该行 `alphaMode`
+恒为 1 = `PREMULTIPLY_ON_UPLOAD`、渲染结果无差别。要改只能改像素。
+
+#### 骨架文件名与 atlas 页名以 manifest / 客户端为准
+
+* 骨架怎么写叫由 `data/assets.json` 决定：带编辑器根（`imagesPath` / `audioPath`）的客户端骨架，`tools/prepare-operator-skins.mjs`
+  写的是 `<skinId>.display.skel`；`skinspines.py` 的 `skin_skel_names()` 从 manifest 读这个名字再写，不要自己猜。
+  写错名字皮肤整侧加载失败、退回旧 PRTS 页，表现同样是黑眼圈。
+* 客户端 atlas 以**空行开头**，页名其实是第 1 行。`skinspines.py` 会删掉所有页名行、在开头写我们的一份，并去掉首尾
+  空行 —— 页名后紧跟字段，中间不能有空行，否则 pixi-spine 报
+  `Spine: error in texture loader … reading 'baseTexture'`（它把 `size:` 当成 region 头）。
+
+对历史遗留的预乘页（`node tools/mark-skin-pma.mjs` 报告那些没有 `pma:` 标记的），用
+`node tools/unpremultiply-pages.mjs [--write] public/assets/skins`：它逐页分类（预乘页 `max(RGB) <= A` 恒成立、直通页会
+大量超出），只对预乘页做 `RGB / (A/255)`，并顺带删掉 atlas 里的 `pma:` 行与重复页名行。默认只报告。
 
 The local 2026-10-08 candidate covers all **271 official fashions within the current 209-character scope**. Existing
 127 records and all installed CN/JP/EN audio are retained. The added 144 comprise 142 distinct front/rear pairs,

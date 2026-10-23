@@ -142,6 +142,12 @@ export function formMode(unit, form, map = null) {
 }
 
 const idOf = (v) => v?.info?.id ?? v?.id;
+/** The equipped skill index of a view (a 自选 pick's, else its own); null when it says nothing. */
+const skillIndexOf = (v) => {
+  const info = v?.info;
+  const i = Number.isInteger(info?.diy?.skillIndex) ? info.diy.skillIndex : Number.isInteger(info?.skillIndex) ? info.skillIndex : null;
+  return i;
+};
 /** A held entry that loops for its hold: hold 'skill' and a looping prefab (a one-shot prefab plays once at the start). */
 const isLoop = (e) => e.hold === 'skill' && e.loop !== false;
 /** The plan's attacks a normal attack can use: not the skill's own casts at its start / end (`when`, skills.js tagCasts). */
@@ -223,12 +229,22 @@ export class SkillFx {
 
   // ---- resolution -------------------------------------------------------------------------------------------------
 
-  /** The record of a battle unit (resolved once per battle id), or null when nothing official belongs to it. */
+  /**
+   * The record of a battle unit (resolved once per battle id and equipped skill), or null when nothing official belongs
+   * to it. The id alone is not enough: a battle id is reused by the next fight (and by a redeploy / a form change can
+   * answer a different skill), so a cached record whose skill changed is dropped and resolved again — 伊内丝 keeping
+   * 暗夜无明's lasting loops after being fielded with 淬影突袭 came from the id-only cache.
+   */
   of(v) {
     if (!v || !this.w.idx) return null;
     const id = idOf(v);
     if (id == null) return null;
     let U = this.units.get(id);
+    if (U && U.skillIndex !== skillIndexOf(v)) {
+      this._releaseU(U);      // the old skill's held loops stop before the next skill's start
+      U = undefined;
+      this.units.delete(id);
+    }
     if (U === undefined) {
       U = null;
       const info = v.info || null;
@@ -236,7 +252,7 @@ export class SkillFx {
         const unitKey = this.w.unitKeyOf(v);
         const rec = this._recordOf(info);
         const r = unitKey ? planFor(this.w.idx, { info, rec, unitKey }) : null;
-        if (r && (r.plan || r.charge || r.enemy.length)) U = this._record(id, r, rec);
+        if (r && (r.plan || r.charge || r.enemy.length)) U = this._record(id, r, rec, skillIndexOf(v));
       }
       this.units.set(id, U);
     }
@@ -250,7 +266,7 @@ export class SkillFx {
     try { return this.w.opts.record(info) || null; } catch { return null; }
   }
 
-  _record(id, r, rec = null) {
+  _record(id, r, rec = null, skillIndex = null) {
     const idx = this.w.idx, plan = r.plan;
     const has = (k) => !!k && this.w.ofx.lib.has(k);
     let draws = false;
@@ -262,7 +278,7 @@ export class SkillFx {
       if (a && ((a.cast || []).length || (a.hit || []).length || a.projectileKey)) draws = true;
     }
     return {
-      id, v: null, key: r.unitKey, skillId: r.skillId, plan, charge: r.charge, srec: r.srec,
+      id, v: null, key: r.unitKey, skillId: r.skillId, skillIndex, plan, charge: r.charge, srec: r.srec,
       buffS: buffDuration(r.srec), tHit: plan ? targetsOf(idx, plan).hit : [], drawsStart: draws,
       on: null, startFrame: -1, offAt: -Infinity, atkN: 0, attacked: false, byFlag: false, loopsOn: false,
       loops: [], ready: [], readyOn: false, passiveOn: false, passiveShots: false, passiveDraws: false, passiveDone: false, timed: false,

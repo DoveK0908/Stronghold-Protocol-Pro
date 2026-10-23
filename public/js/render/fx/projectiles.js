@@ -6,6 +6,7 @@ import { SHOT_HEIGHT, bodyZ, feetZ } from './camera.js';
 import { clamp } from './limits.js';
 import { pickNoteFrame } from './notes.js';
 import { projSpeed } from './speeds.js';
+import { boneNames } from '../vfx/mounts.js';
 
 const MAX_PROJ = 260;
 
@@ -24,10 +25,14 @@ const SHELL_RISE = 0.34, SHELL_UP = 5.5;
 /** 蕾缪安 S3 shell (fx 'bombardShell'); `look` 'mortar' is its own flight (_stepMortar). */
 const BOMBARD_SHELL = Object.freeze({ look: 'mortar', tint: 0xfff2d8, glow: 0xff9c33, trail: 0xffb35c, smoke: 0x3a3430, len: 1.3, width: 0.3, head: 0.56 });
 
-/** The muzzle bone names an operator skin may carry (render/vfx/mounts.js POINT_NAMES.muzzle, same order). */
-// The drawable models name the muzzle with a front/back prefix (`F_Muzzle` on the front skeleton, `B_Muzzle` on the
-// back), so try the bare names too for skeletons that keep one set.
-const MUZZLE_BONES = Object.freeze(['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoint', 'F_MuzzlePoint', 'B_MuzzlePoint', 'muzzle', 'F_muzzle', 'B_muzzle']);
+/**
+ * The muzzle/weapon bone candidates are the same ones the official-effect layer uses (render/vfx/mounts.js
+ * `boneNames('muzzle')`: `Muzzle` / `MuzzlePoint` with the `F_`/`B_` prefixes, then `OriginMuzzle`, `Gun`, `Weapon`,
+ * the hands, and the fuzzy name patterns). Kept in one place: the two lists had drifted apart, so a operator whose
+ * skin names its weapon bone `F_OriginMuzzle` / `F_Gun` lost the muzzle here and kept shooting from the middle of
+ * the sprite while the official effects already came out of the weapon.
+ */
+export function muzzleBones() { return boneNames('muzzle'); }
 
 /**
  * Where the weapon of a drawn unit is, in tiles from its feet (`x` along the screen's right with the facing applied,
@@ -36,7 +41,7 @@ const MUZZLE_BONES = Object.freeze(['Muzzle', 'F_Muzzle', 'B_Muzzle', 'MuzzlePoi
  */
 export function muzzleOffset(view) {
   if (!view || typeof view.boneOffset !== 'function') return null;
-  const o = view.boneOffset(MUZZLE_BONES, { x: 0, up: 0, angle: 0, flip: 1 }, true);
+  const o = view.boneOffset(muzzleBones(), { x: 0, up: 0, angle: 0, flip: 1 }, true);
   return o && Number.isFinite(o.x) && Number.isFinite(o.up) ? o : null;
 }
 

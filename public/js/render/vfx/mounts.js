@@ -177,7 +177,7 @@ export function pointOffset(skin, kind, back) {
 const _bo = { x: 0, up: 0, angle: 0, flip: 1 };
 
 /** The bone names to try for a point kind on a model that carries no skin point table (front and back skeletons). */
-function boneNames(kind) {
+export function boneNames(kind) {
   const base = POINT_NAMES[kind] || [];
   const out = [];
   for (const n of base) out.push(n, `F_${n}`, `B_${n}`);
