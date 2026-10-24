@@ -560,6 +560,36 @@ function nearestFoe(battle, unit, x, y, r) {
  * @param {(e: object) => void} strike deals this note's damage to one enemy
  * @returns {(p: object, dt: number) => boolean} the projectile `steer` hook: true = it is done (→ onHit).
  */
+/**
+ * Bend a note that is still in 【自由移动】 towards `(ux, uy)` by `turn` of the angle left. A straight note rotates its
+ * velocity; a sine note rotates the curve's axis and re-anchors its origin on the note's current point, so the drift
+ * carries on from there (the curve is `origin + axis·u + perpendicular·amp·sin u`). No-op when the note already points
+ * that way, and the rear hemisphere is left alone — weak homing nudges, it never spins a note around.
+ * @param {object} st the note's flight state
+ * @param {number} ux @param {number} uy a unit vector towards the target
+ * @param {number} turn the fraction of the remaining angle to take (0..1)
+ * @param {{x: number, y: number}} p the note's current position
+ */
+function wander(st, ux, uy, turn, p) {
+  const ax = st.state === 'free' && st.sine !== false ? st.ax : st.vx;
+  const ay = st.state === 'free' && st.sine !== false ? st.ay : st.vy;
+  const dot = ax * ux + ay * uy;
+  if (dot >= 0.9999) return;
+  const cross = ax * uy - ay * ux;
+  if (dot <= 0) return;                              // behind it: a weak bend would only make it hover
+  const a = atan2(Math.abs(cross), dot) * turn * (cross < 0 ? -1 : 1);
+  const ca = cos(a), sa = sin(a);
+  const rx = ax * ca - ay * sa, ry = ax * sa + ay * ca;
+  const n = hypot(rx, ry) || 1e-6;
+  if (st.sine !== false && st.ax !== undefined) {
+    st.ax = rx / n; st.ay = ry / n;
+    st.u = 0;                                        // the curve restarts at the note's current point
+    st.ox = p.x; st.oy = p.y;
+  } else {
+    st.vx = rx / n; st.vy = ry / n;
+  }
+}
+
 function noteSteer(battle, unit, st, cfg, strike) {
   const freeSpeed = num(cfg.freeSpeed, cfg.trackSpeed);
   const straight = cfg.free === 'straight' || (cfg.straightWhenAimed && st.aimed);
@@ -583,6 +613,15 @@ function noteSteer(battle, unit, st, cfg, strike) {
       st.sinceUpdate = 0;
       if (st.state === 'free') {
         if (!st.target || !st.target.alive) st.target = nearestFoe(battle, unit, p.x, p.y, cfg.seekR);
+        // 微弱的追踪 while still 自由移动 (owner 2026-10-24: 「音符带有微弱的追踪，如果敌人在攻击范围内，那么对她发射强追踪
+        // 的音符」): an unaimed note bends towards whatever it already sees, `turnFree` of the angle left per update —
+        // the same ceiling the 【追踪移动】 of a non-aimed note uses, so the bend stays gentle until it locks. The sine
+        // curve re-anchors on the note's current position so the drift continues from where it is, not from a stale
+        // origin.
+        if (st.target && st.target.alive) {
+          const dx = st.target.x - p.x, dy = st.target.y - p.y, d = hypot(dx, dy);
+          if (d > 1e-6) wander(st, dx / d, dy / d, num(cfg.turnFree, cfg.turn) * 0.5, p);
+        }
         if (st.target && st.freeFor >= cfg.minFree) st.state = 'track';   // 锁定 (sticky — see the header above)
       } else if (st.target && (!st.target.alive || st.target.hidden)) {
         // 【追踪移动】 with the locked target gone: NOT back to 【自由移动】, and no other enemy is ever picked
@@ -686,6 +725,9 @@ function fireNote(battle, unit, { target = null, scale, type, cfg, tag, aim = nu
     ox: unit.x, oy: unit.y, ax: 0, ay: 0, u: 0,
   };
   st.ax = st.vx; st.ay = st.vy;
+  // a note that drifts on the 扩张正弦 curve (the row's `free: 'sine'`) steers its axis in 【自由移动】; a straight one
+  // steers its velocity (see `wander`)
+  st.sine = cfg.free === 'sine' && !(cfg.straightWhenAimed && st.aimed);
   // `strike` deals this note's damage and reports what the engine's own pipeline actually removed (damage.js
   // `dealDamage`: 0 for a dodge, a shield that ate the whole hit, or an invulnerable target). The ATTACK itself —
   // 攻击回复技力 included — was already settled when this note was FIRED (that is the attack action: 每次「发出音符」
