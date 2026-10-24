@@ -24,7 +24,7 @@
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, MicroLabel, useTicker, secondsLeft } from '../ui/components.js';
-import { useGameData, BandIcon, RichText, PlayerAvatar, LpTower, Sprite, Img } from '../ui/gameComponents.js';
+import { useGameData, BandIcon, RichText, PlayerAvatar, LpTower, Sprite } from '../ui/gameComponents.js';
 import { StepHeader, ExitModal } from '../ui/matchChrome.js';
 import { MatchInfoDialog, matchInfoModel } from '../ui/matchInfo.js';
 import { MatchEnemies } from '../ui/matchEnemies.js';
@@ -41,7 +41,7 @@ import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
 import { t, tParts, tName } from '../../../shared/i18n.js';
 import { NameCardLayer } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
-import { cardOperators, cardAvatarUrl, seatPortrait } from '../ui/seatArt.js';
+import { cardOperators, seatPortrait } from '../ui/seatArt.js';
 import { usePlayerLabel } from '../ui/myInfo.js';
 import { useMyCard } from '../ui/playerCard.js';
 import { useRise } from '../ui/transitions.js';
@@ -207,18 +207,15 @@ export function draftInfoStatus({ myPick = null, pickName = null, myTurn, turnNa
  * room.state seats[].card, else their 名片干员 half-body) so the order reads like the room's seat cards. The name keeps
  * its own column and ellipsises — the card art only fills the background, it never squeezes the text.
  */
-function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, face, gd, turnSecs }) {
+function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, gd, turnSecs }) {
   const label = usePlayerLabel();
   const flash = useRise(!!picked, 1100);
   const pband = picked ? gd.band(picked) : null;
-  const glyph = [...(p.name || '?')][0];
   return html`<div key=${p.playerId} class=${cx('dorder', cur && 'is-cur', picked && 'is-done', self && 'is-self', flash && 'is-flash', nc && 'has-nc')} style=${solo ? null : `--i:${i}`}>
     ${nc ? html`<span class="dorder__nc"><${NameCardLayer} card=${nc} /></span>` : null}
     ${art && !nc ? html`<span class="dorder__art" style=${'background-image:url("' + art + '")'}></span>` : null}
     <span class="dorder__idx num">${i + 1}</span>
-    <span class="dorder__face">${p.isBot
-      ? html`<${PlayerAvatar} player=${p} self=${self} />`
-      : html`<${Img} src=${face} alt="" class="dorder__img" fallback=${html`<span class="dorder__glyph">${glyph}</span>`} />`}${self ? html`<span class="dorder__me" title=${t('我')}><${Icon} name="user" /></span>` : null}</span>
+    <span class="dorder__face"><${PlayerAvatar} player=${p} self=${self} /></span>
     <div class="dorder__text">
       <b class="dorder__name">${p.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<span class="dorder__label">${p.isBot ? p.name || t('博士') : label(p.name, p.tag)}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
       <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || t('已选择')}</span>`
@@ -266,8 +263,6 @@ export function BandDraftScreen() {
   const seatOf = (pid) => (Array.isArray(roomSeats) ? roomSeats.find((x) => x && x.playerId === pid) : null) || null;
   const cardOf = (pl) => (pl.playerId === myId ? myCard : seatOf(pl.playerId)?.card || null);
   const artOf = (pl) => (pl.isBot ? null : seatPortrait(seatOf(pl.playerId) || { playerId: pl.playerId }, portraits));
-  // the row keeps the player's own avatar (like the lobby's 名片): their picked look, else the seat portrait
-  const faceOf = (pl) => (pl.isBot ? null : cardAvatarUrl(cardOf(pl)?.avatar, portraits.m, cardOf(pl)?.avatarLook) || artOf(pl));
   const draft = normalizeDraft(pub?.draft, players);
   // an expanded room's draft: every seat picks at once (server MatchPhases.concurrentDraft) — no turn, no skip
   const concurrent = !solo && draft.concurrent === true;
@@ -369,7 +364,7 @@ export function BandDraftScreen() {
           const picked = draft.picks.get(p.playerId) || (p.playerId === myId ? myPick : p.bandId) || null;
           const cur = !picked && (solo || concurrent || draft.turnPid === p.playerId);
           return html`<${OrderRow} key=${p.playerId} p=${p} i=${i} picked=${picked} cur=${cur} self=${p.playerId === myId} solo=${solo}
-            nc=${(!p.isBot && cardOf(p)?.bg) || null} art=${artOf(p)} card=${cardOf(p)} face=${faceOf(p)} gd=${gd} turnSecs=${turnSecs} />`;
+            nc=${(!p.isBot && cardOf(p)?.bg) || null} art=${artOf(p)} card=${cardOf(p)} gd=${gd} turnSecs=${turnSecs} />`;
         })}
         </div>
         ${concurrent ? html`<div class="draft-queue" data-testid="draft-queue">

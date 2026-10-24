@@ -203,9 +203,7 @@
 .dorder__glyph { display: grid; place-items: center; width: 100%; height: 100%; font-size: calc(.28 * var(--t)); font-weight: 900; color: var(--mint-400); }
 .dorder__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
 .dorder .dorder__face .pavatar { box-shadow: 0 0 0 .02rem rgba(230, 233, 233, .85); border: 0; }
-.dorder__me { position: absolute; left: -.08rem; top: -.08rem; width: .24rem; height: .24rem; display: grid; place-items: center;
-  background: var(--mint-500); color: #062019; }
-.dorder__me .icon { width: 74%; height: 74%; }
+/* the 我 corner badge is gone (owner 2026-10-24): the same face now comes from PlayerAvatar and needs no mark */
 .dorder__text { text-shadow: 0 1px 3px #000, 0 0 .12rem #000; }
 .dorder__name { align-items: center; }
 .dorder__name > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

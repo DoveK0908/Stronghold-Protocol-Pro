@@ -45,3 +45,15 @@ test('the status strip is back to 已连接 / 延迟 / 服务 with separators (n
   assert.doesNotMatch(net, /border-radius: 99px/, 'the rounded pill experiment is reverted');
   assert.match(css, /\.gtop__net > \* \+ \* \{ border-left: 1px solid var\(--line\); \}/, 'cells are separated by a line');
 });
+
+test('the 选择策略 order row draws the same 头像 as everywhere else and carries no corner badge', () => {
+  const band = read('public/js/screens/bandDraft.js');
+  const css = read('public/css/screens/draft.css');
+  // one component for every row: PlayerAvatar resolves 自传头像 + 精一/精二/皮肤 + the fallback glyph itself
+  assert.match(band, /<span class="dorder__face"><\$\{PlayerAvatar\} player=\$\{p\} self=\$\{self\} \/><\/span>/);
+  assert.doesNotMatch(band, /dorder__img/, 'no raw <Img> face left in the row');
+  assert.doesNotMatch(band, /const faceOf = /, 'the row no longer pre-computes a face');
+  // the 「我」 corner badge is gone (owner playtest 2026-10-24)
+  assert.doesNotMatch(band, /dorder__me/);
+  assert.doesNotMatch(css, /\.dorder__me/);
+});
