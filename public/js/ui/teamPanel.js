@@ -34,7 +34,7 @@ import { useEffect, useReducer, useRef, useState } from '../../vendor/hooks.modu
 import { PHASE } from '../../../shared/constants.js';
 import { html, Icon, Tooltip } from './components.js';
 import { PlayerAvatar, LpTower, GIcon, LocalSprite } from './gameComponents.js';
-import { playerLabel } from './myInfo.js';
+import { usePlayerLabel } from './myInfo.js';
 import { EmoteBubble } from './emotes.js';
 import { STATUS_META, sortedPlayers, teamFrameIds, activeBubbles } from './gameLogic.js';
 import { MissTag, uniteRemaining } from './hud.js';
@@ -222,6 +222,7 @@ function RowStatus({ status, meta, offline }) {
 /** One seat. `bubble`: its emote beside the row (classic roster), else null. */
 function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, selfLive, cap, uniteLocal, team, frameArt, list, bubble, spMarks = null }) {
   const self = p.playerId === myId;
+  const label = usePlayerLabel();
   const status = p.pendingDeath ? 'rescue' : p.alive === false ? 'dead' : p.status;
   const meta = p.pendingDeath ? { ...STATUS_META.deciding, text: t('等待救援') } : STATUS_META[status] || STATUS_META.acting;
   // a player on a half of the 联防 / 最终攻势 field on screen: the tap switches the camera ('ALL': their half is shown)
@@ -248,7 +249,7 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
         : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
     </button>
     <div class="team__info">
-      <span class="team__name" title=${playerLabel(p.name, p.tag)}>${playerLabel(p.name, p.tag)}</span>
+      <span class="team__name" title=${label(p.name, p.tag)}>${label(p.name, p.tag)}</span>
       <div class="team__line">
         <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
           tip=${rowLpTip(lp, cap)} />

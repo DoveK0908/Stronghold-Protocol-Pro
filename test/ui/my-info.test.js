@@ -13,7 +13,7 @@ test('the lobby 名片 button: avatar + 名字#四位, opens 我的信息', () =
   assert.match(info, /export function MeCard\(/);
   assert.match(info, /data-testid="me-card"/);
   // the card prints 名字#四位 on ONE line (the same playerLabel every other display uses)
-  assert.match(info, /data-testid="me-card-tag">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}/);
+  assert.match(info, /data-testid="me-card-tag">\$\{label\(me\?\.name, me\?\.tag\)\}/);
   assert.ok(info.includes('<${NameCardLayer} card=${card.bg} />'), 'the name card is the button background');
   const lobby = read('public/js/screens/lobby.js');
   assert.match(lobby, /<\$\{MeCard\} me=\$\{me\} onOpen=\$\{\$?\{?\(\) => setInfoOpen\(true\)/);
@@ -69,11 +69,11 @@ test('no display still says DOCTOR #NNNN', () => {
     assert.doesNotMatch(read(p), /DOCTOR #\$\{?doctorNo/, `${p} no longer prints DOCTOR #`);
   }
   // the seat's 名片 prints 名字#四位 on the name line; bots keep AUTONOMOUS UNIT on the small line
-  assert.match(read('public/js/screens/room.js'), /playerLabel\(seat\.name, seat\.tag\)/);
+  assert.match(read('public/js/screens/room.js'), /label\(seat\.name, seat\.tag\)/);
   assert.match(read('public/js/screens/room.js'), /seat\.isBot \? html`<small class="rseat__doc">AUTONOMOUS UNIT<\/small>` : null/);
   // both cards print ONE 名字#四位 line (no second, smaller ID line under the name)
-  assert.match(read('public/js/ui/achievements.js'), /<span class="ach-card__name">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}<\/span>/);
-  assert.match(read('public/js/ui/myInfo.js'), /<span class="ach-card__name" data-testid="me-info-tag">\$\{playerLabel\(me\?\.name, me\?\.tag\)\}<\/span>/);
+  assert.match(read('public/js/ui/achievements.js'), /<span class="ach-card__name">\$\{label\(me\?\.name, me\?\.tag\)\}<\/span>/);
+  assert.match(read('public/js/ui/myInfo.js'), /<span class="ach-card__name" data-testid="me-info-tag">\$\{label\(me\?\.name, me\?\.tag\)\}<\/span>/);
   for (const p of ['public/js/ui/achievements.js', 'public/js/ui/myInfo.js']) assert.doesNotMatch(read(p), /ach-card__id/);
 });
 

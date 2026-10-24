@@ -42,7 +42,7 @@ import { t, tParts, tName } from '../../../shared/i18n.js';
 import { NameCardLayer } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
 import { cardOperators, cardAvatarUrl, seatPortrait } from '../ui/seatArt.js';
-import { playerLabel } from '../ui/myInfo.js';
+import { usePlayerLabel } from '../ui/myInfo.js';
 import { useMyCard } from '../ui/playerCard.js';
 import { useRise } from '../ui/transitions.js';
 
@@ -208,6 +208,7 @@ export function draftInfoStatus({ myPick = null, pickName = null, myTurn, turnNa
  * its own column and ellipsises — the card art only fills the background, it never squeezes the text.
  */
 function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, face, gd, turnSecs }) {
+  const label = usePlayerLabel();
   const flash = useRise(!!picked, 1100);
   const pband = picked ? gd.band(picked) : null;
   const glyph = [...(p.name || '?')][0];
@@ -219,7 +220,7 @@ function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, face, gd, turn
       ? html`<${PlayerAvatar} player=${p} self=${self} />`
       : html`<${Img} src=${face} alt="" class="dorder__img" fallback=${html`<span class="dorder__glyph">${glyph}</span>`} />`}${self ? html`<span class="dorder__me" title=${t('我')}><${Icon} name="user" /></span>` : null}</span>
     <div class="dorder__text">
-      <b class="dorder__name">${p.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<span class="dorder__label">${p.isBot ? p.name || t('博士') : playerLabel(p.name, p.tag)}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
+      <b class="dorder__name">${p.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<span class="dorder__label">${p.isBot ? p.name || t('博士') : label(p.name, p.tag)}</span>${p.isBot ? html`<span class="dorder__ai">AI</span>` : null}</b>
       <span class="dorder__state">${picked ? html`<span class="t-mint">${pband?.name || t('已选择')}</span>`
         : cur ? html`<span class="t-gold"><${Icon} name="hourglass" />${t('决策中')}${turnSecs != null ? html`<b class="num dorder__secs">${turnSecs}s</b>` : null}</span>`
         : html`<span class="t-dim"><${Icon} name="dots" />${t('等待中')}</span>`}</span>

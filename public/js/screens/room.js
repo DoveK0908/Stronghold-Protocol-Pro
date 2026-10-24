@@ -53,7 +53,7 @@ import { OperatorPicker, AvatarPicker } from '../ui/opPicker.js';
 import { NameCardLayer, NameCardPicker } from '../ui/namecards.js';
 import { TrophyBadge } from '../ui/trophies.js';
 import { OwnerBadge, isOwnerSeat } from '../ui/ownerName.js';
-import { playerLabel } from '../ui/myInfo.js';
+import { usePlayerLabel } from '../ui/myInfo.js';
 import { difficultyInfo, stageLabel, stageSuffix, ProtoCard } from './lobby.js';
 import { ProtocolScene } from '../ui/protocolScene.js';
 import { usePresence, useRise, afterLeave } from '../ui/transitions.js';
@@ -228,6 +228,7 @@ function EliteRecruit({ room, busy, onAdd }) {
 function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, onKick, onInvite, onAddBot, onAddElite, onRemoveBot, onBotBand, onMove, portraits,
   onPickCard = null, onPickAvatar = null, onPickBg = null }) {
   const [bad, setBad] = useState(null);
+  const label = usePlayerLabel();
   const flash = useRise(!!seat && (seat.ready || seat.isBot || seat.playerId === room.hostId));
   const coop = room.mode !== 'solo';
   if (!seat) {
@@ -307,7 +308,7 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, on
             <${AvatarFrame} size="sm" name=${seat.name} src=${customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} fallback=${customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
         : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} fallback=${!seat.isBot && customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} bot=${seat.isBot} />`}
       <span class="rseat__who">
-        ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.isBot ? seat.name || t('博士') : playerLabel(seat.name, seat.tag)}</b>
+        ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name${owner ? ' sp-owner-name' : ''}`}>${seat.isBot ? seat.name || t('博士') : label(seat.name, seat.tag)}</b>
         <${OwnerBadge} seat=${seat} />
       </span>
       ${seat.isBot ? html`<small class="rseat__doc">AUTONOMOUS UNIT</small>` : null}

@@ -517,6 +517,8 @@ export function SettingsModal({ open, onClose }) {
       <p class="set-hint">${t('打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。')}</p>
       <${Toggle} label=${t('部署时收起商店')} micro="DEPLOY FOLD" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
       <p class="set-hint">${t('拿起干员部署、装备或调整位置时，暂时收起商店条并切到收起商店后的镜头，松手后恢复你原来的状态。')}</p>
+      <${Toggle} label=${t('显示名字后面的编号')} micro="PLAYER TAG" value=${s.showTag !== false} onChange=${(v) => updateSettings({ showTag: v })} />
+      <p class="set-hint">${t('关闭后只显示代号，不再显示「代号#四位数字」。房间席位、同盟名单、决策顺序和名片的显示一起生效；只影响你自己的画面，不影响别人看到的名字。')}</p>
       <div class="set-row">
         <span class="set-row__label">${t('画面质量')}<${MicroLabel}>QUALITY<//></span>
         <div class="set-seg" role="radiogroup">

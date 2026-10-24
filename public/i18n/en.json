@@ -3379,5 +3379,7 @@
   "取消二倍速": "Turn off 2× speed",
   "下一场战斗开始后恢复一倍速。正在进行或即将开始的这一场不受影响。想再开需要重新投票。": "Back to normal speed from the next battle; the battle in progress or about to start keeps its pace. Turning it on again needs a fresh vote.",
   "取消这次二倍速。想再开需要重新投票。": "Cancel this 2× speed. Turning it on again needs a fresh vote.",
-  "取消二倍速：下一场战斗开始后恢复一倍速": "Turn off 2× speed: back to normal from the next battle"
+  "取消二倍速：下一场战斗开始后恢复一倍速": "Turn off 2× speed: back to normal from the next battle",
+  "显示名字后面的编号": "Show the number after a name",
+  "关闭后只显示代号，不再显示「代号#四位数字」。房间席位、同盟名单、决策顺序和名片的显示一起生效；只影响你自己的画面，不影响别人看到的名字。": "Off prints the 代号 alone, without the four-digit number. Applies to the room seats, the roster, the draft order and the name cards; your own screen only — nobody else sees a different name."
 }

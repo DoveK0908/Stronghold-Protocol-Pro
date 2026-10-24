@@ -21,7 +21,7 @@ import { data } from '../data.js';
 import { peekStatsRecords, aggregateStats, countsTowardStats, selfRowOf, roundsOf, FULL_KEEP } from './stats.js';
 import { TrophyBadge } from './trophies.js';
 import { NameCardLayer, NameCardPicker } from './namecards.js';
-import { playerLabel } from './myInfo.js';
+import { usePlayerLabel } from './myInfo.js';
 import { useMyCard, trophyTotal, setCardBackground, setCardAvatar, setAvatarLook } from './playerCard.js';
 import { cardOperators, cardAvatarUrl, lookOptions } from './seatArt.js';
 import { AvatarPicker } from './opPicker.js';
@@ -300,6 +300,7 @@ function TitleHex({ titles, gd }) {
 
 /** The name card (头像 with the LV, the name, DOCTOR #, 名片底图) and the counts beside it. */
 function Plate({ me, card, s, p, done, total, gd, onAvatar, onBg }) {
+  const label = usePlayerLabel();
   const lv = levelOf(s.exp, milestones());
   const opRec = card.charId && gd.ready ? gd.list('chess').find((c) => c.charId === card.charId) : null;
   // 头像 (room.card avatar), else the 名片干员's avatar, else the name's first letter
@@ -311,7 +312,7 @@ function Plate({ me, card, s, p, done, total, gd, onAvatar, onBg }) {
         <${Img} src=${face} alt="" fallback=${html`<span class="ach-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
         <span class="ach-card__lv" title=${t('等级')}><b class="num">${lv.lv}</b><small>LV</small></span></button>
       <span class="ach-card__who">
-        <span class="ach-card__name">${playerLabel(me?.name, me?.tag)}</span>
+        <span class="ach-card__name">${label(me?.name, me?.tag)}</span>
         <span class="ach-card__edits">
           <button type="button" class="ach-card__nc" onClick=${onAvatar}><${Icon} name="edit" />${t('头像')}</button>
           <button type="button" class="ach-card__nc" onClick=${onBg}><${Icon} name="edit" />${t('名片底图')}</button>

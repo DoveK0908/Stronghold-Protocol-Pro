@@ -12,12 +12,22 @@ import { openStats } from '../screens/stats.js';
 import { uploadAvatar } from './customAvatar.js';
 import { toast } from './toasts.js';
 import { net, identity } from '../net.js';
+import { useStore } from '../store.js';
+import { settingsStore } from './settingsStore.js';
 import { t } from '../../../shared/i18n.js';
 
-/** `名字#1234` — the four digits when the server has given the session one, else just the name. */
-export function playerLabel(name, tag) {
+/** `名字#1234` — the four digits when the server has given the session one, else just the name. `showTag` is
+ *  设置「显示名字后面的编号」: off prints the bare 代号 and drops the digits. */
+export function playerLabel(name, tag, showTag = true) {
   const who = name || t('博士');
-  return typeof tag === 'string' && /^\d{4}$/.test(tag) ? `${who}#${tag}` : who;
+  return showTag && typeof tag === 'string' && /^\d{4}$/.test(tag) ? `${who}#${tag}` : who;
+}
+
+/** playerLabel bound to 设置「显示名字后面的编号」. Every display takes it from here, so flipping the switch redraws the
+ *  names where they stand (the room's seats, the 20-player 名单, the 选干员 draft, both 名片 cards). */
+export function usePlayerLabel() {
+  const show = useStore((s) => s.showTag !== false, Object.is, settingsStore);
+  return (name, tag) => playerLabel(name, tag, show);
 }
 
 /**
@@ -26,6 +36,7 @@ export function playerLabel(name, tag) {
  */
 export function MeCard({ me, onOpen }) {
   const card = useMyCard();
+  const label = usePlayerLabel();
   const face = customAvatarSrc(card) || cardAvatarUrl(card.avatar, undefined, card.avatarLook);
   return html`<button type="button" class="me-card" data-testid="me-card" onClick=${onOpen}
       title=${t('我的信息')} aria-label=${t('我的信息')}>
@@ -34,7 +45,7 @@ export function MeCard({ me, onOpen }) {
       <${Img} src=${face} alt="" fallback=${html`<span class="me-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
     </span>
     <span class="me-card__text">
-      <span class="me-card__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" /><span class="me-card__label" data-testid="me-card-tag">${playerLabel(me?.name, me?.tag)}</span></span>
+      <span class="me-card__name"><${TrophyBadge} count=${card.trophies} class="tbadge--inline" /><span class="me-card__label" data-testid="me-card-tag">${label(me?.name, me?.tag)}</span></span>
     </span>
   </button>`;
 }
@@ -45,6 +56,7 @@ export function MeCard({ me, onOpen }) {
  */
 export function MyInfoDialog({ me, onClose }) {
   const card = useMyCard();
+  const label = usePlayerLabel();
   const gd = useGameData();
   const list = cardOperators(gd.ready ? gd.list('chess') : []);
   const [picking, setPicking] = useState(null); // 'avatar' | 'bg'
@@ -90,7 +102,7 @@ export function MyInfoDialog({ me, onClose }) {
           <${Img} src=${face} alt="" fallback=${html`<span class="ach-card__glyph">${[...(me?.name || '?')][0]}</span>`} />
         </button>
         <span class="ach-card__who">
-          <span class="ach-card__name" data-testid="me-info-tag">${playerLabel(me?.name, me?.tag)}</span>
+          <span class="ach-card__name" data-testid="me-info-tag">${label(me?.name, me?.tag)}</span>
         </span>
         <span class="ach-card__brand" aria-hidden="true">STRONGHOLD<br />PROTOCOL</span>
       </div>
