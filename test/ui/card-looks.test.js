@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { lookUrl, lookOptions, seatLook, seatIllust } from '../../public/js/ui/seatArt.js';
+import { lookUrl, lookOptions, seatLook, seatIllust, seatPortrait, cardOperator } from '../../public/js/ui/seatArt.js';
 import { cardMessage, seatCardMatches, cardStore, setCardAvatar, setCustomAvatar, customAvatarSrc } from '../../public/js/ui/playerCard.js';
 
 const M = {
@@ -68,6 +68,26 @@ test('seatIllust: 精二/精一/皮肤 all draw the illustration of that look', 
   const plainMate = { playerId: 'p_mate', card: { charId: 'char_a', look: 'e1' } };
   assert.equal(seatIllust(plainMate, base), '/i1.png', '精一 has its own full-body illustration');
   assert.equal(seatLook(plainMate, 'char_a', base), 'e1');
+});
+
+// 2026-10-24 维护者：「准备大厅的立绘还是不同步」「显示的还是精一的半身照」——本模式的干员清单
+// （cardOperators → seats 的 byChar）里没有这个 charId 时，以前整条链退化成「按 playerId 哈希随机取一个
+// 5★/6★ 的半身像」：明明选过，显示的却是别人。素材清单里有这个角色就够了，不必在本模式的清单里。
+test('a card operator outside the mode roster still draws its own art (no hash-random portrait)', () => {
+  const m = { chars: { char_a: { portrait: '/p1.png', portraitE2: '/p2.png', illust: '/i2.png', illustE1: '/i1.png' },
+    char_zz: { portrait: '/z1.png', portraitE2: '/z2.png', illust: '/zi.png' } } };
+  const byChar = new Map([['char_a', { charId: 'char_a' }]]);          // 本模式只有 char_a
+  const pool = [{ charId: 'char_a' }, { charId: 'char_z' }];
+  const ctx = { byChar, pool, m, myId: 'p_me', myCard: 'char_zz', myLook: '' };
+  const mate = { playerId: 'p_mate', card: { charId: 'char_zz', look: '' } };   // 选了一个不在本模式清单里的干员
+  assert.deepEqual(cardOperator(m, byChar, 'char_a'), { charId: 'char_a' });
+  assert.deepEqual(cardOperator(m, byChar, 'char_zz'), { charId: 'char_zz' }, 'the manifest alone is enough');
+  assert.equal(cardOperator(m, byChar, 'char_nope'), null);
+  assert.equal(seatIllust(mate, ctx), '/zi.png', 'its own 精二 illustration, not null');
+  assert.equal(seatPortrait(mate, ctx), '/z2.png', 'and its own 精二 portrait, never the hash-random one');
+  // 自己的席位：本机选择认不出来时用服务端广播的那份，而不是随机
+  const own = { playerId: 'p_me', card: { charId: 'char_a' } };
+  assert.equal(seatIllust(own, { ...ctx, myCard: 'char_gone' }), '/i2.png', 'own unknown pick falls back to the card');
 });
 
 // 2026-10-23 维护者：「在准备大厅调整头像连自己都不生效」——头像 是三选一的一格（默认 / 干员官方头像 / 自传图片），

@@ -87,18 +87,43 @@ export function cardAvatarUrl(charId, m = data.get('assets'), look = '') {
 }
 
 /**
+ * 名片干员的一条记录，按 charId 认：先查本模式的干员清单（byChar），查不到就直接拿素材清单里的角色
+ * （`{ charId }` 够 lookUrl 用）。跨模式进来时 cardStore 里还留着上一个模式的干员，本模式清单里没有他 ——
+ * 以前这里返回 null，席位就退回「按 playerId 哈希随便取一个 5★/6★」的半身像：明明选过，显示的却是别人。
+ * @param {any} m the art manifest @param {Map<string, any>} byChar @param {string} [charId]
+ */
+export function cardOperator(m, byChar, charId) {
+  if (typeof charId !== 'string' || !charId) return null;
+  const rec = byChar ? byChar.get(charId) : null;
+  if (rec) return rec;
+  const chars = m && typeof m.chars === 'object' ? m.chars : null;
+  return chars && Object.hasOwn(chars, charId) ? { charId } : null;
+}
+
+/**
+ * 这个席位该画谁的立绘：自己优先本机 cardStore 的选择，认不出来（不在素材清单里）才用服务端广播的那份；
+ * 都没有时返回 ''。
+ * @returns {{ charId: string, look: string }}
+ */
+export function seatPick(seat, { byChar, m, myId, myCard, myLook = '' } = {}) {
+  const mine = !!seat && seat.playerId === myId && !!myCard;
+  const own = mine ? (typeof myCard === 'string' ? myCard : myCard?.charId) : '';
+  const fromCard = typeof seat?.card === 'string' ? seat.card : seat?.card?.charId;
+  const rec = cardOperator(m, byChar, own) || cardOperator(m, byChar, fromCard);
+  if (!rec) return { charId: '', look: '', rec: null };
+  return { charId: rec.charId, look: seatLook(seat, rec.charId, { myId, myCard, myLook }), rec };
+}
+
+/**
  * 席位大图的「带场景」版本：名片干员装备了皮肤时，用该皮肤的 illustration（官方那张连背景的立绘）；
  * 没皮肤 / 精一 / 机器人返回 null，调用方退回 seatPortrait（透明立绘）。
  */
-export function seatIllust(seat, { byChar, m, myId, myCard, myLook = '' }) {
+export function seatIllust(seat, ctx) {
   if (!seat || seat.playerId == null || seat.isBot) return null;
-  const mine = seat.playerId === myId && myCard;
-  const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
-  const rec = pick && byChar ? byChar.get(pick) : null;
-  if (!rec) return null;
-  const look = seatLook(seat, rec.charId, { myId, myCard, myLook });
+  const { charId, look } = seatPick(seat, ctx);
+  if (!charId) return null;
   // '' = 精英二：客户端里那张带背景的立绘（chars[].illust）；'e1' = 同一套取景的透明全身立绘（chars[].illustE1）
-  return lookUrl(m, rec.charId, look, 'illust');
+  return lookUrl(ctx.m, charId, look, 'illust');
 }
 
 /**
@@ -120,16 +145,13 @@ export function seatLook(seat, charId, { myId, myCard, myLook = '' } = {}) {
   return typeof seat?.card?.look === 'string' ? seat.card.look : '';
 }
 
-export function seatPortrait(seat, { pool, byChar, m, myId, myCard, myLook = '' }) {
+export function seatPortrait(seat, ctx) {
   if (!seat || seat.playerId == null) return null;
   // seats[].card is { charId, bg, trophies } (ui/playerCard.js); a bare string is the design's original form
-  const mine = seat.playerId === myId && myCard;
-  const pick = (mine && (typeof myCard === 'string' ? myCard : myCard?.charId)) || (typeof seat.card === 'string' ? seat.card : seat.card?.charId);
-  const rec = pick && byChar ? byChar.get(pick) : null;
-  if (rec) {
-    const look = seatLook(seat, rec.charId, { myId, myCard, myLook });
-    return (look && lookUrl(m, rec.charId, look, 'portrait')) || chessPortraitUrl(m, rec);
-  }
+  const { charId, look, rec } = seatPick(seat, ctx);
+  // '' = 精英二（`portraitE2`，和立绘同一取景），'e1' = 半身 `portrait`，皮肤 = 该皮肤自己的 portrait
+  if (charId) return lookUrl(ctx.m, charId, look, 'portrait') || chessPortraitUrl(ctx.m, rec || { charId });
+  const { pool, m } = ctx;
   if (!Array.isArray(pool) || !pool.length) return null;
   return chessPortraitUrl(m, pool[hash32(seat.playerId) % pool.length]);
 }

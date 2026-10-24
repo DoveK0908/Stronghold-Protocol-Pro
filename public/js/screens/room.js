@@ -398,11 +398,19 @@ export function RoomScreen() {
   // tell the server (teammates see the card) once it knows room.card; a server that refuses it keeps the card local
   const cardRefused = useRef(false);
   const mineCard = room ? roomFacts(room, me.playerId).mine?.card : null;
-  const known = (id) => (id && portraits.byChar.has(id) ? id : '');
+  // 认「素材清单里有这个角色」，不是「本模式的干员清单里有他」：跨模式时 cardStore 里留着上个模式的干员，
+  // 按 byChar 判会把一个有效的选择当成无效、发空字符串上去，服务端那份反而被清掉。
+  const known = (id) => (typeof id === 'string' && id && m && m.chars && Object.hasOwn(m.chars, id) ? id : '');
   const cardMsg = cardMessage({ ...myCard, charId: known(myCard.charId), avatar: known(myCard.avatar) });
   const cardKey = `${cardMsg.charId}|${cardMsg.avatar}|${cardMsg.bg}|${cardMsg.trophies}|${cardMsg.look}|${cardMsg.avatarLook}|${cardMsg.avatarImg}`;
   // one retry after a 限流/超时: the card is still pending, so re-run the effect with the newest message
   const [cardRetry, setCardRetry] = useState(0);
+  // 每次握手（welcome）都给自己一次重新同步的机会：否则一次坏消息（服务端不认那个干员）就会让这张卡整局不再上报，
+  // 队友永远停在「随机的精一半身像」上（维护者 2026-10-24：Test 那边一直看不到 Dovee 的立绘/头像/名片）。
+  useEffect(() => {
+    const off = net.on('welcome', () => { cardRefused.current = false; setCardRetry((n) => n + 1); });
+    return () => { if (typeof off === 'function') off(); };
+  }, []);
   useEffect(() => {
     if (!CARD_SYNC || cardRefused.current || !room || room.inMatch || conn.status !== 'online' || myCard.trophies == null) return;
     if (!roomFacts(room, me.playerId).mine || seatCardMatches(mineCard, cardMsg)) return;
