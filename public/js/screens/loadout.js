@@ -26,6 +26,10 @@
 // it and lifts the black (LoadoutHost keeps it mounted meanwhile: ui/transitions.js usePresence). css/screens/loadout.css.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
+import { useDragScroll } from '../ui/dragScroll.js';
+
+// A press on the quick-cultivate select must not turn into a drag of the deck.
+const DECK_SKIP = (target) => !!target?.closest?.('select, input, textarea, .lo-op__quick--cult');
 import { usePresence, LEAVE_MS } from '../ui/transitions.js';
 import { html, Icon, MicroLabel, Button, TierChip, TextField, Countdown, Spinner, confirmDialog, hasDeadline, Modal, Fragment } from '../ui/components.js';
 import { OperatorImage, Img, RichText, UnitThumb } from '../ui/gameComponents.js';
@@ -524,43 +528,6 @@ function DiyDeckCard({ m, tier, slots, picks, onOpen }) {
 }
 
 /**
- * Mouse drag scrolls a sideways deck (a desktop has no swipe): past a few pixels the press becomes a drag and the click
- * that ends it is swallowed, so a card is not picked by letting go. Touch and pen keep the browser's own scrolling.
- */
-function useDragScroll() {
-  const drag = useRef(null), swallow = useRef(false);
-  const end = (e) => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d?.moved) return;
-    e.currentTarget.classList.remove('is-dragging');
-    swallow.current = true;
-    setTimeout(() => { swallow.current = false; }, 0);
-  };
-  return {
-    onPointerDown: (e) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0 || e.target?.closest?.('select, input, textarea, .lo-op__quick--cult')) return;
-      drag.current = { id: e.pointerId, x: e.clientX, left: e.currentTarget.scrollLeft, moved: false };
-    },
-    onPointerMove: (e) => {
-      const d = drag.current;
-      if (!d || d.id !== e.pointerId) return;
-      const dx = e.clientX - d.x;
-      if (!d.moved) {
-        if (Math.abs(dx) < 6) return;
-        d.moved = true;
-        e.currentTarget.setPointerCapture?.(e.pointerId);
-        e.currentTarget.classList.add('is-dragging');
-      }
-      e.currentTarget.scrollLeft = d.left - dx;
-    },
-    onPointerUp: end,
-    onPointerCancel: end,
-    onClickCapture: (e) => { if (swallow.current) { swallow.current = false; e.stopPropagation(); e.preventDefault(); } },
-  };
-}
-
-/**
  * The deck: one group per tier present in `list` (a tall marker, then the cards flowing in two rows), the 甄选 card closing
  * tiers 5 / 6. A vertical wheel scrolls it sideways; `onTier` reports the tier group at the left edge (the bottom bar).
  */
@@ -568,7 +535,7 @@ function DeckView({ m, list, getChess, st, selId, quick, onPick, onChange, onOps
   const groups = TIERS.map((tier) => ({ tier, items: list.filter((c) => c.tier === tier) }))
     .filter((g) => g.items.length || (!filtered && diySlots.some((s) => s.tier === g.tier)));
   const raf = useRef(0);
-  const dragScroll = useDragScroll();
+  const dragScroll = useDragScroll({ skip: DECK_SKIP });
   const onScroll = (e) => {
     const el = e.currentTarget;
     cancelAnimationFrame(raf.current);
@@ -615,7 +582,7 @@ export function codexItems(items) {
 function ItemCodex({ m, items, deckRef, onOpen, onTier }) {
   const groups = TIERS.map((tier) => ({ tier, items: items.filter((x) => x.tier === tier) })).filter((g) => g.items.length);
   const raf = useRef(0);
-  const dragScroll = useDragScroll();
+  const dragScroll = useDragScroll({ skip: DECK_SKIP });
   const onScroll = (e) => {
     const el = e.currentTarget;
     cancelAnimationFrame(raf.current);

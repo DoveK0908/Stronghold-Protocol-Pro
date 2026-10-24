@@ -1772,6 +1772,9 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rs-seats { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; justify-content: center; gap: max(.3rem, 2.2vw); padding: .3rem .4rem .1rem;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 .rs--big .rs-seats { justify-content: flex-start; gap: .16rem; }
+/* 按住鼠标左右拖动（ui/dragScroll.js）：拖起来时整条带子跟着手走，光标变成抓握、别顺手选中文字。 */
+.rs-seats.is-dragging { cursor: grabbing; user-select: none; }
+.rs-seats.is-dragging * { cursor: grabbing; user-select: none; }
 .rseat { --w: min(18vw, 3.4rem, calc((100vw - 1.6rem) / var(--n, 4) - .3rem)); position: relative; flex: none; width: var(--w); display: flex; flex-direction: column;
   animation: sw-in 260ms var(--ease-out) backwards; animation-delay: calc(var(--i) * 60ms); }
 .rs--big .rseat { --w: max(1.7rem, 120px); }

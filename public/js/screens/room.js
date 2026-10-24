@@ -35,6 +35,7 @@ import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyIcon, Tooltip, confirmDialog, Spinner, Modal,
 } from '../ui/components.js';
 import { toast, toastError } from '../ui/toasts.js';
+import { useDragScroll } from '../ui/dragScroll.js';
 import { copyText } from '../ui/clipboard.js';
 import { GuideButton } from '../ui/guide.js';
 import { openStats } from './stats.js';
@@ -443,6 +444,14 @@ export function RoomScreen() {
     }, { passive: false });
   };
 
+  // 扩容房（8–20 席）横过来排：按住鼠标左右拖就能看成员。以前只有滚轮和那条 6px 滚动条，
+  // 社区反馈「鼠标左右拖动查看成员没用了」（2026-10-24）——其实从来没做过，这次补上。
+  // 只在真的横向超出时才接管按下，否则一次普通点击会被当成拖动。
+  const seatsDrag = useDragScroll({
+    canStart: (el) => !!el && el.scrollWidth > el.clientWidth + 1,
+    skip: (target) => !!target?.closest?.('select, input, textarea'),
+  });
+
   if (!room) return null;
   const online = conn.status === 'online';
   const coop = room.mode !== 'solo';
@@ -579,7 +588,7 @@ export function RoomScreen() {
       </div>
     </header>
 
-    <main class="rs-seats" ref=${bindSeatsWheel}>
+    <main class="rs-seats" ref=${bindSeatsWheel} ...${seatsDrag}>
       ${facts.seats.map((s, i) => {
         const card = html`<${SeatCard} key=${s ? `p${s.playerId}` : `e${i}`} seat=${s} index=${i} room=${room} facts=${facts}
           myId=${me.playerId} myCard=${myCard} busy=${busy} gd=${gd} queued=${queued} onKick=${kick} onInvite=${() => copy('code')}
