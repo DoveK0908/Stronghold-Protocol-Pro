@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { voiceCandidates } from '../../public/js/voiceLanguage.js';
 import { SFX_PRI, bgmKeyFor, resolveBgm, SfxLimiter, AudioManager, normalAttackSfx, installAudio, audio, combatTrackFor, COMBAT_TRACK_SWITCH_ROUND, VoiceGate, resultSpeaker, resultVoiceSlot, VOICE_PRIORITY, VOICE_COOLDOWN_MS, voiceLine, VOICE_TREES } from '../../public/js/audio.js';
 import { mediaUrl } from '../../public/js/media.js';
 import { pickedBgm, bgmChoiceKind, sanitizeBgmChoice, BGM_CHOICES, MAJOR_BGM_URL } from '../../public/js/bgmChoice.js';
@@ -347,6 +348,11 @@ describe('operator battle voice', () => {
     assert.deepEqual(voiceLine(audioM, 'char_a', 'start', 'jp'), { url: '/a/voice/cn/char_a/cn_019.mp3', fallback: null }, 'a slot the JP tree lacks: the Chinese line');
     assert.equal(voiceLine(audioM, 'char_zz', 'select', 'jp'), null, 'an operator no dub voices (stand-ins, 盟约·辅助干员, summons) stays silent');
     assert.equal(voiceLine({ voice: {} }, 'char_a', 'select', 'jp'), null);
+    // 结城理 has no Chinese dub: a 中文 listener still hears his Japanese line
+    const jpOnly = { voice: {}, voiceJp: { char_b: { place: '/a/voice/jp/char_b/cn_023.mp3' } } };
+    assert.deepEqual(voiceLine(jpOnly, 'char_b', 'place', 'cn'), { url: '/a/voice/jp/char_b/cn_023.mp3', fallback: null }, '日配 only: 中文 falls over to it');
+    assert.deepEqual(voiceLine(jpOnly, 'char_b', 'place'), { url: '/a/voice/jp/char_b/cn_023.mp3', fallback: null });
+    assert.deepEqual(voiceCandidates({ audio: jpOnly }, 'char_b', 'place', 'cn'), ['/a/voice/jp/char_b/cn_023.mp3'], 'candidates: the japanese line is all he has');
     assert.equal(voiceLine(null, 'char_a', 'select', 'jp'), null);
     assert.deepEqual(voiceLine({ voice: audioM.voice }, 'char_a', 'place', 'jp'), { url: '/a/voice/cn/char_a/cn_023.mp3', fallback: null }, 'a manifest without voiceJp');
     // the real manifest: every operator with a Chinese line has its Japanese twin

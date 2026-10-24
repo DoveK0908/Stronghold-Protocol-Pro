@@ -20,5 +20,7 @@ export function voiceCandidates(manifest, charId, slot, language, random = Math.
   const chinese = pick(line(audio.voiceByLang?.cn)) || pick(line(audio.voice));
   const selected = audio.voiceByLang?.[chosen] ?? (chosen === 'jp' ? audio.voiceJp : null);
   const preferred = chosen === 'cn' ? chinese : pick(line(selected));
-  return [...new Set([preferred, chosen === 'cn' ? null : chinese].filter(Boolean))];
+  // 只有日配的干员（结城理）：中文档没有中文候选时才用他的日配，有中文候选就保持原样
+  const jpOnly = chosen === 'cn' && !preferred ? pick(line(audio.voiceByLang?.jp ?? audio.voiceJp)) : null;
+  return [...new Set([preferred, chosen === 'cn' ? jpOnly : chinese].filter(Boolean))];
 }

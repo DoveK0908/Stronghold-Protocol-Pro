@@ -452,7 +452,10 @@ export function voiceLine(audio, charId, slot, lang = 'cn', random = Math.random
     return { url: dub, fallback: cn.find((u) => file(u) === file(dub)) ?? draw(cn) };
   }
   const url = draw(cn);
-  return url ? { url, fallback: null } : null;
+  if (url) return { url, fallback: null };
+  // 只有日配的干员（结城理）：中文档的博士也听他的日配，而不是干脆没声音
+  const jpOnly = VOICE_TREES.jp ? draw(lines(dubTree(audio, 'jp')?.[charId]?.[slot])) : null;
+  return jpOnly ? { url: jpOnly, fallback: null } : null;
 }
 
 /**
