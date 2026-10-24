@@ -16,6 +16,8 @@
 // - T1 S.E.E.S.队长: when the 替身 ends she leads the squad's 总攻击 — `atk_scale` × ATK true damage to every enemy
 //   around her [SIMPLIFIED: PRTS spreads it around the S.E.E.S. squad members; the sim has no team ids, so only her own
 //   surroundings are hit].
+// - S3's 塔纳托斯 → 俄耳甫斯 switch is driven by the fatal hook only (PRTS also lists 「开启技能」, but a 替身 has 阻回
+//   and nobody presses skills by hand: owner, 2026-10-24).
 // - 「范围」 is the trait's `x-1` ring (`chess.trait.rangeGrid`, 13 tiles), not the 2-tile attack range: the 停顿, the
 //   heal, the extra targets and the 总攻击 all read it (`bbStr.range_id` on both talents names `x-1`).
 // - The 替身's normal attack is the 人格面具's: an arts hit at `attack@atk_scale` (S1 150 %, S2 160 %, S3 170 %) on up to
@@ -70,14 +72,9 @@ export default {
         // `dollForms`), its numbers are that skill's blackboard
         skchr_makoto_1: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
         skchr_makoto_2: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
-        // S3: 「塔纳托斯在场时，开启技能或受到致命伤时，改为召唤俄耳甫斯」 — a second press while P1 stands
-        skchr_makoto_3: {
-          kind: instantKind(def),
-          onStart({ unit }) {
-            if (unit.trait.doll && !unit.trait.dollSwitching && unit.form === DOLL_FORMS[2] && unit.trait.dollForm) unit.trait.dollForm(DOLL_FORM_P2);
-            else unit.trait.dollEnter?.();
-          },
-        },
+        // S3's 替身 is 塔纳托斯 (P1) and only 受到致命伤 turns it into 俄耳甫斯 (see talents[0]): the other trigger PRTS
+        // lists — 「开启技能」 — cannot happen here, a 替身 has 阻回 (`noSp`) and the player never presses a skill by hand.
+        skchr_makoto_3: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
       },
       talents: [
         { install(battle, unit) { // 不羁之力: the switch itself, its 停顿, and the 人格面具's boosts

@@ -178,17 +178,3 @@ test('结城理 S2: 击倒 needs the fear — the same low-HP enemy dies only on
   assert.equal(e.hp, 0, 'feared + under 230 % ATK ⇒ 击倒');
   checkInvariants(h.b);
 });
-
-test('结城理 S3: pressing the skill while 塔纳托斯 stands switches to 俄耳甫斯 (「开启技能…改为召唤俄耳甫斯」)', () => {
-  const h = field(2);
-  const u = h.unit(1);
-  kill(h, u);
-  assert.equal(u.form, 'doll3p1');
-  h.run(2);
-  u.trait.dollEnter?.();            // the skill press goes through `unit.trait.dollEnter` for S1/S2…
-  // …but S3's own onStart is what the player triggers; exercise it directly:
-  const kit = u.kit;
-  kit.skills.skchr_makoto_3.onStart({ unit: u, battle: h.b });
-  assert.equal(u.form, 'doll3p2', 'P1 → 俄耳甫斯 without a lethal hit');
-  checkInvariants(h.b);
-});
