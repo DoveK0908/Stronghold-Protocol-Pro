@@ -519,69 +519,10 @@ describe('interp: the snapshot `proj` list', () => {
     assert.equal(b.projAt(NaN), null);
   });
 
-  test('the official note prefab is picked by what fired the note (noteTrailKey / noteHitKey)', async () => {
-    const N = await import('../../public/js/render/fx/notes.js');
-    assert.equal(N.noteTrailKey('note'), 'oblvns_talent_trail', "the talent's own note");
-    assert.equal(N.noteHitKey('note'), 'oblvns_attack_01_hit');
-    for (const [i, key] of ['oblvns_skill_01_trail', 'oblvns_skill_02_trail', 'oblvns_skill_03_trail'].entries()) {
-      assert.equal(N.noteTrailKey('noteSkill', i), key, `skill slot ${i}`);
-      assert.equal(N.noteHitKey('noteSkill', i), ['oblvns_skill_01_hit', 'oblvns_skill_02_hit', 'oblvns_skill_03_hit'][i]);
-    }
-    // a skill note whose owner we cannot resolve (or an unknown slot) uses S1's, never null
-    assert.equal(N.noteTrailKey('noteSkill', null), 'oblvns_skill_01_trail');
-    assert.equal(N.noteTrailKey('noteSkill', 9), 'oblvns_skill_01_trail');
-    // an unknown kind has no official note: the procedural glyph draws it
-    assert.equal(N.noteTrailKey('bolt'), null);
-    assert.equal(N.noteHitKey('bolt'), null);
-  });
-
-  test('the official layer draws the note: played on birth, moved with it every frame, stopped when it goes', () => {
-    const plays = [];
-    const official = {
-      playOn: (key, point, o) => {
-        const h = { key, point, o, stopped: 0, stop() { this.stopped++; } };
-        plays.push(h);
-        return h;
-      },
-    };
-    const fx = makeFx();
-    fx.syncNotes([[7, 4, 10, 'note']], { official });
-    assert.equal(plays.length, 1, 'one note, one official effect');
-    assert.equal(plays[0].key, 'oblvns_talent_trail');
-    assert.equal(plays[0].o.loop, true, 'it lives as long as the note does');
-    assert.deepEqual([plays[0].point.x, plays[0].point.y], [4, 10], 'born where the sim has the note');
-    // our own glyph steps aside: the official prefab IS the note (owner 2026-10-24)
-    const n = fx.notes.get(7);
-    fx.time = 1 / 60;
-    fx.syncNotes([[7, 4.5, 12, 'note']], { official });
-    fx._updateNotes(1 / 60);
-    assert.equal(n.core.visible, false, 'no double drawing');
-    assert.equal(n.halo.visible, false);
-    assert.deepEqual([plays[0].point.x, plays[0].point.y], [4.5, 12], 'the point follows the note');
-    // it lands: the official trail stops and its hit fires once
-    fx.syncNotes([], { official });
-    for (let i = 0; i < 40; i++) { fx.time += 1 / 60; fx._updateNotes(1 / 60); }   // the 0.35 s fade-out runs out
-    assert.equal(plays[0].stopped, 1, 'stopped when the note left the field');
-    const hit = plays.find((h) => h.key === 'oblvns_attack_01_hit');
-    assert.ok(hit, 'and its official impact plays');
-    assert.deepEqual([hit.point.x, hit.point.y], [4.5, 12], 'at the last position');
-  });
-
-  test('without the official layer the procedural glyph still draws the note', () => {
-    const fx = makeFx();
-    fx.syncNotes([[9, 4, 10, 'note']]);
-    fx.time = 0.5;
-    fx._updateNotes(1 / 60);
-    const n = fx.notes.get(9);
-    assert.equal(n.official, undefined, 'nothing official to play');
-    assert.equal(n.core.visible, true, 'so the fallback glyph is the note');
-  });
-
   test('the battle frame hands the snapshot list to the FX system (app.js)', () => {
     const src = readFileSync(new URL('../../public/js/render/app.js', import.meta.url), 'utf8');
-    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\), \{ official: wiring \}\)/,
-      'render/app.js must feed interp.projAt(renderT) to fx.syncNotes each battle frame (a note has no atk event), '
-      + 'together with the official layer that draws the note itself (owner 2026-10-24)');
+    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\)\)/,
+      'render/app.js must feed interp.projAt(renderT) to fx.syncNotes each battle frame (a note has no atk event)');
   });
 
   test('the FX context carries the view list the launch sound resolves the firing unit from (app.js)', () => {
