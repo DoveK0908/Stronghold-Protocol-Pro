@@ -221,6 +221,32 @@ const installDollkeeper = (battle, unit) => {
     return tok && tok.stats.maxHp > 0 ? Math.max(0.05, tok.stats.maxHp / Math.max(1, unit.base.maxHp)) : 1;
   };
   const at = (extra) => ({ x: unit.x, y: unit.y, id: unit.id, ...extra });
+  // The <替身>'s 攻击范围 is the trait's own grid — every dollkeeper's trait carries the 9 tiles around the unit
+  // (`trait.rangeGrid`, 风丸 / 归溟幽灵鲨 alike), while the 本体's grid is the plain 2-tile melee. The client data already
+  // has it (simdata trait.rangeGrid); the remake used to keep the melee grid, so the 替身 only hit the tile in front
+  // (community report 2026-10-24: 「风丸的替身攻击范围好像不对，应该是周围8格」). `_ownRangeGrid` holds the 本体's grid
+  // so the way back restores exactly what she had (a kit may have changed it).
+  const setRange = (grid) => {
+    if (!Array.isArray(grid) || !grid.length || unit.rangeGrid === grid) return;
+    unit.rangeGrid = grid;
+    unit.markDirty();
+    // also on the way out (a knocked-out 替身 still holds a tile: the redeploy rebuilds from the 本体's grid)
+    if (unit.deployed || Number.isInteger(unit.tileR)) battle._refreshRange(unit);
+  };
+  const enterRange = () => {
+    // `def.trait` at runtime is the trait's TEXT (simdata keeps the description there); the parsed grid is on the raw chess
+    // record (`def.raw.trait.rangeGrid` — the same place professions.js reaperrange reads it from).
+    const grid = [unit.def?.raw?.trait?.rangeGrid, unit.def?.trait?.rangeGrid].find((g) => Array.isArray(g) && g.length);
+    if (!grid) return;
+    unit._ownRangeGrid = unit._ownRangeGrid || unit.rangeGrid;
+    setRange(grid);
+  };
+  const leaveRange = () => {
+    const back = unit._ownRangeGrid;
+    if (!back) return;
+    unit._ownRangeGrid = null;
+    setRange(back);
+  };
   // The 替身's form name. A dollkeeper whose skeleton carries more than one 替身 (结城理: one 人格面具 per selectable skill —
   // ops/op-makoto.js) names them in `profile.dollForms`, indexed by the selected skill; every other one is plain 'doll',
   // whose single entry lives in the render's FORMS. `dollForm()` re-names the form mid-替身 (S3's 塔纳托斯 → 俄耳甫斯).
@@ -266,6 +292,7 @@ const installDollkeeper = (battle, unit) => {
     if (!unit.trait.doll) return;
     unit.trait.doll = false;
     unit.form = null;
+    leaveRange();
     if (!unit.alive || !unit.deployed) return;
     startSwitch();
     unit.markDirty();
@@ -288,6 +315,7 @@ const installDollkeeper = (battle, unit) => {
     battle.releaseBlocked(unit);
     const form = formFor();
     unit.form = form;
+    enterRange();
     unit.markDirty();
     unit.hp = unit.s.maxHp;
     // `dur`: until the switch back (the client times the 替身's closing clip with it)
@@ -315,6 +343,7 @@ const installDollkeeper = (battle, unit) => {
     unit.trait.doll = false;
     unit.trait.dollSwitching = false;
     // knocked out as the 替身: its death clip has played (the 'die' event came first); the redeploy is the 本体 again
+    leaveRange();
     if (unit.form) { unit.form = null; battle.fx('dollEnd', at({ form: null })); }
   }, { owner: unit });
 };

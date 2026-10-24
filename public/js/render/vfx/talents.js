@@ -172,6 +172,11 @@ export function formModes(idx, unitKey) {
     const sw = (n.switchMode || []).find((x) => hasMode(x?.mode));
     if (fatal && sw) out.doll ??= sw.mode;
   }
+  // 风丸's index carries no talent node at all (her 替身 is the trait's, not a talent's), so the switchMode rule finds
+  // nothing and the 替身 used to fight in the 本体's Default mode: its attack played the wrong effects and, with
+  // `animKey 'Attack'` against the skeleton's `Attack_B`, none showed up (community report 2026-10-24: 「替身…好像没有
+  // 攻击特效」). The client names every 傀儡师's 替身 mode Stand, so fall back to it.
+  if (!out.doll && hasMode('Stand')) out.doll = 'Stand';
   return out;
 }
 

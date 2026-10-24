@@ -217,3 +217,25 @@ test('风丸: her 替身 still attacks (PRTS "<替身>状态下可对空"); the 
   assert.ok(log.attacksAsDoll > 0, 'the 替身 attacks');
   assert.ok(!g.s.flags.silence && !g.s.flags.disarm);
 });
+
+test('风丸 / 归溟幽灵鲨: the <替身> fights with the trait’s range — the 8 tiles around her, not the 本体’s melee tile — and the way back restores it', { skip }, () => {
+  // PRTS 分支特性信息 傀儡师: the <替身>'s 攻击范围 is the 9 tiles around the unit (the client data carries it as
+  // trait.rangeGrid); the 本体 is a plain 2-tile melee. The remake kept the melee grid, so the 替身 only reached the tile
+  // in front (community report 2026-10-24: 「风丸的替身攻击范围好像不对，应该是周围8格」).
+  for (const [id, skillIndex] of [['chess_char_2_11_a', 0], ['chess_char_5_13_a', 1]]) {
+    const { h, g, lethal } = setup({ id, skillIndex });
+    h.run(1);
+    assert.equal(g.rangeKeys.length, 2, `${id}: the 本体's melee range`);
+    lethal();
+    assert.ok(g.trait.doll, `${id}: the 替身`);
+    assert.equal(g.rangeKeys.length, 9, `${id}: the 替身's 8 surroundings + itself`);
+    assert.equal(g.liveRangeGrid.length, 9, `${id}: the detail card shows it too`);
+    // a second lethal blow knocks the 替身 out (past the 1 s switch window, which holds 不死): the way back to the 本体 is
+    // the melee grid again
+    h.run(DOLL_SWITCH + 0.5);
+    h.b.dealDamage(null, g, { amount: 1e9, type: 'true' });
+    assert.ok(!g.alive || g.form === null, `${id}: the 替身 was knocked out`);
+    assert.equal(g.rangeKeys.length, 2, `${id}: knocked out as the 替身, the redeploy is the 本体`);
+    checkInvariants(h.b);
+  }
+});

@@ -188,6 +188,13 @@ describe('talents in force and their bindings (talents.js)', () => {
     const idx = makeIndex();
     assert.deepEqual(formModes(idx, 'enemy_801_reb'), { form2: 'Reborn' });
     assert.deepEqual(formModes(idx, 'char_804_doll'), { doll: 'Stand' });
+    // 风丸's index has no talent node (her 替身 is the trait's): the client's Stand mode is the fallback, else her 替身
+    // fought in Default — its attack effects never matched the skeleton's Attack_B (2026-10-24 report)
+    idx.units.char_4016_kaze = { kind: 'char', skills: {}, talents: {},
+      modes: [{ name: 'Default', attack: melee([]) }, { name: 'Stand', attack: melee(['stand_cast']) }, { name: 'S2', attack: melee([]) }] };
+    assert.deepEqual(formModes(idx, 'char_4016_kaze'), { doll: 'Stand' });
+    idx.units.char_4016_kaze.modes = [{ name: 'Default', attack: melee([]) }];
+    assert.deepEqual(formModes(idx, 'char_4016_kaze'), {}, 'no Stand mode: nothing to map');
     const hp = { toggle: [{ class: 'HpRatioToggleChecker', minHpRatio: 0, maxHpRatio: 0.5 }] };
     assert.equal(toggleOn(hp, { hp: 40, maxHp: 100 }, {}, 0), true);
     assert.equal(toggleOn(hp, { hp: 60, maxHp: 100 }, {}, 0), false);
