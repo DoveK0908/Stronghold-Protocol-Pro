@@ -26,6 +26,14 @@ import { SHOT_HEIGHT, bodyZ } from './camera.js';
  *  a note that left the snapshot — the note dims and sinks away instead of popping out of existence. */
 const MAX_NOTES = 64, NOTE_FADE = 0.35;
 /**
+ * The OFFICIAL trail prefab of a note, by `kind` (owner 2026-10-24: 「我们提取到的特效是完全够的，应该不用自己再渲染」):
+ * her own `oblvns_talent_trail` carries the 五线谱绸带 + 2×2 音符 flipbook + 光环, i.e. exactly the note's look, so when the
+ * official effect layer is available a note is that prefab — moved every frame onto the note's flight point through
+ * `playOn`'s `track` callback — and our own glyph/halo is not drawn at all. `noteSkill` is her skills' note
+ * (`projectile_chr_oblvns_s1_*`); its trail is the same family.
+ */
+const NOTE_TRAIL = Object.freeze({ note: 'oblvns_talent_trail', noteSkill: 'oblvns_skill_01_trail' });
+/**
  * How far (board tiles) a unit may stand from a note's first position and still count as the one that fired it
  * (`_noteOwner`): a note is born AT its caster, so the caster is the nearest unit by construction — the radius only
  * keeps an unrelated unit that happens to stand nearby (or a stale view) from being blamed. Generous on purpose: a
@@ -75,7 +83,7 @@ export class FxNotes {
    *   where the launch sound goes (default: the app's `audio` singleton, whose entry point is `playProj`) — injectable
    *   so a render test can count the launches without an AudioContext
    */
-  syncNotes(list, sink = null) {
+  syncNotes(list, sink = null, fxw = null) {
     const seen = this._noteSeen || (this._noteSeen = new Set());
     seen.clear();
     if (Array.isArray(list)) {
@@ -87,6 +95,7 @@ export class FxNotes {
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
         seen.add(id);
         let n = this.notes.get(id);
+        if (fxw !== this._noteFx) { this._noteFx = fxw || null; this._noteOfficialOff(); }
         if (!n) {
           n = this._takeNote();
           n.id = id; n.emit = Math.random(); n.out = 0;
@@ -94,6 +103,7 @@ export class FxNotes {
           n.frame = pickNoteFrame();                                                  // 八分 / 十六分 / 高音谱号
           this.notes.set(id, n);
           this._noteFired(e[3], x, y, sink);                                          // 发出音符: the launch sound
+          if (this._noteFx) this._noteOfficialOn(n, e[3], x, y);                      // the official note prefab
         }
         n.spec = PROJ[e[3]] && PROJ[e[3]].look === 'note' ? PROJ[e[3]] : PROJ.note;
         n.x = x; n.y = y; n.out = 0;
@@ -180,11 +190,47 @@ export class FxNotes {
   }
 
   _freeNote(n) {
+    if (n.h) { try { n.h.stop(); } catch { /* already gone */ } n.h = null; }
+    if (n.carrier) n.carrier.alive = false;
+    n.official = false;
     n.core.visible = n.halo.visible = false;
     n.core.alpha = n.halo.alpha = 0;
     n.id = null;
     n.burst = false;   // the parting flash belongs to the life that just ended
     this.noteFree.push(n);
+  }
+
+  /**
+   * Start the OFFICIAL trail prefab of a note and hand it a `track` that puts it back on the note's flight point every
+   * frame (the same `fx.anchor` the default track writes, board coordinates: x, y, -height). Nothing happens when the
+   * official layer is absent or does not carry that prefab — the note is then still drawn by `_updateNotes`.
+   */
+  _noteOfficialOn(n, kind, x, y) {
+    const w = this._noteFx;
+    if (!w || typeof w.playOn !== 'function') return;
+    const key = NOTE_TRAIL[kind] || NOTE_TRAIL.note;
+    try {
+      if (!w.idx?.prefabs?.[key]) return;
+    } catch { return; }
+    const carrier = { x, y, z: 0, hover: 0, dir: null, visFacing: 1, alive: true, destroyed: false, info: { id: n.id, kind: 'item' } };
+    n.carrier = carrier;
+    n.h = w.playOn(key, carrier, {
+      loop: true,
+      track: (fx) => {
+        if (!n.carrier.alive) { fx.hidden = true; return; }
+        fx.anchor[0] = n.carrier.x; fx.anchor[1] = n.carrier.y; fx.anchor[2] = 0;
+        fx.groundZ = 0;
+      },
+    });
+    n.official = !!n.h;
+  }
+  /** Stop every official note trail (the official layer went away, or the whole list was replaced). */
+  _noteOfficialOff() {
+    for (const n of this.notes.values()) {
+      if (n.h) { try { n.h.stop(); } catch { /* a dead handle stops nothing */ } }
+      n.h = null; n.official = false;
+      if (n.carrier) n.carrier.alive = false;
+    }
   }
 
   /**
@@ -228,6 +274,13 @@ export class FxNotes {
       // a slow float and sway: the note reads as playing in the air, not as a sprite pinned to the tile
       const py = p.y - (NOTE_BOB * (0.6 + 0.4 * Math.sin(this.time * 2.2 + n.seed))) * s;
       const k = 0.85 + 0.15 * fade;
+      if (n.carrier) { n.carrier.x = n.x; n.carrier.y = n.y; }
+      if (n.official) {   // the official prefab IS the note: our glyph and halo stay hidden
+        n.core.visible = n.halo.visible = false;
+        n.core.alpha = n.halo.alpha = 0;
+        if (n.out > 0 && !n.burst) { n.burst = true; n.carrier.alive = false; }
+        continue;
+      }
       const core = n.core;
       // the official flipbook: four frames in order, 30 fps, phase-shifted per note (its `seed`)
       const flip = NOTE_FLIP[Math.floor((this.time + n.seed * 0.13) * NOTE_FLIP_HZ) % NOTE_FLIP.length];

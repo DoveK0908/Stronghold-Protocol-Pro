@@ -518,8 +518,9 @@ describe('interp: the snapshot `proj` list', () => {
 
   test('the battle frame hands the snapshot list to the FX system (app.js)', () => {
     const src = readFileSync(new URL('../../public/js/render/app.js', import.meta.url), 'utf8');
-    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\)\)/,
-      'render/app.js must feed interp.projAt(renderT) to fx.syncNotes each battle frame (a note has no atk event)');
+    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\), null, wiring\)/,
+      'render/app.js must feed interp.projAt(renderT) — and the official effect layer, so a note is her own prefab — '
+      + 'to fx.syncNotes each battle frame (a note has no atk event)');
   });
 
   test('the FX context carries the view list the launch sound resolves the firing unit from (app.js)', () => {
