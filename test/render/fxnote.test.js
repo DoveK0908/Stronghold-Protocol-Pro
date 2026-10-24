@@ -530,3 +530,13 @@ describe('interp: the snapshot `proj` list', () => {
       'render/app.js must give the FX context the field views (render/fx/notes.js `_noteOwner`)');
   });
 });
+
+test('the note wears the官方 note-with-trail prefab, not the talent trail', async () => {
+  const src = readFileSync(new URL('../../public/js/render/fx/notes.js', import.meta.url), 'utf8');
+  // 2026-10-24: `oblvns_talent_trail` is the buff trail ON the unit (it renders as a speck here); the flying note
+  // with its staff-trail is `oblvns_attack_01_trail` / `oblvns_skill_0N_trail` (fx-viewer screenshots).
+  assert.match(src, /note: 'oblvns_attack_01_trail'/);
+  assert.doesNotMatch(src, /note: 'oblvns_talent_trail'/);
+  assert.match(src, /oblvns_skill_0\$\{si \+ 1\}_trail/);
+  assert.match(src, /_noteTrailKey/);
+});

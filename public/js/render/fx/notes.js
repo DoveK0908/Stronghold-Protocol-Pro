@@ -32,7 +32,7 @@ const MAX_NOTES = 64, NOTE_FADE = 0.35;
  * placed them — only x/y move), and our drawn glyph is hidden. If it cannot (no official layer, missing prefab, a
  * throw), the glyph below still draws, so a note is never invisible.
  */
-const NOTE_TRAIL = Object.freeze({ note: 'oblvns_talent_trail', noteSkill: 'oblvns_skill_01_trail' });
+const NOTE_TRAIL = Object.freeze({ note: 'oblvns_attack_01_trail', noteSkill: 'oblvns_skill_01_trail' });
 /**
  * How far (board tiles) a unit may stand from a note's first position and still count as the one that fired it
  * (`_noteOwner`): a note is born AT its caster, so the caster is the nearest unit by construction — the radius only
@@ -205,10 +205,27 @@ export class FxNotes {
    * prefab's own ground offset and scale stay untouched. Any failure leaves `n.official` false and the drawn glyph in
    * place (`_updateNotes`), which is why a note can never vanish any more.
    */
+  /**
+   * The official trail of a note: her normal attack's note is `oblvns_attack_01_trail`; a skill's note is
+   * `oblvns_skill_01/02/03_trail` by the skill the caster has equipped (S1's eight notes share `_01_trail`, whose
+   * `_02.._08` are takes of the same look). Falls back to the normal one, then to `null` (then the glyph draws).
+   */
+  _noteTrailKey(kind, x, y) {
+    const w = this._noteFx;
+    const prefabs = w && w.idx && w.idx.prefabs;
+    if (!prefabs) return null;
+    if (kind !== 'noteSkill') return NOTE_TRAIL[kind] || NOTE_TRAIL.note;
+    const owner = this._noteOwnerView(x, y);
+    const si = owner && owner.info && Number.isInteger(owner.info.skillIndex) ? owner.info.skillIndex : null;
+    const per = si != null ? `oblvns_skill_0${si + 1}_trail` : null;
+    for (const k of [per, NOTE_TRAIL.noteSkill]) if (k && prefabs[k]) return k;
+    return null;
+  }
+
   _noteOfficialOn(n, kind, x, y) {
     const w = this._noteFx;
     if (!w || typeof w.playOn !== 'function') return;
-    const key = NOTE_TRAIL[kind] || NOTE_TRAIL.note;
+    const key = this._noteTrailKey(kind, x, y) || NOTE_TRAIL.note;
     try {
       if (!w.idx?.prefabs?.[key]) return;
       const owner = this._noteOwnerView(x, y);
