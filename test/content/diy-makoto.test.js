@@ -66,7 +66,7 @@ test('结城理 T0: the switch 停顿s the enemies around her and the 替身 fig
   const atkBefore = u.s.atk, hpBefore = u.s.maxHp;
   kill(h, u);
   h.step();
-  assert.ok(e.buffs.some((b) => b.status === 'stun' && b.timeLeft > 7), '停顿 for the talent’s 8 s');
+  assert.ok(e.buffs.some((b) => b.status === 'sluggish' && b.timeLeft > 7), '停顿 (a slow, not a stun) for the talent’s 8 s');
   assert.equal(u.form, 'doll1');
   assert.ok(u.s.atk > atkBefore * 1.5, `the 替身's ATK (was ${atkBefore}, now ${u.s.atk})`);
   assert.ok(u.s.maxHp > hpBefore, 'and its max HP');

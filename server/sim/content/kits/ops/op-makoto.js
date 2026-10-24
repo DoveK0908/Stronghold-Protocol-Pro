@@ -11,7 +11,8 @@
 //   carries one clip set per form (`Doll_Skill_1_*` / `Doll_Skill_2_*` / `Doll_Skill_3_P1_*` / `Doll_Skill_3_P2_*`),
 //   so the sim names the form (`unit.form` = 'doll1' | 'doll2' | 'doll3p1' | 'doll3p2'; `installDollkeeper` maps the
 //   selected skill through `unit.profile.dollForms`) and `public/js/render/units.js` FORMS maps it to those clips.
-// - T0 不羁之力: switching to the 替身 停顿 (stun) the enemies around her for `sluggish` s; in the 替身 ATK +85 %,
+// - T0 不羁之力: switching to the 替身 停顿 (sluggish — a slow, not a stun) the enemies around her for `sluggish` s;
+//   in the 替身 ATK +85 %,
 //   max HP +35 %, attack interval +0.4 s (the 人格面具 swings slower but hits far harder).
 // - T1 S.E.E.S.队长: when the 替身 ends she leads the squad's 总攻击 — `atk_scale` × ATK true damage to every enemy
 //   around her [SIMPLIFIED: PRTS spreads it around the S.E.E.S. squad members; the sim has no team ids, so only her own
@@ -95,7 +96,7 @@ export default {
             // into the 替身: 停顿 the enemies around her (PRTS: 切换为<替身>状态时停顿周围一定范围内敌人 8 秒)
             if (sluggish > 0) {
               for (const e of enemiesInGrid(battle, unit, ring, { n: 0 })) {
-                if (e.alive) battle.applyStatus(e, 'stun', { duration: sluggish, source: unit });
+                if (e.alive) battle.applyStatus(e, 'sluggish', { duration: sluggish, source: unit });
               }
             }
             battle.addBuff(unit, {

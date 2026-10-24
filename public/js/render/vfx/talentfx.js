@@ -245,6 +245,7 @@ export class TalentFx {
     if (kind === 'shieldBreak') { U.broken = true; return false; }
     if (kind === 'phase' && extra.kind === 'artsBarrier') { U.broken = false; return false; }
     let drew = false;
+    let switched = false;
     if (kind === 'extraAttack') {
       const tgt = this.w.lastTarget(U.id);
       for (const b of U.binds) {
@@ -256,7 +257,26 @@ export class TalentFx {
       }
       return drew;
     }
-    for (const b of U.binds) if (triggerKinds(b).includes(kind) && this._modeOk(U, b, true) && this._fire(U, b, U.v)) drew = true;
+    // the sim's 替身 switch — 'substitute' on the way in, 'swap' back out (battle.fx carries `form`): a dollkeeper's
+    // switch rows, an ability's `BuffToOwner` buff template with no event of its own (结城理's `makoto_change_01`,
+    // keyed `switch2stand_s1` / `switch2stand_s2` / `switch2stand_s3_1` / `switch2stand_s3_2` / `switch2normal` in the
+    // index). They belong to no mode, so the generic trigger loop below never reaches them.
+    if (kind === 'substitute' || kind === 'swap') {
+      const form = typeof extra.form === 'string' ? extra.form : null;
+      const mode = form ? this.w.formMap(this.w.unitKeyOf(U.v))[form] || null : null;
+      const want = (mode ? String(mode) : 'normal').toLowerCase();
+      const cands = U.binds.filter((b) => (b.when === null || b.when === undefined) && b.plan.start.length);
+      // one switch effect per switch: the binding whose key names the target mode (`switch2stand_s1`, `switch2normal`…),
+      // else the only one there is — never all of them (they are one prefab each, and playing them all stacks it)
+      const pick = cands.find((b) => String(b.key || '').toLowerCase().includes(want)) || (cands.length === 1 ? cands[0] : null);
+      if (pick) { switched = true; for (const e of pick.plan.start) if (this._play(e, U.v)) drew = true; }
+    }
+    for (const b of U.binds) {
+      // the switch rows played above are not played again by the generic trigger loop (they all fire on 'substitute'
+      // and draw the same prefab — five of them stacked it on every switch)
+      if (switched && (b.when === null || b.when === undefined) && b.plan.start.length) continue;
+      if (triggerKinds(b).includes(kind) && this._modeOk(U, b, true) && this._fire(U, b, U.v)) drew = true;
+    }
     return drew;
   }
 
