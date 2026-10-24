@@ -433,6 +433,29 @@ export const FORMS = Object.freeze({
   char_4016_kazema: Object.freeze({
     doll: Object.freeze({ change: 'Start_B', leave: 'Start', roles: dollRoles('Idle_B', 'Die_B', 'Attack_B') }),
   }),
+  // 结城理 (char_4217_makoto): one 替身 per selectable skill — S1 俄耳甫斯, S2 塔纳托斯, S3 塔纳托斯 that becomes 俄耳甫斯 when
+  // it would be knocked out. Each form has its own clip set (`Doll_Skill_N_*`), so the sim names the form
+  // (professions.js installDollkeeper: `profile.dollForms`, then `dollForm()` for S3's second one) and these entries pick
+  // the clips. The Back skeleton carries no `Die/Stun/SwitchOut` clip — play() skips a name it cannot find, so the back
+  // view simply holds its idle.
+  char_4217_makoto: Object.freeze({
+    doll1: Object.freeze({
+      change: 'Doll_Skill_1_SwitchIn', leave: 'Doll_Skill_1_SwitchOut',
+      roles: Object.freeze({ ...dollRoles('Doll_Skill_1_Idle', 'Doll_Skill_1_Die', 'Doll_Skill_1_Attack'), stun: loop('Doll_Skill_1_Stun') }),
+    }),
+    doll2: Object.freeze({
+      change: 'Doll_Skill_2_SwitchIn', leave: 'Doll_Skill_2_SwitchOut',
+      roles: Object.freeze({ ...dollRoles('Doll_Skill_2_Loop', 'Doll_Skill_2_Die'), stun: loop('Doll_Skill_2_Stun') }),
+    }),
+    doll3p1: Object.freeze({
+      change: 'Doll_Skill_3_P1_SwitchIn', leave: 'Doll_Skill_3_P1_SwitchOut',
+      roles: Object.freeze({ ...dollRoles('Doll_Skill_3_P1_Idle', 'Doll_Skill_3_P1_SwitchOut', 'Doll_Skill_3_P1_Attack_A'), stun: loop('Doll_Skill_3_P1_Stun') }),
+    }),
+    doll3p2: Object.freeze({
+      change: 'Doll_Skill_3_P1toP2_ChangeEnd', leave: 'Doll_Skill_3_P2_SwitchOut',
+      roles: Object.freeze({ ...dollRoles('Doll_Skill_3_P2_Loop', 'Doll_Skill_3_P2_Die'), stun: loop('Doll_Skill_3_P2_Stun') }),
+    }),
+  }),
   enemy_1040_bombd: Object.freeze({
     bombed: Object.freeze({
       roles: Object.freeze({

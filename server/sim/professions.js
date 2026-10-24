@@ -221,6 +221,23 @@ const installDollkeeper = (battle, unit) => {
     return tok && tok.stats.maxHp > 0 ? Math.max(0.05, tok.stats.maxHp / Math.max(1, unit.base.maxHp)) : 1;
   };
   const at = (extra) => ({ x: unit.x, y: unit.y, id: unit.id, ...extra });
+  // The 替身's form name. A dollkeeper whose skeleton carries more than one 替身 (结城理: one 人格面具 per selectable skill —
+  // ops/op-makoto.js) names them in `profile.dollForms`, indexed by the selected skill; every other one is plain 'doll',
+  // whose single entry lives in the render's FORMS. `dollForm()` re-names the form mid-替身 (S3's 塔纳托斯 → 俄耳甫斯).
+  const formFor = () => {
+    const forms = unit.profile?.dollForms;
+    if (!Array.isArray(forms) || !forms.length) return 'doll';
+    const i = unit.def?.loadout?.skillIndex;
+    return (Number.isInteger(i) && forms[i]) || forms[0];
+  };
+  const dollForm = (name) => {
+    if (!name || unit.form === name) return false;
+    unit.form = name;
+    unit.markDirty();
+    if (unit.alive && unit.deployed) battle.fx('substitute', at({ form: name }));
+    if (battle.hasHook('dollSwap')) battle.emit('dollSwap', { unit, form: name });
+    return true;
+  };
   // a switch animation: "切换动画开始时会清除自身一切Buff" (header: the running skill and the statuses), then 1 s of 不死
   // (the fatal hook below) 无敌 阻回 禁疗 孤立 强制缴械 and 眩晕 / 冻结 / 睡眠 immunity (beforeStatus below). "切换途中重设自身
   // 生命至最大值": the HP is set to the max at the start (enter / leave) and again when the switch ends, so she always
@@ -269,16 +286,20 @@ const installDollkeeper = (battle, unit) => {
       flags: { noSp: true, ...(unit.profile.dollNoAttack ? { disarm: true, silence: true } : null) },
     });
     battle.releaseBlocked(unit);
-    unit.form = 'doll';
+    const form = formFor();
+    unit.form = form;
     unit.markDirty();
     unit.hp = unit.s.maxHp;
     // `dur`: until the switch back (the client times the 替身's closing clip with it)
-    battle.fx('substitute', at({ form: 'doll', dur }));
-    // `dollSwap` { unit, form }: a switch started — to the 替身 ('doll') or back to the 本体 (null); not fired when she is
-    // knocked out as the 替身 (不屈 rolls on both switches: PRTS 盟约记录 "切换<替身>与<本体>时")
-    if (battle.hasHook('dollSwap')) battle.emit('dollSwap', { unit, form: 'doll' });
+    battle.fx('substitute', at({ form, dur }));
+    // `dollSwap` { unit, form }: a switch started — to the 替身 (its form name) or back to the 本体 (null); not fired when
+    // she is knocked out as the 替身 (不屈 rolls on both switches: PRTS 盟约记录 "切换<替身>与<本体>时")
+    if (battle.hasHook('dollSwap')) battle.emit('dollSwap', { unit, form });
     return true;
   };
+  // a kit may switch the 替身 itself (结城理 S3: 塔纳托斯 → 俄耳甫斯 when it would be knocked out)
+  unit.trait.dollEnter = enter;
+  unit.trait.dollForm = dollForm;
   battle.on('fatal', (ctx) => {
     if (ctx.unit !== unit || ctx.prevented) return;
     if (unit.trait.dollSwitching) { ctx.prevented = true; return; } // 不死 while switching (a 流失 ignores 无敌)

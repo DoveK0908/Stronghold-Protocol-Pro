@@ -543,13 +543,15 @@ const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees'
  */
 const DIY_EXCLUDED_NUMBER_PREFIXES = Object.freeze(['MH', 'RS', 'AM', 'PS', 'DD']);
 /**
- * …and the exceptions carved out of the two rules above (the owner's decision of 2026-10-08): collab operators added
- * to the 自选 roster on purpose, one id at a time. 丰川祥子 (Ave Mujica) may be selected in 自选编队; once picked she
- * is a private stock of that player's own shop and never enters the shared pool, so her id alone belongs here. Do NOT
- * drop `mujica` from DIY_EXCLUDED_TEAMS nor `AM` from the prefixes instead: that would also put the other four Ave
- * Mujica operators in the pool, and they carry no kit, art or voice of their own.
+ * …and the exceptions carved out of the two rules above (the owner's decisions of 2026-10-08 and 2026-10-24): collab
+ * operators added to the 自选 roster on purpose, one id at a time. 丰川祥子 (Ave Mujica) may be selected in 自选编队;
+ * once picked she is a private stock of that player's own shop and never enters the shared pool, so her id alone
+ * belongs here. 结城理 (Persona 3, `sees`) joined on 2026-10-24: the owner asked for the 傀儡师 the client has and we
+ * do not, and he is the only 6★ dollkeeper outside the chess pool (风丸 / 归溟幽灵鲨 are chess; 维荻 / 贝娜 / 双月 /
+ * 若叶睦 are 4–5★, and a 自选 slot fields a 6★). Do NOT drop `mujica` / `sees` from DIY_EXCLUDED_TEAMS nor `AM` / `PS`
+ * from the prefixes instead: that would also put their teammates in the pool, and those carry no kit, art or voice.
  */
-const DIY_INCLUDED_COLLAB = new Set(['char_4182_oblvns']);
+const DIY_INCLUDED_COLLAB = new Set(['char_4182_oblvns', 'char_4217_makoto']);
 
 /**
  * The skill a prototype carries in a 自选 slot when no 补位 row of the slot's tier names it (only 预备干员-医疗 at tier 5:

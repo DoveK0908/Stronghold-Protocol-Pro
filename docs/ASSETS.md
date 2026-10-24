@@ -686,6 +686,13 @@ pose carried over (`render/spine.js syncFormPose`). The forms:
   Neither Back skeleton has the 替身's death clip, so a 替身 knocked out lies on the Front model (like every knocked-out
   operator facing up, DESIGN §22.1) with its `Die_B_2` / `Die_B`: the view keeps the form it died in for that model and
   for one rebuilt while it lies down, although the sim resets the form right after the knock-out.
+- 结城理 (Persona 3, 自选): one `Doll_Skill_N_*` clip set per 人格面具 instead of the `*_B` sets — `doll1` 俄耳甫斯
+  (`Doll_Skill_1_SwitchIn` / `_Idle` / `_Attack` / `_Die` / `_Stun` / `_SwitchOut`), `doll2` 塔纳托斯 (`Doll_Skill_2_*`,
+  idle named `_Loop`), `doll3p1` 塔纳托斯 (`Doll_Skill_3_P1_*`), and `doll3p2` 俄耳甫斯 again, entered through
+  `Doll_Skill_3_P1toP2_ChangeEnd` (`Doll_Skill_3_P2_*`). His Back skeleton carries only `Attack_A`, `Attack_B`,
+  `Doll_Skill_1_Attack`, `Doll_Skill_1_Idle`, `Doll_Skill_2_Loop`, `Doll_Skill_3_P1_Attack_A/B` and
+  `Doll_Skill_3_P1_Idle` — the same "missing clips are skipped" rule as above (measured 2026-10-24: the four forms draw
+  109–123 slots on the Front skeleton against 69 for the 本体).
 
 Not mapped (clip names ambiguous): “自在”, “巨大的丑东西”, 主角阵营角色 and “余音” (`*_A` / `*_B`: which of its two forms is A
 is not known) keep their manifest clips.
