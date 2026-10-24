@@ -187,7 +187,7 @@ describe('UnitView.land — the Start clip again and the landing sound, once (PR
 test('render/app.js wiring: landings in setPrep, the replay schedule, its timers cleared when prep mode ends and on destroy', () => {
   const src = readFileSync(path.join(ROOT, 'public/js/render/app.js'), 'utf8');
   // a purchase (an operator new on the bench), a merge's elite, a piece put on a board tile it was not on
-  assert.match(src, /if \(e\.piece\.kind === 'chess'\) landPiece\(v, 'buy'\);/);
+  assert.match(src, /if \(e\.piece\.kind === 'chess'\) \{\s*landPiece\(v, 'buy'\);/);
   assert.match(src, /landPiece\(v, 'merge'\);/);
   assert.match(src, /if \(was && e\.area === 'board' && \(was\.area !== 'board' \|\| was\.row !== e\.row \|\| was\.col !== e\.col\)[^\n]*landPiece\(v, 'board'\);/);
   assert.match(src, /const prevAt = new Map\(prepPieces\.map\(\(p\) => \[p\.uid, p\]\)\);/, 'compared with the last state of this prep, not a rebuild');
@@ -205,8 +205,13 @@ test('render/app.js wiring: landings in setPrep, the replay schedule, its timers
 test('a bench arrival flashes only: no passive loops start in 待部署区 (斯卡蒂 / 伊内丝 residue)', () => {
   const app = readFileSync(path.join(ROOT, 'public/js/render/app.js'), 'utf8');
   const wire = readFileSync(path.join(ROOT, 'public/js/render/vfx/wiring.js'), 'utf8');
-  // 买到的干员落到待部署区：只放到达闪光
-  assert.match(app, /if \(e\.piece\.kind === 'chess'\) landPiece\(v, 'buy'\);\s*fx\.arrive\(v\);/);
+  // 买到的干员落到待部署区：只放到达闪光 — and it is the official layer's arrive(), the procedural FxSystem has none:
+  // `fx.arrive(v)` threw a TypeError there, which aborted setPrep before `prepPieces` was rebuilt, so the bought
+  // operator was drawn but could not be selected until the next private state (维护者 2026-10-23).
+  assert.match(app, /if \(e\.piece\.kind === 'chess'\) \{\s*landPiece\(v, 'buy'\);\s*(?:\/\/[^\n]*\n\s*)*wiring\.arrive\(v\);/);
+  assert.doesNotMatch(app, /fx\.arrive\(/, 'the bench arrival flash is wiring.arrive, not fx.arrive');
+  const fx = readFileSync(path.join(ROOT, 'public/js/render/fx/arrivals.js'), 'utf8');
+  assert.doesNotMatch(fx, /^  arrive\(/m, 'FxSystem (fx/arrivals.js) must not be assumed to have arrive()');
   const arrive = wire.slice(wire.indexOf('  arrive(v) {'), wire.indexOf('  arrive(v) {') + 460);
   assert.ok(arrive.length > 100, 'arrive() exists');
   assert.doesNotMatch(arrive, /skills\.deployed|talents\.deployed/, 'arrive() must not start passive loops or talents');

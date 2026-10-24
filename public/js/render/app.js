@@ -923,8 +923,15 @@ export async function createFieldView(host, options = {}) {
         else if (before.length && (e.area === 'hand' || e.area === 'temp') && !before.some((g) => g.uid === e.uid)) {
           // an operator that just arrived on the bench — bought, a reward, a grant — lands there (PR #416); a summon that comes
           // with its owner's placement does not, nor does an item
-          if (e.piece.kind === 'chess') landPiece(v, 'buy');
-          fx.arrive(v);   // 待部署区的到达闪光；deploy() 会启动被动技能的 loop，之后不会停，会留在格子上
+          if (e.piece.kind === 'chess') {
+            landPiece(v, 'buy');
+            // 待部署区的到达闪光；deploy() 会启动被动技能的 loop，之后不会停，会留在格子上 (6fba6457). `arrive()` lives on
+            // the official-effect layer (`FxWiring`), not on `fx` (`FxSystem`, whose container has deploy / promote / death /
+            // crateBreak / pop only): `fx.arrive` threw a TypeError here, and a throw at this point leaves `prepPieces` below
+            // stale, so the arrived operator is drawn but cannot be selected until the next private state re-runs setPrep
+            // (维护者 2026-10-23: 商店购买之后备战席选不中，刷新 / 冻结商店才恢复). Items get no flash: they arrive quietly.
+            wiring.arrive(v);
+          }
         }
       } else {
         const prevHome = v._home;
