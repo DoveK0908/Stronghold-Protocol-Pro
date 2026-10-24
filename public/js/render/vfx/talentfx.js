@@ -421,7 +421,10 @@ export class TalentFx {
       for (const [k, t] of U.loops) if (!want.has(k) || (!t.h.alive && t.e.loop)) { if (!want.has(k)) t.h.stop(); U.loops.delete(k); }
       for (const [k, e] of want) {
         if (U.loops.has(k)) continue;
-        const h = this._play(e, v, { loop: true });
+        // `e.loop` is the prefab's own `looping` flag: a one-shot row (结城理's `*_start` bursts, live 38 particles)
+        // plays ONCE while it stays wanted — forcing loop:true restarted that burst every time it ended, which is what
+        // made the 替身's feet glare (owner report 2026-10-24: 「官方的没问题，我们有问题说明运用上出问题了」)
+        const h = this._play(e, v, { loop: e.loop !== false });
         if (h) U.loops.set(k, { h, e });
       }
     }
