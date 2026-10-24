@@ -112,6 +112,9 @@
 .team--list .team__row.is-open { background: rgba(13, 44, 36, .92); border-color: var(--mint-700); }
 .team--list .team__name { flex: 1 1 3em; min-width: 0; max-width: none; font-size: var(--team-fs); }
 .team--list .team__line { flex: none; gap: 6px; }
+/* 界面#10 in the list layout: the row is a wrapping flex line, so a short name left room for 策略 beside the HP row while a
+   long one pushed it below — same list, two different shapes. It always takes a line of its own now, under the name. */
+.team--list .team__strategy { flex: 0 0 100%; margin-top: 0; }
 .team--list .lp--sm { font-size: var(--team-fs); gap: 2px; }
 .team--list .lp__pend { font-size: var(--team-fs-sm); }
 .team--list .team__line .misstag { height: 20px; min-width: 52px; }
