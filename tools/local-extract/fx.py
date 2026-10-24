@@ -2163,22 +2163,15 @@ def behaviour_uses(cls, fields, ek, templates=None, node=None, ability=None):
 
 
 def skill_mode(fields):
-    """The unit mode a skill behaviour switches its owner to (index into the unit's modes), or None: the skill root's
-    `_defaultModeIndex` (a ToggleSkill's landing mode — 丰川祥子 S2 lands on `S2_Atk`), the mode its blackboard names
-    (`_attackBlackboardModeIndex`, S3), the blackboard `mode` of a switch_mode* buff, or a `_switchToMode` that is an
-    index rather than the boolean flag most skills carry (2026-10-24: reading that flag as an index gave 丰川祥子's S2
-    `S2_AttackSpeed`, which made her S2 play the wrong mode's effects)."""
-    for key in ('_attackBlackboardModeIndex', '_defaultModeIndex'):   # S3: 4 (attack blackboard), S2: 2
-        m = fields.get(key)
-        if isinstance(m, int) and not isinstance(m, bool) and m >= 0:
-            return m
+    """The unit mode a skill behaviour switches its owner to (index into the unit's modes), or None: the blackboard
+    `mode` of a switch_mode* buff, a ToggleSkill's _switchToMode."""
     for b in buffs_in(fields):
         if str(b.get('templateKey') or '').startswith('switch_mode'):
             for bb in b.get('blackboard') or []:
                 if isinstance(bb, dict) and bb.get('key') == 'mode' and isinstance(bb.get('value'), (int, float)):
                     return int(bb['value'])
     m = fields.get('_switchToMode')
-    return m if isinstance(m, int) and not isinstance(m, bool) and m > 1 else None
+    return m if isinstance(m, int) and not isinstance(m, bool) and m >= 0 else None
 
 
 def roles_of(uses):
@@ -2680,23 +2673,7 @@ def node_entry(env, root, ek, pk, effect_refs, templates, node_name=None, stop=N
                     if info.get('extraProjectileKeys'):
                         u['extraProjectileKeys'] = info['extraProjectileKeys']
             uses += found_uses
-            # a skill's own ability list (`_abilityConfigs`): 丰川祥子's S2 / S3 carry their effects on the abilities'
-            # inline buffs (overrideEffectKey, loadFromDB 0 — no global template), so following the list is what puts
-            # `oblvns_skill_02_*` / `oblvns_skill_03_*` into the index at all (2026-10-24)
-            for cfg in fields.get('_abilityConfigs') or []:
-                if not isinstance(cfg, dict) or not cfg.get('_ability'):
-                    continue
-                f2, o2 = env.resolve(go.assets_file, cfg['_ability'])
-                if o2 is None or f2 == 'builtin' or o2.type.name != 'MonoBehaviour':
-                    continue
-                d2 = env.tt(o2)
-                cls2 = env.script(o2)[1] or 'MonoBehaviour'
-                fields2 = {k: v for k, v in d2.items() if k not in SKIP_FIELDS}
-                strings_of(fields2, strings)
-                named += bb_ability_names(fields2)
-                uses += behaviour_uses(cls2, fields2, ek, templates, node=name,
-                                      ability=cls2 if 'Emitter' in cls2 else None)
-            if mode is None and go is root:      # only the prefab's own root names the mode (a sub-ability's flag is not it)
+            if mode is None:
                 mode = skill_mode(fields)
         stack.extend(k for k in go_children(env, go) if not (stop and stop(k)))
     found = set(effect_refs(strings))
@@ -2708,28 +2685,10 @@ def node_entry(env, root, ek, pk, effect_refs, templates, node_name=None, stop=N
             'unclassified': sorted(found - placed), 'abilities': abilities, '_switches': switches, '_named': named}
 
 
-def keep_switches(entry):
-    """`_switches` → skills[id].switchMode: the mode switches a skill makes ({event, mode, restore, buff}), the read
-    side of skill_mode (丰川祥子's S2 dials: modes 1 / 2 / 3 / 5 on ON_TOGGLE_SKILL_START and ON_BUFF_TRIGGER). Drops
-    an entry that names no mode index. (2026-10-24: these were popped and lost, so nothing could tell that S2 switches
-    modes at all.)"""
-    sw = [{k: v for k, v in x.items() if k != 'node'} for x in entry.pop('_switches', None) or []
-          if isinstance(x, dict) and isinstance(x.get('mode'), int)]
-    if sw:
-        seen, out = set(), []
-        for x in sw:
-            k = (x.get('event'), x.get('mode'), bool(x.get('restore')))
-            if k in seen:
-                continue
-            seen.add(k)
-            out.append(x)
-        entry['switchMode'] = out
-
-
 def skill_entry(env, root, ek, pk, effect_refs, templates):
     """index.json skills[id] of a skill prefab ([uc]skills.ab) or of an enemy's skill node (node_entry)."""
     e = node_entry(env, root, ek, pk, effect_refs, templates)
-    keep_switches(e)
+    e.pop('_switches', None)
     e.pop('_named', None)
     return e
 
@@ -2808,7 +2767,7 @@ def crawl_units(ab_root, cabs, unit_ids, gd, eff, enemy_idx, token_idx, log, ski
         if sid is None or sid in skills:
             return sid
         entry = node_entry(shared, skill_roots[sid], ekn, pk, effect_refs, templates)
-        keep_switches(entry)
+        entry.pop('_switches', None)
         skill_named[sid] = entry.pop('_named', [])
         for p in entry['projectiles']:
             projectile(p)

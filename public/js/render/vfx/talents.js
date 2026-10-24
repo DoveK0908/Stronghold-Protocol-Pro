@@ -80,17 +80,6 @@ export function activeTalentKeys(idx, unitKey, { rec = null } = {}) {
 const skillIndexOf = (info) => (Number.isInteger(info?.diy?.skillIndex) ? info.diy.skillIndex : Number.isInteger(info?.skillIndex) ? info.skillIndex : null);
 
 /**
- * The mode an ability node sits in, read off its own path (`Modes/S2_Atk/Body/GeneralAbilities/Ability0`): 丰川祥子's
- * three S2 timbres keep their buff effect on a passive ability inside each mode folder, so the folder is the only place
- * that says which dial the effect belongs to (2026-10-24).
- * @returns {string|null}
- */
-const modeOfNode = (node) => {
-  const m = /^Modes\/([^/]+)\//.exec(typeof node === 'string' ? node : '');
-  return m && m[1] ? m[1] : null;
-};
-
-/**
  * Every talent node and ability of a unit as a binding (module header): talents in force only (activeTalentKeys), and
  * only the nodes valid with the equipped skill (`skills`).
  * @returns {any[]}
@@ -128,8 +117,7 @@ export function talentBindings(idx, unitKey, { info = null, rec = null } = {}) {
     const plan = planUses(idx, emptyPlan(unitKey, a.name ?? `ability${i}`), uses, { mode: null, abilities: a.abilities });
     out.push({
       id: `a:${a.name ?? i}#${i}`, source: 'ability', key: a.name ?? null, kind: a.kind ?? null, node: a.node ?? null, class: a.class ?? null,
-      ability: a.class ?? null, when: a.when ?? null,
-      mode: (typeof a.mode === 'string' && a.mode ? a.mode : modeOfNode(a.node)),
+      ability: a.class ?? null, when: a.when ?? null, mode: typeof a.mode === 'string' ? a.mode : null,
       modes: Array.isArray(a.modes) && a.modes.length ? a.modes : null, skills: null, toggle: a.toggle ?? null, reborn: null,
       triggers: a.triggers ?? null, stops: a.stops ?? null, switchMode: a.switchMode ?? null, bb: null, plan, uses: uses.length,
     });
