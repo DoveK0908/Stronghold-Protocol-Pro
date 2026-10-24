@@ -98,12 +98,10 @@ export default {
               key: 'makoto:doll', duration: 1 + dollDur, visible: false,
               mods: { atkPct, ...(hpPct ? { hpPct } : null), ...(batPct ? { batPct } : null) },
             });
-            // S3-P2 俄耳甫斯: 阻挡数 +2 and the team's 闪避
-            if (ctx.form === DOLL_FORM_P2 && (p2Block > 0 || healScale > 0)) {
-              battle.addBuff(unit, {
-                key: 'makoto:orfeo', duration: 1 + dollDur, visible: false,
-                mods: { ...(p2Block > 0 ? { blockCnt: p2Block } : null), dodgePhys: P2_DODGE, dodgeArts: P2_DODGE },
-              });
+            // S3-P2 俄耳甫斯: 阻挡数 +2 for herself, and 「范围内友方获得 30% 物理与法术闪避」 for the allies around her
+            // (the aura is theirs, not hers — the heal aura below refreshes it every second while she stands)
+            if (ctx.form === DOLL_FORM_P2 && p2Block > 0) {
+              battle.addBuff(unit, { key: 'makoto:orfeo', duration: 1 + dollDur, visible: false, mods: { blockCnt: p2Block } });
             }
           }, { owner: unit });
           // S3: 塔纳托斯 would be knocked out ⇒ 俄耳甫斯 takes over (once; after that she is knocked out as usual).
@@ -151,10 +149,16 @@ export default {
               }
             }
           }, { owner: unit });
-          // S3-P2 俄耳甫斯's aura: 25 % ATK per second to up to 3 hurt allies while the 替身 lasts
-          if (healScale > 0) {
+          // S3-P2 俄耳甫斯's aura while the 替身 lasts: 30 % physical + arts 闪避 for the allies in range (PRTS
+          // 「范围内友方获得 30% 物理与法术闪避」), and 25 % ATK per second to up to 3 hurt ones
+          if (healScale > 0 || P2_DODGE > 0) {
             battle.every(1, () => {
               if (!unit.alive || !unit.trait.doll || unit.form !== DOLL_FORM_P2) return;
+              const around = alliesInGridOf(battle, unit, ring);
+              for (const a of around) {
+                if (P2_DODGE <= 0) break;
+                battle.addBuff(a, { key: 'makoto:orfeo-aura', duration: 1.6, visible: false, mods: { dodgePhys: P2_DODGE, dodgeArts: P2_DODGE } });
+              }
               for (const a of hurtAlly(battle, unit, P2_MAX_HEAL)) battle.heal(unit, a, unit.s.atk * healScale, { tags: ['doll', 'orfeo'] });
             }, { owner: unit });
           }
