@@ -186,12 +186,27 @@ export class FxLibrary {
   /** index.json (null without one); its version tells mounts.js whether skins still need skinShift. */
   index() {
     if (this._index) return this._index;
-    this._index = this.init().then(() => this._json(this.url('fx', 'index')).catch(() => null)).then((j) => {
+    this._index = this.init().then(() => this._json(this.indexUrl()).catch(() => null)).then((j) => {
       setIndexVersion(j?.version);
       if (Object.keys(this.assets?.manifest?.fx || {}).length) { this.pluginFx = mergePluginFx(j, this.assets.manifest.fx); return this.pluginFx.index; }
       return j;
     }).catch(() => null);
     return this._index;
+  }
+
+  /**
+   * The index URL with the extraction's own identity appended as a query (`?v=<set>-<version>-<prefabs>`): a re-extraction
+   * changes the count, so the URL changes with it. Needed because `/assets/local/fx/index.json` is a plain same-origin
+   * `/assets/` path, which the material service worker answers from its cache — without the query a client keeps the old
+   * index after a hot-fix, and a kit's new effects never appear (maintainer 2026-10-24: 丰川祥子 re-extracted, no visible
+   * change). A queried path is not a material path for sw.js, so it is fetched (and revalidated by its ETag) each load.
+   */
+  indexUrl() {
+    const path = this.url('fx', 'index');
+    if (!path) return null;
+    const e = this.groups?.fx?.index;
+    const tag = isObj(e) ? [e.set, e.version, e.prefabs].filter((x) => x != null && x !== '').join('-') : '';
+    return tag ? `${path}?v=${encodeURIComponent(tag)}` : path;
   }
 
   /** textures.json entries (wrap / filter / mips by texture key). */
