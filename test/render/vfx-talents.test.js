@@ -195,6 +195,15 @@ describe('talents in force and their bindings (talents.js)', () => {
     assert.deepEqual(formModes(idx, 'char_4016_kaze'), { doll: 'Stand' });
     idx.units.char_4016_kaze.modes = [{ name: 'Default', attack: melee([]) }];
     assert.deepEqual(formModes(idx, 'char_4016_kaze'), {}, 'no Stand mode: nothing to map');
+    // 结城理: one 人格面具 per skill, the client's modes Stand_S1 / Stand_S2 / Stand_S3_1 / Stand_S3_2 (his skill plans name
+    // no mode, so the form is the only way into them)
+    const stand = (n) => ({ name: n, attack: melee([]) });
+    idx.units.char_4217_mako = { kind: 'char', skills: {}, talents: {},
+      modes: [stand('Default'), stand('Stand_S1'), stand('Stand_S2'), stand('Stand_S3_1'), stand('Stand_S3_2')] };
+    assert.deepEqual(formModes(idx, 'char_4217_mako'),
+      { doll1: 'Stand_S1', doll2: 'Stand_S2', doll3p1: 'Stand_S3_1', doll3p2: 'Stand_S3_2' });
+    idx.units.char_4217_mako.modes = [stand('Default'), stand('Stand_S2')];
+    assert.deepEqual(formModes(idx, 'char_4217_mako'), { doll2: 'Stand_S2' }, 'only the forms whose mode exists');
     const hp = { toggle: [{ class: 'HpRatioToggleChecker', minHpRatio: 0, maxHpRatio: 0.5 }] };
     assert.equal(toggleOn(hp, { hp: 40, maxHp: 100 }, {}, 0), true);
     assert.equal(toggleOn(hp, { hp: 60, maxHp: 100 }, {}, 0), false);
