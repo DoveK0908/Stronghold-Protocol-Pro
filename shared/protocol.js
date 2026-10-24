@@ -521,7 +521,12 @@ const isDir = (v) => DIRS.includes(v);
  */
 export const CARD_LIMITS = Object.freeze({ idLength: 48, trophies: 1_000_000 });
 const isCardCharId = (v) => v === '' || (isStr(v, CARD_LIMITS.idLength) && /^char_[0-9a-z_]+$/.test(v));
-const isCardLook = (v) => v === '' || v === 'e1' || (isStr(v, CARD_LIMITS.idLength) && /^char_[0-9a-z_]+$/.test(v));
+// `look` / `avatarLook` carry a SKIN KEY, and 20 of the 276 shipped skins are camelCase
+// (`char_249_mlyss_ambienceSynesthesia_6`): the `[0-9a-z_]` pattern `isCardCharId` uses refused them, so `validateC2S`
+// rejected the whole `room.card` in the browser and the seat card never reached the room — the teammates of whoever
+// picked such a skin kept drawing a hash-random portrait (maintainer report 2026-10-24). Skin ids are `isSkinId`.
+const isCardLook = (v) => v === '' || v === 'e1'
+  || (isStr(v, SKIN_LIMITS.idLen) && v.startsWith('char_') && isSkinId(v));
 const isCardBg = (v) => v === '' || (isStr(v, CARD_LIMITS.idLength) && /^[a-z0-9][a-z0-9_:\-\/]*$/i.test(v));
 // 自传头像 (me.avatar) 的 id: '' 表示不带头像, 否则是 16 个十六进制字符
 const isCardAvatarImg = (v) => v === '' || (typeof v === 'string' && /^[0-9a-f]{16}$/.test(v));

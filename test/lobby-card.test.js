@@ -63,6 +63,14 @@ test('room.card wire shape: optional charId / avatar / bg ids ("" clears) and an
   ok({ avatarImg: '' });
   ok({ avatarImg: '0123456789abcdef' });
   for (const avatarImg of ['0123456789ABCDEF', '0123', 7, null]) bad({ avatarImg }, 'avatarImg');
+  // 2026-10-24 维护者：「特别是切换到带皮肤的版本的时候，还会显示精二的样子」。`look` 是皮肤 key，而 276 个皮肤里有 20 个
+  // 是 camelCase（`char_249_mlyss_ambienceSynesthesia_6`）；旧判据 `[0-9a-z_]` 把它们判成非法，`validateC2S` 于是整条
+  // room.card 被拒 —— 浏览器端根本不发，队友永远看不到新立绘。皮肤 key 一律按 isSkinId 放行。
+  ok({ look: 'char_249_mlyss_ambienceSynesthesia_6' });
+  ok({ avatarLook: 'char_1033_swire2_ambienceSynesthesia_4' });
+  ok({ look: 'char_103_angel_wild_1', avatarLook: 'char_1012_skadi2_iteration_2' });
+  bad({ look: 'char_249_mlyss_ambience Synesthesia_6' }, 'look');
+  bad({ look: 'char_249_mlyss_ambienceSynesthesia_6'.padEnd(65, 'x') }, 'look');
 });
 
 // 2026-10-23 维护者：「在准备大厅调整头像连自己都不生效」。自传头像原先只由 session.avatarImg 回填进 room.card，客户端
@@ -240,4 +248,21 @@ test('look / avatarLook (feedback #9 / #24): 精一 or a skin of that very opera
   // a look without its operator is not kept; '' clears
   assert.deepEqual(f.card(s, { avatar: '', avatarLook: 'e1' }), { ok: true });
   assert.deepEqual({ ...s.card }, { charId: other });
+});
+
+// 2026-10-24 维护者：「特别是切换到带皮肤的版本的时候，还会显示精二的样子」。`look` 是皮肤 key，而 276 个皮肤里有 20 个是
+// camelCase（`char_249_mlyss_ambienceSynesthesia_6`）。旧判据 `[0-9a-z_]` 把它们判成非法：浏览器端 `validateC2S` 直接拒掉
+// 整条 room.card，于是服务端永远收不到 look，队友只能看到精二立绘（自 dip 只读本地 store，所以「自己看自己是对的」）。
+test('a camelCase skin key is a legal look: it validates, stores and reaches the room', (t) => {
+  const camel = SKINS.find((s) => OPS.includes(s.charId) && /[A-Z]/.test(s.id));
+  assert.ok(camel, 'a camelCase skin of an operator in the data');
+  assert.equal(validateC2S({ t: 'room.card', charId: camel.charId, look: camel.id }), null);
+  const f = fixture(t);
+  const s = f.player();
+  assert.deepEqual(f.card(s, { charId: camel.charId, look: camel.id }), { ok: true });
+  assert.deepEqual({ ...s.card }, { charId: camel.charId, look: camel.id });
+  // 上线进房后席位卡也带着它（队友看到的就是这个 look）
+  assert.deepEqual(f.lobby.create(s, { mode: 'coop', difficulty: 'NORMAL' }), { ok: true });
+  const seat = f.lobby.roomOf(s).seats.find((x) => x && x.playerId === s.playerId);
+  assert.equal(seat.card.look, camel.id);
 });
