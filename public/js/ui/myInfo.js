@@ -135,6 +135,8 @@ export function MyInfoDialog({ me, onClose }) {
     ${picking === 'bg' ? html`<${NameCardPicker} current=${card.bg} onPick=${setCardBackground} onClose=${() => setPicking(null)} />` : null}
     ${picking === 'avatar' ? html`<${AvatarPicker} current=${card.avatar} list=${list} m=${gd.m}
       looks=${{ kind: 'avatar', current: card.avatarLook, onLook: (look) => { setAvatarLook(look); setPicking(null); } }}
+      uploaded=${card.avatarImgSaved ? { src: `/avatar/${card.avatarImgSaved}`, on: !!card.avatarImg,
+        onPick: () => { setCustomAvatar(card.avatarImgSaved); setPicking(null); } } : null}
       onPick=${(id) => { setCardAvatar(id); if (!id || !gd.m) setPicking(null); }}
       onClose=${() => setPicking(null)} />` : null}
   <//>`;
