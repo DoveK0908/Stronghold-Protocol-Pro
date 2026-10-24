@@ -35,6 +35,31 @@ const NOTE_OWNER_R = 2.5;
 /** Notes: trail motes per real second of one note, and the slow float (tiles) of the glyph above its flight point. */
 const NOTE_HZ = 5, NOTE_BOB = 0.05;
 /**
+ * The official prefabs that ARE her 音符 (owner 2026-10-24: 「你提取的特效其实是音符的特效，我们现在的音符是额外渲染的，可以用那个特效替换」).
+ * A note is streamed as a snapshot projectile, so nothing in the fx index is attached to it — the official effect is
+ * played here, on a bare map point that this file moves to the note's position every frame (wiring.playOn's track
+ * re-reads the point, the way a status aura re-reads its unit), and stopped when the note goes.
+ * `note` is the talent's own note; `noteSkill` is a skill's, whose look follows the skill the owner is running (S1's
+ * eight fan notes use `oblvns_skill_01_trail`, S2's the piano's, S3's the sword's). Unknown ⇒ null (draw our glyph).
+ */
+const TRAIL_TALENT = 'oblvns_talent_trail';
+const TRAIL_SKILL = Object.freeze(['oblvns_skill_01_trail', 'oblvns_skill_02_trail', 'oblvns_skill_03_trail']);
+const HIT_TALENT = 'oblvns_attack_01_hit';
+const HIT_SKILL = Object.freeze(['oblvns_skill_01_hit', 'oblvns_skill_02_hit', 'oblvns_skill_03_hit']);
+/** The fx-index key of the official note for a `proj` kind and its owner's skill slot (null: none known). */
+export function noteTrailKey(kind, skillIndex = null) {
+  if (kind === 'note') return TRAIL_TALENT;
+  if (kind !== 'noteSkill') return null;
+  return TRAIL_SKILL[skillSlot(skillIndex)];
+}
+/** The fx-index key of that note's impact (the same family as its trail). */
+export function noteHitKey(kind, skillIndex = null) {
+  if (kind === 'note') return HIT_TALENT;
+  if (kind !== 'noteSkill') return null;
+  return HIT_SKILL[skillSlot(skillIndex)];
+}
+const skillSlot = (i) => (Number.isInteger(i) && i >= 0 && i < TRAIL_SKILL.length ? i : 0);
+/**
  * The three note glyphs of render/textures.js and their weights — one is picked at random for every note when it
  * appears and kept for its whole life (syncNotes): 八分音符 / 十六分音符 / 高音谱号, 40 % / 40 % / 20 %. Tune the weights
  * here (they must add up to 1); `pickNoteFrame` takes an rng so tests can pin the choice down.
@@ -86,6 +111,7 @@ export class FxNotes {
           n.frame = pickNoteFrame();                                                  // 八分 / 十六分 / 高音谱号
           this.notes.set(id, n);
           this._noteFired(e[3], x, y, sink);                                          // 发出音符: the launch sound
+          this._noteOfficialOn(n, e[3], x, y, sink);                                   // 发出音符: the official note itself
         }
         n.spec = PROJ[e[3]] && PROJ[e[3]].look === 'note' ? PROJ[e[3]] : PROJ.note;
         n.x = x; n.y = y; n.out = 0;
@@ -122,16 +148,60 @@ export class FxNotes {
       // only thing this branch was ever run against, so the guard below silently swallowed every launch on a real
       // client (owner report 「天赋发射的音符没有诞生音效」). Ask for the API that exists, and keep accepting a bare
       // `play` sink so a harness stays a harness.
-      const api = sink ?? audio;
+      const api = sink && (typeof sink.playProj === 'function' || typeof sink.play === 'function') ? sink : audio;
       if (typeof api?.playProj === 'function') api.playProj(k, { unitId: who?.id ?? null, unit: who?.def ?? null });
       else if (typeof api?.play === 'function') api.play(k, { unitId: who?.id ?? null, unit: who?.def ?? null });
     } catch { /* a frame is never broken by a sound */ }
   }
 
   /**
+   * 发出音符: hand the note to the OFFICIAL effect layer — play her own 音符 prefab on a bare map point that
+   * `_updateNotes` keeps on the note (`wiring.playOn`'s track re-reads that point every frame, exactly like a status
+   * aura re-reads its unit), and stop it when the note goes (`_freeNote`). When the official layer is off (a 'low'
+   * quality client, a harness) nothing plays and the procedural glyph in `_updateNotes` still draws the note.
+   * @param {{x:number,y:number,z:number}} point the note's own carrier (mutated every frame)
+   * @param {string} kind 'note' | 'noteSkill'
+   * @param {number} x board column of the note's first frame
+   * @param {number} y board row
+   * @param {{ official?: { playOn?: Function } }|null} sink where the official layer is (render/app.js passes `wiring`)
+   */
+  _noteOfficialOn(n, kind, x, y, sink) {
+    const w = sink && sink.official;
+    if (!w || typeof w.playOn !== 'function') return;
+    try {
+      const who = this._noteOwner(x, y);
+      const key = noteTrailKey(kind, who ? who.skill : null);
+      if (!key) return;
+      const c = n.carrier || (n.carrier = { x, y, z: 0 });
+      c.x = x; c.y = y; c.z = 0;
+      n.w = w;
+      n.hitKey = noteHitKey(kind, who ? who.skill : null);
+      n.official = w.playOn(key, c, { loop: true });
+    } catch { n.official = null; }
+  }
+
+  /** The official impact of a note that just left the field (its trail is stopped by `_freeNote`). */
+  _noteHit(n) {
+    const w = n.w, key = n.hitKey;
+    if (!w || !key || typeof w.playOn !== 'function') return;
+    try {
+      const at = n.at || (n.at = { x: 0, y: 0, z: 0 });
+      at.x = n.x; at.y = n.y; at.z = 0;
+      w.playOn(key, at, {});
+    } catch { /* a frame is never broken by an effect */ }
+  }
+
+  /** Stop a note's official effect (the note landed, expired, was recycled or the battle ended). */
+  _noteOfficialOff(n) {
+    const h = n.official;
+    n.official = null;
+    if (h && typeof h.stop === 'function') { try { h.stop(); } catch { /* a frame is never broken by an effect */ } }
+  }
+
+  /**
    * The unit a note at (x, y) was fired by: the nearest of the views the renderer draws, within NOTE_OWNER_R tiles.
    * null when the context has no view list (a harness) or nothing stands that close.
-   * @returns {{ id: string|number, def: string|null }|null}
+   * @returns {{ id: string|number, def: string|null, skill: number|null }|null}
    */
   _noteOwner(x, y) {
     const views = this.ctx?.units?.();
@@ -141,10 +211,10 @@ export class FxNotes {
       if (!v || !Number.isFinite(v.x) || !Number.isFinite(v.y)) continue;
       const d = Math.hypot(v.x - x, v.y - y);
       if (d <= NOTE_OWNER_R && (!best || d < best.d)) {
-        best = { d, id, def: (v.info?.defId ?? v.info?.spine ?? v.defId ?? v.spine ?? null) };
+        best = { d, id, def: (v.info?.defId ?? v.info?.spine ?? v.defId ?? v.spine ?? null), skill: Number.isInteger(v.info?.skillIndex) ? v.info.skillIndex : null };
       }
     }
-    return best ? { id: best.id, def: best.def } : null;
+    return best ? { id: best.id, def: best.def, skill: best.skill } : null;
   }
 
   /** A pooled note record: its glyph sprite + a halo (both additive, shown from the next _updateNotes). */
@@ -172,6 +242,7 @@ export class FxNotes {
   }
 
   _freeNote(n) {
+    this._noteOfficialOff(n);
     n.core.visible = n.halo.visible = false;
     n.core.alpha = n.halo.alpha = 0;
     n.id = null;
@@ -216,7 +287,15 @@ export class FxNotes {
       const spec = n.spec || PROJ.note;
       const p = this._proj(n.x, n.y, this._noteZ(cam, n.x, n.y), this._p);
       const s = p.s, px = p.x;
-      if (n.out > 0 && !n.burst) { n.burst = true; this._noteGone(px, p.y, s); }   // it just left the field
+      if (n.out > 0 && !n.burst) { n.burst = true; this._noteGone(px, p.y, s); this._noteHit(n); }   // it just left the field
+      // the official note rides this point (wiring re-reads it every frame); our own glyph only draws when the
+      // official layer is not playing it — the owner's call: 「用那个特效替换」 (m11874)
+      if (n.official) {
+        if (n.carrier) { n.carrier.x = n.x; n.carrier.y = n.y; }
+        n.core.visible = false;
+        n.halo.visible = false;
+        continue;
+      }
       // a slow float and sway: the note reads as playing in the air, not as a sprite pinned to the tile
       const py = p.y - (NOTE_BOB * (0.6 + 0.4 * Math.sin(this.time * 2.2 + n.seed))) * s;
       const k = 0.85 + 0.15 * fade;
