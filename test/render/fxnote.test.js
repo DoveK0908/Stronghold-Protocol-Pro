@@ -518,7 +518,7 @@ describe('interp: the snapshot `proj` list', () => {
 
   test('the battle frame hands the snapshot list to the FX system (app.js)', () => {
     const src = readFileSync(new URL('../../public/js/render/app.js', import.meta.url), 'utf8');
-    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\)\)/,
+    assert.match(src, /fx\.syncNotes\(interp\.projAt\(renderT\), null, wiring\)/,
       'render/app.js must feed interp.projAt(renderT) to fx.syncNotes each battle frame (a note has no atk event)');
   });
 
