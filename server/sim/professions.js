@@ -308,7 +308,8 @@ const installDollkeeper = (battle, unit) => {
     const mul = dollHpMul();
     battle.addBuff(unit, {
       key: 'trait:substitute', duration: dur, visible: true, onExpire: leave, onRemove: leave,
-      mods: { blockCnt: -99, ...(mul !== 1 ? { hpMul: mul } : null) },
+      // 阻挡 0：抵掉本体自己的阻挡数（不是 −99 —— 那样 结城理 S3 二段的「阻挡数 +2」永远压回 0）
+      mods: { blockCnt: -Math.max(0, Math.round(unit.base?.blockCnt ?? 0)), ...(mul !== 1 ? { hpMul: mul } : null) },
       // 阻回 for the whole form; a 替身 that makes no normal attack casts no skill either (header)
       flags: { noSp: true, ...(unit.profile.dollNoAttack ? { disarm: true, silence: true } : null) },
     });

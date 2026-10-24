@@ -128,3 +128,67 @@ test('结城理 S2: 塔纳托斯的 arts hit reaches up to three targets at once
   assert.ok(b.hp < hpB, `the second enemy in range is hit too (${hpB} → ${b.hp})`);
   checkInvariants(h.b);
 });
+
+test('傀儡师: the 替身 blocks nothing, and S3’s 俄耳甫斯 gets the +2 back', () => {
+  const base = field(0);
+  assert.equal(base.unit(1).s.blockCnt, 2, 'the 本体 blocks 2');
+  const h = field(2);
+  const u = h.unit(1);
+  kill(h, u);
+  assert.equal(u.form, 'doll3p1');
+  assert.equal(u.s.blockCnt, 0, '塔纳托斯 blocks nothing (PRTS 替身阻挡数为 0)');
+  h.run(2);
+  kill(h, u); // P1 would be knocked out ⇒ 俄耳甫斯
+  assert.equal(u.form, 'doll3p2');
+  assert.equal(u.s.blockCnt, 2, '俄耳甫斯: 阻挡数 +2 (a −99 offset used to flatten it to 0 for ever)');
+  checkInvariants(h.b);
+});
+
+test('结城理 S2: 击倒 needs the fear — the same low-HP enemy dies only once feared', () => {
+  const h = field(1);
+  const u = h.unit(1);
+  const e = h.spawn('enemy_1007_slime', { pos: [10, 4], mods: { hpMul: 400, speedMul: 0.01 } });
+  h.step();
+  kill(h, u);
+  assert.equal(u.form, 'doll2');
+  // a hit of hers is 1.6 × ATK, the kill line is 230 % ATK: park it between the two so one swing hurts but cannot kill
+  // and only the 击倒 can finish it
+  const swing = u.s.atk * 1.6;
+  const line = u.s.atk * 2.3;
+  const parked = Math.round((swing + line) / 2);
+  assert.ok(swing < parked && parked < line, `parked HP ${parked} sits between ${Math.round(swing)} and ${Math.round(line)}`);
+  /** Advance until she swings at `e` once (dmg events are ['dmg', targetId, amount, type]). */
+  const oneSwing = () => {
+    const before = h.eventsOf('dmg').filter((x) => x[1] === e.id).length;
+    for (let i = 0; i < 120; i += 1) {
+      h.step();
+      if (h.eventsOf('dmg').filter((x) => x[1] === e.id).length > before) return true;
+    }
+    return false;
+  };
+  const unfeared = () => { for (const b of e.buffs.slice()) if ((b.status ?? b.key) === 'fear') h.b.removeBuff(e, b); };
+  e.hp = parked;
+  unfeared();
+  assert.ok(oneSwing(), 'she swings at it');
+  assert.ok(e.hp > 0, `no fear ⇒ no 击倒 (hp ${e.hp} of max ${e.s.maxHp})`);
+  // positive control: the same HP, now feared ⇒ the swing knocks it out
+  e.hp = parked;
+  h.b.applyStatus(e, 'fear', { duration: 8, source: u });
+  assert.ok(oneSwing(), 'the next swing goes out');
+  assert.equal(e.hp, 0, 'feared + under 230 % ATK ⇒ 击倒');
+  checkInvariants(h.b);
+});
+
+test('结城理 S3: pressing the skill while 塔纳托斯 stands switches to 俄耳甫斯 (「开启技能…改为召唤俄耳甫斯」)', () => {
+  const h = field(2);
+  const u = h.unit(1);
+  kill(h, u);
+  assert.equal(u.form, 'doll3p1');
+  h.run(2);
+  u.trait.dollEnter?.();            // the skill press goes through `unit.trait.dollEnter` for S1/S2…
+  // …but S3's own onStart is what the player triggers; exercise it directly:
+  const kit = u.kit;
+  kit.skills.skchr_makoto_3.onStart({ unit: u, battle: h.b });
+  assert.equal(u.form, 'doll3p2', 'P1 → 俄耳甫斯 without a lethal hit');
+  checkInvariants(h.b);
+});

@@ -70,7 +70,14 @@ export default {
         // `dollForms`), its numbers are that skill's blackboard
         skchr_makoto_1: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
         skchr_makoto_2: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
-        skchr_makoto_3: { kind: instantKind(def), onStart({ unit }) { unit.trait.dollEnter?.(); } },
+        // S3: 「塔纳托斯在场时，开启技能或受到致命伤时，改为召唤俄耳甫斯」 — a second press while P1 stands
+        skchr_makoto_3: {
+          kind: instantKind(def),
+          onStart({ unit }) {
+            if (unit.trait.doll && !unit.trait.dollSwitching && unit.form === DOLL_FORMS[2] && unit.trait.dollForm) unit.trait.dollForm(DOLL_FORM_P2);
+            else unit.trait.dollEnter?.();
+          },
+        },
       },
       talents: [
         { install(battle, unit) { // 不羁之力: the switch itself, its 停顿, and the 人格面具's boosts
@@ -132,8 +139,10 @@ export default {
             dmg.mul *= atkScale;
             const feared = (t) => fearProb > 0 && fearDur > 0 && t && t.alive && battle.rng.chance(fearProb)
               && battle.applyStatus(t, 'fear', { duration: fearDur, source: unit });
+            // 塔纳托斯: 对**处于恐惧状态**的敌人，若其生命值低于 230% ATK，则直接击倒
+            const isFeared = (t) => !!(t && t.alive && Array.isArray(t.buffs) && t.buffs.some((b) => (b.status ?? b.key) === 'fear' && b.timeLeft > 0));
             const execute = (t) => {
-              if (killScale > 0 && t && t.alive && t.hp > 0 && t.hp < unit.s.atk * killScale) {
+              if (killScale > 0 && t && t.alive && isFeared(t) && t.hp > 0 && t.hp < unit.s.atk * killScale) {
                 battle.dealDamage(unit, t, { amount: t.hp + 1, type: 'true', tags: ['doll', 'execute'] });
               }
             };
