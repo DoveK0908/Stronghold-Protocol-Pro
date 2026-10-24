@@ -342,7 +342,9 @@ u2 = fx.behaviour_uses('MeleeAttack', attack, ek, tpl)
 u3 = fx.behaviour_uses('ActiveBuffAbility', own, ek, tpl)
 u4 = fx.behaviour_uses('ReadySkillEffect', {'_effects': ['x_ready'], '_stopBeforeCast': 1}, ek, tpl)
 print(json.dumps({'u1': u1, 'u2': u2, 'u3': u3, 'u4': u4, 'roles': fx.roles_of(u1 + u2 + u3 + u4),
-                  'modes': [fx.skill_mode(switch), fx.skill_mode({'_switchToMode': 1}), fx.skill_mode(own)],
+                  'modes': [fx.skill_mode(switch), fx.skill_mode({'_switchToMode': 1}), fx.skill_mode(own),
+                            fx.skill_mode({'_switchToMode': 3}), fx.skill_mode({'_defaultModeIndex': 2}),
+                            fx.skill_mode({'_defaultModeIndex': 0, '_attackBlackboardModeIndex': 4})],
                   'on': [fx.buff_target('ActiveBuffAbility', '_buffs', {'_selector': {'m_PathID': 5}}), fx.buff_target('AuraAbility', '_buffs', {}),
                          fx.buff_target('BuffDuringSkill', '_buffs', {}), fx.buff_target('SpawnTokenOnTileByIDAbility', '_buffsToToken', {}),
                          fx.buff_target('SomethingNew', '_buffs', {})],
@@ -372,7 +374,10 @@ print(json.dumps({'u1': u1, 'u2': u2, 'u3': u3, 'u4': u4, 'roles': fx.roles_of(u
     assert.deepEqual(out.u4, [{ role: 'ready', keys: ['x_ready'], from: 'ReadySkillEffect._effects' }]);
     assert.deepEqual(Object.keys(out.roles), ['start', 'loop', 'range', 'hit', 'end', 'ready'], 'roles in SKILL_ROLES order');
     assert.deepEqual(out.roles.start, ['ifrit_skill_02_start', 'x_start_up', 'x_start', 'x_start_down', 'x_tpl_start']);
-    assert.deepEqual(out.modes, [2, 1, null]);
+    // `_switchToMode` is a boolean flag in real prefabs (丰川祥子's S2 carries 1 yet lands on mode 2 via
+    // `_defaultModeIndex`), so it is an index only above 1; the attack blackboard's mode wins over the default one (her
+    // S3: 4 / 0)
+    assert.deepEqual(out.modes, [2, null, null, 3, 2, 4]);
     assert.deepEqual(out.on, ['targets', 'targets', 'owner', 'token', null]);
     assert.deepEqual(out.graph, [['CreateEffect', '_effectKey', 'x_tpl_start'], ['CreateBuff', 'overrideEffectKey', 'x_tpl_derived']]);
   });
