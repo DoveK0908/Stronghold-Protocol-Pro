@@ -2094,7 +2094,7 @@ export async function createFieldView(host, options = {}) {
           if (!presentation.ended) windUpAttacks(renderT);
           // content-owned projectiles (丰川祥子's notes) have no 'atk' event: they are drawn from the snapshot's
           // `proj` list instead (render/fx/notes.js syncNotes — an empty list fades them all out)
-          fx.syncNotes(interp.projAt(renderT), null, wiring);
+          fx.syncNotes(interp.projAt(renderT));
           // the official effects run on the battle clock (render time of the snapshots: 1× / 2×, still while paused); the
           // skill effects' per-frame part reads the views' fresh sample (render/vfx/skillfx.js sync)
           const gdt = presentation.ended ? dt : ofxPrevT == null ? 0 : Math.min(opts.playbackTime ? Infinity : 0.25, Math.max(0, renderT - ofxPrevT));
