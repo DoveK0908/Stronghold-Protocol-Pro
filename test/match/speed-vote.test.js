@@ -1,7 +1,9 @@
 // 局内投票开启二倍速 (server/match/match/speedVote.js, the owner's rule of 2026-10-23): the connected humans of a live
-// match agree, unanimously, to run the rest of the match at twice the speed. The boost lands on the *next* battle
-// (startCombat doubles gameSpeed once), never on the battle in flight; a rejected / timed-out vote changes nothing and
-// blocks another for the rest of the round. The vote is transient, the boost is not.
+// match agree, unanimously, to run the match at twice the speed. The boost lands on the *next* battle (startCombat
+// doubles gameSpeed once), never on the battle in flight; a rejected / timed-out vote changes nothing and blocks another
+// for the rest of the round. Any connected human then calls it off with one click (g.speedOff, owner's rule of
+// 2026-10-24), again from the next battle, and turning it on again needs a fresh vote. The vote is transient, the boost
+// is not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE, ERR } from '../../shared/constants.js';
@@ -23,6 +25,7 @@ function prep(n = 3, o = {}) {
 
 test('protocol and thresholds: g.speedVote takes nothing, g.speedBallot { voteId, agree }; everybody must agree', () => {
   assert.equal(validateC2S({ t: 'g.speedVote' }), null);
+  assert.equal(validateC2S({ t: 'g.speedOff' }), null);
   assert.equal(validateC2S({ t: 'g.speedBallot', voteId: 1, agree: false }), null);
   for (const msg of [{ t: 'g.speedBallot', voteId: 0, agree: true },
     { t: 'g.speedBallot', voteId: 1 }, { t: 'g.speedBallot', voteId: 1, agree: 1 }]) {
@@ -32,7 +35,7 @@ test('protocol and thresholds: g.speedVote takes nothing, g.speedBallot { voteId
   assert.equal(SPEED_VOTE_MS, 30_000);
   assert.equal(SPEED_BOOST, 2);
   for (const k of ['speedVote', '_speedVoteSeq', '_speedFailedRound', '_speedVoteAt']) assert.ok(MATCH_FIELDS.transient.includes(k), k);
-  for (const k of ['speedBoost', 'speedBoostPending']) assert.ok(MATCH_FIELDS.saved.includes(k), k);
+  for (const k of ['speedBoost', 'speedBoostPending', 'speedBoostOffPending']) assert.ok(MATCH_FIELDS.saved.includes(k), k);
 });
 
 test('a unanimous vote: the next battle runs at 2×, the battle after it keeps it', (t) => {
@@ -69,6 +72,59 @@ test('a unanimous vote: the next battle runs at 2×, the battle after it keeps i
   assert.equal(m.handle('p_0', { t: 'g.speedVote' }).error, ERR.ALREADY);
   h.runToPhase(PHASE.COMBAT, 2);
   assert.equal(m.gameSpeed, base * SPEED_BOOST);
+});
+
+test('any connected human turns 2× off with one click: back to 1× next battle, and on again needs a fresh vote', (t) => {
+  const { h, m } = prep(3);
+  t.after(() => m.dispose());
+  const base = m.gameSpeed;
+  assert.deepEqual(m.handle('p_0', { t: 'g.speedVote' }), { ok: true });
+  ballot(m, 'p_1', true);
+  ballot(m, 'p_2', true);
+  h.runToPhase(PHASE.COMBAT, 1);
+  assert.equal(m.gameSpeed, base * SPEED_BOOST);
+  // the round after the vote: anybody may call it off, no ballot at all
+  h.runToPhase(PHASE.PREP, 2);
+  assert.deepEqual(m.handle('p_2', { t: 'g.speedOff' }), { ok: true });
+  assert.equal(m.speedBoost, true, 'the battle in flight keeps its pace');
+  assert.equal(m.speedBoostOffPending, true);
+  assert.ok(m.publicView().speedBoost.pendingOff, 'the client shows it will stop');
+  assert.equal(notices(h, 'speedOff').length, 1);
+  // asking twice is harmless, and no vote may turn it up while it is still on
+  assert.deepEqual(m.handle('p_0', { t: 'g.speedOff' }), { ok: true });
+  assert.equal(notices(h, 'speedOff').length, 1);
+  assert.equal(m.handle('p_0', { t: 'g.speedVote' }).error, ERR.ALREADY);
+  // the next battle drops back to exactly 1×, once
+  h.runToPhase(PHASE.COMBAT, 2);
+  assert.equal(m.gameSpeed, base);
+  assert.equal(m.speedBoost, false);
+  assert.equal(m.speedBoostOffPending, false);
+  assert.equal(m.publicView().speedBoost.on, false);
+  // it stays off in the rounds after, and turning it on again takes a whole new vote
+  h.runToPhase(PHASE.PREP, 3);
+  assert.deepEqual(m.handle('p_1', { t: 'g.speedVote' }), { ok: true });
+  assert.deepEqual([...m.speedVote.agreed], ['p_1'], 'a fresh vote from scratch');
+  assert.equal(m.speedVote.need, 3);
+});
+
+test('calling off a boost that has not landed just drops the promise; off when it is already off is an error', (t) => {
+  const { h, m } = prep(2);
+  t.after(() => m.dispose());
+  const base = m.gameSpeed;
+  assert.equal(m.handle('p_0', { t: 'g.speedOff' }).error, ERR.ALREADY, 'nothing is on yet');
+  assert.equal(m.handle('ai_0', { t: 'g.speedOff' }).error, ERR.NOT_IN_ROOM, 'a bot seat');
+  // agreed, but the next battle has not begun: cancelling drops the promise instead of scheduling a turn-off
+  assert.deepEqual(m.handle('p_0', { t: 'g.speedVote' }), { ok: true });
+  ballot(m, 'p_1', true);
+  assert.equal(m.speedBoostPending, true);
+  assert.deepEqual(m.handle('p_1', { t: 'g.speedOff' }), { ok: true });
+  assert.equal(m.speedBoostPending, false);
+  assert.equal(m.speedBoostOffPending, false, 'nothing was on, so nothing to turn off later');
+  assert.equal(m.publicView().speedBoost.pending, false);
+  h.runToPhase(PHASE.COMBAT, 1);
+  assert.equal(m.gameSpeed, base, 'the battle runs at 1×');
+  // and a new proposal is welcome straight away — a cancellation is not a failed vote
+  assert.deepEqual(m.handle('p_0', { t: 'g.speedVote' }), { ok: true });
 });
 
 test('one rejection fails it, and the same round refuses another proposal', (t) => {

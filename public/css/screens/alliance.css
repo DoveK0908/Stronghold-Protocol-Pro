@@ -19,6 +19,10 @@
 .team-speed .btn { min-height: .32rem; }
 .team-speed--on { color: var(--mint-400); font-size: .14rem; }
 .team-speed--on > .icon { width: .19rem; height: .19rem; }
+/* 二倍速会在下一场战斗关掉 (g.speedOff): still running, so amber rather than off */
+.team-speed.is-pending { color: var(--amber); font-size: .14rem; }
+.team-speed.is-pending > .icon { width: .19rem; height: .19rem; }
+.team-speed > span { white-space: nowrap; }
 .team-speed-vote { color: var(--mint-400); }
 .sp-coarse .team-speed .btn { min-height: 40px; min-width: 56px; padding: 0 12px; font-size: 14px; }
 .team-rescue-action { display: flex; flex-direction: column; align-items: flex-start; gap: .02rem; margin-top: .04rem; max-width: 1.8rem; }

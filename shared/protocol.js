@@ -637,9 +637,11 @@ export const C2S = {
   'g.kickBallot': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
   // 局内投票开启二倍速 (server/match/match/speedVote.js): propose running the rest of the match twice as fast (every live
   // phase before SETTLE; needs every connected human to agree), and answer the open vote (m.public speedVote.id); the
-  // proposer's agree:false withdraws it
+  // proposer's agree:false withdraws it. g.speedOff calls it off again — no vote, any connected human, lands on the next
+  // battle like the switch-on (owner's rule of 2026-10-24)
   'g.speedVote': {},
   'g.speedBallot': { voteId: (v) => isInt(v, 1, 2 ** 31), agree: isBool },
+  'g.speedOff': {},
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

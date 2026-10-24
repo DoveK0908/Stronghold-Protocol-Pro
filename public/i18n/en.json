@@ -3358,7 +3358,6 @@
   "自定义": "Custom",
   "上传名片底图": "Upload name card",
   "上传图片": "Upload image",
-  "二倍速投票通过：本局接下来的战斗以二倍速进行": "The 2× speed vote passed: the rest of this match's battles run twice as fast",
   "二倍速投票超时，未通过": "The 2× speed vote timed out without passing",
   "二倍速投票未通过": "The 2× speed vote did not pass",
   "二倍速已开启，投票作废": "2× speed is already on; this vote is void",
@@ -3367,9 +3366,18 @@
   "换成上次上传的那张图": "Switch back to the picture uploaded last time",
   "二倍速已开启": "2× speed is on",
   "开启二倍速": "Turn on 2× speed",
-  "投票通过后，本局接下来的战斗会以二倍速进行（正在进行或即将开始的这一场不受影响）。需要全部在线队友同意。": "Once the vote passes, the rest of this match's battles run at double speed (the battle in progress or about to start keeps its pace). Every connected teammate has to agree.",
+  "投票通过后，本局接下来的战斗会以二倍速进行（正在进行或即将开始的这一场不受影响）。需要全部在线队友同意。": "Once the vote passes, the next battle onwards runs at double speed (the battle in progress or about to start keeps its pace). Every connected teammate has to agree.",
   "发起二倍速投票": "Propose a 2× speed vote",
   "投票开启二倍速：本局接下来的战斗以二倍速进行": "Vote to turn on 2× speed: the rest of this match's battles then run twice as fast",
   "二倍速": "2× speed",
-  "局内投票开启二倍速": "Vote for 2× speed"
+  "局内投票开启二倍速": "Vote for 2× speed",
+  "二倍速投票通过：下一场战斗开始以二倍速进行": "The 2× speed vote passed: the next battle onwards runs twice as fast",
+  "有人取消了二倍速，本次投票作废": "Somebody turned 2× speed off; this vote is void",
+  "二倍速已取消：下一场战斗开始恢复一倍速，想再开需要重新投票": "2× speed is off from the next battle; turning it on again needs a fresh vote",
+  "二倍速：下一场恢复 1×": "2× speed: back to 1× next battle",
+  "二倍速：下一场开始": "2× speed: starts next battle",
+  "取消二倍速": "Turn off 2× speed",
+  "下一场战斗开始后恢复一倍速。正在进行或即将开始的这一场不受影响。想再开需要重新投票。": "Back to normal speed from the next battle; the battle in progress or about to start keeps its pace. Turning it on again needs a fresh vote.",
+  "取消这次二倍速。想再开需要重新投票。": "Cancel this 2× speed. Turning it on again needs a fresh vote.",
+  "取消二倍速：下一场战斗开始后恢复一倍速": "Turn off 2× speed: back to normal from the next battle"
 }

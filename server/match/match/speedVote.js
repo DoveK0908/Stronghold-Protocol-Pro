@@ -1,5 +1,5 @@
 // server/match/match/speedVote.js — 局内投票开启二倍速 (the owner's rule of 2026-10-23): the connected humans of a live
-// match may agree, unanimously, to run the rest of the match's battles at twice the speed.
+// match may agree, unanimously, to run the match's battles at twice the speed.
 // [ASSUMED] A convenience rule, not an official one (DESIGN, 0.3.0 history).
 //
 // The vote (g.speedVote proposes, g.speedBallot { voteId, agree } answers): open in every live phase before SETTLE
@@ -12,9 +12,15 @@
 // What it buys: `speedBoostPending`, which doubles `gameSpeed` for the *next* battle, never the one in flight — every
 // deadline, field clock and 联军 budget of a phase is computed from `gameSpeed` when the phase begins, so switching it
 // under a running battle would make game time jump (clientCombat derives elapsed game time as wall × speed). MatchCombat's startCombat reads
-// the flag and doubles `m.gameSpeed` once, then clears it; `speedBoost` records that this match already runs at 2× so
-// nobody can vote it up twice. Both survive a checkpoint restore with the match state (server/match/snapshot.js), and
-// the vote itself is transient like the other votes.
+// the flag and doubles `m.gameSpeed` once, then clears it.
+//
+// Turning it back off (owner's rule of 2026-10-24): any connected human may call it off with g.speedOff — no vote, one
+// click — and it lands the same way, on the *next* battle (`speedBoostOffPending`), never mid-battle. A cancelled
+// 二倍速 is not a failed vote: the boost simply stops being on, so turning it on again needs a fresh vote (the
+// `speedBoost` guard only blocks proposals while it is on). Cancelling a vote that has passed but not landed yet just
+// drops the pending flag. `speedBoost` records that the match currently runs at 2×; `speedBoostOffPending` that it will
+// stop at the next battle. Both survive a checkpoint restore with the match state (server/match/snapshot.js), and the
+// vote itself is transient like the other votes.
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
 import { PHASE, ERR } from '../../../shared/constants.js';
@@ -23,21 +29,31 @@ import { OK, fail } from './common.js';
 
 /** How long a speed vote stays open (ms, × timerScale). */
 export const SPEED_VOTE_MS = 30_000;
-/** How much faster the rest of the match runs once the vote passes. */
+/** How much faster the match runs once the vote passes. */
 export const SPEED_BOOST = 2;
 /** Yes votes a speed vote needs of `n` voters: all of them (the owner's rule of 2026-10-23). */
 export const speedNeed = (n) => Math.max(1, n);
 
 export class MatchSpeedVote {
   /**
-   * The vote's payoff, taken by MatchCombat.startCombat when the next battle begins: doubles `gameSpeed` once and records
-   * that the match now runs at 2×. Never called mid-battle — see the header.
+   * The scheduled change, taken by MatchCombat.startCombat when the next battle begins: turning it on doubles `gameSpeed`
+   * once, turning it off halves it back. Never called mid-battle — see the header. Both directions are exact: the factor
+   * is a power of two, so `x * 2 / 2` returns to the very same float.
    */
   applySpeedBoost() {
+    const base = Number.isFinite(this.gameSpeed) && this.gameSpeed > 0 ? this.gameSpeed : GAME_SPEED;
+    if (this.speedBoostOffPending) {
+      this.speedBoostOffPending = false;
+      if (!this.speedBoost) return false;
+      this.speedBoost = false;
+      this.gameSpeed = Math.max(1, base / SPEED_BOOST);
+      this.log.info?.(`[match ${this.roomCode}] battles back to ${this.gameSpeed} (R${this.round})`);
+      return true;
+    }
     if (!this.speedBoostPending) return false;
     this.speedBoostPending = false;
+    if (this.speedBoost) return false;
     this.speedBoost = true;
-    const base = Number.isFinite(this.gameSpeed) && this.gameSpeed > 0 ? this.gameSpeed : GAME_SPEED;
     this.gameSpeed = Math.min(200, base * SPEED_BOOST);
     this.log.info?.(`[match ${this.roomCode}] battles now run at ${this.gameSpeed} (R${this.round})`);
     return true;
@@ -79,6 +95,34 @@ export class MatchSpeedVote {
       this._failSpeedVote('timeout');
     });
     return this._settleSpeedVote();
+  }
+
+  /**
+   * g.speedOff — no payload: any connected human calls the 二倍速 off, no vote (owner's rule of 2026-10-24). It lands on
+   * the next battle like the switch-on does. Idempotent: asking twice is fine; asking when it is not on is an error.
+   */
+  requestSpeedOff(ps) {
+    if (this.disposed || this.ended) return fail(ERR.WRONG_PHASE);
+    if (!ps || ps.isBot || ps.spectator || ps.left || !ps.connected) return fail(ERR.NOT_IN_ROOM);
+    if (!this.speedVotePhase()) return fail(ERR.WRONG_PHASE);
+    if (this.speedBoostOffPending) return OK;
+    if (!this.speedBoost && !this.speedBoostPending) return fail(ERR.ALREADY, 'not at 2x');
+    // a vote still open is moot — it would only grant what is being given up
+    if (this.speedVote) this.cancelSpeedVote('turnedOff');
+    this.speedBoostPending = false;
+    if (this.speedBoost) {
+      // already running at 2×: stop at the next battle, never mid-battle
+      this.speedBoostOffPending = true;
+      this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} turns 2× off (from the next battle, R${this.round})`);
+      this.broadcast({ t: 'm.notice', kind: 'speedOff', playerId: ps.playerId });
+    } else {
+      // agreed but not yet landed (the next battle had not begun): nothing to undo later, just drop the promise
+      this.log.info?.(`[match ${this.roomCode}] seat ${ps.seat} cancels the pending 2× (R${this.round})`);
+      this.broadcast({ t: 'm.notice', kind: 'speedOff', playerId: ps.playerId });
+    }
+    this.markPublic();
+    this.flush(true);
+    return OK;
   }
 
   /** g.speedBallot { voteId, agree } */
@@ -141,7 +185,7 @@ export class MatchSpeedVote {
 
   /**
    * `reason` (m.notice speedCancelled): 'withdrawn' (the proposer), 'empty' (no voter left), 'phaseEnd' (SETTLE /
-   * match end), 'alreadyOn' (the boost was turned on by something else).
+   * match end), 'alreadyOn' (the boost was turned on by something else), 'turnedOff' (somebody called 二倍速 off).
    */
   cancelSpeedVote(reason) {
     const vote = this._endSpeedVote();

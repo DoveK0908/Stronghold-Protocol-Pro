@@ -591,6 +591,7 @@ export class Match {
     this._speedVoteAt = new Map();
     this.speedBoost = false;
     this.speedBoostPending = false;
+    this.speedBoostOffPending = false;
     this._turnTimer = null;
     this._pubDirty = false;
     this._pubTimer = null;

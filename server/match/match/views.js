@@ -102,9 +102,14 @@ export class MatchViews {
       kickVote: this.kickVoteView(),
       // 局内投票开启二倍速 (speedVote.js): null or { id, proposerId, voters, agreed, rejected, need, deadline }
       speedVote: this.speedVoteView(),
-      // whether the rest of the match runs at 2× already / owes it to the next battle (the vote's effect)
-      // failedRound: 本轮已经失败过一次（客户端据此收起按钮，不用等一次拒绝）
-      speedBoost: { on: !!this.speedBoost, pending: !!this.speedBoostPending, failedRound: this._speedFailedRound },
+      // whether the match runs at 2× already / owes it to the next battle, and whether it will stop at the next battle
+      // (g.speedOff). failedRound: 本轮已经失败过一次（客户端据此收起按钮，不用等一次拒绝）
+      speedBoost: {
+        on: !!this.speedBoost,
+        pending: !!this.speedBoostPending,
+        pendingOff: !!this.speedBoostOffPending,
+        failedRound: this._speedFailedRound,
+      },
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),
       drawnDisabledBonds: this.disabledBonds.slice(),

@@ -26,6 +26,7 @@ export class MatchIntents {
       // 局内投票开启二倍速 (speedVote.js)
       case 'g.speedVote': return this.requestSpeedVote(ps);
       case 'g.speedBallot': return this.answerSpeedVote(ps, msg.voteId, msg.agree);
+      case 'g.speedOff': return this.requestSpeedOff(ps);
       case 'g.band': return this.pickBand(ps, msg.bandId);
       case 'g.bandSkip': return this.skipBand(ps);
       // the strategy highlighted in the draft screen (what a timed-out turn takes, timeoutBand)

@@ -25,6 +25,17 @@ export function speedVotable(pub, myId) {
   return (pub.players || []).filter((p) => !p.isBot && !p.spectator && p.status !== 'left' && p.connected !== false).length >= 1;
 }
 
+/** Whether `myId` may call 二倍速 off now (any connected human, no vote — owner's rule of 2026-10-24). */
+export function speedStoppable(pub, myId) {
+  if (!pub) return false;
+  const boost = pub.speedBoost;
+  if (!boost?.on && !boost?.pending) return false;
+  if (boost.pendingOff) return false;
+  if (!LIVE_PHASES.includes(pub.phase)) return false;
+  const me = pub.players?.find((p) => p.playerId === myId);
+  return !!me && !me.isBot && !me.spectator && me.status !== 'left' && me.connected !== false;
+}
+
 function useSend() {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -41,10 +52,27 @@ function useSend() {
 export function SpeedAction({ pub, myId, compact = false }) {
   const online = useStore((s) => s.connection.status === 'online');
   const [busy, send] = useSend();
-  if (pub?.speedBoost?.on || pub?.speedBoost?.pending) {
-    // already agreed: say so instead of offering a vote nobody may start again
-    return html`<div class="team-speed team-speed--on" role="status">
-      <${Icon} name="play" /><span>${t('二倍速已开启')}</span>
+  const boost = pub?.speedBoost;
+  if (boost?.on || boost?.pending) {
+    // agreed (or already on): say where it stands, and let anybody call it off — no vote, lands on the next battle
+    const label = boost.on
+      ? boost.pendingOff ? t('二倍速：下一场恢复 1×') : t('二倍速已开启')
+      : t('二倍速：下一场开始');
+    const stop = () => send(async () => {
+      const ok = await confirmDialog({
+        title: t('取消二倍速'),
+        text: boost.on
+          ? t('下一场战斗开始后恢复一倍速。正在进行或即将开始的这一场不受影响。想再开需要重新投票。')
+          : t('取消这次二倍速。想再开需要重新投票。'),
+        okText: t('取消二倍速'),
+        danger: true,
+      });
+      if (ok) await act('g.speedOff', {}, { sfx: 'back' });
+    });
+    return html`<div class="team-speed${boost.pendingOff ? ' is-pending' : ' team-speed--on'}" role="status">
+      <${Icon} name="play" /><span>${label}</span>
+      ${speedStoppable(pub, myId) ? html`<${Button} variant="ghost" size="sm" disabled=${!online || busy} loading=${busy}
+        onClick=${stop} title=${t('取消二倍速：下一场战斗开始后恢复一倍速')}>${compact ? null : t('取消')}<//>` : null}
     </div>`;
   }
   if (!speedVotable(pub, myId)) return null;

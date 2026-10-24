@@ -284,9 +284,14 @@ const VOTE_NOTICE = {
   kickPassed: (m) => [t('{name} 已被投票移出对局', { name: typeof m.name === 'string' && m.name ? m.name : t('博士') }), 'info'],
   kickFailed: (m) => [m.reason === 'timeout' ? t('移出投票超时，未通过') : t('移出投票未通过'), 'info'],
   kickCancelled: (m) => [m.reason === 'reconnected' ? t('该玩家已重新连接，移出投票取消') : t('移出投票已取消'), 'info'],
-  speedPassed: () => [t('二倍速投票通过：本局接下来的战斗以二倍速进行'), 'success'],
+  speedPassed: () => [t('二倍速投票通过：下一场战斗开始以二倍速进行'), 'success'],
   speedFailed: (m) => [m.reason === 'timeout' ? t('二倍速投票超时，未通过') : t('二倍速投票未通过'), 'info'],
-  speedCancelled: (m) => [m.reason === 'alreadyOn' ? t('二倍速已开启，投票作废') : t('二倍速投票已取消'), 'info'],
+  speedCancelled: (m) => {
+    if (m.reason === 'alreadyOn') return [t('二倍速已开启，投票作废'), 'info'];
+    if (m.reason === 'turnedOff') return [t('有人取消了二倍速，本次投票作废'), 'info'];
+    return [t('二倍速投票已取消'), 'info'];
+  },
+  speedOff: () => [t('二倍速已取消：下一场战斗开始恢复一倍速，想再开需要重新投票'), 'info'],
 };
 
 function wireNet() {

@@ -72,7 +72,7 @@ export const MATCH_FIELDS = Object.freeze({
     'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
     '_botEmotesSettledRound',
     // 局内投票开启二倍速 (speedVote.js): whether this match already runs at 2× and whether its next battle owes the boost
-    'speedBoost', 'speedBoostPending',
+    'speedBoost', 'speedBoostPending', 'speedBoostOffPending',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'poolGroups', 'playerItemPools',
