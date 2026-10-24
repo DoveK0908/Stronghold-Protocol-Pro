@@ -39,14 +39,6 @@ const NOTE_HZ = 5, NOTE_BOB = 0.05;
  * appears and kept for its whole life (syncNotes): 八分音符 / 十六分音符 / 高音谱号, 40 % / 40 % / 20 %. Tune the weights
  * here (they must add up to 1); `pickNoteFrame` takes an rng so tests can pin the choice down.
  */
-/**
- * 丰川祥子's note FILPBOOK, played in order (owner 2026-10-24: the extracted effect IS the note — her prefab's `music02`
- * emitters flip through a 2×2 sheet of 高音谱号 / 八分音符 / 二分音符 / 连梁两个八分音符 at 30 fps). The atlas cells are
- * `textures.js` noteF0..noteF3; a note's `seed` offsets its phase so a volley does not flick in lockstep.
- */
-export const NOTE_FLIP = Object.freeze(['noteF0', 'noteF1', 'noteF2', 'noteF3']);
-/** The flipbook's rate (the prefab's UVModule.fps). */
-const NOTE_FLIP_HZ = 30;
 export const NOTE_FRAMES = Object.freeze([Object.freeze(['note', 0.4]), Object.freeze(['note16', 0.4]), Object.freeze(['treble', 0.2])]);
 /** Weighted random glyph of one note: a frame name of the FX atlas ('note' | 'note16' | 'treble'). */
 export function pickNoteFrame(rand = Math.random) {
@@ -229,9 +221,7 @@ export class FxNotes {
       const py = p.y - (NOTE_BOB * (0.6 + 0.4 * Math.sin(this.time * 2.2 + n.seed))) * s;
       const k = 0.85 + 0.15 * fade;
       const core = n.core;
-      // the official flipbook: four frames in order, 30 fps, phase-shifted per note (its `seed`)
-      const flip = NOTE_FLIP[Math.floor((this.time + n.seed * 0.13) * NOTE_FLIP_HZ) % NOTE_FLIP.length];
-      core.texture = this.tex[flip] || this.tex[n.frame] || this.tex.note;
+      core.texture = this.tex[n.frame] || this.tex.note;   // its own glyph, fixed for its whole life
       core.tint = spec.tint;
       core.position.set(px, py);
       core.rotation = 0.16 * Math.sin(this.time * 1.7 + n.seed);

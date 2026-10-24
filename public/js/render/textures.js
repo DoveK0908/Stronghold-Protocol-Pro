@@ -876,42 +876,7 @@ const FX_DRAW = {
   note: [128, 256, 128, 128, (c, x, y, w) => drawNote(c, x, y, w, 1)],
   note16: [256, 256, 128, 128, (c, x, y, w) => drawNote(c, x, y, w, 2)],
   treble: [384, 256, 128, 128, (c, x, y, w) => drawTreble(c, x, y, w)],
-  // 丰川祥子's note FLIPBOOK (owner 2026-10-24: 「你提取的特效其实是音符的特效…可以用那个特效替换」): her note prefab's
-  // `music02` emitters are a 2×2, 30 fps flipbook of four frames — 高音谱号, 八分音符, 二分音符, 连梁的两个八分音符
-  // (`public/assets/local/fx/tex/flipbook_125`, sliced and redrawn here so the atlas stays one canvas). notes.js plays them
-  // in order on every note (`NOTE_FLIP`), which is what the official effect does, instead of picking one glyph for life.
-  noteF0: [512, 256, 128, 128, (c, x, y, w) => drawTreble(c, x, y, w)],
-  noteF1: [640, 256, 128, 128, (c, x, y, w) => drawNote(c, x, y, w, 1)],
-  noteF2: [768, 256, 128, 128, (c, x, y, w) => drawHalf(c, x, y, w)],
-  noteF3: [896, 256, 128, 128, (c, x, y, w) => drawBeamed(c, x, y, w)],
 };
-
-/** 二分音符: the same head and stem with no flag (the flipbook's third frame) — one cell of the FX atlas. */
-function drawHalf(c, x, y, w) {
-  const cx = x + w / 2, cy = y + w / 2;
-  radial(c, cx, cy, w * 0.42, [[0, 'rgba(255,255,255,0.42)'], [0.5, 'rgba(255,255,255,0.14)'], [1, 'rgba(255,255,255,0)']]);
-  c.save(); c.translate(cx, cy);
-  c.fillStyle = 'rgba(255,255,255,0.97)';
-  c.save(); c.translate(-6, 30); c.rotate(-0.36); c.beginPath(); c.ellipse(0, 0, 24, 17, 0, 0, Math.PI * 2); c.fill(); c.restore();
-  c.lineCap = 'round'; c.lineWidth = 7; c.strokeStyle = 'rgba(255,255,255,0.97)';
-  c.beginPath(); c.moveTo(17, 24); c.lineTo(17, -40); c.stroke();
-  c.restore();
-}
-
-/** 两个八分音符连梁 (the flipbook's fourth frame): two heads, two stems, one beam across their tops. */
-function drawBeamed(c, x, y, w) {
-  const cx = x + w / 2, cy = y + w / 2;
-  radial(c, cx, cy, w * 0.44, [[0, 'rgba(255,255,255,0.42)'], [0.5, 'rgba(255,255,255,0.14)'], [1, 'rgba(255,255,255,0)']]);
-  c.save(); c.translate(cx, cy);
-  c.fillStyle = 'rgba(255,255,255,0.97)';
-  c.lineCap = 'round'; c.lineWidth = 7; c.strokeStyle = 'rgba(255,255,255,0.97)';
-  for (const dx of [-17, 15]) {
-    c.save(); c.translate(dx - 4, 30); c.rotate(-0.36); c.beginPath(); c.ellipse(0, 0, 21, 15, 0, 0, Math.PI * 2); c.fill(); c.restore();
-    c.beginPath(); c.moveTo(dx + 12, 24); c.lineTo(dx + 12, -34); c.stroke();
-  }
-  c.beginPath(); c.lineWidth = 13; c.moveTo(-3, -34); c.lineTo(27, -34); c.stroke();
-  c.restore();
-}
 
 /** A notehead + stem + `flags` flags (1 = 八分音符, 2 = 十六分音符) — one cell of the FX atlas, centred on its middle. */
 function drawNote(c, x, y, w, flags) {

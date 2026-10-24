@@ -34,8 +34,6 @@ const DT = 1 / 60;
 const cam = presetCamera('normal', { width: 1600, height: 900 });
 /** The three glyph frames the atlas must carry, and the weights every note is drawn from. */
 const GLYPHS = ['note', 'note16', 'treble'];
-/** The official flipbook cells (textures.js noteF0..noteF3 — 丰川祥子's note prefab's 2×2 sheet). */
-const FLIP = ['noteF0', 'noteF1', 'noteF2', 'noteF3'];
 
 /** A FxSystem on fake layers (the ctx the render frame passes), ground height 0 like the flat test fields.
  *  `units` is the views map app.js passes as `ctx.units()` — the FxSystem's ctx is the object handed to its
@@ -208,7 +206,7 @@ describe('syncNotes (b.snap `proj`)', () => {
     const n = fx.notes.get(1);
     assert.equal(fx.projLayer.children.length, sprites + 2, 'one glyph + one halo');
     assert.ok(GLYPHS.includes(n.frame), `the note's own glyph (${n.frame})`);
-    assert.ok(FLIP.some((g) => fx.tex[g] === n.core.texture), 'the official flipbook frame');
+    assert.equal(n.core.texture, fx.tex[n.frame]);
     assert.equal(n.halo.texture, fx.tex.glow);
     assert.equal(n.core.tint, PROJ.note.tint, 'glyph in NOTE_INK');
     assert.equal(n.halo.tint, NOTE_FX, 'halo in the effect colour');
@@ -226,28 +224,33 @@ describe('syncNotes (b.snap `proj`)', () => {
     assert.equal(fx.projLayer.children.length, sprites + 2, 'a known id never creates a sprite');
     assert.equal(fx.notes.get(1), n, 'the same pooled record');
     fx.update(DT);
-    assert.ok(FLIP.some((g) => fx.tex[g] === n.core.texture), 'still one of the flipbook frames');
+    assert.equal(n.core.texture, fx.tex[n.frame], 'its glyph never changes while it lives');
     const p1 = notePt(5.5, 10);
     assert.ok(Math.abs(n.core.x - p1.x) < 1e-9, 'moved to the new board position');
     assert.ok(Math.abs(n.core.x - p0.x) > 1, 'and it really moved');
   });
 
-  test('the note plays her official four-frame flipbook (30 fps, phase-shifted per note)', () => {
+  test('every note of a stream is given one of the three glyphs, fixed for its whole life', () => {
     const fx = makeFx();
+    const N = 60;   // under MAX_NOTES (64): the live cap is another test's business
     const ids = [];
-    for (let i = 0; i < 4; i++) ids.push([i, 2 + (i % 17), 6 + (i % 5), 'note']);
+    for (let i = 0; i < N; i++) ids.push([i, 2 + (i % 17), 6 + (i % 5), 'note']);
     fx.syncNotes(ids);
     fx.update(DT);
-    assert.equal(fx.notes.size, 4);
-    const at = (fx2, t) => { fx2.time = t; fx2.syncNotes(ids); fx2.update(0); return [...fx2.notes.values()].map((n) => n.core.texture); };
-    // one full flipbook cycle is 4 frames at 30 fps: every frame turns up within ~0.14 s
-    const seen = new Set();
-    for (let k = 0; k < 5; k++) for (const tex of at(fx, 1 + k * 0.0334)) seen.add(tex);
-    assert.equal(seen.size, 4, 'all four official frames play');
-    for (const tex of seen) assert.ok(FLIP.some((g) => fx.tex[g] === tex), 'and every one is an atlas cell of the flipbook');
-    // the per-note phase offsets them: at one instant a volley is not all on the same frame
-    const same = at(fx, 1.0);
-    assert.ok(new Set(same).size > 1, 'four notes born together do not flick in lockstep');
+    assert.equal(fx.notes.size, N);
+    const first = new Map();
+    for (const [id, n] of fx.notes) {
+      assert.ok(GLYPHS.includes(n.frame), `note ${id}: '${n.frame}'`);
+      assert.equal(n.core.texture, fx.tex[n.frame], 'the sprite shows the record’s glyph');
+      first.set(id, n.frame);
+    }
+    assert.deepEqual([...new Set(first.values())].sort(), [...GLYPHS].sort(), `all three glyphs turn up in ${N} notes`);
+    // it stays put across frames and moves
+    for (let f = 0; f < 30; f++) {
+      fx.syncNotes(ids.map(([id, x, y, k]) => [id, x + 0.2, y, k]));
+      fx.update(DT);
+    }
+    for (const [id, n] of fx.notes) assert.equal(n.frame, first.get(id), `note ${id} kept its glyph`);
   });
 
   test('`kind` picks the spec; an unknown kind draws the talent note', () => {
@@ -331,7 +334,7 @@ describe('syncNotes (b.snap `proj`)', () => {
     const n = low.notes.get(1);
     assert.equal(n.core.visible, true, 'the glyph is drawn at low quality');
     assert.ok(n.core.alpha > 0.9 && n.core.scale.x > 0 && n.core.scale.y > 0, 'fully drawn glyph');
-    assert.ok(GLYPHS.includes(n.frame) && FLIP.some((g) => low.tex[g] === n.core.texture), 'its own glyph, still there');
+    assert.ok(GLYPHS.includes(n.frame) && n.core.texture === low.tex[n.frame], 'its own glyph, still there');
     assert.equal(n.core.tint, PROJ.note.tint);
     assert.equal(n.core.blendMode, fake.P.BLEND_MODES.ADD);
     assert.ok(n.halo.visible && n.halo.alpha > 0.2, 'the halo stays, dimmer');
