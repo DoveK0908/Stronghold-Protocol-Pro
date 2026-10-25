@@ -35,7 +35,7 @@ import { createNamecardStore } from '../namecards.js';
 function perNetwork(n) { return n > 0 ? n : 'unlimited'; }
 
 export function createSessionStack(opts, { data, log, combatPool = null, trialPool = null, getLoadState, getLoadDetails, onlineLimit = null, ownerFile = null,
-  content = null, plugins = null, hosts = null }) {
+  content = null, plugins = null, hosts = null, versions = null, versionHosts = null, simPool = null }) {
   if (opts.lobbyFactory != null && typeof opts.lobbyFactory !== 'function') throw new TypeError('invalid lobby factory');
   if (opts.getClusterLoad != null && typeof opts.getClusterLoad !== 'function') throw new TypeError('invalid cluster load provider');
   const netOptions = netOptionsFrom(opts, log);
@@ -52,7 +52,7 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   // 玩家自传名片底图 (server/namecards.js): the same store shape, its own files.
   const namecards = opts.namecards || createNamecardStore({ dir: opts.namecardsDir, indexFile: opts.namecardsIndex, log });
   const lobby = createLobby({ registry, log, MatchClass: opts.MatchClass, getData: () => data, seedFn: opts.seedFn, combatPool, trialPool, options: lobbyOptions,
-    limits: onlineLimit, content, plugins, hosts, avatars, namecards, ...metrics });
+    limits: onlineLimit, content, plugins, hosts, versions, versionHosts, simPool, avatars, namecards, ...metrics });
   // The owner file (server/ownerFile.js): the 服主 key every hello may carry and the owner's reserved names.
   // The 名字#四位 claims (server/tags.js, 界面#09): one registry per server, on disk so a restart keeps them taken.
   const tags = opts.tags || createTagRegistry({ file: opts.tagsFile === undefined ? undefined : opts.tagsFile, log });
@@ -65,6 +65,8 @@ export function createSessionStack(opts, { data, log, combatPool = null, trialPo
   log.info(`[http] limits: rooms ${lobby.opts.maxRooms} (${perNetwork(lobby.opts.maxRoomsPerAddr)}/network), `
     + `matches ${perNetwork(lobby.opts.maxMatchesPerAddr)}/network, `
     + `sockets ${network.opts.maxConnections} (${perNetwork(network.opts.maxConnectionsPerAddr)}/network)`);
+  // server/aiTakeover.js reaches the socket of a taken-over player through the lobby (lobby.network.conns).
+  lobby.network = network;
   return { registry, lobby, network };
 }
 

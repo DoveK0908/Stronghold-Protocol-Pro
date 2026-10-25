@@ -175,11 +175,11 @@ function preloadCapsuleArt() {
  * late join lands mid-phase) or with reduced motion. `seq` re-keys the capsule so its CSS motion restarts.
  * @param {string|undefined} phase @param {number|undefined} round
  */
-function useCapsuleFx(phase, round) {
+function useCapsuleFx(phase, round, held = false) {
   const ref = useRef({ key: null, phase: null, kind: null, seq: 0 });
   const s = ref.current;
   const key = `${phase}:${round}`;
-  if (s.key !== key) {
+  if (s.key !== key && !(held && s.key !== null)) {
     const kind = s.key === null || reducedMotion() ? null : capsuleFxKind(phase, s.phase);
     s.kind = kind && kind !== 'enter' && capsuleArt !== true ? 'enter' : kind;
     s.key = key;
@@ -490,7 +490,7 @@ export function PauseButton({ paused, busy = false, onToggle }) {
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
-  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null }) {
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, held = false }) {
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
   const lp = boss && Number.isFinite(pub?.teamLp) ? pub.teamLp : Number.isFinite(priv?.lp) ? priv.lp : null;
@@ -515,7 +515,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
   // the latency pill also opens the server-load panel (public issue #?; UI/serverStatus.js)
   const [loadOpen, setLoadOpen] = useState(false);
-  const fx = useCapsuleFx(phase, pub?.round);
+  const fx = useCapsuleFx(phase, pub?.round, held);
   useEffect(() => { preloadCapsuleArt(); }, []);
   const onLeft = () => (pen ? onPen(false) : onDrawer('info'));
   const onRight = () => (pen ? onPen(false) : penAvail ? onPen(true) : null);

@@ -36,6 +36,12 @@ function deploy(m, ps, count = 1) {
 const owner = (packet, pid = 'p0') => packet.owners.find((o) => o.playerId === pid);
 const hit = (b, u, e, n) => b.dealDamage(u, e, { type: 'true', amount: n });
 const tokenDef = { tokenId: 'score_fixture_token', stats: { maxHp: 100, atk: 0, blockCnt: 0, cost: 0 }, rangeGrid: [] };
+// 0.3.3's kernel really emits `damageCalculate`, so svrash's LOR module (kits/ops/chess_char_4_22-svrash.js →
+// installLordArtsAddition, ratio = the module's tb.atk_scale_m, 0.1 at stage 1) adds one arts child hit per instance
+// the operator deals — credited to the same operator row. This case is about the rows and the history, not the rider's
+// own value, so the rider is derived from the attack instead of being written out as a constant.
+const rider = (x) => x.s.atk * 0.1;
+const near = (actual, expected, msg) => assert.ok(Math.abs(actual - expected) < 1e-6, `${msg ? msg + ': ' : ''}${actual} !== ${expected}`);
 
 for (const poolSize of [0, 6]) test(`actual Match ${poolSize ? '6 workers' : 'inline'}: normal+unite freeze, unseen-owner reconnect and new battle reset`, { timeout: 15000 }, async (t) => {
   let pool = null;
@@ -99,7 +105,9 @@ test('actual inline Match retains summon/dead/redeploy/device history and replac
   const device = b.spawnDevice('score_fixture_device', 11, 4); device.ownerId = 'p0'; hit(b, device, e, 13);
   m._sampleDamage(true);
   let r = owner(m.damageBoard.packet());
-  assert.equal(r.total, 105); assert.equal(r.operators[0].damage, 92); assert.equal(r.otherDamage, 13);
+  near(r.total, 105 + 3 * rider(u), 'normal rows plus the LOR arts rider');
+  near(r.operators[0].damage, 92 + 3 * rider(u));
+  assert.equal(r.otherDamage, 13);
   const second = m.fields[1].battle;
   second.spawnEnemy('enemy_1007_slime', { routeIndex: 0, pos: [9, 10], mods: { speedMul: 0 } });
   b.kill(e, u); // helper clears, p1 leaks and enters a real unite plan
@@ -110,10 +118,12 @@ test('actual inline Match retains summon/dead/redeploy/device history and replac
   const uu = ub.players[0].units.find((x) => x.uid === piece.uid);
   const ue = ub.spawnEnemy('enemy_1007_slime', { routeIndex: 0, pos: [9, 10], mods: { hpMul: 100, speedMul: 0 } });
   hit(ub, uu, ue, 25); m._sampleDamage(true); m._sampleDamage(true);
-  r = owner(m.damageBoard.packet()); assert.equal(r.total, 130); assert.equal(r.operators[0].damage, 117);
+  r = owner(m.damageBoard.packet());
+  near(r.total, 130 + 4 * rider(u), 'the unite hit brings its own rider');
+  near(r.operators[0].damage, 117 + 4 * rider(u));
   m.runner.forceAll('timeout');
   m.settle(plan, ub.result());
-  assert.equal(owner(m.damageBoard.packet()).total, 130, 'repeated result callbacks do not add totals');
+  near(owner(m.damageBoard.packet()).total, 130 + 4 * rider(u), 'repeated result callbacks do not add totals');
   assert.equal(m.damageBoard.status, 'frozen');
   const metadata = structuredClone(m.damageBoard.packet());
   m.order[0].board.clear(); m.startRound(2);

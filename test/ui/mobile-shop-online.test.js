@@ -39,7 +39,8 @@ test('mobile offers have their own size floor and scrolling, without changing th
   assert.match(css, /\.gm \.shopbar \.scard \{ flex: none; width: max\(1\.56rem, calc\(80px \* var\(--ui\)\)\); height: max\(2\.24rem, calc\(112px \* var\(--ui\)\)\); \}/);
   assert.match(css, /\.gm \.shopbar__cards, \.gm \.shopbar__rwcards \{[^}]*overflow-x: auto;[^}]*touch-action: pan-x;/);
   assert.match(css, /\.gm \.shopbar__row \{ max-width: 100%; min-width: 0;/);
-  assert.match(read('public/css/theme.css'), /font-size: clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100svh \/ 10\.8\)\), 240px\);/);
+  // the small-viewport root scale, multiplied by 界面大小 (var(--sp-ui, 1), DESIGN §35.43) like every other floor
+  assert.match(read('public/css/theme.css'), /font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100svh \/ 10\.8\)\), 240px\) \* var\(--sp-ui, 1\)\);/);
 });
 
 test('phone lobby never hides the existing online-session count', () => {

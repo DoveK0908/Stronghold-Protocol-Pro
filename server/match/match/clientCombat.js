@@ -41,7 +41,7 @@ export class MatchClientCombat {
     // protocol ids are ≤ 64 chars (shared/protocol.js isId): the field id is informational, the sequence is unique
     const battleId = seq.length + 1 + String(fieldId).length <= 64 ? `${seq}.${fieldId}` : seq;
     // room experiment (项目 5): the browser runs this field's sim, so the soft-cap flag rides in the spec
-    const spec = buildBattleSpec({ ...opts, ...morphBattleOpt(this.rules), ...(this.experimental?.bossHitSoftCap === true ? { bossHitSoftCap: true } : {}), battleId, fieldId, kind, content: this.battleContent, boss, cs: this.cs, vs: this.vs });
+    const spec = buildBattleSpec({ ...opts, ...morphBattleOpt(this.rules), ...(this.experimental?.bossHitSoftCap === true ? { bossHitSoftCap: true } : {}), battleId, fieldId, kind, content: this.battleContent, boss, cs: this.cs, vs: this.vs, version: this.data.config?.version?.id });
     let total = 0;
     for (const x of spec.spawns) if (x && x.tag !== 'boss' && x.tag !== 'part' && x.countInTotal !== false) total += Math.max(1, Math.floor(Number(x.count) || 1));
     return {

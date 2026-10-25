@@ -107,7 +107,9 @@ for (const family of ['bounty', 'tactic', 'supply', 'shop']) test(`${family}: le
 });
 
 test('room, draft and readable in-game lists keep every seat in bounded scrollers', () => {
-  assert.match(source('../../public/css/screens/room.css'), /\.seats\.seats--expanded \{[^}]*overflow-y: auto/);
+  // the fork's seat grid (`.seats--expanded`) moved to screens/lobby.css when 0.3.2 replaced screens/room.css wholesale
+  assert.match(`${source('../../public/css/screens/room.css')}\n${source('../../public/css/screens/lobby.css')}`,
+    /\.seats\.seats--expanded \{[^}]*overflow-y: auto/);
   const team = source('../../public/css/screens/team.css');
   assert.match(team, /\.team\.team--list\.is-open \{[^}]*bottom: var\(--team-bottom\)/);
   assert.match(team, /\.team--list \.team__players \{[^}]*grid-auto-flow: column[^}]*overflow-y: auto/);

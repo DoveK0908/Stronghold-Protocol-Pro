@@ -35,16 +35,17 @@ test('slots: two per tier (5, 6), each with its elite twin', () => {
   assert.equal(diyTokenOwner(SIEGE, chess.chess_char_6_diy1_b.status), 'char_112_siege@2/60/7/3');
 });
 
-test('diyPool: tier 5 = 15 prototypes + 73 owned 6★, tier 6 = 9 + 73; no preset, no collab; with the kit registry only kitted operators', () => {
+test('diyPool: tier 5 = 15 prototypes + 74 owned 6★, tier 6 = 9 + 74; no preset, no collab; with the kit registry only kitted operators', () => {
   const p5 = diyPool(5, { data: DATA }), p6 = diyPool(6, { data: DATA });
   assert.deepEqual(p5, [...RESERVES5, ...ELITES, ...ownedPool]);
   assert.deepEqual(p6, [...ELITES, ...ownedPool]);
-  assert.deepEqual([p5.length, p6.length], [88, 82]);
+  assert.deepEqual([p5.length, p6.length], [89, 83]);
   const roster = new Set(Object.values(chess).map((c) => c.charId).filter(Boolean));
-  // 丰川祥子 (char_4182_oblvns) is the mod's one collab operator admitted into the owned pool: tools/build-data.mjs
-  // carries her in DIY_INCLUDED_COLLAB (see mods/sakiko/), so she is the deliberate exception to "no collab".
-  const OBLVNS = 'char_4182_oblvns';
-  for (const id of p5) assert.ok(!roster.has(id) && (!COLLAB.includes(id) || id === OBLVNS), id);
+  // The mod's two collab picks are admitted into the owned pool: 丰川祥子 (char_4182_oblvns) and 结城理 (char_4217_makoto).
+  // tools/build-data.mjs carries both in DIY_INCLUDED_COLLAB (mods/sakiko/, mods/persona/), so they are the deliberate
+  // exceptions to "no collab".
+  const DIYPICKS = ['char_4182_oblvns', 'char_4217_makoto'];
+  for (const id of p5) assert.ok(!roster.has(id) && (!COLLAB.includes(id) || DIYPICKS.includes(id)), id);
   assert.deepEqual(diyPool(4, { data: DATA }), [], 'no 自选 slot at tier 4');
   // the kit registry: the 预备干员 run the generic kit (exact for their skills), the nine elites their stand-in kits, the
   // owned 6★ only with an operator kit file (kits/index.js OPERATOR_KIT_FILES), in pool order

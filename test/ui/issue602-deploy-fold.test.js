@@ -35,7 +35,8 @@ describe('设置「部署时收起商店」 is opt-in here', () => {
   test('the dialog offers the switch, under 盟约效果剩余时间', () => {
     const dialog = read('public/js/ui/settings.js');
     assert.match(dialog, /label=\$\{t\('部署时收起商店'\)\} micro="DEPLOY FOLD" value=\$\{s\.prepDeployFold\}/);
-    assert.match(dialog, /拿起干员部署、装备或调整位置时/);
+    // the fork's hint spells out both the fold and what turning it off leaves alone (the owner's 2026-10-16 wording)
+    assert.match(dialog, /拖起干员、装备或召唤物，以及放下后选择朝向时/);
   });
 });
 

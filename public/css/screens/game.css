@@ -1524,3 +1524,464 @@
 .set-list .voice-language-toggle > button { height: max(.24rem, calc(28px * var(--ui))); padding: 0 .04rem; font-size: max(calc(.11 * var(--t)), calc(11px * var(--ui))); }
 .set-list .voice-language-toggle .voice-language-code { font-size: 8px; margin-left: .03rem; }
 .set-list .language-options__hint { display: none; }
+
+/* ==========================================================================================
+   the official 0.3.3 rules this fork never had, appended rather than merged so that no fork rule is
+   silently replaced by an official one of the same name (the fork's own layout decisions, DESIGN §35.43-fork,
+   win where both define a selector; the official ones new here arrive whole).
+   ========================================================================================== */
+
+/* ==========================================================================================
+   screens/game.css — in-match screen layout & HUD (js/screens/game.js, js/ui/hud.js, bondStrip.js,
+   teamPanel.js, emotes.js, ticker.js, effectsList.js, combatHud.js, settings.js, matchChrome.js,
+   fallbackField.js). Shop: game-shop.css. Panels / overlays / rich text: game-panels.css.
+   Sizes in rem (1rem = 100 design px at 1920×1080).
+   ========================================================================================== */
+
+
+/* ---- screen shell ---------------------------------------------------------------------------- */
+
+/* Host test dock (public/js/ui/testDock.js DOCK_REM). Unitless rem, shared by the HUD and the dock.
+   team-right = .team left .22 + avatar .8 + gap .1 + name 1.5 + info padding .18.
+   bond-bottom = fieldHost.js HUD_REM.bondStripBottom. shop-top = HUD_REM.shopBarTop.
+   hand-clear = prep hudPadding bottom 3.2 + the bench piece 1.56. top = bottom of .gtop.
+   ready-h = .gtop padding .2 + clock --cd-h .7 + gap .1 + .readybtn .56. */
+
+
+/* Host test console (DESIGN §34.8). A floating field panel. Its default left/top is the dock home
+   (right of .team, below the bond strip, above the hand) from the --dock-* rem above. The host drags
+   it by the header; JS then sets left/top in px. At ≤720px the top sheet wins, including over a stored position. */
+
+/* the audit log keeps about five rows: a scroll container's automatic minimum is 0, so in the open panel's grid the
+   other controls squeezed it to a few px at the default height (the panel body scrolls instead) */
+
+
+/* ---- top bar -------------------------------------------------------------------------------------- */
+
+/* a match with gameplay plugins (DESIGN §32.6): the HUD corner's MOD mark */
+
+.gtop__rules { max-width: 3.4rem; font-size: calc(.11 * var(--t)); line-height: 1.4; color: var(--text-md); overflow-wrap: anywhere; }
+
+/* the latency pill and, beside it, the 观战席 capsule (ui/hud.js SpectatorPill: an eye + how many are watching; opens the roster) */
+
+/* the ping pill as tall as its value at a big 文字大小 (§35.51: cut 1 px at 特大 on the phones), as in the room and the hub */
+
+.gtop__net .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
+
+/* the roster inside its modal */
+
+/* 顶部中栏 (PR #643 / #827, the event's top bar, video 8:01): [🔍] in a bracket frame · + · one long thin band — 回合 N
+   centred in its left half, the LP tower in its right half, the official deco type above (ui/hud.js DecoType) — with
+   the phase capsule as a bevelled plate in a grey outer frame across the middle · + · [🔍▶▶] in its own bracket frame.
+   Outlines of bevelled shapes are two clipped layers (the line colour, then the fill 1–2 px inside). [ASSUMED] these
+   CSS frames, halves, round chip and plate stand in for the official hudPanel bg_check_btn / frame_mid_normal (a boss
+   round's frame_mid_boss, by its name) / bg_round, which are not painted yet; the colours, read off the footage; the
+   second + mark and the round number's flip, #827's additions (#643 had one + and no flip). */
+
+/* the deco type: hudPanel/frame_deco_txt1 / txt3 (RHODES ISLAND TERMINAL SERVICE, 103×6) over the two halves,
+   frame_deco_txt2 (STRONGHOLD PROTOCOL, 53×5) over the plate — [ASSUMED] the placement (txt2 fits the gap in the top
+   edge of frame_mid_normal) —, at the 🔍 buttons' scale (.01586rem a sprite pixel); text of the same size without them */
+
+.gtop__deco { position: absolute; top: -.16rem; display: block; line-height: 0; pointer-events: none; }
+
+.gtop__deco--l { left: .24rem; }
+
+.gtop__deco--r { right: .24rem; }
+
+.gtop__deco--c { left: 50%; transform: translateX(-50%); }
+
+.gtop__decoimg { display: block; height: auto; }
+
+.gtop__decoimg--txt1, .gtop__decoimg--txt3 { width: 1.634rem; }
+
+.gtop__decoimg--txt2 { width: .841rem; }
+
+.gtop__decotxt { display: block; font-family: var(--font-num); font-size: .085rem; font-weight: 700; line-height: 1; letter-spacing: .14em;
+  color: rgba(225, 232, 232, .28); white-space: nowrap; }
+
+/* the round chip and the LP keep plain rem: HUD chrome in boxes the design fixed (test/ui/text-scale.test.js NOT_SCALED) */
+
+/* a normal round's LP in white (the footage, video 8:01; [ASSUMED] the tint) — never over the pending-leak red
+   (.lp.is-pending, GitHub #479), the low-LP red (.lp--danger) or the boss rounds' team colour (.lp--team) */
+
+.gtop__half .lp--lg:not(.lp--danger):not(.lp--team):not(.is-pending) .lp__val { color: #eef2f2; }
+
+/* a narrow screen (phone landscape 640×360 / 667×375: the root at its 40 px floor): the halves shrink to their content,
+   so a boss round's wide capsule leaves room for the corners (the exit, latency and 观战席 pills at the left; the solo
+   clock and pause at the right). The deco type's text stand-in (no art pack) is wider than the sprites it stands in for
+   and ran into itself over the narrowed band (§35.18's leftover): it gives way there — decoration only, aria-hidden; the
+   official sprites fit and stay */
+@media (max-width: 767px){
+  .gtop__decotxt { display: none; }}
+
+/* the two official 🔍 buttons (ui/hud.js CheckBtn): btn_check_player (mint, left) and btn_check_enemy (amber, right);
+   sprites are 35×29 (plain) / 61×29 (with chevrons) → .555rem / .967rem × .46rem */
+
+
+/* solo pause / resume (ui/hud.js PauseButton, official battle pause: two bars on a dark square) */
+
+
+/* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
+
+
+/* phase capsule */
+
+/* 联防: a leaker's enemies still standing (MissTag, user playtest #6 item 7) — the official bg_miss_enemy pill (runner ×
+   on its left 3/5, the number on the rest) or an orange look-alike */
+
+.team__line .misstag { height: .21rem; min-width: .68rem; padding-right: .08rem; }
+
+.team__line .misstag.has-art { width: .68rem; }
+
+.team__line .misstag__n { font-size: .16rem; }
+
+.team__line .misstag__icon { font-size: .13rem; }
+
+/* phase capsule scenes (ui/hud.js CapsuleScene, capsuleFxKind): the official hudPanel/trans_* sprites at ×1.3 of their
+   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
+   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
+
+/* the capsule plate: a grey outer frame around the phase capsule */
+
+.gtop__cap::before, .gtop__cap::after { content: ''; position: absolute; pointer-events: none;
+  clip-path: polygon(.2rem 0, calc(100% - .2rem) 0, 100% .2rem, 100% calc(100% - .2rem), calc(100% - .2rem) 100%, .2rem 100%, 0 calc(100% - .2rem), 0 .2rem); }
+
+.gtop__cap::before { inset: 0; background: rgba(176, 184, 186, .5); }
+
+.gtop__cap::after { inset: 1px; background: rgba(9, 12, 12, .9); }
+
+.gtop__cap > .capsule { position: relative; z-index: 1; }
+
+/* inside the plate's padding: the scene stays on the capsule pill it was sized for, off the plate's frame (PR #827) */
+
+.gtop__cap > .capfx { inset: calc(.08rem + 2px) calc(.13rem + 2px); }
+
+/* 回合开始: three kettles (trans_cup 31×29) drop in one after another and bob out of step; at 休整期 they fly up */
+
+/* 作战 / 联防: the robot (trans_batte1 / coop1 31×33, its sword trans_batte2 / coop2 20×34 behind its left side) drops in,
+   the enemy (trans_worm1 46×31 / worm2 57×25) hops in from the right edge and stops beside it */
+
+/* 联防: the robot turns into the two 联防 faces (trans_coop4 smiling, trans_coop3 worried; 31×33 / 30×33) */
+
+/* where they meet: the scene dims, the two crossed swords flash up and move left, 开始作战 / 联防开始 slides out of them */
+
+/* trans_batte2 / coop2 (×1.45 here, as large as the footage's) lean ≈ 28°: turned to 45° and mirrored they cross
+   like the footage's ✕ */
+
+/* then the words slide up out of the capsule and its own content rises in */
+
+
+/* LP tower */
+
+/* the running battle's pending loss (LpTower `pending`, user playtest #3 item 2): the number turns red, a −N plate
+   pops again on every new leak (keyed), 联防中 while teammates may still save part of it */
+
+
+/* enemy preview button: amber [🔍▶▶] → the pen (research 09 §2); grey [🔍] in the pen view and outside 休整期 */
+
+/* official sprites: the picture is the whole button */
+
+
+/* ready toggle */
+
+/* why 准备就绪 is refused (the temp overflow row holds pieces, user playtest #3 item 3): shown, not only on hover */
+
+
+/* ---- bond strip ---------------------------------------------------------------------------------------- */
+
+/* Only the bond discs (and the +N chip) take the pointer: the strip's box spans the width under the top bar, where the
+   top board row's units stand (row 12 at 16:9 / 21:9 / 720p / phones, the boss field's row 5 in a boss prep) — it used
+   to swallow the taps and drags on them (review of user playtest #2 item 8: every own unit reachable). */
+
+/* The hidden list leaves no hit area over the board; only this compact tab can reopen it (GitHub #142). */
+
+/* A bare arrow (the owner's request after 0.2.0: the boxed 「收起」 tab looked heavy): transparent, half-visible until
+   hovered or focused; the 44 × 44 touch target stays (an invisible hit area), the name is the aria-label. */
+
+/* a watched teammate's bonds (DESIGN §20.15): an amber "👁 name" pill in front of the discs, amber rings. Horizontal at
+   every width with a pixel floor (a vertical .12rem name was ~6-8 px per glyph on desktop / tablet, ~5 px on phones
+   where 1rem is clamped at 40 px); centred on the discs, clear of the team panel below */
+
+/* a bond the mode never activates, with members (the server's `off` entry): the briefing's grey ✕ disc, the chips'
+   struck name, 本局禁用 under it instead of the count */
+
+
+/* ---- team panel ------------------------------------------------------------------------------------------- */
+
+.team { position: absolute; left: .22rem; top: 2.36rem; display: flex; flex-direction: column; gap: .14rem; pointer-events: none; }
+
+.team__row { position: relative; display: flex; align-items: center; gap: .1rem; pointer-events: auto; }
+
+.team__btn {
+  position: relative; padding: 0; background: none; border: 0;
+  transition: transform var(--t-fast);
+}
+
+.team__btn:hover { transform: translateX(.03rem); }
+
+.team__seat {
+  position: absolute; left: -.02rem; top: -.04rem; font-size: .11rem; padding: 0 .04rem; line-height: 1.3;
+  background: rgba(8, 11, 10, .9); color: var(--text-lo); border: 1px solid var(--line-2);
+}
+
+.team__ai { position: absolute; right: -.04rem; bottom: -.04rem; font-family: var(--font-num); font-size: .11rem; font-weight: 700; padding: 0 .04rem; background: #a9c3d8; color: #0b1520; }
+
+.team__you { position: absolute; right: -.08rem; top: -.08rem; width: .22rem; height: .22rem; display: grid; place-items: center; background: var(--mint-500); color: var(--text-on-mint); clip-path: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%); }
+
+.team__you .icon { width: .14rem; height: .14rem; }
+
+.team__info { display: flex; flex-direction: column; gap: .02rem; min-width: 0; padding: .04rem .12rem .04rem .06rem; background: linear-gradient(90deg, rgba(8, 11, 10, .82), rgba(8, 11, 10, 0)); }
+
+.team__name { font-size: .15rem; font-weight: 500; color: var(--text-md); max-width: 1.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+
+.team__line { display: flex; align-items: center; gap: .1rem; }
+
+.team__status { width: .26rem; height: .26rem; display: grid; place-items: center; border: 1px solid currentColor; background: rgba(0, 0, 0, .5); }
+
+/* the shared 机变 draft's pick order on the portrait (ui/choiceOverlay.js spMarks): ✓ picked, ••• deciding */
+
+.team__spmark { position: absolute; right: -.07rem; bottom: -.05rem; z-index: 2; display: grid; place-items: center; width: .24rem; height: .24rem; border-radius: 50%;
+  background: var(--mint-500); color: #05261e; box-shadow: 0 0 0 2px rgba(6, 9, 8, .9), 0 0 .08rem rgba(23, 249, 183, .5); }
+
+.team__spmark .icon { width: .17rem; height: .17rem; }
+
+.team__spmark.is-turn { display: flex; gap: 2px; width: auto; padding: 0 .05rem; border-radius: .12rem; background: rgba(8, 11, 10, .92); box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+
+.team__status .icon { width: .18rem; height: .18rem; }
+
+.team__status .lsprite { width: .2rem; height: .2rem; object-fit: contain; }
+
+.team__status.has-sprite { border-color: transparent; background: none; animation: none; }
+
+.team__status.has-sprite .lsprite { width: .26rem; height: .26rem; }
+
+.team__status.is-lo { color: var(--text-lo); }
+
+.team__status.is-mint { color: var(--mint-400); }
+
+.team__status.is-gold { color: var(--gold); animation: blink 1.2s steps(2) infinite; }
+
+.team__status.is-orange { color: var(--orange-hi); }
+
+.team__status.is-red, .team__status.is-offline { color: var(--red-premium); }
+
+.team__eye { color: var(--amber); display: grid; }
+
+.team__eye .icon { width: .2rem; height: .2rem; }
+
+.team__row.is-self .pavatar { box-shadow: 0 0 0 2px var(--mint-500), 0 0 .18rem rgba(23, 249, 183, .35); }
+
+.team__row.is-watched .pavatar { box-shadow: 0 0 0 2px var(--amber), 0 0 .18rem rgba(246, 163, 41, .45); }
+
+.team__row.is-dead .team__name { color: var(--text-dim); text-decoration: line-through; }
+
+/* 最终攻势 / 隐秘核心: the viewer's pair framed in the official green from the round's start (item 51) — the official
+   ui/battle bg_team_border (a white frame with its glow) tinted through a mask; a plain green ring without the local art.
+   It replaces the own row's mint ring; a watched row keeps its amber one inside the frame. */
+
+.team__frame {
+  position: absolute; inset: -.07rem; pointer-events: none; z-index: 1;
+  background: var(--mint-500); -webkit-mask: var(--frame) center / 100% 100% no-repeat; mask: var(--frame) center / 100% 100% no-repeat;
+}
+
+.team__frame--plain { inset: -.04rem; background: none; -webkit-mask: none; mask: none; border: 2px solid var(--mint-500); box-shadow: 0 0 .14rem rgba(78, 216, 175, .65); }
+
+.team__row.is-self.is-team .pavatar { box-shadow: none; }
+
+.team__bubble { position: absolute; left: calc(100% + .06rem); top: 50%; transform: translateY(-50%); width: max-content; max-width: 3.2rem; }
+
+/* 前往查看 / 返回战场 (research 09 §3.1: tapping a teammate's avatar expands a mint button under it) */
+
+.team__row.is-open .pavatar { box-shadow: 0 0 0 2px var(--mint-400), 0 0 .2rem rgba(23, 249, 183, .45); }
+
+.team__row.is-open .team__info { background: linear-gradient(90deg, rgba(13, 44, 36, .92), rgba(8, 11, 10, 0)); }
+
+.team__ob, .team__back { align-self: flex-start; margin-top: .04rem; min-width: 1.1rem; animation: pop-in var(--t-fast) var(--ease-out); }
+
+.team__ob .btn__label, .team__back .btn__label { letter-spacing: .12em; }
+
+.team__back { border-color: rgba(255, 255, 255, .7); color: #fff; }
+
+
+/* player avatar (band icon / glyph) */
+
+
+/* ---- effects ---------------------------------------------------------------------------------------------- */
+
+/* 准备就绪 refused (the temp row holds pieces): its reason shows under the button and pushes the ready count down —
+   the effects column follows, or the count runs into it on phones */
+
+
+/* ---- corner: emote + settings --------------------------------------------------------------------------------- */
+
+
+/* Local combat meter, docked above the corner's actual height (including mobile wrapped rows). */
+
+/* Phones in landscape (short touch screens: 1rem is clamped at 40 px by theme.css): the ported desktop card — 12–16 px
+   text, 340 px wide, 30 px thumbs — took 40 % of an 844 × 390 screen, about twice the HUD's own 6–7 px text, and hid
+   the battle behind it. Scale the card by the HUD's proportion instead of the desktop one: 9–12 px text, 24 px thumbs,
+   36 px touch rows, 300 px wide (文字大小 still lifts every size through --t). Desktop/tablet keep the original sizes. */
+
+
+/* speech bubble next to a team row: official emote art (+ phrase), or the phrase alone */
+
+
+/* ---- ticker -------------------------------------------------------------------------------------------- */
+
+/* a slim strip hugging the bottom of the top bar; the bond strip starts right below it (.gm__bonds top) */
+
+
+/* ---- watching / dead / combat hud ------------------------------------------------------------------------------ */
+
+/* scouting a teammate's board in prep: the shop bar is hidden, the pill takes its place */
+
+/* a spectator seat (community report #26): the same place, the watching pill's amber — nobody was eliminated */
+
+/* a still hourglass: a rotating one next to the text read as a loading spinner (user playtest #3 item 9) */
+
+/* client-side combat (ui/combatHud.js, research 09 §3.1): waiting pill + teammates' progress, observing pill, ‹ › halves */
+
+/* a 联防 / 最终攻势 field watched with 前往查看: the ‹ › pill carries 返回战场 (DESIGN §20.15) */
+
+
+/* ---- settings modal ------------------------------------------------------------------------------------------------ */
+
+/* the 设置 trigger of the lobby and the room (ui/settings.js SettingsButton, GitHub #238): the 玩法说明 button's twin; its gear sits
+   inside the label, so the label lays glyph and text out like the button itself */
+
+/* square (the lobby's gear alone): the label box drops out so the gear sizes and centres against the button, like an `icon` */
+ /* the gear glyph is drawn smaller in its box than the book */
+
+/* The label column may shrink (the label wraps) instead of pushing its control out of the modal: at 设置 →「文字大小」
+   大 / 特大 a phone's label (a Chinese name plus its Latin micro label) is wider than 3.3rem at 1rem = 40 px. */
+
+/* a floor, not a fixed width: the %. value grows with the text step (20 px on a phone, 3 digits at 特大) */
+
+/* 语音语言: the four endonyms plus the 本土语言 switch. A flex wrap left 한국어 on a row of its own (four .8rem
+   minima squeezed by the switch). The group wraps its four buttons four across or two by two, never 3 + 1: each
+   button's basis is clamp(25 %, (2.4rem − 100 %) × 999, 50 %) of the group — hugely negative (→ 25 %, four across)
+   while the group is wider than 2.4rem, hugely positive (→ 50 %, two by two) below it. The group's 1 px gaps over
+   its line-coloured background draw the dividers in both layouts. No container query (the CSS stays within the
+   supported browsers, test/client-static.test.js).
+   [ASSUMED] 2.4rem of the group (about 0.6rem a button): the usual control column (desktop, and a phone around
+   844 px where 1rem is 40 px) is wider, so the four names stay on one row beside 本土语言. */
+
+/* 文字大小 (ui/settings.js): four steps, so its buttons are narrower than the two- and three-step groups' — at .8rem each
+   the group would be wider than the row's 1fr column on a phone (1rem = 40 px) */
+
+.set-hint__help { display: inline-flex; align-items: center; gap: .03rem; padding: 0; border: 0; background: none; color: var(--text-lo); font: inherit; cursor: help; text-decoration: underline dotted; text-underline-offset: .03rem; }
+
+.set-hint__help .icon { width: .14rem; height: .14rem; }
+
+.set-hint__help:hover, .set-hint__help:focus-visible { color: var(--mint-400); }
+
+/* 快捷键 (ui/settings.js HotkeySection): each shortcut with its key — click the key, press the new one; two columns,
+   one under 768 px (phones in landscape) */
+
+/* 外观插件 (DESIGN §32 P1a, ui/settings.js CosmeticSection): laid out like 快捷键 — a head, a hint, one switch per plugin */
+
+.set-theme-win { margin: 0; font-family: var(--font-num); color: var(--text-lo); overflow-wrap: anywhere; }
+
+/* 素材存储 (ui/settings.js StorageSection): laid out like 问题反馈 below it — a head with its button, a hint, the answer */
+
+/* 问题反馈 (ui/settings.js DiagSection): laid out like 快捷键 — a head with its button, a hint, the result line; the
+   recorded-error count in the figure face of the slider values (amber once there is one); the report box only when the
+   clipboard refused it, styled like 干员调配's 导出 box (screens/loadout.css .lo-io__text) */
+
+/* touch: 16 px, below which iOS zooms into the focused box (as 干员调配's 导出 box and ui/clipboard.js) */
+
+
+/* ---- exit / away ------------------------------------------------------------------------------------------------------ */
+
+
+/* ---- simplified (DOM) field view ---------------------------------------------------------------------------------------- */
+
+/* facing wedge (research 09 §1.2): an orange › on the piece's edge along its direction */
+
+
+/* ---- small screens (1280×720 → root ≈ 66px) ------------------------------------------------------------------------ */
+
+
+/* fallback view: enemy preview pen (setCamera('pen')) */
+
+
+/* enemy preview pen view (research 09 §2): the bond strip and the effects column step aside for the pen */
+
+
+/* solo pause overlay (screens/game.js PausedOverlay; m.public.paused): the field dims under an official matte plate */
+
+
+/* 协议已失效 (ui/downedPlate.js): the project's Modal restyled as the event's panel (video 10:56–10:58) — the official map
+   behind, the knocked-out face, the title, and the two buttons under the panel; design px ÷ 100 [ASSUMED: measured from
+   that footage]. The face turns from calm to knocked out after .5 s with a shake; with reduced motion it simply shows. */
+
+/* the footage dims the field but keeps it sharp: no blur behind this one */
+
+/* the official map is an opaque square: its edges fade into the panel */
+
+/* the footage's button glyphs are about as tall as the text block */
+
+
+/* ---- 进场 (PR #827; the maintainer's decision of 2026-10-21): the HUD waits hidden while 协议启动！ shows
+   (screens/game.js `hudIn`: .gm__hud.is-wait) and comes in as soon as it leaves — the event's top bar is up from the end
+   of 协议启动 (video 7:51) through the round-1 kettles and plate (7:55–8:01): the phase plate drops in with a flash, the
+   band opens from it to both sides, the + marks and the 🔍 frames slide out to the ends; the corners, the team column and
+   the shop follow, ~1.2 s in all. [ASSUMED] the order, the timings and the motion, read off the footage by the PR's
+   author. ---- */
+
+.gm__hud.is-wait > * { visibility: hidden; }
+
+.gm__hud.is-enter .gtop__cap { animation: gtop-cap-in 420ms cubic-bezier(.2, 1.35, .45, 1) both; }
+
+.gm__hud.is-enter .gtop__half { animation: gtop-open 380ms cubic-bezier(.16, .84, .3, 1) 150ms both; }
+
+.gm__hud.is-enter .gtop__deco { animation: gtop-fade 360ms ease-out 480ms both; }
+
+.gm__hud.is-enter .gtop__plus { animation: gtop-fade 240ms ease-out 400ms both; }
+
+.gm__hud.is-enter .gtop__frame--l { animation: gtop-out-l 320ms cubic-bezier(.16, .84, .3, 1) 440ms both; }
+
+.gm__hud.is-enter .gtop__frame--r { animation: gtop-out-r 320ms cubic-bezier(.16, .84, .3, 1) 440ms both; }
+
+.gm__hud.is-enter .gtop__left { animation: gtop-from-l 420ms cubic-bezier(.16, .84, .3, 1) 260ms both; }
+
+.gm__hud.is-enter .gtop__right { animation: gtop-from-r 420ms cubic-bezier(.16, .84, .3, 1) 260ms both; }
+
+.gm__hud.is-enter .team { animation: gtop-from-l 460ms cubic-bezier(.16, .84, .3, 1) 380ms both; }
+
+/* the shop keeps its own shop-up in the list, so it does not start again when .is-enter goes */
+
+.gm__hud.is-enter .shopbar { animation: shop-up var(--t-slow) var(--ease-out), gtop-rise 460ms cubic-bezier(.16, .84, .3, 1) 460ms both; }
+@media (prefers-reduced-motion: reduce){
+  .gtop__half .roundbox__num, .gm__hud.is-enter .gtop__cap, .gm__hud.is-enter .gtop__half, .gm__hud.is-enter .gtop__deco,
+  .gm__hud.is-enter .gtop__plus, .gm__hud.is-enter .gtop__frame--l, .gm__hud.is-enter .gtop__frame--r, .gm__hud.is-enter .gtop__left, .gm__hud.is-enter .gtop__right,
+  .gm__hud.is-enter .team { animation: none; }
+
+  .gm__hud.is-enter .shopbar { animation: shop-up var(--t-slow) var(--ease-out); }}
+
+
+/* Keep every bond reachable without shrinking its disc or extending over the right HUD. */
+
+.bstrip-scroll { display: flex; align-items: center; min-width: 0; gap: .04rem; }
+
+/* Let the padding protect rings/counts from clipping without lowering the discs and names into the board. */
+
+.gm__bonds .bstrip-scroll .bstrip { min-width: 0; overflow-x: auto; overflow-y: hidden; padding: .08rem 0; margin: -.08rem 0;
+  pointer-events: auto; touch-action: pan-x; scrollbar-width: thin; }
+
+.bstrip-scroll .bslot { flex: none; }
+
+.gm__bonds .bstrip-scroll__arrow { flex: none; width: 44px; height: 44px; padding: 0;
+  background: rgba(8, 11, 10, .7); color: var(--mint); border: 1px solid var(--line-2); cursor: pointer; pointer-events: auto; }
+
+.bstrip-scroll__arrow:disabled { opacity: .3; cursor: default; }
+
+.gm.is-pen .gm__bonds .bstrip-scroll *, .gm.has-sp .gm__bonds .bstrip-scroll * { pointer-events: none; }
+
+
+.gm__bond-list > .tt-anchor { display: block; max-width: 100%; }
+
+
+.ai-vote { display:flex; flex-wrap:wrap; gap:.12rem; align-items:center; margin:.15rem 0; padding:.1rem; border:1px solid #426055; }
+
+.ai-participation-entry { flex:none; }

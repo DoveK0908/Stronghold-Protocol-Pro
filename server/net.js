@@ -43,6 +43,7 @@
 //   onDisconnect(session)                  the session's socket closed (session kept for the reconnect window)
 //   onExpire(session)                      the session was purged (disconnected longer than the window)
 
+import { prepareStateFrame, negotiateStateDelta, resetStateDelta, setStateDeltaRoom } from './stateTransport.js';
 import { randomBytes } from 'node:crypto';
 import { isIP } from 'node:net';
 import { C2S, validateC2S, normalizeServerLoad, normalizeLoadDetails } from '../shared/protocol.js';
@@ -50,7 +51,6 @@ import { normalizeClusterLoad } from '../shared/cluster-load.js';
 import { ERR, ERR_TEXT, PROTOCOL_VERSION, MATCHMAKING_VERSION } from '../shared/constants.js';
 import { PLAYER_CAPACITY_VERSION } from '../shared/playerCapacity.js';
 import { isCompressibleType } from './wsCompression.js';
-import { negotiateStateDelta, prepareStateFrame } from './stateTransport.js';
 import { moderateName } from '../shared/names.js';
 import { NO_PHASES } from './phaseMetrics.js';
 import { serverFullDetail } from './onlineLimit.js';
@@ -83,6 +83,7 @@ export const NET_DEFAULTS = Object.freeze({
   maxConnections: 0,            // concurrent sockets (0 = unlimited; enforced at upgrade time)
   maxConnectionsPerAddr: 0,     // concurrent sockets per client network key (0 = unlimited); see clientAddress
   maxSessions: 0,               // registry cap (0 = unlimited); finite caps evict oldest idle sessions first
+  maxOnline: 0,                 // authenticated players admitted at once (0 = unlimited); a resume is never refused
   heavyPerSec: 2,               // refill of the bucket for resend-heavy intents (HEAVY_TYPES)
   heavyBurst: 6,
   trustProxy: 'auto',           // forwarding headers: 'auto' = from loopback/private peers only, true = always, false = never
@@ -95,9 +96,15 @@ export const NET_DEFAULTS = Object.freeze({
  * edits), room.ownership (a ≤ 160-id list), room.diy (≤ 8 自选 picks), room.skins (whitelisted display choices), room.spectate
  * (taking a spectator seat in a running match resends its state like a watcher's g.watch — server/lobby.js spectate) and
  * room.setPlugins (a new visual set: every member downloads its art manifest — server/plugins/visualSet.js).
- * room.skins (docs/SKINS.md) is a small `{ [charId]: skinId }` map, sent on every edit of the appearance.
+ * room.skins (docs/SKINS.md) is a small `{ [charId]: skinId }` map, sent on every edit of the appearance; a changed map
+ * re-broadcasts room.state to a waiting room (its seat cards wear it: room.state seats[].skins). room.card (名片干员, PR
+ * #643 split 6): every accepted change re-broadcasts room.state to the room. room.rerollSetup (重刷本局): with one human a
+ * start completes at once and clears that seat's 30 s cooldown, and each reroll rebuilds the opening and resends m.public
+ * to every connection (server/match/match/setupVote.js, DESIGN §35.47). Any seated player may start it (#860).
+ * room.proposeVersion (DESIGN §35.23) stays host-proposed: an accepted proposal by a lone human switches the room's
+ * version — every page then downloads that version's data.
  */
-export const HEAVY_TYPES = new Set(['g.watch', 'room.loadout', 'room.ownership', 'room.diy', 'room.skins', 'queue.join', 'room.spectate', 'room.setPlugins']);
+export const HEAVY_TYPES = new Set(['g.watch', 'room.loadout', 'room.ownership', 'room.diy', 'room.spectate', 'room.setPlugins', 'room.skins', 'queue.join', 'room.card', 'room.rerollSetup', 'room.proposeVersion', 'state.resync']);
 
 /** Close codes (see header). */
 export const CLOSE = Object.freeze({ REPLACED: 4001, HELLO_TIMEOUT: 4002, POLICY: 1008, SHUTDOWN: 1001 });
@@ -161,9 +168,11 @@ export class Session {
     this.notOwned = null;
     /** @type {Readonly<Record<string, { charId: string, skillIndex: number, uniEquipId: string|null }>> | null} checked 自选 picks (lobby-owned, 0.2.0 自选编队) */
     this.diy = null;
-    /** @type {Readonly<Record<string, string>>} display-only skin choices (lobby-owned) */
+    /** @type {Readonly<Record<string, string>>} display-only skin choices (lobby-owned, docs/SKINS.md): keyed by charId;
+     * PUBLIC, unlike the loadout (a teammate sees your skin through Match.publicView().players[].skins) */
     this.skins = Object.freeze({});
-    /** @type {Readonly<{ charId?: string, avatar?: string, bg?: string, trophies?: number }> | null} display card (lobby-owned, room.card) */
+    /** @type {Readonly<{ charId?: string, avatar?: string, avatarLook?: string, bg?: string, look?: string, trophies?: number, avatarImg?: string }> | null}
+     * display card (lobby-owned, room.card): PUBLIC (room.state seats[].card), cosmetic */
     this.card = null;
     /** @type {boolean} the latest hello carried the owner's key (服主, server/ownerFile.js); decided again on every hello */
     this.owner = false;
@@ -426,12 +435,13 @@ export const isDroppable = (msg) => !!msg && msg.t === 'b.snap';
  * Encode and send one message to a socket. Never throws.
  * @param {import('ws').WebSocket | null | undefined} ws
  * @param {object} msg
+ * @param {string | null} [encoded] bytes a caller already produced; must be this message when it is a state kind
  * @returns {boolean}
  */
-export function send(ws, msg) {
-  const data = encode(msg);
-  if (data == null) return false;
-  return sendMessage(ws, msg, data);
+export function send(ws, msg, encoded = null) {
+  const bytes = encoded == null ? encode(msg) : encoded;
+  if (bytes == null) return false;
+  return sendMessage(ws, msg, bytes);
 }
 
 /**
@@ -441,8 +451,13 @@ export function send(ws, msg) {
  * @returns {boolean}
  */
 export function sendMessage(ws, msg, data) {
+  // state kinds go through the delta transport: it owns the per-connection baseline, so commit() only runs after the
+  // frame was really queued (a dropped or terminated socket must not advance it).
   const frame = prepareStateFrame(ws, msg, data);
-  const queued = sendRaw(ws, frame.data, { droppable: isDroppable(msg), compress: isCompressibleType(msg?.t) });
+  // Pre-encoded bytes that are not a JSON object cannot be a baseline: fall back to the full frame encoded here.
+  const bytes = frame.usable ? frame.data : encode(msg);
+  if (bytes == null) return false;
+  const queued = sendRaw(ws, bytes, { droppable: isDroppable(msg), compress: isCompressibleType(msg?.t) });
   if (queued) frame.commit();
   return queued;
 }
@@ -453,9 +468,10 @@ export function sendMessage(ws, msg, data) {
  * @param {object} msg
  * @returns {boolean}
  */
-export function sendSession(session, msg) {
+export function sendSession(session, msg, encoded = null) {
   if (!session || !session.connected) return false;
-  return send(session.ws, msg);
+  setStateDeltaRoom(session.ws, session.roomCode ?? null);
+  return send(session.ws, msg, encoded);
 }
 
 /**
@@ -702,6 +718,15 @@ export class Network {
   /** Number of open sockets. */
   get connectionCount() { return this.conns.size; }
 
+  /** Number of authenticated sessions bound to a live socket (what the online cap counts). */
+  get onlineCount() {
+    let n = 0;
+    for (const conn of this.conns.values()) {
+      if (conn.session?.connected && conn.session.ws === conn.ws) n++;
+    }
+    return n;
+  }
+
   /**
    * Upgrade-time admission check (server/http/websocket.js): null to accept, otherwise the reason to refuse.
    * @param {import('node:http').IncomingMessage} req
@@ -813,6 +838,18 @@ export class Network {
     if (!conn.session) { this.reply(conn, errorMsg(ERR.BAD_MSG, rid, 'hello required')); return; }
     if (HEAVY_TYPES.has(msg.t) && !conn.heavy.take(now)) { this.reply(conn, errorMsg(ERR.RATE, rid, `${msg.t} too often`)); return; }
 
+    // A client that missed a delta asks for a full frame (shared/stateDelta.js StateReceiver). Dropping the baseline is
+    // the point: the next frame of every state channel is then a full one, which is what restores the client. The state
+    // itself is resent by the same resync a repeated hello runs (the lobby throttles it with resyncMinGapMs).
+    if (msg.t === 'state.resync') {
+      resetStateDelta(conn.ws);
+      const resent = this.handler.onMessage(conn.session, { t: 'state.resync' });
+      if (resent && resent.error) {
+        this.reply(conn, errorMsg(isErrCode(resent.error) ? resent.error : ERR.INTERNAL, rid, resent.detail));
+      } else if (validRid(rid)) this.reply(conn, { t: 'ok', rid });
+      return;
+    }
+
     if (this.opts.allowAsyncHandlers && conn.pendingHandlers >= 64) { this.reply(conn, errorMsg(ERR.RATE, rid)); return; }
     const session = conn.session;
     const respond = res => {
@@ -823,6 +860,7 @@ export class Network {
       } else if (validRid(rid)) this.reply(conn, { t: 'ok', rid });
     };
     const t0 = this.metrics.start();
+
     let res;
     try {
       // client-side combat reports (b.progress / b.result, DESIGN §14) belong to the running match like 'g.*' intents:
@@ -913,7 +951,13 @@ export class Network {
         this.helloCounts.resumed++;
         if (session.ws && session.ws !== conn.ws) this.detachReplaced(session.ws);
       } else {
-        // the online cap admits no NEW session while the lobby is at it; a resumed one above always comes back
+        // The online cap decides *new players only*: a token that still resolves resumed above and never reaches this
+        // check, so a full server does not lock out the people already playing. Two sources: the `maxOnline` option
+        // (SP_MAX_ONLINE, docs/CONCURRENCY-ADMISSION.md) and this fork's hot-reloadable limits file (server/onlineLimit.js);
+        // the tighter of the two wins. "A resume is never refused" holds at this layer alone — the socket cap
+        // (maxConnections, checked at the upgrade in server/http/websocket.js, answering 503 before a socket exists) still
+        // applies, and the `noReplace` / claimAt decision above still answers SESSION_IN_USE for a token whose session is
+        // live on another socket. This check is what the player sees as 服务器已满 (ERR.SERVER_FULL).
         const full = this.serverFull();
         if (full) { this.reply(conn, errorMsg(ERR.SERVER_FULL, rid, full)); return; }
         session = this.registry.create(name);
@@ -941,14 +985,17 @@ export class Network {
     session.limitKey = conn.key;
     session.matchmakingVersion = msg.matchmakingVersion ?? null;
     session.playerCapacityVersion = msg.playerCapacityVersion ?? null;
-    // m.public / m.private as m.state deltas on this socket (a repeated hello keeps its baselines)
-    negotiateStateDelta(conn.ws, msg.stateDelta);
+    // m.public / m.private as m.state deltas on this socket (a repeated hello keeps its baselines). Opt-in
+    // (shared/stateDelta.js): a hello may name the version it decodes — `stateDelta` is this fork's name for the field,
+    // `delta` the official one; a client that never names one (or names an unknown version) keeps getting plain frames.
+    negotiateStateDelta(conn.ws, msg.stateDelta ?? msg.delta);
 
     let extra = null;
     try { extra = this.handler.welcomeInfo?.() ?? null; } catch (e) { this.log.error('[net] welcomeInfo crashed', e); }
     // Keep the type first for bounded ingress inspection; optional metadata cannot replace identity fields.
     const welcome = { t: 'welcome', playerId: session.playerId, token: session.token, name: session.name, tag: session.tag, serverNow: now, version: PROTOCOL_VERSION, resumed };
     if (session.owner) welcome.owner = true; // the settings screen's confirmation that the key worked
+    if (session.aiTakeoverFrom) { welcome.takeoverFrom = session.aiTakeoverFrom; session.aiTakeoverFrom = null; }
     if (extra && typeof extra === 'object') for (const [key, value] of Object.entries(extra)) {
       if (!Object.hasOwn(welcome, key) && key !== '__proto__') welcome[key] = value;
     }
@@ -1003,13 +1050,20 @@ export class Network {
     try { return this.ownerFile?.reserved(name) === true; } catch { return false; }
   }
 
-  /** The SERVER_FULL detail when the online cap is set and reached (the lobby's onlineCount), else null. */
+  /**
+   * The SERVER_FULL detail when the online cap is set and reached, else null. Two sources, the tighter one wins: the
+   * hot-reloadable limits file (server/onlineLimit.js, this fork) and the `maxOnline` option (SP_MAX_ONLINE, the
+   * official knob in server/http/config.js).
+   */
   serverFull() {
     let cap = 0;
     try { cap = this.onlineLimit?.limit() ?? 0; } catch { cap = 0; }
+    const optionCap = Number(this.opts.maxOnline) || 0;
+    if (optionCap > 0 && (cap <= 0 || optionCap < cap)) cap = optionCap;
     if (!(cap > 0)) return null;
     let online = 0;
     try { online = Number(this.handler.onlineCount?.()) || 0; } catch { online = 0; }
+    if (!(online > 0)) online = this.onlineCount;
     return online >= cap ? serverFullDetail(online, cap) : null;
   }
 
@@ -1039,6 +1093,40 @@ export class Network {
     }
   }
 
+  /**
+   * Ping every socket; terminate the ones that did not answer since the previous heartbeat.
+   *
+   * A closed server has no connection left to keep alive, and a shutting-down one must not be walked: nothing to do.
+   * The pass yields between chunks, so a large connection set cannot hold the event loop for the whole sweep.
+   * A pass still yielding when the next tick fires is skipped rather than started a second time on top of itself.
+   */
+  heartbeat() {
+    if (this.closed || this._heartbeatPending) return;
+    this._heartbeatPending = true;
+    this._heartbeatPass()
+      .catch((e) => this.log.debug?.('[net] heartbeat error', e?.message))
+      .finally(() => { this._heartbeatPending = false; });
+  }
+
+  /**
+   * One heartbeat pass: the same per-connection step, in chunks of 128 with a yield in between. Fewer connections
+   * than one chunk still run through in a single tick, exactly like a plain synchronous loop.
+   *
+   * Each connection is pinged at most once per pass. The pass stops when the server closes, and a connection that
+   * was removed or replaced while the pass was yielding is skipped — the map no longer holds that same object — and
+   * is left to the next pass instead of being acted on twice or after its owner already dropped it.
+   */
+  async _heartbeatPass() {
+    const now = this.now();
+    let seen = 0;
+    for (const [key, conn] of [...this.conns.entries()]) {
+      if (this.closed) return;
+      if (this.conns.get(key) !== conn) continue;
+      this.heartbeatConn(conn, now);
+      if (++seen % 128 === 0) await new Promise((resolve) => setImmediate(resolve));
+    }
+  }
+
   /** Timer tick: the next slice only (each slice comes round once per heartbeatMs). */
   heartbeatTick() {
     const slice = this.heartbeatSlices[this.heartbeatCursor];
@@ -1047,12 +1135,6 @@ export class Network {
     const t0 = this.metrics.start(), now = this.now();
     for (const conn of [...slice]) this.heartbeatConn(conn, now);
     this.metrics.end('net.heartbeat', t0, slice.size);
-  }
-
-  /** Ping every socket at once; terminate the ones that did not answer since the previous heartbeat. */
-  heartbeat() {
-    const now = this.now();
-    for (const conn of [...this.conns.values()]) this.heartbeatConn(conn, now);
   }
 
   /**

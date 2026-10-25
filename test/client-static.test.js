@@ -440,13 +440,15 @@ describe('net.js', () => {
     const hello = ws().last('hello');
     const { PLAYER_CAPACITY_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/playerCapacity.js')).href);
     const { STATE_DELTA_VERSION } = await import(pathToFileURL(path.join(ROOT, 'shared/stateDelta.js')).href);
-    // 界面#09: every hello carries this browser's install id (the owner of its #tag claim); no tag until one is chosen
+    // 界面#09: every hello carries this browser's install id (the owner of its #tag claim); no tag until one is chosen.
+    // The fork names both state-delta spellings: `stateDelta` (the versioned envelope) and `delta` (the official 0.3.2
+    // field); a server that does not know one of them ignores it.
     assert.match(hello.uid, /^[a-z0-9]{32}$/);
     assert.equal(hello.tag, undefined);
     const { uid: helloUid, ...rest } = hello;
     assert.equal(helloUid.length, 32);
     assert.deepEqual({ ...rest, rid: 0 }, { t: 'hello', rid: 0, name: '凯尔希', version: PROTOCOL_VERSION, matchmakingVersion: MATCHMAKING_VERSION, playerCapacityVersion: PLAYER_CAPACITY_VERSION,
-      stateDelta: STATE_DELTA_VERSION, token: 'tok-1' });
+      stateDelta: STATE_DELTA_VERSION, delta: STATE_DELTA_VERSION, token: 'tok-1' });
     assert.equal(net.status, 'handshaking');
     ws().recv({ t: 'welcome', rid: hello.rid, playerId: 'p_1', token: 't', name: '凯尔希', serverNow: Date.now() });
     assert.equal(net.status, 'online');

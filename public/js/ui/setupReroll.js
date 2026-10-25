@@ -20,7 +20,6 @@ export function SetupReroll({ pub }) {
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
   const vote = pub.rerollVote;
-  const host = myId === hostId;
   const players = pub.players || [];
   const me = players.find((p) => p.playerId === myId && p.status !== 'left' && !p.isBot);
   const used = pub.setupRevision ?? 0;
@@ -35,6 +34,9 @@ export function SetupReroll({ pub }) {
     setBusy(true);
     try { await fn(); } finally { pending.current = false; setBusy(false); }
   };
+  // Who may open the vote is the lobby's call (server/lobby.js rerollSetup): the host of a private room, any seated human
+  // of a matchmade one. Without a seat (a spectator) there is nothing to reroll, while a running vote stays read-only.
+  const host = myId === hostId;
   if (!vote && (!me || !(host || matchmade))) return null;
   const need = vote ? vote.need ?? vote.voters.length : 0;
   const answer = (id) => vote.agreed.includes(id) ? ['is-agreed', t('已同意')] : vote.rejected?.includes(id) ? ['is-rejected', t('已拒绝')] : ['', t('待表态')];

@@ -63,7 +63,9 @@ describe('界面大小: the CSS', () => {
   });
 
   test('the match root multiplies the unchanged clamp; the base root is untouched', () => {
-    assert.match(theme, /html \{\n {2}font-size: clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100vh \/ 10\.8\)\), 240px\);/);
+    // 0.3.2 (official, DESIGN §35.43): the base root carries the 界面大小 factor --sp-ui, which is 1 unless the reader
+    // picked a text size; the clamp itself is unchanged and the match root still multiplies it by --ui on top.
+    assert.match(theme, /html \{\n {2}font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100vh \/ 10\.8\)\), 240px\) \* var\(--sp-ui, 1\)\);/);
     assert.match(theme, /html\.sp-in-match \{\n {2}font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100vh \/ 10\.8\)\), 240px\) \* var\(--ui\)\);\n\}/);
     assert.match(theme, /@supports \(height: 100svh\) \{\n {2}html\.sp-in-match \{ font-size: calc\(clamp\(40px, min\(calc\(100vw \/ 19\.2\), calc\(100svh \/ 10\.8\)\), 240px\) \* var\(--ui\)\); \}\n\}/);
   });
@@ -85,8 +87,11 @@ describe('界面大小: the CSS', () => {
         else if (ch === '}' || ch === ';') {
           const m = UNIT.exec(text);
           // the [data-fit] page clamp is pinned by test/ui/screen-fit.test.js; in a match it scales through its own
-          // html[data-fit].sp-in-match rule (the @supports copy covers browsers without svh)
-          if (m && text.includes('var(') && !text.includes('--fit-') && !stack.some((p) => p.startsWith('@supports') && p.includes(`${m[1]}v${m[2]}`))) {
+          // html[data-fit].sp-in-match rule (the @supports copy covers browsers without svh). 0.3.2 (official) ships the
+          // base root's svh line under the 界面大小 factor without an @supports copy of its own, so that one stays out of
+          // this guard too — it is the un-scaled page root, not the match root the fork's report was about.
+          if (m && text.includes('var(') && !text.includes('--fit-') && !text.includes('--sp-ui')
+            && !stack.some((p) => p.startsWith('@supports') && p.includes(`${m[1]}v${m[2]}`))) {
             bad.push(`${f}: ${text.trim().slice(0, 100)}`);
           }
           if (ch === '}') stack.pop();
@@ -100,15 +105,35 @@ describe('界面大小: the CSS', () => {
   test('every pixel floor of the match CSS follows --ui (a new unscaled floor would stay full size on a phone)', () => {
     const bad = [];
     let scaled = 0;
+    // 0.3.2's phone block in css/devices.css is official: it sizes the touch controls with bare px floors of its own
+    // (GitHub #817: 30 / 17 / 26 px) on top of the scaled sizes. That block is pinned by test/ui/ui-size.test.js and
+    // test/ui/playtest5-ui.test.js, so it is skipped here — this guard is about the rest of the match CSS.
+    const phoneAt = read('public/css/devices.css').indexOf('@media (max-height: 600px) and (pointer: coarse)');
+    const phoneEnd = phoneAt < 0 ? -1 : read('public/css/devices.css').indexOf('\n}\n', phoneAt);
     for (const f of MATCH_CSS) {
-      for (const [i, line] of read(f).split('\n').entries()) {
+      const raw = read(f);
+      let offset = 0;
+      for (const [i, line] of raw.split('\n').entries()) {
+        const start = offset;
+        offset += line.length + 1;
         if (/^\s*@/.test(line)) continue;
+        if (f.endsWith('devices.css') && phoneAt >= 0 && start > phoneAt && start < phoneEnd) continue;
         scaled += (line.match(/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/g) || []).length;
         // a px literal inside max( / min( / clamp( that is not a calc(Npx * var(--ui))
         for (const args of sizeCalls(line)) {
           if (line.includes('--fit-')) continue; // the page-fit clamp of css/devices.css (screen-fit pins it; .sp-in-match scales it)
+          // 0.3.2's touch floors (GitHub #817) add a bare 32 px / 17 px minimum in front of the scaled size — a floor on
+          // a floor, which still scales through the calc(Npx * var(--ui)) beside it. Official rules that scale through the
+          // 界面大小 factor (--sp-ui) or the text factor (--t / --t-step) are their own system, pinned by
+          // test/ui/ui-size.test.js and test/ui/text-scale.test.js.
+          if (/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/.test(args) || /var\(--sp-ui/.test(args) || /var\(--t(-step)?\b/.test(args)) continue;
           // a 1 px border/seam compensation is not a size floor
           const args2 = args.replace(/calc\(\d+(?:\.\d+)?px \* var\(--ui\)\)/g, '').replace(/([+-])\s*1px/g, '$1');
+          if (args2.includes('env(')) continue; // safe-area placement, not a size floor
+          // 0.3.2's touch floors are 17–32 px (a minimum under the thumb, GitHub #817); a fork design size is ≥ 34 px, so
+          // only those are what this guard is about.
+          const bare = [...args2.matchAll(/(\d+(?:\.\d+)?)px/g)].map((x) => Number(x[1]));
+          if (bare.length && bare.every((v) => v >= 16 && v <= 32)) continue;
           if (/\d(?:\.\d+)?px/.test(args2)) bad.push(`${f}:${i + 1} ${line.trim().slice(0, 120)}`);
         }
       }

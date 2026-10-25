@@ -21,7 +21,8 @@ test('the service pill inside the Tooltip anchor gets the same 36px row as the o
 });
 
 test('添加精英干员 is the same block as 添加 AI 队友', () => {
-  const css = read('public/css/screens/room.css');
+  // the fork's own room rules live in screens/lobby.css (screens/room.css is the official room since 0.3.2)
+  const css = read('public/css/screens/lobby.css');
   assert.match(css, /\.rseat__adds > \*, \.rseat__adds \.rseat__addbot \{ width: 100%; \}/, 'the elite wrapper stretches like the AI button');
   const room = read('public/js/screens/room.js');
   assert.match(room, /<div class="rseat__adds">\n\s*<button type="button" class="rseat__addbot" disabled=\$\{busy === 'add'\}/);

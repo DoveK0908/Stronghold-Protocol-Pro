@@ -53,7 +53,8 @@ test('the 选择策略 order row draws the same 头像 as everywhere else and ca
   assert.match(band, /<span class="dorder__face"><\$\{PlayerAvatar\} player=\$\{p\} self=\$\{self\} \/><\/span>/);
   assert.doesNotMatch(band, /dorder__img/, 'no raw <Img> face left in the row');
   assert.doesNotMatch(band, /const faceOf = /, 'the row no longer pre-computes a face');
-  // the 「我」 corner badge is gone (owner playtest 2026-10-24)
-  assert.doesNotMatch(band, /dorder__me/);
-  assert.doesNotMatch(css, /\.dorder__me/);
+  // the 「我」 corner badge is gone (owner playtest 2026-10-24). `dorder__medal` (the trophy medal before the name) is a
+  // different element, so the guards below name the badge class rather than matching it as a prefix.
+  assert.doesNotMatch(band, /class="dorder__me"/);
+  assert.doesNotMatch(css, /\.dorder__me\s*\{/);
 });

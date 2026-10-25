@@ -138,19 +138,24 @@ test('public/private and sockets are isolated; a large change and a result-phase
 test('decoder: a gap or a malformed delta yields no partial state; duplicates are not re-emitted; views are private copies', () => {
   const rx = new StateReceiver(), a = makeView();
   assert.deepEqual(rx.receive({ kind: a.t, seq: 1, full: a }).message, a);
-  assert.deepEqual(rx.receive({ kind: a.t, seq: 3, base: 2, patch: [[['funds'], 8]] }), { failed: true });
-  assert.deepEqual(rx.receive({ kind: a.t, seq: 5, base: 3, patch: [] }), { failed: true }, 'stays broken until a full frame');
+  const broken = (r) => r.message === null && r.resync === true;
+  assert.ok(broken(rx.receive({ kind: a.t, seq: 3, base: 2, patch: [[['funds'], 8]] })));
+  const stillBroken = rx.receive({ kind: a.t, seq: 5, base: 3, patch: [] });
+  assert.ok(stillBroken.message === null, 'stays broken until a full frame');
+  assert.equal(stillBroken.resync, false, 'one resync request covers the whole blocked window');
   const full = rx.receive({ kind: a.t, seq: 6, full: makeView({ funds: 8 }) }).message;
   full.board[0].col = 99; // the UI may mutate what it gets
   const next = rx.receive({ kind: a.t, seq: 7, base: 6, patch: [[['funds'], 7]] }).message;
   assert.equal(next.board[0].col, 3);
-  assert.equal(rx.receive({ kind: a.t, seq: 7, base: 6, patch: [[['funds'], 7]] }), null);
+  assert.deepEqual(rx.receive({ kind: a.t, seq: 7, base: 6, patch: [[['funds'], 7]] }), { message: null, resync: false });
   const bad = rx.receive({ kind: a.t, seq: 8, base: 7, patch: [[['board', 0, 'col'], 1], [['absent', 'x'], 1]] });
-  assert.deepEqual(bad, { failed: true });
+  assert.ok(broken(bad));
   assert.equal(a.board[0].col, 3);
-  assert.deepEqual(rx.receive({ kind: 'm.field', seq: 9, full: {} }), { failed: true });
+  // An unknown kind is not a channel: ignored, never a failure.
+  assert.deepEqual(rx.receive({ kind: 'm.field', seq: 9, full: {} }), { message: null, resync: false });
   rx.reset();
   assert.equal(rx.states.size, 0);
+  assert.equal(rx.missing.size, 0);
 });
 
 test('browser Net: hello offers stateDelta, m.state dispatches as the original event, a broken chain reconnects', () => {
@@ -168,10 +173,13 @@ test('browser Net: hello offers stateDelta, m.state dispatches as the original e
   const warn = console.warn; console.warn = () => {};
   try { net._onMessage(JSON.stringify({ t: 'm.state', kind: 'm.private', seq: 100, base: 99, patch: [] })); }
   finally { console.warn = warn; }
-  assert.equal(reconnects, 1);
+  // a gap is answered by one rate-limited `state.resync`, not by dropping the socket (0.3.2: the full frame of the
+  // next channel puts the decoder back in step, so a reconnect would only cost the player a fresh handshake)
+  assert.equal(reconnects, 0);
+  assert.ok(net._resyncAt > 0, 'the broken chain asked for a full frame');
   assert.equal(events.length, 2);
   net._teardownSocket();
-  assert.equal(net._states.states.size, 0);
+  assert.equal(net._receiver.states.size, 0);
   let hello = null;
   net.name = 'Doctor';
   net._sendRaw = (msg) => { hello = msg; return true; };

@@ -58,6 +58,12 @@
 //                                              then runs in a match host, server/match/host/): a b.result whose
 //                                              `cs` is missing or not opts.cs is refused like an implausible one — the
 //                                              server simulates that battle itself
+//   opts.version     string (optional)          a non-default official version's registry id (DESIGN §35.23,
+//                                              shared/versions.js; the lobby passes it for such a room only, the match
+//                                              then runs in that version's match host on its data): this.version, the
+//                                              test journal's init.options.version, the external AI's context.gameVersion,
+//                                              m.public / m.result `version` (the page reads a replayed result with it).
+//                                              Absent, unknown or 'act2autochess' ⇒ this.version null (the default)
 //   opts.data        frozen game data (server/data.js getData()); may lack keys while data is generated
 //   opts.log         { info, warn, error, debug }
 //   opts.now         () => ms epoch             injectable clock (Date.now in production)
@@ -253,6 +259,7 @@ import { roomCapacity } from '../../shared/playerCapacity.js';
 import { createDamageBoard } from './damageBoard.js';
 import { MatchExtensions } from './match/extensions.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
+import { DEFAULT_VERSION, versionById } from '../../shared/versions.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -289,7 +296,7 @@ import { AFK_REMOVE_ROUNDS } from './match/common.js';
 import { installTestTrace } from './testTrace.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
-import { ExternalAI } from './externalAI.js';
+import { createExternalAI } from './llmGate.js';
 
 export { FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS, REVIVAL_UNAVAILABLE_REASONS, AFK_REMOVE_ROUNDS, OFFLINE_TAKEOVER_ROUNDS } from './match/common.js';
 
@@ -334,12 +341,17 @@ export class Match {
     this.broadcastFn = opts.broadcast;
     this.onEndFn = opts.onEnd;
     this.data = opts.data && typeof opts.data === 'object' ? opts.data : {};
+    if (this.data.config?.version && !Object.hasOwn(this.data.config.modes || {}, this.modeId)) {
+      throw new RangeError(`Match: mode ${this.modeId} is unavailable in ${this.data.config.version.id}`);
+    }
     /** the room's content hash (opts.cs, DESIGN §32): every BattleSpec carries it */
     this.cs = isContentHash(opts.cs) ? opts.cs : null;
     /** the room's visual set (opts.vs, DESIGN §32.6): every BattleSpec names it */
     this.vs = isContentHash(opts.vs) ? opts.vs : null;
     /** a room with gameplay plugins (opts.requireCs): a client result must name this match's cs (reports.js) */
     this.requireCs = opts.requireCs === true && !!this.cs;
+    /** a non-default official version's id (opts.version, DESIGN §35.23), else null (the default, act2autochess) */
+    this.version = typeof opts.version === 'string' && opts.version !== DEFAULT_VERSION && versionById(opts.version) ? opts.version : null;
     // [ASSUMED] Only an array is a content list. Omitting the key (every vanilla match) leaves setDiy on KITTED_CHARS.
     // A copy so a caller's freeze or later mutation cannot change the check, and so the key stays off public views.
     if (Array.isArray(opts.kitted)) this.diyKitted = Object.freeze(opts.kitted.filter((id) => typeof id === 'string'));
@@ -425,6 +437,14 @@ export class Match {
     this._rehearsalSeq = 0;
     /** how this match's delegated rehearsals ended (the log lines above; the tests read it) */
     this.rehearsalStats = { delegated: 0, answered: 0, takeovers: 0 };
+    /**
+     * The server's own simulation pool (server/workers/roomPool.js), or null when the operator started none. It is a
+     * placement decision only: `poolRehearsal` submits the same candidates the local run would simulate and falls back
+     * to simulating them here whenever the pool is absent, busy or broken.
+     */
+    this.simPool = opts.simPool || null;
+    /** how the bot rehearsals that were offered to `simPool` ended — separate from rehearsalStats (its keys are asserted) */
+    this.rehearsalPoolStats = { pooled: 0, accepted: 0, fallbacks: 0 };
     this.ds = dataSourceFor(this.data);
     /** client-side combat (DESIGN §14) — see the header */
     this.clientCombat = opts.clientCombat != null ? !!opts.clientCombat : envClientCombat();
@@ -578,6 +598,8 @@ export class Match {
     this._lastSetupVoteAt = -Infinity;
     /** playerId → the setup revision it last proposed a reroll for (one proposal per player per revision; setupVote.js) */
     this._setupProposals = new Map();
+    /** @type {Map<string, number>} last accepted 重刷本局 start per seat (30 s cooldown; DESIGN §28.21, PR #860) */
+    this._rerollStartAt = new Map();
     // 投票移出 (kickVote.js): the open vote, its id sequence, targetId → the round a vote on it failed, playerId → last proposal ms
     this.kickVote = null;
     this._kickVoteSeq = 0;
@@ -610,7 +632,8 @@ export class Match {
     this.sp = null;
     this.wave = null;
     this.bossWaves = null;
-    this.bossPairs = null; // drawn once per match; the hidden round retains partners and sides
+    this.bossPairs = null; // drawn for the Final Assault, drawn anew for the Hidden Core (GitHub #845, DESIGN §35.27)
+    this.bossPairsRound = null; // the round whose first plan drew bossPairs (a re-plan after a departure keeps them)
     this.fields = [];
     this.runner = null;
     /** playerId → fieldId */
@@ -648,7 +671,7 @@ export class Match {
     // [ASSUMED] A real scheduler keeps the 8 ms bot and headless slices, including a test match,
     // so one callback cannot run to HARD_CAP_SECONDS. Virtual time stays unbounded (the defaults
     // above). The input journal records the steps that callback took; replay stops there.
-    this.externalAI = this.bot.id === 'external' ? new ExternalAI(this, opts.externalAI, opts.externalReplay === true) : null;
+    this.externalAI = createExternalAI(this, opts);
     if (this.test && opts.journal !== false) installTestTrace(this, opts);
   }
 }

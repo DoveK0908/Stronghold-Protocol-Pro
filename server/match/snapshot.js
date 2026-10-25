@@ -36,7 +36,7 @@ import { SPEED_BOOST } from './match/speedVote.js';
  * Checkpoint layout version. A document of another version is refused (the match is dropped, server/persist/).
  * Raise it whenever a saved field is added, removed or changes its meaning, or the restore rules below change.
  */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 
 /** Phases whose state is fully serializable (see the header). */
 export const SNAPSHOT_PHASES = Object.freeze([PHASE.INFO_CHECK, PHASE.BAND_DRAFT, PHASE.SP_DRAFT, PHASE.ROUND_START, PHASE.PREP]);
@@ -70,6 +70,9 @@ export const MATCH_FIELDS = Object.freeze({
     'setupRevision', '_setupVoteSeq', 'loneHuman', 'uidSeq', 'pausedMs', 'verifyStats', 'rehearsalStats', '_rehearsalSeq',
     'errors', 'errorCount', 'simErrors', 'simErrorLog', 'localStats', 'watchPref', 'lastResults', '_revival',
     'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
+    // the round whose first plan drew bossPairs (bossRounds.js): a restore inside it must keep that draw, and the
+    // next round's first plan must re-plan from scratch — saved with the pairs rather than re-drawn on restore
+    'bossPairsRound',
     '_botEmotesSettledRound',
     // 局内投票开启二倍速 (speedVote.js): whether this match already runs at 2× and whether its next battle owes the boost
     'speedBoost', 'speedBoostPending', 'speedBoostOffPending',
@@ -84,6 +87,8 @@ export const MATCH_FIELDS = Object.freeze({
     'BattleClass', 'battleContent', 'timerScale', 'gameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
     'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'bot', 'externalAI', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
     'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
+    // the room version this match plays in (server/versions.js): rebuilt from the room's own options like `mode`
+    'version',
     'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
     'playerPools', 'itemPool', 'ended', 'disposed',
   ]),
@@ -101,6 +106,9 @@ export const MATCH_FIELDS = Object.freeze({
     // 0.3.1 plugin offer windows (offers.js): a window is a live popup + a resume callback, so a restore drops it — the
     // round continues without the window (the same rule as every other timer). `test` is the room's test-console flag.
     'offers', 'offerWin', '_offerTimers', '_offerResume', 'offerSeq', '_offerResumeTimer', 'test',
+    // the trial-worker pool and its stats (simPool, rehearsalPoolStats) are handles to live threads, and the reroll
+    // window (`_rerollStartAt`) is a wall-clock rate limit: none of them survives a restore
+    'simPool', 'rehearsalPoolStats', '_rerollStartAt',
   ]),
 });
 

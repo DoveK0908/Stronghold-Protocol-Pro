@@ -528,6 +528,7 @@ describe('real server + real browsers', { skip: !ENABLED && 'set SP_REAL_E2E=1 (
       // ---- lobby & room --------------------------------------------------------------------------------------------
       await host.open();
       await host.enter('凯尔希');
+      // createCoop picks the difficulty in the room's own 选择模拟协议 dialog (`.rs-proto`)
       await host.createCoop('险境模拟');
       const room = (await host.waitFor((s) => !!s.room?.code, 'room created')).room;
       await host.click('button', '添加 AI 队友');
@@ -560,10 +561,11 @@ describe('real server + real browsers', { skip: !ENABLED && 'set SP_REAL_E2E=1 (
           if (c === guest && !guestSkipped) {
             guestSkipped = true;
             // one skip — only while someone is left to pass to: the last player still to pick sees 跳过 disabled (PR #546)
-            const canSkip = await c.page.evaluate(() => [...document.querySelectorAll('.draft-detail__btns .btn')]
+            // (PR #828: 跳过选择 sits in the step header's turn line, .dturn .draft-skip, on the player's own turn)
+            const canSkip = await c.page.evaluate(() => [...document.querySelectorAll('.dturn .draft-skip')]
               .some((b) => b.textContent.includes('跳过') && !b.disabled));
             if (canSkip) {
-              await c.click('.draft-detail__btns .btn', '跳过');
+              await c.click('.dturn .draft-skip', '跳过');
               c.note('skipped once');
               continue;
             }

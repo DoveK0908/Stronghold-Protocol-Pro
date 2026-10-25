@@ -73,7 +73,7 @@ test('the committed manifest: her S3 swing and impact are the `_s` pair, her nor
   assert.equal(u.hits?.['0'], '/assets/audio/sfx/player/p_imp/p_imp_hljdrfswd_d.mp3', '技能1 的命中');
 });
 
-test('every manifest hits entry is a skill-mode file; the slot is not the filename letter (#679)', () => {
+test('every manifest hits entry is a mode impact: a skill-mode file, or the mode\'s own plain `_n` file (#679)', () => {
   const units = manifest.audio.sfx.units;
   // 丰川祥子 (char_4182_oblvns, the mod's own operator) is the single exception, and it is sourced from the official
   // table rather than invented: `excel/audio_data.json` hangs each of her skills' impact on a bank whose NAME carries
@@ -90,15 +90,18 @@ test('every manifest hits entry is a skill-mode file; the slot is not the filena
     for (const [i, url] of Object.entries(u?.hits || {})) {
       n++;
       const letter = skillModeLetter(url);
-      if (!letter) {
-        assert.equal(id, 'char_4182_oblvns', `${id}: hits[${i}] is a skill-mode file (${url})`);
+      if (!letter && id === 'char_4182_oblvns') {
         assert.equal(url.split('/').pop(), HER_IMPACTS[Number(i)], `${id}: hits[${i}] is the official S${Number(i) + 1} impact bank`);
         loose.push(`${id}:hits[${i}]`);
         continue;
       }
-      // 0.3.1 #679: the letter comes from the skill's fx mode, not from the slot — a mode may sit on any slot
-      // (e.g. 推进之王's S3 mode carries the `_h` bank), so the manifest's job is "every impact is a mode file".
-      assert.ok(letter, `${id}: hits[${i}] carries a skill-mode letter (${url})`);
+      // The slot is not the filename letter. A plain `_n` impact is the mode's own sound only when the unit's normal
+      // impact is a different file (宴's S2 `p_imp_darksword_n` beside her normal `p_imp_sword_n`); a mode that
+      // merely replays the normal impact carries no entry at all. 0.3.1 #679: the letter comes from the skill's fx
+      // mode, not from the slot — a mode may sit on any slot (e.g. 推进之王's S3 mode carries the `_h` bank), so the
+      // manifest's job is "every impact is a mode file or the mode's own plain impact".
+      const own = letter !== null || (typeof u?.hit === 'string' && u.hit !== url);
+      assert.ok(own, `${id}: hits[${i}] is the unit's normal impact, not a mode sound (${url})`);
     }
   }
   assert.deepEqual(loose, ['char_4182_oblvns:hits[0]', 'char_4182_oblvns:hits[1]', 'char_4182_oblvns:hits[2]'], 'only her three official impact banks are mode-less');

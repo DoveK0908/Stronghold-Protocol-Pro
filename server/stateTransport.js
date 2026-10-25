@@ -1,81 +1,106 @@
-// Server side of the state-delta transport (shared/stateDelta.js; after xinhai-ai/Stronghold-Protocol 2abc60f).
+// Connection-local baselines. Snapshot and diff encoding are shared only for the SAME message/baseline objects,
+// never across players' private views. Weak maps release disconnected sockets and superseded snapshots.
 //
-// Baselines live per socket: the browser's socket in a single process (server/net.js), the per-member game channel
-// on a cluster game node (cluster/game-node.js; the ingress relays m.state untouched). A new socket starts from full
-// frames, so a reconnect or a channel switch needs no reset message. A baseline moves only after the frame was queued
-// (commit), and the transport is reliable and ordered, so the browser's baseline is always the one a delta names.
-// Encoding is shared per message object: a broadcast parses its JSON once, and members whose last frame was the same
-// snapshot share one delta string.
+// Every frame a connection is given — full or delta — carries a fresh number from that connection's own counter, so
+// the sequence only moves forward: a re-sent snapshot must not hand out an older number than the frames before it, and
+// a full frame is always ahead of what came before it. The receiver keys its baseline on those numbers.
+//
+// This fork compresses one channel more than upstream does: `m.private` rides the transport too (the Pro line has sent
+// both views this way since pro.3, and the browser decodes either). A private view is per player, so its patch is
+// cached on its own message object and is never shared with another connection — the sharing below is public-only.
 import { diffState, isStateKind, STATE_DELTA_VERSION } from '../shared/stateDelta.js';
 
-/** @type {WeakMap<object, Map<string, Snapshot>>} socket → kind → last committed snapshot */
-const sockets = new WeakMap();
-/** @type {WeakMap<object, Snapshot>} message object → its snapshot */
-const snapshots = new WeakMap();
-let sequence = 0;
-const noop = () => {};
+/**
+ * The channels this build compresses. The public view is the frame every member of a room receives, so a client that
+ * cannot apply one loses nothing it cannot get back from the next full frame; the private view is per player and only
+ * reaches clients that negotiated the transport, which have opted in already.
+ */
+export const DELTA_KINDS = new Set(['m.public', 'm.private']);
+
 // Terminal phases stay plain m.public: the cluster ingress drops those by type (only the coordinator's receipt
 // delivers a result), which it could not do inside a delta.
 const TERMINAL_PHASES = new Set(['RESULT', 'ENDED']);
-// `{"t":"m.state","kind":"m.private","seq":<n>,"full":` + `}`, with room for a long seq
-const FULL_OVERHEAD = 64;
 
 /** Frames and bytes by encoding, for /metrics. */
 export const stateDeltaStats = { full: 0, delta: 0, fullBytes: 0, deltaBytes: 0, plainBytesAvoided: 0 };
 
-/**
- * @typedef {{ encoded: string, bytes: number, seq: number, kind: string, view: any, full: string | null,
- *   transitions: WeakMap<Snapshot, { data: string, bytes: number } | null> }} Snapshot
- */
+const connections = new WeakMap();   // ws -> { seq, kinds: Map<kind, { snapshot, seq }>, roomCode }
+const snapshots = new WeakMap();     // msg -> { encoded, bytes, view, patches: WeakMap<previousSnapshot, opsJson | false> }
 
-/** hello.stateDelta (browser) or cluster.bind stateDelta (ingress): enable for this socket, or disable. */
+const fullFrame = (kind, seq, encoded) =>
+  `{"t":"m.state","kind":${JSON.stringify(kind)},"seq":${seq},"full":${encoded}}`;
+
 export function negotiateStateDelta(ws, version) {
   if (!ws || typeof ws !== 'object') return;
-  if (version === STATE_DELTA_VERSION) { if (!sockets.has(ws)) sockets.set(ws, new Map()); }
-  else sockets.delete(ws);
+  const enabled = version === STATE_DELTA_VERSION;
+  const old = connections.get(ws);
+  // A repeated hello keeps the baseline it already has: dropping it would turn the next frame into a full one for no
+  // reason, and the client would have to decode a full frame it did not need.
+  if (enabled) { if (!old) connections.set(ws, { seq: 0, kinds: new Map() }); return; }
+  connections.delete(ws);
 }
 
-/** @returns {boolean} */
-export const stateDeltaEnabled = (ws) => !!ws && typeof ws === 'object' && sockets.has(ws);
+/** The already negotiated capability, for an internal identity handover on the same socket. */
+export function stateDeltaVersion(ws) { return connections.has(ws) ? STATE_DELTA_VERSION : undefined; }
 
-/**
- * The bytes to queue for `msg` (already encoded as `encoded`) on `ws`, and commit() to call once they were queued.
- * Plain `encoded` for a socket without the transport and for any other message.
- * @returns {{ data: string, commit: () => void }}
- */
+/** @returns {boolean} */
+export const stateDeltaEnabled = (ws) => !!ws && typeof ws === 'object' && connections.has(ws);
+
+/** Forget the baselines (a new negotiation, or a client that asked for a full resync). The counter never rewinds. */
+export function resetStateDelta(ws) { connections.get(ws)?.kinds.clear(); }
+
+/** Keep negotiation and sequence, but never carry a previous room's state into a new room. */
+export function setStateDeltaRoom(ws, roomCode) {
+  const connection = connections.get(ws);
+  if (!connection || connection.roomCode === roomCode) return;
+  connection.roomCode = roomCode;
+  connection.kinds.clear();
+}
+
+/** Return an encoded state and commit its baseline ONLY after the caller successfully queues the reliable frame.
+ * `usable: false` means the given bytes cannot be a baseline (they are not a JSON object) and the caller should send a
+ * full frame it encoded itself; this connection keeps the baseline it already had. */
 export function prepareStateFrame(ws, msg, encoded) {
-  const states = ws && typeof ws === 'object' ? sockets.get(ws) : undefined;
-  const kind = msg?.t;
-  if (!states || !isStateKind(kind) || typeof encoded !== 'string'
-    || (kind === 'm.public' && TERMINAL_PHASES.has(msg.phase))) return { data: encoded, commit: noop };
+  const connection = connections.get(ws);
+  if (!connection || !isStateKind(msg?.t) || !DELTA_KINDS.has(msg.t)) return { data: encoded, commit() {}, usable: true };
+  if (msg.t === 'm.public' && TERMINAL_PHASES.has(msg.phase)) return { data: encoded, commit() {}, usable: true };
   let snapshot = snapshots.get(msg);
-  // The encoding, not the (mutable) game object, is the immutable baseline.
+  // The encoding, not mutable game objects, owns this immutable baseline.
   if (!snapshot || snapshot.encoded !== encoded) {
     let view;
-    try { view = JSON.parse(encoded); } catch { return { data: encoded, commit: noop }; }
-    snapshot = { encoded, bytes: Buffer.byteLength(encoded), seq: ++sequence, kind, view, full: null, transitions: new WeakMap() };
+    // Bytes a caller pre-encoded (a lane worker) can be anything: never throw out of the send path because of them.
+    try { view = JSON.parse(encoded); } catch { view = null; }
+    if (view === null || typeof view !== 'object' || Array.isArray(view)) {
+      return { data: encoded, commit() {}, usable: false };
+    }
+    snapshot = { encoded, bytes: Buffer.byteLength(encoded), view, patches: new WeakMap() };
     snapshots.set(msg, snapshot);
   }
-  const previous = states.get(kind);
-  /** @type {{ data: string, bytes: number } | null | undefined} */
-  let delta = null;
-  if (previous && previous !== snapshot) {
-    delta = snapshot.transitions.get(previous);
-    if (delta === undefined) {
-      const patch = diffState(previous.view, snapshot.view);
-      const data = patch && JSON.stringify({ t: 'm.state', kind, seq: snapshot.seq, base: previous.seq, patch });
-      // UTF-8 bytes, not string length; a large change goes out full.
-      const bytes = data ? Buffer.byteLength(data) : Infinity;
-      delta = bytes < snapshot.bytes + FULL_OVERHEAD ? { data, bytes } : null;
-      snapshot.transitions.set(previous, delta);
+  const previous = connection.kinds.get(msg.t);
+  const seq = ++connection.seq;
+  let data = fullFrame(msg.t, seq, encoded);
+  let deltaBytes = null;
+  if (previous && previous.snapshot !== snapshot) {
+    // The patch is content-only, so it is shared between connections; the sequence numbers are not.
+    let patch = snapshot.patches.get(previous.snapshot);
+    if (patch === undefined) {
+      const ops = diffState(previous.snapshot.view, snapshot.view);
+      patch = ops ? JSON.stringify(ops) : false;
+      snapshot.patches.set(previous.snapshot, patch);
+    }
+    if (patch) {
+      const candidate = `{"t":"m.state","kind":${JSON.stringify(msg.t)},"seq":${seq},"base":${previous.seq},"patch":${patch}}`;
+      // Compare actual UTF-8 bytes, not JS string length. Large changes fall back to full.
+      const bytes = Buffer.byteLength(candidate);
+      if (bytes < Buffer.byteLength(data)) { data = candidate; deltaBytes = bytes; }
     }
   }
-  const data = delta?.data ?? (snapshot.full ??= `{"t":"m.state","kind":"${kind}","seq":${snapshot.seq},"full":${encoded}}`);
   return {
     data,
+    usable: true,
     commit() {
-      states.set(kind, snapshot);
-      if (delta) { stateDeltaStats.delta++; stateDeltaStats.deltaBytes += delta.bytes; stateDeltaStats.plainBytesAvoided += snapshot.bytes; }
+      connection.kinds.set(msg.t, { snapshot, seq });
+      if (deltaBytes != null) { stateDeltaStats.delta++; stateDeltaStats.deltaBytes += deltaBytes; stateDeltaStats.plainBytesAvoided += snapshot.bytes; }
       else { stateDeltaStats.full++; stateDeltaStats.fullBytes += snapshot.bytes; }
     },
   };

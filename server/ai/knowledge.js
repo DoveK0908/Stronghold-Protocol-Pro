@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { applyFileOverlay } from '../../shared/i18nData.js';
+import { DEFAULT_VERSION, versionOfData } from '../../shared/versions.js';
 import { deepFreeze } from '../data.js';
 import { GameData } from '../match/gamedata.js';
 import { buildPlaybook } from './playbook.js';
@@ -68,7 +69,9 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
   let entries = cache.get(data);
   if (!entries) { entries = new Map(); cache.set(data, entries); }
   if (entries.has(key)) return entries.get(key);
-  if (!overlay && language !== 'zh-CN') {
+  // the fixed overlay is keyed by default-data record ids: another official version's data (config.version) keeps its
+  // Chinese names until it has its own overlay
+  if (!overlay && language !== 'zh-CN' && !data?.config?.version) {
     try { overlay = JSON.parse(readFileSync(new URL(`../../data/i18n/${language}.json`, import.meta.url), 'utf8')); }
     catch { overlay = {}; }
   }
@@ -80,8 +83,12 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
     return { id, name: r.name || id, nameZh: raw.name || id, ...fn(r, id) };
   });
   const copies = gd.visibleChess.map(id => ({ tier: gd.tierOf(id), count: gd.poolCopies(id) }));
+  const gameVersion = versionOfData(data);
   const payload = {
-    schema: 'sp-knowledge/1', language, modeId, contentId, sources: ['docs/PLAYING.md §1–§7', 'docs/DATA.md', 'excel/activity_table.json autoChessData',
+    schema: 'sp-knowledge/1', language, modeId, contentId,
+    // another official version's data (DESIGN §35.23): its registry id; the default pack (and its hash) has no key
+    ...(gameVersion !== DEFAULT_VERSION ? { gameVersion } : {}),
+    sources: ['docs/PLAYING.md §1–§7', 'docs/DATA.md', 'excel/activity_table.json autoChessData',
       'excel/character_table.json', 'excel/skill_table.json', 'excel/enemy_handbook_table.json'], playingHash: hash(source),
     rulesSummary: summaries[language] || summaries.en,
     // Retain the source economy table as Chinese reference, alongside localized prose and numeric rules.
@@ -107,7 +114,7 @@ export function knowledgePack(data, { language = 'zh-CN', modeId, rules = {}, of
       // PRTS help / pool.js: there is no fixed tier-odds table. Never reveal the live shared stock here.
       shopOdds: 'P(id) = remaining eligible copies of id / sum of remaining eligible copies; tier <= shop level. Item tier shares follow this pool, then eligible item stock. No fixed odds.',
     },
-    bonds: rows('bonds', r => ({ thresholds: r.thresholds, countMode: r.countMode, countsGoldenOnly: r.countsGoldenOnly,
+    bonds: rows('bonds', r => ({ core: !!r.isCore, thresholds: r.thresholds, countMode: r.countMode, countsGoldenOnly: r.countsGoldenOnly,
       thresholdTemplate: r.thresholdTemplate, effect: short(r.desc), layers: r.bb })),
     operators: rows('chess', (r, id) => ({ tier: r.tier, cost: gd.chessPrice(id), sellValue: gd.sellPrice(id), elite: !!r.isGolden,
       baseId: gd.baseIdOf(id), poolEligible: gd.visibleChess.includes(id),

@@ -47,12 +47,35 @@ test('computeBuildTag: server-only code and downloaded media do not change the b
   const root = fixture();
   try {
     const known = computeBuildTag(root);
-    for (const rel of ['server/index.js', 'server/http/routes.js', 'server/data.js', 'public/assets/sprite.png']) {
+    // data/versions/: another official version's data, served only when the server enables it (DESIGN §35.22, §35.23)
+    for (const rel of ['server/index.js', 'server/http/routes.js', 'server/data.js', 'public/assets/sprite.png',
+      'data/versions/act1autochess/chess.json']) {
       const abs = path.join(root, rel);
       fs.mkdirSync(path.dirname(abs), { recursive: true });
       fs.writeFileSync(abs, 'changed');
     }
     assert.equal(computeBuildTag(root), known);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('computeBuildTag: a served official version\'s data is part of the build; an unserved one\'s is not (DESIGN §35.23)', () => {
+  const root = fixture();
+  try {
+    const bare = computeBuildTag(root);
+    const served = path.join(root, 'data', 'versions', 'act1autochess');
+    const unserved = path.join(root, 'data', 'versions', 'act1autochess-v1_1');
+    for (const dir of [served, unserved]) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'chess.json'), 'x'); }
+    const opts = { servedVersionDirs: [served] };
+    assert.equal(computeBuildTag(root), bare, 'no served version: data/versions/ never counts');
+    const known = computeBuildTag(root, opts);
+    assert.notEqual(known, computeBuildTag(root), 'a served version directory is part of the tag');
+    fs.writeFileSync(path.join(unserved, 'chess.json'), 'rebuilt, longer');
+    assert.equal(computeBuildTag(root, opts), known, 'an unserved version\'s rebuild is no new build');
+    fs.writeFileSync(path.join(served, 'chess.json'), 'rebuilt, longer');
+    assert.notEqual(computeBuildTag(root, opts), known, 'a served version\'s rebuild is a new build');
+    assert.equal(computeBuildTag(root, { servedVersionDirs: [path.join(root, 'elsewhere')] }), computeBuildTag(root), 'a directory outside data/versions/ is ignored');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -121,6 +144,12 @@ test('computeBuildTag: nothing readable → null (an unknown build never reloads
 
 test('client-build exposes only a stable instance marker for its actual public directory', async (t) => {
   const a = fixture(), b = fixture();
+  // The served tag also covers the official versions' data/versions/<slug>/ trees the process offers (buildTag's
+  // servedVersionDirs, server/index.js). This checkout narrows nothing (no SP_VERSIONS), so every data/versions child
+  // counts: a deployment that enables fewer versions drops the others from the tag.
+  const servedVersionDirs = fs.readdirSync(path.join(ROOT, 'data/versions'), { withFileTypes: true })
+    .filter((d) => d.isDirectory()).map((d) => path.join(ROOT, 'data/versions', d.name));
+  const expectTag = (dir) => computeBuildTag(ROOT, { publicDir: dir, servedVersionDirs });
   t.after(() => { fs.rmSync(a, { recursive: true, force: true }); fs.rmSync(b, { recursive: true, force: true }); });
   fs.writeFileSync(path.join(b, 'public/index.html'), 'different browser runtime');
   const first = await startServer({ host: '127.0.0.1', port: 0, quiet: true, publicDir: path.join(a, 'public') });
@@ -133,11 +162,11 @@ test('client-build exposes only a stable instance marker for its actual public d
   };
   const before = await get(first);
   assert.deepEqual(Object.keys(before), ['build']);
-  assert.equal(before.build, computeBuildTag(ROOT, path.join(a, 'public')), 'custom public files plus the actual served sim/shared/data trees');
+  assert.equal(before.build, expectTag(path.join(a, 'public')), 'custom public files plus the actual served sim/shared/data trees');
   fs.writeFileSync(path.join(a, 'public/js/file.js'), 'changed after the first server started');
   const second = await startServer({ host: '127.0.0.1', port: 0, quiet: true, publicDir: path.join(b, 'public') });
   t.after(() => second.close());
-  assert.equal((await get(second)).build, computeBuildTag(ROOT, path.join(b, 'public')));
+  assert.equal((await get(second)).build, expectTag(path.join(b, 'public')));
   assert.notEqual((await get(second)).build, before.build);
   resetBuildTag();
   assert.deepEqual(await get(first), before, 'other starts and helper resets cannot move a running instance marker');

@@ -67,15 +67,16 @@ test('data/assets.json: voiceJp gives every voiced operator the JP twin of each 
   const cn = m.audio.voice;
   const jp = m.audio.voiceJp;
   assert.ok(jp && typeof jp === 'object', 'the manifest carries the JP tree');
-  // 丰川祥子 (char_4182_oblvns, the mod's 自选 collab pick) is the one operator with a JP tree and no Chinese one:
-  // the upstream dump never published her CN battle lines (voice_cn/char_4182_oblvns/cn_019.mp3 … cn_032.mp3 are all
-  // 404) while the JP one carries all fourteen — the whole Ave Mujica collaboration is like that. `tools/assets/plan.mjs`
-  // encodes it as VOICE_LANG_OVERRIDE = { char_4182_oblvns: 'jp' }, so her lines land in voiceJp only.
-  assert.deepEqual(Object.keys(jp).filter((k) => !(k in cn)), ['char_4182_oblvns'], 'the JP-only operator is her');
+  // Two operators have a JP tree and no Chinese one, both collab picks the mod added: 丰川祥子 (char_4182_oblvns) and
+  // 结城理 (char_4217_makoto). The upstream dump never published their CN battle lines (voice_cn/char_4182_oblvns/
+  // cn_019.mp3 … and voice_cn/char_4217_makoto/cn_019.mp3 … are all 404) while the JP one carries all fourteen — the
+  // whole Ave Mujica / Persona collaboration is like that. `tools/assets/plan.mjs` encodes it as
+  // VOICE_LANG_OVERRIDE = { char_4182_oblvns: 'jp', char_4217_makoto: 'jp' }, so their lines land in voiceJp only.
+  assert.deepEqual(Object.keys(jp).filter((k) => !(k in cn)).sort(), ['char_4182_oblvns', 'char_4217_makoto'], 'the JP-only operators are the two collab picks');
   assert.deepEqual(Object.keys(cn).filter((k) => !(k in jp)), [], 'every Chinese-voiced operator keeps its JP twin');
   assert.equal(m.stats.voiceJpChars, Object.keys(jp).length);
   assert.equal(m.stats.voiceChars, Object.keys(cn).length);
-  assert.equal(Object.keys(jp).length, 193);
+  assert.equal(Object.keys(jp).length, 194);
   assert.equal(Object.keys(cn).length, 192);
   // the JP tree is the Chinese one with the folder swapped: same slots, same lines in the same order, same file names
   const swapped = JSON.parse(JSON.stringify(cn).replaceAll('/assets/audio/voice/cn/', '/assets/audio/voice/jp/'));
@@ -84,7 +85,7 @@ test('data/assets.json: voiceJp gives every voiced operator the JP twin of each 
   const lines = [];
   const walk = (x) => { if (typeof x === 'string') lines.push(x); else if (Array.isArray(x)) x.forEach(walk); else if (x && typeof x === 'object') Object.values(x).forEach(walk); };
   walk(jp);
-  assert.equal(lines.length, 2702);
+  assert.equal(lines.length, 2716);
   for (const u of lines) assert.match(u, /^\/assets\/audio\/voice\/jp\/char_[^/]+\/cn_\d+\.mp3$/);
   // no voice: the 17 stand-ins of data/backups.json (预备干员 / 原型干员), the mode's 盟约·辅助干员, every summon
   const backups = readJson('data/backups.json');

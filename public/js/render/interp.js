@@ -18,8 +18,9 @@
 //   * sample(): per unit, lerps x/y/hp/sp between the two snapshots bracketing renderT; flags/anim come from
 //     the older one. A unit missing from the newer snapshot (died/left mid-buffer) holds its last position
 //     until renderT reaches the newer snapshot; a unit that only exists in the newer one (spawned mid-buffer)
-//     appears when renderT reaches it. Moves longer than `teleport` tiles between two snapshots snap, and so does a
-//     unit whose deploy animation starts in between (a redeploy while it stays listed: 乌尔比安's 【移动】, a 突袭 jump).
+//     appears when renderT reaches it. Moves longer than `teleport` tiles between two snapshots snap, as do moves
+//     marked by a parasite attachment `teleport` fx (even a short blink) and units whose deploy animation starts
+//     between snapshots. Other teleport effects retain the normal distance-threshold interpolation rule.
 //   * event queue: a `b.ev` batch is stamped with its game time (`gt`, the snapshot it was drained with); a batch
 //     without one is placed inside the latest snapshot interval (newest snapshot time minus half an interval),
 //     and handed out by `takeEvents()` once renderT passes the stamp. Stale cosmetic events (> `eventMaxLag`
@@ -50,6 +51,7 @@
 //       `ammo`   [[id, rounds left, rounds in the magazine]]  → sample().ammo   [left, magazine] | null (whole numbers only)
 //       `wolves` [[id, 狼影 left, the talent's maximum]]      → sample().wolves [left, maximum]  | null
 //       `neg`    [[id, fill]] (0.01–1: the negative-HP pool's share of its cap) → sample().neg  number (0: none)
+//       `motes`  [[id, count, wide]] (魔王的「微尘」: 环绕的枚数与 S2 的宽半径) → sample().motes { n, wide } | null
 //     and two the official effects read (render/vfx/talentfx.js, skillfx.js), the same way:
 //       `layers`  [[id, n]] (the hit-negating 护盾 layers, n ≥ 1)                → sample().layers  number (0: none)
 //       `charges` [[id, stored, maximum]] (a charge skill's stored charges)   → sample().charges [stored, maximum] | null
@@ -60,10 +62,12 @@
 //     snapshot without it interpolates linearly;
 //   * `standCut` [[id, at]] — the latest time that enemy's recovery was cut or ignored: an interval with a cut inside
 //     it stays linear.
-// Game times in the first two (`cooldownEnd`, `respawnAt`) are on the snapshots' clock, so a view compares them with
-// renderT (`proj` / `fever` carry no time: their entries live exactly as long as the snapshot lists them).
-
+//   * `face` [[id, ±1]] — a scripted horizontal sign (心虚设计师): sample() hands it out from the older snapshot like
+//     flags. The model applies it only while it is not sliding. Absent or malformed entries leave the velocity rule.
+// Game times in all of them (`cooldownEnd`, `respawnAt`, `until`, `at`) are on the snapshots' clock, so a view compares
+// them with renderT (`proj` / `fever` / `face` carry no time: their entries live exactly as long as the snapshot lists them).
 import { fxForm } from '../../../shared/protocol.js';
+import { MOTE_MAX } from './motes.js';
 import { ANIM, UF } from '../../../shared/constants.js';
 
 export const TUPLE = Object.freeze({ ID: 0, X: 1, Y: 2, HP: 3, MAXHP: 4, SP: 5, SPMAX: 6, FLAGS: 7, ANIM: 8, EL: 9, EL_FILL: 10, EL_UNTIL: 11, EL_DUR: 12 });
@@ -108,12 +112,12 @@ export function frameTime(msg) {
 
 /**
  * Validate & normalise a b.snap payload. Returns `{ t, units: Map<id, tuple>, down: [[id, respawnAt, respawnTime,
- * state, row?, col?]] | null, proj: [[id, x, y, kind]] | null, fever: Map<id, pct> | null, ammo, wolves: Map id → [left, max] | null,
+ * state, row?, col?]] | null, proj: [[id, x, y, kind]] | null, fever: Map<id, pct> | null,
+ * face: Map<id, ±1> | null, ammo, wolves: Map id → [left, max] | null,
  * neg: Map id → fill | null, stand: Map<id, until> | null, standCut: Map<id, at> | null, raw }` or null when unusable. Tuples with a
  * non-finite id/x/y are skipped; other numbers default to 0; a unit's `elem` entry (see header) is appended to its tuple; malformed
- * `elem` / `down` / `proj` / `fever` / `ammo` / `wolves` / `neg` entries are dropped (a `fever` pct is clamped to 0..100). `stand` keeps
- * finite end times after `t` of units in the snapshot; `standCut` keeps finite times in [0, t] of units in it.
- */
+ * `elem` / `down` / `proj` / `face` / `fever` / `ammo` / `wolves` / `neg` entries are dropped (a `fever` pct is clamped to 0..100).
+ * `stand` keeps finite end times after `t` of units in the snapshot; `standCut` keeps finite times in [0, t] of units in it. */
 export function normalizeSnapshot(snap) {
   if (!snap || typeof snap !== 'object') return null;
   const t = frameTime(snap);
@@ -149,6 +153,14 @@ export function normalizeSnapshot(snap) {
     for (const e of snap.neg) {
       if (!Array.isArray(e) || !units.has(e[0]) || !(typeof e[1] === 'number' && e[1] > 0)) continue;
       (neg || (neg = new Map())).set(e[0], Math.min(1, e[1]));
+    }
+  }
+  let motes = null;
+  if (Array.isArray(snap.motes)) {
+    for (const e of snap.motes) {
+      if (!Array.isArray(e) || !units.has(e[0]) || !Number.isFinite(e[1])) continue;
+      const n = Math.max(0, Math.min(MOTE_MAX, Math.floor(e[1])));
+      if (n > 0) (motes || (motes = new Map())).set(e[0], { n, wide: e[2] ? 1 : 0 });
     }
   }
   let down = null;
@@ -190,7 +202,14 @@ export function normalizeSnapshot(snap) {
       (fever || (fever = new Map())).set(f[0], clamp(f[1], 0, 100));
     }
   }
-  return { t, units, down, proj, fever, ammo, wolves, coins, energy, charges, layers, neg, stand, standCut, raw: snap };
+  let face = null;
+  if (Array.isArray(snap.face)) {
+    for (const e of snap.face) {
+      if (!Array.isArray(e) || !units.has(e[0]) || (e[1] !== -1 && e[1] !== 1)) continue;
+      (face || (face = new Map())).set(e[0], e[1]);
+    }
+  }
+  return { t, units, down, proj, fever, ammo, wolves, coins, energy, charges, layers, neg, motes, stand, standCut, face, raw: snap };
 }
 
 /**
@@ -248,6 +267,8 @@ export class SnapshotBuffer {
     this.lastArrival = NaN; // (a new battle's clock is not comparable: the learned `delay` stays, its window starts over)
     /** @type {{t:number, ev:any}[]} */
     this.events = [];
+    /** @type {Map<number|string, number[]>} Parasite attachment blink times, retained after cosmetic fx is consumed. */
+    this.parasiteBlinkTimes = new Map();
     this.meta = null; // latest snapshot's extra fields (dp, killed, total, boss…)
     return this;
   }
@@ -291,6 +312,11 @@ export class SnapshotBuffer {
     // (no animation frames) snapshots keep arriving and must not pile up; a clock left behind is clamped.
     const horizon = s.t - this.keep * this.rate;
     while (this.snaps.length > 2 && this.snaps[1].t < horizon) this.snaps.shift();
+    for (const [id, times] of this.parasiteBlinkTimes) {
+      const kept = times.filter((t) => t > this.snaps[0].t);
+      if (kept.length) this.parasiteBlinkTimes.set(id, kept);
+      else this.parasiteBlinkTimes.delete(id);
+    }
     if (!Number.isFinite(this.renderT)) this.renderT = Math.max(this.snaps[0].t, s.t - this.delay * this.rate);
     else if (this.renderT < this.snaps[0].t) this.renderT = this.snaps[0].t;
     return true;
@@ -329,6 +355,15 @@ export class SnapshotBuffer {
     for (const ev of evs) {
       if (!Array.isArray(ev) || typeof ev[0] !== 'string') continue;
       this.events.push({ t: stamp, ev });
+      if (ev[0] === 'fx' && ev[1] === 'teleport' && ev[4]?.kind === 'parasite') {
+        const id = ev[4]?.id;
+        if ((typeof id === 'number' && Number.isFinite(id)) || (typeof id === 'string' && id)) {
+          const times = this.parasiteBlinkTimes.get(id) ?? [];
+          times.push(stamp);
+          if (times.length > 32) times.shift();
+          this.parasiteBlinkTimes.set(id, times);
+        }
+      }
       added++;
     }
     // bounded queue (hidden tab: nothing consumes it) — shed the oldest cosmetic events first
@@ -385,6 +420,12 @@ export class SnapshotBuffer {
       if (s[mid].t <= time) { ans = mid; lo = mid + 1; } else hi = mid - 1;
     }
     return ans;
+  }
+
+  _parasiteBlinkAt(id, from, to) {
+    let first = Infinity;
+    for (const t of this.parasiteBlinkTimes.get(id) ?? []) if (t > from && t <= to && t < first) first = t;
+    return first;
   }
 
   /**
@@ -447,9 +488,10 @@ export class SnapshotBuffer {
   /**
    * Interpolated state at `time` (default renderT). Fills and returns `out` (a Map id → sample object reused
    * across calls: `{ id, x, y, hp, maxHp, sp, spMax, flags, anim, vx, vy, seen, el, elFill, elUntil, elDur, ammo, wolves,
-   * neg, fever }` — `el` = the shown element gauge (null: none), `ammo` / `wolves` / `neg` the HP-bar readouts (null /
-   * null / 0: none), `fever` = the unit's Fever gauge 0..100 (null: none), see header). Samples of units no longer
-   * present are deleted from `out`.
+   * neg, fever, motes, face }` — `el` = the shown element gauge (null: none), `ammo` / `wolves` / `neg` the HP-bar readouts
+   * (null / null / 0: none), `fever` = the unit's Fever gauge 0..100 (null: none), `motes` = the 微尘 readout (null: none),
+   * `face` = a scripted horizontal sign (null: the velocity rule), see header). Samples of units no longer present are
+   * deleted from `out`.
    */
   sample(time = this.renderT, out = new Map()) {
     const s = this.snaps;
@@ -466,17 +508,19 @@ export class SnapshotBuffer {
     const fever = A.fever || null;   // b.snap `fever`: flags come from the older snapshot, so does the gauge
     for (const [id, a] of A.units) {
       let o = out.get(id);
-      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0, fever: null }; out.set(id, o); }
+      if (!o) { o = { id, x: 0, y: 0, hp: 0, maxHp: 0, sp: 0, spMax: 0, flags: 0, anim: 0, vx: 0, vy: 0, seen: 0, el: null, elFill: 0, elUntil: 0, elDur: 0, ammo: null, wolves: null, neg: 0, fever: null, motes: null, face: null }; out.set(id, o); }
       const b = B ? B.units.get(id) : null;
       if (b) {
         const dx = b[1] - a[1], dy = b[2] - a[2];
         // (a deployment in between — the newer snapshot starts its deploy animation — lands on its tile, no slide)
-        const tele = dx * dx + dy * dy > this.teleport * this.teleport || redeployed(a, b);
+        const jumpAt = this._parasiteBlinkAt(id, A.t, B.t);
+        const tele = dx * dx + dy * dy > this.teleport * this.teleport || redeployed(a, b) || jumpAt < Infinity;
+        const afterJump = alpha >= 1 || time >= jumpAt;
         const start = movementStart(A, B, id);
         const moveSpan = B.t - start;
         const moveAlpha = moveSpan > 0 ? clamp((time - start) / moveSpan, 0, 1) : 0;
-        o.x = tele ? (alpha < 1 ? a[1] : b[1]) : a[1] + dx * moveAlpha;
-        o.y = tele ? (alpha < 1 ? a[2] : b[2]) : a[2] + dy * moveAlpha;
+        o.x = tele ? (afterJump ? b[1] : a[1]) : a[1] + dx * moveAlpha;
+        o.y = tele ? (afterJump ? b[2] : a[2]) : a[2] + dy * moveAlpha;
         o.vx = !tele && moveSpan > 0 && (start === A.t || time >= start) ? dx / moveSpan : 0;
         o.vy = !tele && moveSpan > 0 && (start === A.t || time >= start) ? dy / moveSpan : 0;
         o.hp = a[3] + (b[3] - a[3]) * alpha;
@@ -493,7 +537,8 @@ export class SnapshotBuffer {
           const moveSpan = A.t - movementStart(P, A, id);
           if (p && dtp > 0 && moveSpan > 0) {
             const dx = a[1] - p[1], dy = a[2] - p[2];
-            if (dx * dx + dy * dy <= this.teleport * this.teleport && !redeployed(p, a)) {
+            if (dx * dx + dy * dy <= this.teleport * this.teleport && !redeployed(p, a)
+              && this._parasiteBlinkAt(id, P.t, A.t) === Infinity) {
               vx = dx / moveSpan; vy = dy / moveSpan;
             }
           }
@@ -518,6 +563,8 @@ export class SnapshotBuffer {
       o.layers = A.layers?.get(id) ?? 0;
       o.neg = A.neg ? A.neg.get(id) || 0 : 0;
       o.fever = fever ? (fever.get(id) ?? null) : null;
+      o.motes = A.motes ? A.motes.get(id) || null : null;
+      o.face = A.face ? A.face.get(id) ?? null : null;
       o.seen = stamp;
     }
     for (const id of out.keys()) if (!A.units.has(id)) out.delete(id);

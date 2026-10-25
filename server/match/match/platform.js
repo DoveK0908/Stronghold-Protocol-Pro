@@ -214,6 +214,8 @@ export class MatchPlatform {
       this._cancelBotPrep(ps);
       ps.left = true;
       this._dropSetupVoter(playerId);
+      // A seat that is gone for good takes its reroll cooldown with it (it cannot ask again in this match anyway).
+      this._rerollStartAt.delete(playerId);
       ps.connected = false;
       ps.autoplay = false;
       ps.offlineAutoplay = false;

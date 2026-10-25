@@ -28,7 +28,8 @@ test('the game screen checks the guard before a hotkey sale and records the spot
   const src = readFileSync(new URL('../../public/js/screens/game.js', import.meta.url), 'utf8');
   const at = src.indexOf("act === 'sell' && available?.sell != null");
   assert.ok(at > 0);
-  const block = src.slice(at, at + 500);
+  // the window must reach `await sellOwnPiece`: the guard's comment above it grew with the 0.3.3 merge
+  const block = src.slice(at, at + 900);
   assert.match(block, /staleHotkeySale\(lastSale, spot, pointer\)/);
   assert.ok(block.indexOf('lastSale = {') < block.indexOf('await sellOwnPiece(uid)'), 'the spot is kept before the sale is sent');
 });

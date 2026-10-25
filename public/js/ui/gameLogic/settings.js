@@ -69,10 +69,12 @@ export function uiScaleStep(uiScale, phone) {
  *  otherSkins: 设置「显示其他玩家的皮肤」 (docs/SKINS.md), ON by default — draw the appearance another player chose instead
  *  of that operator's own model. A pure client preference, never sent: turning it off draws every other seat's operator
  *  model as its owner would see it (the same piece may therefore look different on two screens).
+ *  fullscreenWakeLock: 设置「全屏时保持屏幕常亮」 (the official switch; ui/main.js useScreenWakeLock holds the lock only
+ *  while the page is in fullscreen and a match is running). Off by default, a pure client preference.
  *  showTag: 设置「显示名字后面的编号」 (the owner's request of 2026-10-24), ON by default — the four digits a session was
  *  given are drawn after the name (`名字#1234`; ui/myInfo.js playerLabel). Off prints the bare 代号 only. Every display
  *  that reads it through usePlayerLabel follows the switch live. A pure client preference, never sent either. */
-export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true });
+export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true });
 const QUALITIES = ['high', 'medium', 'low'];
 /** The values of 设置「官方特效」 (render/vfx/tier.js OFFICIAL_FX). */
 export const OFFICIAL_FX_MODES = Object.freeze(['auto', 'off', 'lite', 'full']);
@@ -91,7 +93,7 @@ function ammoEnergyCountOf(r) {
 /**
  * Sanitize persisted settings.
  * @param {any} raw
- * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, combatMetrics: boolean, quality: 'high'|'medium'|'low', officialFx: 'auto'|'off'|'lite'|'full',
+ * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean, quality: 'high'|'medium'|'low',
  *   officialFx: 'auto'|'off'|'lite'|'full', otherSkins: boolean, showTag: boolean,
  *   textSize: 'sm'|'md'|'lg'|'xl', uiScale: string, keys: Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>, bgmPrep: string, bgmCombat: string, lobbyTrack: string, lobbyCustomId: string, lobbyShuffle: boolean, lobbyVolume: number, lobbyMusicOpen: boolean }}
  */
@@ -112,6 +114,7 @@ export function sanitizeSettings(raw) {
     bondTimers: r.bondTimers === true,
     prepDeployFold: r.prepDeployFold === true,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
+    fullscreenWakeLock: typeof r.fullscreenWakeLock === 'boolean' ? r.fullscreenWakeLock : DEFAULT_SETTINGS.fullscreenWakeLock,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,
     officialFx: OFFICIAL_FX_MODES.includes(r.officialFx) ? r.officialFx : DEFAULT_SETTINGS.officialFx,
     otherSkins: r.otherSkins !== false,

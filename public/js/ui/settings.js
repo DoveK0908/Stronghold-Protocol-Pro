@@ -26,7 +26,7 @@
 // shrinks and the prep camera frames a taller board, so the shop stays open while deploying instead of being folded.
 
 import { useEffect, useLayoutEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { html, Modal, Button, Icon, MicroLabel, confirmDialog } from './components.js';
+import { html, Modal, Button, Icon, MicroLabel, Tooltip, confirmDialog } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { useStore, savePref, store } from '../store.js';
 import { settingsStore } from './settingsStore.js';
@@ -34,11 +34,11 @@ export { settingsStore } from './settingsStore.js';
 import { sanitizeSettings, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, hotkeyLabel, rebindHotkey, isDefaultHotkeys, captureHotkey, VOICE_LANGS, TEXT_SIZES, UI_SCALES, uiScaleStep } from './gameLogic.js';
 import { audio } from '../audio.js';
 import { openGuide } from './guide.js';
-import { detectFeatures, useMedia } from './device.js';
+import { detectFeatures, useMedia, isIOS } from './device.js';
 import { PHONE_QUERY } from './teamLayout.js';
 import { LanguageSelect, VoiceLanguageRow } from './languageSettings.js';
 import { voiceLanguageStore, setVoiceLanguage } from './voiceLanguage.js';
-import { t, tc, N_ } from '../../../shared/i18n.js';
+import { t, tc, tParts, N_ } from '../../../shared/i18n.js';
 import { errorCount, currentBattle, diagnosticsText } from '../diag.js';
 import { copyText } from './clipboard.js';
 // 异形屏适配 (ui/screenFit.js): imported here, ahead of main.js's first render, so the stored offsets are on at boot
@@ -164,8 +164,8 @@ const TEXT_SCALES = [['sm', N_('小')], ['md', N_('中')], ['lg', N_('大')], ['
 /** 界面大小's buttons: every UI_SCALES step but 'auto' (shown as the step it resolves to: uiScaleStep). */
 const UI_STEPS = UI_SCALES.filter((id) => id !== 'auto');
 /** The rebindable shortcuts' names (msgids), by action. */
-const HOTKEY_NAMES = { buy: N_('购买鼠标指向的商品'), refresh: N_('刷新商店'), freeze: N_('冻结 / 解冻商店'), levelUp: N_('升级调度中心'), retreat: N_('撤退鼠标指向的干员'),
-  sell: N_('出售鼠标指向的干员'), ready: N_('准备就绪 / 暂停（独立模拟）') };
+const HOTKEY_NAMES = { buy: N_('购买鼠标指向的商品'), refresh: N_('刷新商店'), freeze: N_('冻结 / 解冻商店'), levelUp: N_('升级调度中心'), retreat: N_('撤退干员（选中优先）'),
+  sell: N_('出售干员（选中优先）'), ready: N_('准备就绪 / 暂停（独立模拟）') };
 
 /**
  * 快捷键: each shortcut with its key. Click its key (or Enter / Space on it) and press the new one: Esc cancels (the
@@ -516,7 +516,16 @@ export function SettingsModal({ open, onClose }) {
       <${Toggle} label=${t('作战统计')} micro="COMBAT STATS" value=${s.combatMetrics} onChange=${(v) => updateSettings({ combatMetrics: v })} />
       <p class="set-hint">${t('打开后，对局左下角可以查看自己干员的伤害、治疗和 DPS / HPS。官方界面没有这个窗口。改变玩法的插件对局在 Worker 里演算，统计不到，按钮不显示。')}</p>
       <${Toggle} label=${t('部署时收起商店')} micro="DEPLOY FOLD" value=${s.prepDeployFold} onChange=${(v) => updateSettings({ prepDeployFold: v })} />
-      <p class="set-hint">${t('拿起干员部署、装备或调整位置时，暂时收起商店条并切到收起商店后的镜头，松手后恢复你原来的状态。')}</p>
+      <p class="set-hint">${t('拖起干员、装备或召唤物，以及放下后选择朝向时，临时收起商店并放大棋盘。关闭后，拿起时既不改变商店的收起状态，也不缩放镜头。')}</p>
+      <${Toggle} label=${t('全屏时保持屏幕常亮')} micro="SCREEN WAKE LOCK" value=${s.fullscreenWakeLock} onChange=${(v) => updateSettings({ fullscreenWakeLock: v })} />
+      <p class="set-hint" data-testid="wake-lock-hint">${tParts(isIOS()
+        ? N_('全屏期间始终保持屏幕常亮（{support}）；iOS低电量模式下可能不生效。')
+        : N_('全屏期间始终保持屏幕常亮（{support}）。'), {
+        support: html`<${Tooltip} tap=${true} id="wake-lock-requirements" placement="bottom"
+          text=${t('需要 HTTPS 或可信的本地地址（如 localhost），浏览器支持 Screen Wake Lock API，且页面保持在前台。系统设置仍可能限制生效。')}>
+          <button type="button" class="set-hint__help" aria-describedby="wake-lock-requirements">${t('需要环境支持')}<${Icon} name="info" /></button>
+        <//>`,
+      })}</p>
       <${Toggle} label=${t('显示名字后面的编号')} micro="PLAYER TAG" value=${s.showTag !== false} onChange=${(v) => updateSettings({ showTag: v })} />
       <p class="set-hint">${t('关闭后只显示代号，不再显示「代号#四位数字」。房间席位、同盟名单、决策顺序和名片的显示一起生效；只影响你自己的画面，不影响别人看到的名字。')}</p>
       <div class="set-row">

@@ -1,20 +1,61 @@
-// server/index.js — process boot; HTTP routes, static delivery and WebSocket wiring live in server/http/.
-// Worker pools are process-owned loans to matches. Startup and shutdown keep diagnostics separate from readiness.
-// Process-entry boot checks a pending update package before listening (server/update.js).
-// The default dual-stack bind may fall back to IPv4; explicit hosts remain literal.
-// Art under public/assets and public/fonts is served with content-hash URLs once the background index is ready
-// (http/assetIndex.js, http/assetViews.js; SP_ASSET_INDEX=0: off); GET /healthz?traffic=1 adds the traffic counters
-// (http/traffic.js) for a local client.
-// Plugins (DESIGN §32, docs/PLUGINS.md): the registry, the vanilla content hash, the visual and content sets, the room
-// policy, the match hosts of rooms with gameplay plugins and the plugin studio are wired in startServer below
-// (server/plugins/, server/match/host/, server/studio/); SP_CSP=off drops the site-wide Content-Security-Policy.
+// server/index.js — process entry & boot (DESIGN §1, §2). Plain node:http + ws, no framework: startServer() below
+// wires the modules under server/http/, in this order —
+//
+//   http/config.js     ROOT, the served directories, the environment (PORT 3000, HOST '::' dual-stack, TRUST_PROXY auto, DEBUG),
+//                      which startServer() options go to net.js / lobby.js, the console logger, the official versions
+//                      this server offers (SP_VERSIONS / SP_VERSION_DEFAULT / SP_MAX_VERSION_HOSTS — versions.js below)
+//   versions.js        the official versions (DESIGN §35.23, M1): each enabled one's cs, data, manifest
+//                      (/cs/<cs16>/index.json) and data directory (/data/versions/<slug>/); their matches run in match
+//                      hosts of their own (match/host/, kind 'version') — the pool exists when another version is
+//                      enabled (the default: all four) and forks a process on the first match of one, never at boot;
+//                      none when only 第二期下半 is enabled
+//   http/websocket.js  session wiring (SessionRegistry → Lobby → Network) and the WebSocket at /ws (maxPayload 64 KB,
+//                      permessage-deflate from 1 KB; refused at upgrade with 404 / 429 per network / 503)
+//   http/static.js     the static mounts (/ → public/, /data/, /shared/, /sim/ `.js` only), the /data.js browser stand-in,
+//                      the language packs (/packs/index.json, /packs/<id>/<file>), the plugin catalogue
+//                      (/plugins/index.json — the registry is plugins/registry.js), the vanilla content set's manifest
+//                      (/cs/<cs16>/index.json — plugins/identity.js: the content hash `cs`, DESIGN §32), the visual sets
+//                      of cosmetic plugins (/vs/<vs16>/…, plugins/visualSet.js) and their files (/p/<id>/<hash8>/…),
+//                      the content sets of gameplay plugins (/cs/<cs16>/…, plugins/contentSets.js — DESIGN §32.6; the
+//                      server owner's plugins/config.json: plugins/policy.js; a room's plugins: plugins/roomSets.js; its
+//                      match then runs in that set's worker: match/host/)
+//   http/media.js      /media/bgm/act1 → public/assets/audio/bgm/act1.mp3 (audio addressed without its extension)
+//   http/files.js      one file → response: MIME, brotli / gzip + memory cache, ETag / Last-Modified / 304, Cache-Control, ranges
+//   http/assetIndex.js the content hashes of public/assets and public/fonts (built in the background, cached in
+//                      .cache/asset-hashes.json by path + size + mtime; Spine models share one hash)
+//   http/assetViews.js the served /data/assets.json, /data/local-assets.json and /data/local-fx.json: every art URL with
+//                      its hash segment (/assets/~<hash>/…, immutable when the hash matches); the files stay unchanged
+//   http/buildTag.js   the build tag of the served browser runtime (/healthz `build`, public/js/ui/buildGuard.js)
+//   http/routes.js     the request listener: security headers, 414 / 400, the plugin studio (/studio/, studio/index.js —
+//                      this machine and the local network only), 405, GET /healthz → JSON status, else static
+//   http/traffic.js    the traffic counters: bytes sent per category (assets / audio / code / data) and on the
+//                      WebSocket, since the start (GET /healthz?traffic=1)
+//   http/common.js     what every answer shares: security headers, URL split, error page, JSON replies, bare 400
+//   http/boot.js       a pending update package first (update.js: old files deleted, the install verified against
+//                      MANIFEST.json), banner (Local / LAN / tunnel URLs), port-in-use hint, graceful shutdown on SIGINT /
+//                      SIGTERM
+//
+// Per-network limits for internet clients (see net.js clientAddress; local/LAN peers are exempt): open sockets
+// (maxConnectionsPerAddr, refused at upgrade with 429), rooms and running matches (lobby.js).
+//
+// Programmatic use (tests): `const srv = await startServer({ port: 0, quiet: true }); … await srv.close();`
+// The server only auto-listens when this file is the process entry point.
+//
+// Fork extras on top of the official boot: worker pools are process-owned loans to matches (combat streaming, bot
+// rehearsal) and startup / shutdown keep health diagnostics separate from readiness; boot checks a pending update
+// package before listening (server/update.js); the default dual-stack bind may fall back to IPv4 while an explicit host
+// stays literal; art under public/assets and public/fonts is served with content-hash URLs once the background index is
+// ready (http/assetIndex.js, http/assetViews.js; SP_ASSET_INDEX=0: off); GET /healthz?traffic=1 adds the traffic
+// counters (http/traffic.js) for a local client; the plugin registry, the vanilla content hash, the visual and content
+// sets, the room policy, the match hosts of rooms with gameplay plugins and the plugin studio are wired in startServer
+// below (server/plugins/, server/match/host/, server/studio/); SP_CSP=off drops the site-wide Content-Security-Policy.
 
 import http from 'node:http';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { getBotStrategy } from './match/botStrategies.js';
-import { externalConfig } from './match/externalConfig.js';
-import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom } from './http/config.js';
+import { noteLlmIgnored, releaseIgnoresExternalAi, validateExternalConfig } from './match/llmGate.js';
+import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom, versionsFrom, parseRoomCode } from './http/config.js';
 import { WS_MAX_PAYLOAD, createSessionStack, attachWebSocket } from './http/websocket.js';
 import { siteCsp } from './http/csp.js';
 import { DATA_SHIM_JS, createStaticHandler } from './http/static.js';
@@ -27,6 +68,9 @@ import { createContentSets } from './plugins/contentSets.js';
 import { createPluginPolicy } from './plugins/policy.js';
 import { createRoomSets } from './plugins/roomSets.js';
 import { createMatchHosts } from './match/host/index.js';
+import { createVersionSets } from './versions.js';
+import { versionById } from '../shared/versions.js';
+import { t } from '../shared/i18n.js';
 import { createTrustedRuntime } from './plugins/trustedRuntime.js';
 import { trustedHostAllowed } from './plugins/trusted.js';
 import { createStudio } from './studio/index.js';
@@ -37,6 +81,8 @@ import { createTrafficCounter } from './http/traffic.js';
 import { createAssetIndex } from './http/assetIndex.js';
 import { createManifestViews } from './http/assetViews.js';
 import { answerClientError } from './http/common.js';
+import { createEventLoopMonitor } from './health/eventLoop.js';
+import { createRoomWorkerPool } from './workers/roomPool.js';
 import { lanUrls, displayHost, isProcessEntry, runMain } from './http/boot.js';
 import { CombatWorkerPool } from './match/combat/pool.js';
 import { createHealthMetrics, serverLoadState, publicLoadDetails } from './healthMetrics.js';
@@ -78,33 +124,44 @@ export function parseTrialWorkers(value) {
  *   ratePerSec?: number, rateBurst?: number, maxConnections?: number, maxRooms?: number,
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
+ *   versionVoteMs?: number, versionRetryMs?: number,
+ *   roomCode?: string | null,
  *   assetIndex?: boolean | { cacheFile?: string | null, delayMs?: number }, studio?: boolean,
- *   matchHost?: object,
+ *   matchHost?: object, versions?: { enabled?: 'all' | string[], default?: string, maxHosts?: number },
  * }} [opts]
  *   client: 'build' or 'source' — which page `/` is (default SP_CLIENT; http/static.js clientModeFromEnv);
  *   assetIndex: the content-hash index (default on; false or SP_ASSET_INDEX=0: off — config.js assetIndexOptionsFrom);
  *   studio: the plugin studio at /studio/ (default on for this machine and the local network — SP_STUDIO=local|off;
  *   false: none);
- *   matchHost: options of the match hosts (server/match/host/index.js — watchdogMs, matchOptions …; tests)
+ *   matchHost: options of the match hosts (server/match/host/index.js — watchdogMs, matchOptions …; tests) — the
+ *   version hosts' too; versions: the official versions this server offers (http/config.js versionsFrom; DESIGN §35.23);
+ *   versionVoteMs / versionRetryMs: the version vote's answer window and the guard after a declined or expired vote (tests;
+ *   server/lobby.js header "Official versions")
+ *   roomCode: a fixed alliance key for every new room (--room-code; four letters or digits — config.js parseRoomCode);
  * @returns {Promise<{ port: number, host: string, url: string, server: http.Server, wss: import('ws').WebSocketServer,
  *                     lobby: import('./lobby.js').Lobby, network: import('./net.js').Network,
  *                     registry: import('./net.js').SessionRegistry, packs: ReturnType<typeof createPluginRegistry>,
  *                     content: import('./plugins/identity.js').VanillaContent, visual: ReturnType<typeof createVisualSets>,
  *                     contents: ReturnType<typeof createContentSets>, hosts: ReturnType<typeof createMatchHosts>,
+ *                     versions: ReturnType<typeof createVersionSets>, versionHosts: ReturnType<typeof createMatchHosts> | null,
  *                     traffic: ReturnType<typeof createTrafficCounter>, assetIndex: ReturnType<typeof createAssetIndex> | null,
  *                     views: ReturnType<typeof createManifestViews> | null, studio: ReturnType<typeof createStudio> | null,
  *                     close: () => Promise<void> }>}
  */
 export async function startServer(opts = {}) {
-  // Reject a server-wide typo before loading data, creating timers or accepting rooms.
+  // A release ignores external-AI settings (one log line) and keeps the built-in bot (§35.66).
+  // An unknown strategy id still fails here, before data is loaded or the port is opened.
+  const log = opts.log || makeLogger(!!opts.quiet);
+  if (releaseIgnoresExternalAi()) noteLlmIgnored(log);
   try {
     const strategy = getBotStrategy(process.env.SP_BOT_STRATEGY);
-    if (strategy.id === 'external') externalConfig();
+    if (strategy.id === 'external') validateExternalConfig();
   } catch (cause) {
     throw new Error(`Invalid SP_BOT_STRATEGY: ${cause.message}. Unset SP_BOT_STRATEGY to use the original bot (legacy).`, { cause });
   }
   const { port, host } = listenAddress(opts);
-  const log = opts.log || makeLogger(!!opts.quiet);
+  // the fork's own knobs: the WebSocket compression preset (server/wsCompression.js), the client update rate, and the
+  // worker pools borrowed to matches (server streaming and bot rehearsal)
   const wsCompression = resolveWsCompression(opts.wsCompression ?? process.env.SP_WS_COMPRESSION ?? 'on');
   const snapshotHz = parseSnapshotHz(opts.snapshotHz ?? process.env.SP_SNAPSHOT_HZ);
   const combatWorkers = parseCombatWorkers(opts.combatWorkers ?? process.env.SP_COMBAT_WORKERS);
@@ -139,6 +196,7 @@ export async function startServer(opts = {}) {
   const scriptMode = process.env.SP_PLUGIN_SCRIPTS;
   let registry, lobby, network, packs, serveStatic, browserBuild, assetIndex = null, views = null;
   let content = null, visual = null, contents = null, hosts = null, studio = null, trustedRuntime = null, persistence = null;
+  let versions = null, versionHosts = null, simPool = null, eventLoop = null;
   const startedAt = Date.now();
   // The online cap and the lobby's room / AI caps (server/onlineLimit.js): a JSON file re-read while the server runs; none = no cap.
   const onlineLimit = createOnlineLimit({ file: opts.onlineLimitFile ?? process.env.SP_ONLINE_LIMIT_FILE ?? null, log });
@@ -169,23 +227,54 @@ export async function startServer(opts = {}) {
     // an out-of-memory abort in a worker thread ends the whole server)
     const transport = String(process.env.SP_MATCH_HOST || '').trim().toLowerCase() === 'worker' ? 'worker' : 'process';
     hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
+    // the official versions (DESIGN §35.23, M1): which ones (the option, else SP_VERSIONS …), their content, and — only
+    // when one beyond 第二期下半 is enabled — the match hosts their rooms play in (counted apart from the plugin hosts)
+    const versionCfg = versionsFrom(opts, log);
+    versions = createVersionSets({ enabled: versionCfg.enabled, defaultId: versionCfg.default, dataDir, vanilla: content, defaultData: data, log });
+    // (the test options of matchHost apply to both pools, but never the version pool's kind or its own SP_MAX_VERSION_HOSTS)
+    versionHosts = versions.nonDefault.length
+      ? createMatchHosts({ contents: versions, log, options: { transport, ...(opts.matchHost || {}), kind: 'version', maxWorkers: Math.max(1, versionCfg.maxHosts) } })
+      : null;
+    log.info(`[versions] enabled: ${versions.ids.map((id) => `${id} (${t(/** @type {any} */ (versionById(id)).label)}${id === versions.defaultId ? ', default' : ''})`).join(', ')}`);
+    // the server's own simulation pool (server/workers/roomPool.js) for bot rehearsals; null keeps them on this thread
+    simPool = createRoomWorkerPool({ data });
     const avatarDir = opts.avatarsDir !== undefined ? opts.avatarsDir
       : (process.env.SP_AVATARS_DIR === '' ? null : defaultAvatarsDir());
     const namecardDir = opts.namecardsDir !== undefined ? opts.namecardsDir
       : (process.env.SP_NAMECARDS_DIR === '' ? null : defaultNamecardsDir());
     ({ registry, lobby, network } = createSessionStack({ ...opts, avatarsDir: avatarDir, namecardsDir: namecardDir, snapshotHz }, {
-      data, log, combatPool, trialPool, onlineLimit, ownerFile, content, plugins: roomSets, hosts,
+      data, log, combatPool, trialPool, onlineLimit, ownerFile, content, plugins: roomSets, hosts, versions, versionHosts, simPool,
       getLoadState: () => serverLoadState(healthMetrics?.snapshot?.()),
       getLoadDetails: () => publicLoadDetails(healthMetrics?.snapshot?.()),
     }));
+    // Main-thread event-loop delay sampling (server/health/eventLoop.js): opt-in with SP_LOOP_SAMPLE=1, no worker pool involved, and a
+    // LOCAL log line per window (`[loop] p50=… p95=… p99=… max=… cpu=… mem=… rooms=… humans=… phase=…`) — deliberately not
+    // part of /healthz. This is what tells an operator whether a stall is the rehearsal / battle slice or something else.
+    eventLoop = createEventLoopMonitor({
+      log,
+      windowMs: opts.loopSample?.windowMs,
+      counts: () => {
+        const s = lobby.stats();
+        const phases = new Set();
+        let rehearsals = 0;
+        for (const room of lobby.rooms.values()) {
+          if (room.match?.phase) phases.add(room.match.phase);
+          rehearsals += room.match?._rehearsalTasks?.size || 0;
+        }
+        return { rooms: s.rooms, matches: s.matches, humans: s.humans, spectators: s.spectators,
+          phase: [...phases].sort().join('+') || 'idle', rehearsals };
+      },
+    });
     serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, metrics: opts.phaseMetrics,
-      avatarDir, namecardDir, assetIndex, views, visual, contents, ...(opts.client ? { client: opts.client } : {}) });
+      avatarDir, namecardDir, assetIndex, views, visual, contents, versions, ...(opts.client ? { client: opts.client } : {}) });
     // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
     // once it is used (hot reload), and rooms whose host is the author or alone follow a plugin's changes by themselves
     studio = opts.studio === false ? null : createStudio({ publicDir, pluginsDir, dataDir, registry: packs, lobby, sessions: registry, log, fetch: opts.fetch });
     trustedRuntime = await createTrustedRuntime({ registry: packs, log });
     lobby.trustedRuntime = trustedRuntime;
-    browserBuild = computeBuildTag(ROOT, publicDir);
+    // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
+    resetBuildTag();
+    browserBuild = buildTag(ROOT, { publicDir, servedVersionDirs: versions.servedDirs() });
     // checkpoints (SP_REDIS_URL, server/persist/): the saved lobby and its matches come back before the server listens
     persistence = await createPersistence({ opts, registry, lobby, log });
   } catch (e) {
@@ -193,6 +282,9 @@ export async function startServer(opts = {}) {
     network?.close();
     lobby?.shutdown('boot-failed');
     try { hosts?.close(); } catch { /* boot already failed */ }
+    try { versionHosts?.close(); } catch { /* boot already failed */ }
+    try { await simPool?.close(); } catch { /* boot already failed */ }
+    eventLoop?.close();
     studio?.close();
     await trustedRuntime?.close();
     onlineLimit.close();
@@ -204,7 +296,7 @@ export async function startServer(opts = {}) {
   const traffic = createTrafficCounter();
   const health = { startedAt, network, registry, lobby, content, browserBuild, combatPool, trialPool, trialStartupFailed,
     getHealthMetrics: () => healthMetrics, traffic, assetIndex, views, trusted: trustedRuntime?.health,
-    persistence: persistence ? () => persistence.snapshot() : null };
+    persistence: persistence ? () => persistence.snapshot() : null, versions, versionHosts };
   const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health, log,
     trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
   server.on('clientError', answerClientError);
@@ -252,13 +344,16 @@ export async function startServer(opts = {}) {
     }
   } catch (e) {
     await persistence?.close();
-    network.close();
+    network.close(); // stop heartbeat/sweep timers of the half-built server
     lobby.shutdown('boot-failed');
     onlineLimit.close();
     ownerFile.close();
     assetIndex?.close();
     try { hosts?.close(); } catch { /* boot already failed */ }
+    try { versionHosts?.close(); } catch { /* boot already failed */ }
     studio?.close();
+    eventLoop?.close();
+    await simPool?.close();
     await trustedRuntime?.close();
     await closePools();
     throw e;
@@ -273,6 +368,9 @@ export async function startServer(opts = {}) {
     healthMetrics = null;
     try { log.warn?.(`[health] performance metrics unavailable: ${e.message}`); } catch { /* diagnostic only */ }
   }
+  // started only once the server is listening: the first window then reports real counts, not a half-built hall
+  eventLoop?.start();
+
   const addr = server.address();
   const actualPort = typeof addr === 'object' && addr ? addr.port : port;
   const url = `http://${displayHost(boundHost)}:${actualPort}`;
@@ -287,6 +385,10 @@ export async function startServer(opts = {}) {
       try { await persistence?.shutdown(); } catch (e) { log.error('[shutdown] checkpoints', e); }
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
+      try { versionHosts?.close(); } catch (e) { log.error('[shutdown] version hosts', e); }
+      // after the lobby: every room is gone, so no rehearsal can still be waiting on a thread
+      try { await simPool?.close(); } catch (e) { log.error('[shutdown] simulation pool', e); }
+      eventLoop?.close();
       network.close();
       onlineLimit.close();
       ownerFile.close();
@@ -304,8 +406,34 @@ export async function startServer(opts = {}) {
     })();
     return closing;
   }
-  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, combatPool, trialPool,
-    healthMetrics, traffic, assetIndex, views, studio, persistence, close };
+  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, versions, versionHosts,
+    combatPool, trialPool, healthMetrics, traffic, assetIndex, views, studio, eventLoop, simPool, persistence, close };
 }
 
-if (isProcessEntry(import.meta.url)) runMain(startServer);
+/**
+ * The `--room-code ABCD` / `--room-code=ABCD` argument of this process entry, or null when it is absent. The value is
+ * read once at startup and lives only in this server instance: there is no environment variable and nothing is
+ * persisted, so stopping the server and starting it again without the argument is random again. A missing or invalid
+ * value throws (the boot helper reports it and exits) instead of silently starting random.
+ * @param {string[]} [argv]
+ * @returns {string | null}
+ */
+export function roomCodeFromArgv(argv = process.argv.slice(2)) {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--room-code') {
+      const v = argv[i + 1];
+      if (v == null || v.startsWith('-') || !v.trim()) throw new RangeError('--room-code needs 4 letters or digits');
+      return parseRoomCode(v);
+    }
+    if (a.startsWith('--room-code=')) {
+      const v = a.slice('--room-code='.length);
+      if (!v.trim()) throw new RangeError('--room-code needs 4 letters or digits');
+      return parseRoomCode(v);
+    }
+  }
+  return null;
+}
+
+// `node server/index.js` / npm start: listen, print the banner, stop on SIGINT / SIGTERM (http/boot.js).
+if (isProcessEntry(import.meta.url)) runMain(() => startServer({ roomCode: roomCodeFromArgv() }));

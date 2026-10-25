@@ -35,6 +35,14 @@
 // (cosmetic plugins only included; a record from before 0.3.0: null — format v2, MIGRATIONS[1]). Such a match is
 // unofficial: the aggregates leave it out unless asked to take it in (aggregateStats `modded` — the overview's
 // 「含插件对局」 switch); the history lists it with its mark.
+// Official versions (DESIGN §35.23, M1): every record of another version names it — `version` (a registry id, only when
+// it is not 第二期下半; format v3, MIGRATIONS[2]: a record without one played 第二期下半) — and its id does not include
+// it (a record's id stays what it was). 统计数据 filters by version (recordsOfVersion: the version shown by default,
+// 全部版本 on request) and the levels count the records of one season (recordsOfSeason: 第一期 / 第二期 each have their own
+// 卫戍认证 table).
+// Test matches (DESIGN §34.8) never create local records, including quits. Server awards are
+// zero; a live marker latches until the next match. Legacy marked imports are dropped on load
+// and merge, and pure aggregates/badge helpers exclude them even if handed a raw record.
 //
 // Format evolution: the envelope carries a version (`STATS_VERSION`); `migrateStats` walks records through a chain of
 // per-version steps and every loaded / imported record passes `normalizeRecord`, a strict schema: missing fields get
@@ -48,6 +56,7 @@
 import { PHASE } from '../../../shared/constants.js';
 import { MAX_PLAYER_CAPACITY } from '../../../shared/playerCapacity.js';
 import { sanitizeName } from './playerName.js';
+import { DEFAULT_VERSION, versionById } from '../../../shared/versions.js';
 
 /** Current record-envelope version (bump + add a MIGRATIONS step when the record shape changes). */
 export const STATS_VERSION = 3;
@@ -85,6 +94,43 @@ export function contentOf(c) {
 }
 /** Did the record's match play gameplay plugins (unofficial)? @param {any} rec */
 export const isModdedRecord = (rec) => !!(isObj(rec) && rec.content);
+
+/** A record's official version field (see the header): a registry id other than 第二期下半, else null. @param {unknown} v */
+export const versionOf = (v) => (typeof v === 'string' && v !== DEFAULT_VERSION && versionById(v) ? v : null);
+
+/** The official version a record played (第二期下半 without `version`). @param {any} rec */
+export const recordVersion = (rec) => versionOf(rec?.version) ?? DEFAULT_VERSION;
+
+/**
+ * The records of one official version (see the header): `version` a registry id, or 'all' / null — every record.
+ * @param {any[]} records @param {string|null} version
+ */
+export function recordsOfVersion(records, version) {
+  const list = Array.isArray(records) ? records : [];
+  return !version || version === 'all' ? list : list.filter((r) => recordVersion(r) === version);
+}
+
+/**
+ * The records of one season (see the header: 第一期 / 第二期 — the activity a version belongs to), every record when
+ * `season` is null.
+ * @param {any[]} records @param {string|null} season
+ */
+export function recordsOfSeason(records, season) {
+  const list = Array.isArray(records) ? records : [];
+  return season ? list.filter((r) => (versionById(recordVersion(r))?.season ?? DEFAULT_VERSION) === season) : list;
+}
+/**
+ * The records the achievement blocks read — 卫戍成就's peak alliance (highestBondRecord) and 策略记录's special marks
+ * (strategyBadgeIds), on 统计数据 and in the lobby's 成就统计 window: a match with gameplay plugins is unofficial and stays
+ * out (#643 checklist §二.6 「不计插件对局」, DESIGN §32.6) unless `withModded` (统计数据's 「含插件对局」) takes it in.
+ * A filter for the callers, not inside the two helpers: the storage budget (fitToBudget) keeps the peak of every record.
+ * @param {any[]} records
+ * @param {boolean} [withModded]
+ */
+export function achievementRecords(records, withModded = false) {
+  const all = Array.isArray(records) ? records : [];
+  return withModded ? all : all.filter((r) => !isModdedRecord(r));
+}
 const int = (v, d) => (Number.isFinite(v) ? Math.round(v) : d);
 const num = (v) => (Number.isFinite(v) ? v : null);
 const bool = (v, d = false) => (typeof v === 'boolean' ? v : d);
@@ -223,6 +269,7 @@ function normalizePlayerRow(raw, quit = false) {
     seat: int(p.seat, 0),
     name: str(p.name, MAX_NAME) || '',
     isBot: bool(p.isBot),
+    ...(Number.isInteger(p.aiTakeoverRound) && p.aiTakeoverRound >= 1 ? { aiTakeoverRound: p.aiTakeoverRound } : {}),
     left: bool(p.left),
     alive: bool(p.alive, true),
     victory: bool(p.victory), // server semantics: team won AND this player was still in at the end
@@ -283,6 +330,8 @@ export function normalizeRecord(raw) {
     // 项目 4: 收藏 (a local bookmark, survives compaction) and the boss rounds' damage ledger
     fav: bool(r.fav),
     bossDamage: normalizeBossDamage(r.bossDamage),
+    // the official version it played (see the header): a registry id other than 第二期下半, else left out
+    ...(versionOf(r.version) ? { version: versionOf(r.version) } : {}),
     players,
   };
   // Only the literal true. A hand-edited string cannot mark a real match as a test, and a missing key leaves
@@ -292,7 +341,7 @@ export function normalizeRecord(raw) {
   if (r.compact === true) rec.compact = true;
   // an id-less (hand-made) record gets a content id, so both copies of it land on the same key (`vs` and `content` left
   // out: the id of a record from before 0.3.0 stays the same)
-  if (!rec.id) rec.id = `c.${fnv1a(JSON.stringify({ ...rec, vs: undefined, content: undefined }))}`;
+  if (!rec.id) rec.id = `c.${fnv1a(JSON.stringify({ ...rec, vs: undefined, content: undefined, version: undefined }))}`;
   return rec;
 }
 
@@ -303,12 +352,16 @@ export function normalizeRecord(raw) {
  *         original game (null). The same step covers PR #509's fields (§32.14.16): a v1 row has no `creditedKills`
  *         (the actual player kills stay unknown rather than guessed) and a compacted v1 row lost its bonds
  *         (`usedBondIds` stays absent) — nothing to rewrite, the version keeps an older build from stripping them.
- *   2 → 3 (项目 4, 2026-10-16): the record carries the boss rounds' per-player / per-operator damage (`bossDamage`)
- *         and a local 收藏 mark (`fav`). A v2 record simply has neither — nothing to rewrite.
+ *   2 → 3 (项目 4, 2026-10-16 / 0.3.2, DESIGN §35.23): the record carries the boss rounds' per-player / per-operator
+ *         damage (`bossDamage`) and a local 收藏 mark (`fav`), and names another official version (`version`) — one
+ *         without it played 第二期下半. A v2 record has none of the three; only `fav` is rewritten (see the step).
  * @type {Record<number, (stats: any) => any>}
  */
 export const MIGRATIONS = {
   1: (stats) => ({ v: 2, records: (Array.isArray(stats.records) ? stats.records : []).map((r) => (isObj(r) ? { ...r, content: null } : r)) }),
+  // 2 → 3 (项目 4, 2026-10-16 / 0.3.2, DESIGN §35.23): the record carries the boss rounds' per-player / per-operator damage
+  // (`bossDamage`) and a local 收藏 mark (`fav`), and names another official version (`version`); one without the version
+  // played 第二期下半 — nothing to rewrite there, the version keeps an older build from stripping the field
   2: (stats) => ({ v: 3, records: (Array.isArray(stats.records) ? stats.records : []).map((r) => (isObj(r) ? { ...r, fav: r.fav === true } : r)) }),
 };
 
@@ -376,8 +429,9 @@ export function loadStats() {
 }
 
 /**
- * The records for the read-only views (成就统计, the trophies of 名片): read + migrate, nothing written back. An
- * unreadable or newer value reads as none and stays where it is for the 统计数据 page to report (loadStats above).
+ * The records for the read-only views (the lobby's 成就统计 card, the trophies of 名片): read and migrated in memory only
+ * — nothing is written back. An unreadable or newer value reads as no records and stays where it is, for the 统计数据 page
+ * to find and report (loadStats above).
  * @returns {any[]}
  */
 export function peekStatsRecords() {
@@ -385,6 +439,7 @@ export function peekStatsRecords() {
   if (raw == null) return [];
   let parsed;
   try { parsed = JSON.parse(raw); } catch { return []; }
+  if (!isObj(parsed) || !Array.isArray(parsed.records)) return [];
   const { stats, newer } = migrateStats(parsed);
   return newer ? [] : stats.records;
 }
@@ -392,7 +447,7 @@ export function peekStatsRecords() {
 // ---- compaction + the storage budget ---------------------------------------------------------------------------
 
 const COMPACT_FRAME = ['id', 'v', 't', 'end', 'victory', 'roundsPassed', 'lastRound', 'hiddenReached', 'hiddenCleared', 'reason', 'modeId',
-  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'fav', 'test', 'testActions'];
+  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'fav', 'version', 'test', 'testActions'];
 
 /**
  * The compact form of a record: the frame and the player's OWN row without lineup, bonds and name — everything the
@@ -409,6 +464,7 @@ export function compactRecord(rec) {
   out.players = self ? [{
     playerId: self.playerId, seat: self.seat, alive: self.alive, victory: self.victory, roundsPassed: self.roundsPassed,
     eliminatedRound: self.eliminatedRound, bandId: self.bandId, title: self.title, left: self.left, stats: self.stats,
+    ...(Number.isInteger(self.aiTakeoverRound) ? { aiTakeoverRound: self.aiTakeoverRound } : {}),
     // (the trophies and the experience add up across every record: 名片 / 成就统计 and the settlement's LV, screens/settle.js)
     trophies: self.trophies, reward: self.reward,
     ...(usedBondIds.length ? { usedBondIds } : {}),
@@ -446,6 +502,7 @@ export function highestBondRecord(records) {
   for (const record of records) {
     if (record.end === 'quit' || record.compact || record.test === true) continue;
     const player = selfRowOf(record);
+    if (Number.isInteger(player?.aiTakeoverRound)) continue;
     for (const bond of player?.bonds || []) {
       if (!bond.active || !Number.isFinite(bond.layers) || bond.layers <= 0) continue;
       if (!best || bond.layers > best.bond.layers) best = { record, player, bond };
@@ -494,9 +551,9 @@ export function roomModeOf(modeId, roomMode) {
  * without players (the error-path settlement) or matches the local player did not take part in (spectator
  * seats get every result pushed too — eliminated players, who ARE in players[], keep recording).
  * @param {any} res raw m.result payload
- * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, now?: number }} ctx
+ * @param {{ myId?: string|null, roomMode?: string|null, vs?: string|null, content?: any, version?: string|null, now?: number }} ctx
  *   vs: the room's visual set (room.state.content.vs); content: room.state.content (its content set when it played
- *   gameplay plugins) — see the header
+ *   gameplay plugins); version: the official version it played (null / 第二期下半: left out) — see the header
  * @returns {any|null}
  */
 export function buildRecord(res, ctx = {}) {
@@ -528,6 +585,7 @@ export function buildRecord(res, ctx = {}) {
     selfId: myId,
     vs: vsOf(ctx.vs),
     content: contentOf(ctx.content),
+    version: ctx.version ?? null,
     players: r.players,
     // 项目 4: the boss rounds' per-player / per-operator damage, straight from the settlement payload
     bossDamage: r.bossDamage,
@@ -635,8 +693,11 @@ export function buildQuitRecord(state, ctx = {}) {
     selfId: myId,
     vs: vsOf(state.room?.content?.vs),
     content: contentOf(state.room?.content),
+    // the room's version, else the frames' (m.public `version`; absent = 第二期下半, as versions.js matchFrameVersion)
+    version: state.room ? state.room.version ?? null : str(pub.version) ?? null,
     players: [{
       playerId: myId, seat: row.seat, name: row.name, isBot: false, left: true, alive, victory: false, roundsPassed,
+      ...(Number.isInteger(row.aiTakeoverRound) ? { aiTakeoverRound: row.aiTakeoverRound } : {}),
       eliminatedRound: alive ? null : live.aliveRound, lp: row.lp, bandId: row.bandId,
     }],
   });
@@ -851,7 +912,7 @@ export function roundsOf(rec) {
 export function countsTowardStats(rec) {
   if (!isObj(rec)) return false;
   // Legacy test records never count. There is no switch that counts it (DESIGN §34.8).
-  if (rec.test === true) return false;
+  if (rec.test === true || Number.isInteger(selfRowOf(rec)?.aiTakeoverRound)) return false;
   if (rec.end !== 'quit') return true;
   const self = selfRowOf(rec);
   if (!self) return false;
@@ -871,7 +932,7 @@ export function strategyBadgeIds(records, bands) {
   for (const rec of Array.isArray(records) ? records : []) {
     if (!rec || rec.end === 'quit' || rec.test === true || rec.difficulty === 'TRAINING' || rec.modeId === 'mode_training_1') continue;
     const self = selfRowOf(rec);
-    if (!self?.bandId || !selfWon(rec, self)) continue;
+    if (!self?.bandId || Number.isInteger(self.aiTakeoverRound) || !selfWon(rec, self)) continue;
     clears.set(self.bandId, (clears.get(self.bandId) || 0) + 1);
   }
   return Object.values(bands || {}).filter((band) => Number.isInteger(band.victorCount) && band.victorCount > 0

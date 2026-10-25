@@ -128,7 +128,9 @@ test('experimental switches default off and send immutable full options only whe
 test('experimental options are room-only and lobby creation uses server defaults', () => {
   const lobby = source('../../public/js/screens/lobby.js');
   assert.doesNotMatch(lobby, /ExperimentalOptions|experimentalSummary|setExperimental|setOverlay\('experimental'\)/);
-  assert.match(lobby, /net\.request\('room\.create', \{\n\s+mode: roomMode, difficulty, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\),\n\s+\}\)/);
+  // the fork's own payload: the difficulty comes from the hub's pickers (shownSolo / shownCoop), and since 0.3.2 the
+  // official version and the 不限时 pref ride along — the lobby still sends no experimental options of its own.
+  assert.match(lobby, /net\.request\('room\.create', \{\n\s+mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),\n\s+\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),\n\s+\}\)/);
   const room = source('../../public/js/screens/room.js');
   assert.match(room, /editable=\$\{facts\.isHost && online\}/);
   assert.match(room, /mode=\$\{room\.mode\}/);

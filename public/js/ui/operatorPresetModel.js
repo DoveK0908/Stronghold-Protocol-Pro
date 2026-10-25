@@ -51,14 +51,24 @@ export function parseOperatorPreset(input) {
     const r = parseDiyImport(raw);
     return r.ok ? { ok: true, scope: 'diy', patch: { diy: r.picks } } : r;
   }
-  if (kind === OWNERSHIP_EXPORT_KIND || Array.isArray(raw) || (!kind && isObj(raw) && own(raw, 'notOwned'))) {
+  if (kind === OWNERSHIP_EXPORT_KIND || Array.isArray(raw) || (!kind && isObj(raw) && (own(raw, 'notOwned') || own(raw, 'notOwnedChars')))) {
     const r = parseOwnershipImport(raw);
-    return r.ok ? { ok: true, scope: 'notOwned', patch: { notOwned: r.notOwned } } : r;
+    // a v2 file carries `notOwnedChars` (ownershipModel.js OWNERSHIP_VERSION 2), an older one `notOwned`
+    const ids = r.ok ? (r.notOwned ?? r.notOwnedChars) : undefined;
+    if (!Array.isArray(ids)) return r.ok ? fail(N_('里面没有干员持有的数据')) : r;
+    return { ok: true, scope: 'notOwned', patch: { notOwned: ids } };
   }
   if (!kind || kind === LOADOUT_EXPORT_KIND) {
     if (isObj(raw) && own(raw, 'ops') && !isObj(raw.ops)) return fail(N_('无法识别的格式'));
     const r = parseImport(raw);
-    return r.ok ? { ok: true, scope: 'entries', patch: { entries: r.entries, ...(r.ops ? { ops: r.ops } : {}) } } : r;
+    if (!r.ok) return r;
+    // a v2 envelope keeps the choices by charId (`byChar`): read them through parseStored so a 0.2.x export lands in the
+    // same entry shape this build writes, and only carry the sections the file actually had
+    const entries = r.entries ?? (r.byChar ? parseStored({ entries: r.byChar }) : undefined);
+    const patch = {};
+    if (entries !== undefined) patch.entries = entries;
+    if (r.ops !== undefined) patch.ops = r.ops;
+    return { ok: true, scope: 'entries', patch };
   }
   return fail(N_('这不是干员预设的数据'));
 }

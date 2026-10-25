@@ -5,6 +5,7 @@
 //    1920×1080 and a phone in landscape 844×390: the four tabs, the counting rule on screen (the match left in the first
 //    round is listed as 中途退出 / 不计入统计 and left out of the totals), the row click that re-views a settlement and
 //    its 返回统计, Esc, the lobby's entry in English; zero console errors. Screenshots: test/e2e/out/stats-*.png
+//    (In the lobby the page opens from the 名片 card's 我的信息 window: 统计数据 — 界面#09, the maintainer's decision.)
 // 2. The data actions: 导出 hands out a file the page itself imports again (nothing new), a corrupt file and a newer
 //    one are refused with a message and change nothing, 清空 asks first (the confirm dialog sits above the overlay and
 //    Esc closes only it), unreadable storage is set aside with a notice, a newer build's data is never overwritten.
@@ -157,7 +158,9 @@ describe('统计数据 page (real server, headless Chrome)', { skip: !ENABLED &&
     const c = await open({ stored: JSON.stringify(env) });
     await c.page.waitForSelector('.lobby-screen');
     await openStats(c);
-    // 总览: 24 settled + the quit after 6 rounds count, the first-round one does not
+    // 总览: 24 settled + the quit after 6 rounds count, the first-round one does not (the tabs show before the page's data
+    // is loaded: wait for the cards)
+    await c.page.waitForSelector('.st-sec > .st-cards .st-card__num', { timeout: 15000 });
     const cards = await texts(c, '.st-sec > .st-cards .st-card__num');
     assert.equal(cards[0], '25', 'games');
     assert.match(await c.page.$$eval('.st-rule', (els) => els.map((e) => e.textContent).join(' ')), /另有 1 局未计入统计/);
@@ -301,7 +304,8 @@ describe('统计数据 page (real server, headless Chrome)', { skip: !ENABLED &&
     const n = await open({ stored: newer });
     await n.page.waitForSelector('.lobby-screen');
     await openStats(n);
-    await n.page.waitForFunction(() => !/加载中/.test(document.querySelector('.st-body')?.textContent || '加载中'), { timeout: 15000 });
+    // the page shows 加载中 until its game data is in (the hub's art loads beside it)
+    await n.page.waitForFunction(() => /更新版本的统计数据/.test(document.querySelector('.st-body')?.textContent || ''), { timeout: 15000 });
     assert.match(await n.page.$eval('.st-body', (e) => e.textContent), /更新版本的统计数据/);
     assert.ok(await n.page.$eval('[data-testid="stats-clear"]', (b) => b.disabled), 'no 清空 over data this build cannot read');
     assert.equal(await n.page.evaluate(() => localStorage.getItem('sp.pref.stats')), newer);
@@ -369,6 +373,7 @@ describe('统计数据: the real flows (a fast real server, headless Chrome)', {
       assert.equal(env.records[0].players[0].roundsPassed, 1, 'one round cleared — the server\'s own count for a quit in round 2');
       assert.ok(env.records[0].players[0].bandId, 'its strategy');
       // the page: one game counted, one left out, both in the history
+      // 统计数据 from the lobby: the 名片 card → 我的信息 → 统计数据
       await c.click('.lobby-screen [data-testid="me-card"]');
       await c.page.waitForSelector('.me-info-dlg', { visible: true, timeout: 15000 });
       await c.page.evaluate(() => [...document.querySelectorAll('.me-info__actions button')].find((b) => /统计数据/.test(b.textContent))?.click());

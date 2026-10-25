@@ -74,6 +74,7 @@ describe('the settings entry of the lobby and the room', { skip: !ENABLED && 'se
     // the room: 同盟模拟 → 创建同盟 → the same button, closed with 完成
     await page.evaluate(() => [...document.querySelectorAll('.hub-entry')].find((b) => /同盟模拟/.test(b.textContent))?.click());
     await page.waitForSelector('.ally-card--create', { visible: true, timeout: 10000 });
+    await page.waitForFunction(() => !document.querySelector('.ally-card--create')?.disabled, { timeout: 15000 });
     await sleep(500);
     await page.click('.ally-card--create');
     await page.waitForSelector('.room-screen', { timeout: 15000 });
