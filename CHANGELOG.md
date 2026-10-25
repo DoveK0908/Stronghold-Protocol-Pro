@@ -1,3 +1,94 @@
+## 0.3.2-pro.6 — 2026-10-25
+
+在 `0.3.2-pro.5` 之上：把 `v0.3.2-pro.5` tag 之后积压的 57 个提交（其中 42 个此前未推送）一次收进同一个版本，
+内容集中在四个块——**自选干员结城理（傀儡师）**、**丰川祥子的音符特效重做**、**整条特效出手点/起点线**、
+**大厅与房间的交互修补**，另加一批素材工具与文档。没有改官方规则数据，golden 无移动。
+
+### 内容：结城理（傀儡师，`char_4217_makoto`）
+
+- **新增自选干员（内容#）**：`server/sim/content/kits/ops/op-makoto.js`。官方数据表里有他（Persona 3 联动，
+  SPECIAL/dollkeeper，6★）但不在棋池里，`tools/build-data.mjs` 靠 `DIY_INCLUDED_COLLAB` 把他留在
+  `data/backups.json` 的 `diy.ownedPool`。三个技能都是「立刻切换为替身状态作战」（MANUAL / durationType NONE），
+  选哪个技能决定替身是俄耳甫斯还是塔纳托斯；S3 的塔纳托斯在将被击倒时切俄耳甫斯。
+- **四个替身形态各自走 `Stand_S1 / S2 / S3_1 / S3_2` 模式**（`unit.form` = `doll1|doll2|doll3p1|doll3p2`，
+  `professions.js installDollkeeper` 经 `unit.profile.dollForms` 映射，`public/js/render/units.js` 的 FORMS 取 clip）。
+- **替身改用特性自己的攻击范围**（周围 8 格，不是本体射程）；替身的攻击特效走 Stand 模式。
+- **S3 二段的俄耳甫斯：30 % 物法闪避给范围内的友方**（原来错加在自己身上），阻挡 +2 仍归她自己。
+- **替身切换是「停顿」不是「眩晕」**（T0 不羁之力）；替身登场特效只放一份。
+- **替身不再被 −99 压成永久的 0 阻挡**（S3 二段的 +2 才生效）；击倒要求恐惧。
+- **替身光环里一次性爆发的 `*_start` 行不再被强制循环**（原来每轮结束就重放，脚下亮得不正常）。
+- **去掉玩家手动按技能那一支**：替身有阻回，没人会手按技能，S3 只由致命伤切俄耳甫斯。
+- **接上 14 条日文战斗语音**（他没有中文配音），中文档在缺中文时自动放日配。
+
+### 内容：丰川祥子（S2 / 音符）
+
+- 音符**改用官方那套 4 帧 flipbook**，并在自由移动阶段保留微弱追踪（转向速度取 `turnFree` 的一半），
+  锁定后仍是强追踪。
+- 音符**直接放官方 prefab**（只按位移平移，保留它自己的落点高度）；prefab 拿不到时仍画四帧音符，
+  不再可能变成看不见。
+- 音符最终改用**会飞的那枚官方音符 prefab**（`attack_01` / `skill_0N` 的 trail）；`talent_trail` 是身上的光环、
+  不是音符，先前那一版用错了资产（本轮中间有 4 次 revert/reapply，最终形态即此）。
+- S2 拨档特效按官方数据重做（模式索引 + 内联 buff + 拨档清单），按模式挂常驻特效。
+
+### 特效：出手点 / 起点 / 皮肤
+
+- **远程弹道按屏幕空间每帧重算枪口**，箭真的从武器出（不再从人物正中间）；模型未就绪时也按武器侧发射。
+- 皮肤点位指向的骨不在模型上时，改用模型自己的枪口骨（含按名字模糊匹配）；跳过落在骨架原点的枪口标记骨。
+- 朝下/朝上的单位，方向性特效跟着朝向转 90°（`DIR_YAW` 只转 `followRot` 的点；松果 S2 的钉子不再朝右）。
+- buff 图的当前模式门控不再被拍平（伊内丝带一技能只剩影哨，不再整局套着 S2 姿态）。
+- **皮肤立绘「黑眼圈」**：PRTS 皮肤插件的页面是预乘 alpha + `min(RGB, A)` 钳制过的，分两路解决——
+  `tools/mark-skin-pma.mjs` 给预乘页补 `pma: true`；`tools/unpremultiply-pages.mjs` 按直通 alpha 近似还原。
+  最终正解是 0.3.2-pro.5 之后新增的 `tools/local-extract/skinspines.py`：**只从本机客户端 `skinpack` 重提取**，
+  直通写页，不做 `pma:` 伪造、也不写 `RGB/(A/255)` 近似（两种都被判过不可接受）。
+- 特效索引 URL 带上重导身份，热修后不再被素材缓存挡住。
+
+### 大厅 / 房间 / 界面
+
+- **8–20 席的席位条可以用鼠标按住左右拖动**（新增 `public/js/ui/dragScroll.js`；同一套也给干员调配的牌堆，
+  触摸与手写笔仍走浏览器自己的滚动）。
+- **头像：三处选择器都能选「自己上传的头像」与干员的精一/精二/皮肤**；换成官方头像立刻生效，自传头像带得上
+  也清得掉；限流不再让同步永久失效。
+- **选择策略页的决策顺序行头像改走统一入口**（自传头像/精一精二/皮肤），并去掉头像左上角的「我」标志。
+- **席位卡「精一/精二/皮肤切换不了」**：只认「更换立绘」那一处的选择。
+- **准备大厅立绘**：干员不在本模式清单里时按素材清单取图，不再退成随机的半身像。
+- **名片外观**：皮肤 key 允许大写，camelCase 皮肤不再整条 `room.card` 被拒；名片底图的裁剪框改成卡片实际的
+  600 / 186 横构图（原来是竖的）。
+- **设置：新增「显示名字后面的编号」**，一处开关管住所有编号显示。
+- **20 人房的团队面板**：策略固定占一行，显示在名字下面。
+- 修「删掉上传的图后，每次进服务器都弹一次『无效的请求』」。
+
+### 玩法 / 联机
+
+- **局内投票开启二倍速**（`server/match/match/speedVote.js` + `public/js/ui/speedVote.js`）：在场人类全员同意，
+  从**下一场**战斗开始翻倍，绝不在一场进行中切换（所有 deadline / 场地时钟 / 联军预算都按相位开始时的
+  `gameSpeed` 算）。可以随时一键取消（`g.speedOff`，无需投票），同样落下一场；取消不算「投票失败」，
+  再开要重新投票。投票超时 `SPEED_VOTE_MS`、失败后本回合不能再提、提案人 300 ms 突发保护；
+  `speedBoost` / `speedBoostOffPending` 都随 `server/match/snapshot.js` 的存档一起恢复。
+  `[ASSUMED]` 便利规则，非官方。
+- **乌尔比安 S3 没有位移时，技能结束也算【返回】**：原地重新部署（触发迅捷作战粮等「部署时」效果）。
+- 修商店购买后**备战席选不中**（待部署区到达闪光调了不存在的 `fx.arrive`）。
+- 修**待部署区特效残留**：买到的干员只放到达闪光，不再启动被动的 loop。
+- 修**结算页「Boss 关伤害」恒为 0**：客户端结算的 boss 关不再空账。
+
+### 素材与工具
+
+- 新增 `tools/local-extract/skinspines.py`（皮肤 Spine 直通重提取，`--only` 单测、`--skin-bundles` 可重复；
+  271/276 套能提，5 套客户端没有）。
+- 新增 `tools/unpremultiply-pages.mjs`、`tools/mark-skin-pma.mjs`。
+- 新增 `tools/make-hotfix.py`：服务器热修包统一由它生成到工作区 `hotfix/`（不再散落到 `_build/`）。
+- `tools/local-extract/extract.py` / `fx.py` 跟随 `docs/design/vfx-format.md` §33.19（`CheckUnitCurrentMode` 门控、
+  modeGate / notModeGate 的提取与消费链路、带门控的 12 个模板事件，index 版本仍为 3）。
+- `docs/PROJECTS.md` 进 git（`_build/projects.md` 的施工版在清理探针时被 `rm -rf` 删过，这是重建版）。
+
+### 工程
+
+- 新增测试：`test/content/diy-makoto.test.js`、`test/match/speed-vote.test.js`、
+  `test/match/boss-ledger-client.test.js`、`test/lobby-uploads.test.js`、
+  `test/ui/avatar-pick-upload.test.js`、`test/ui/room-seats-drag.test.js`、`test/ui/show-tag.test.js`，
+  另有 15 个既有测试跟随上面的行为变化更新（`test/render/*`、`test/sim/*`、`test/ui/*`、`test/lobby-card.test.js`、
+  `test/local-extract.test.js`、`test/match/fuzz.test.js`）。
+- `data/assets.json` / `data/backups.json` 跟随新干员与皮肤重生成；golden 无移动。
+
 ## 0.3.2-pro.5 — 2026-10-22
 
 在 `0.3.2-pro.4` 之上：跟进官方 `dev`（`06a92237..218647c6`）与精英 AI 阿尔图罗 v0.2.2，并把 GitHub Actions

@@ -112,8 +112,9 @@ test('every chess and 自选 form at every potential: the raw keyframes plus the
       forms++;
     }
   }
-// LOCAL OVERLAY PATCH (baseline data count): 259 → 262: her own forms join the backup pool
-  assert.equal(forms, 262);
+// LOCAL OVERLAY PATCH (baseline data count): 259 → 262 (her own forms join the backup pool) → 265
+// (结城理 char_4217_makoto, the second DIY_INCLUDED_COLLAB exception, brings three stand-in forms)
+  assert.equal(forms, 265);
 });
 
 test('talent candidates at every potential: each talent is the last one unlocked with requiredPotentialRank ≤ the rank', { skip: !HAS_CACHE && 'no .cache/gamedata' }, () => {
