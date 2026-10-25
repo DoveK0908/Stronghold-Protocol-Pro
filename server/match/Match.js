@@ -293,6 +293,7 @@ import { MatchUnite } from './match/unitePhase.js';
 import { MatchBoss } from './match/bossRounds.js';
 import { MatchSettle } from './match/settle.js';
 import { AFK_REMOVE_ROUNDS } from './match/common.js';
+import { benchExpandable, stageWithBenchExpand } from '../../shared/benchExpand.js';
 import { installTestTrace } from './testTrace.js';
 import { MatchTestCommands } from './match/testCommands.js';
 import { MatchOffers } from './match/offers.js';
@@ -508,6 +509,21 @@ export class Match {
     this.rngBots = rng('bots');
     this.rngMeta = rng('meta');
 
+    // per-match setup (DESIGN §6.5) — before the seats: a PlayerState's 整备区 capacity depends on the drawn stage
+    // (整备区扩容 only opens cells on the layout it was measured on).
+    const setup = setupMatchWaves(this.gd, this.rngSetup, { excludeStages: this.experimental.bannedStages ?? [] });
+    this.stageId = setup.stageId;
+    // 整备区扩容 (experimental `benchExpand`): the three dead cells left of the 临时整备区 become 整备区 slots. The
+    // data stage is shared (gd.stage memoizes), so the patch is a per-match copy (shared/benchExpand.js).
+    const baseStage = this.stageId ? this.gd.stage(this.stageId) : null;
+    // Only the measured layout opens cells: on any other stage (a 版本 the host picked) the option stays on the wire but
+    // changes nothing, and the hand keeps ten slots so no piece can land on a cell the board never draws.
+    this.benchExpand = this.experimental.benchExpand === true && benchExpandable(baseStage);
+    this.stage = this.benchExpand ? stageWithBenchExpand(baseStage) : baseStage;
+    this.factions = setup.factions;
+    this.bossId = setup.bossId;
+    this.hiddenBossId = setup.hiddenBossId;
+
     /** @type {Map<string, PlayerState>} */
     this.players = new Map();
     const seen = new Set(), seatIndexes = new Set();
@@ -553,13 +569,6 @@ export class Match {
       }
     }
 
-    // per-match setup (DESIGN §6.5)
-    const setup = setupMatchWaves(this.gd, this.rngSetup, { excludeStages: this.experimental.bannedStages ?? [] });
-    this.stageId = setup.stageId;
-    this.stage = this.stageId ? this.gd.stage(this.stageId) : null;
-    this.factions = setup.factions;
-    this.bossId = setup.bossId;
-    this.hiddenBossId = setup.hiddenBossId;
     const bans = drawDisabledBonds(this.gd, this.rngSetup);
     this.disabledBonds = bans.drawn;
     this.staticInactiveBonds = bans.staticOff;

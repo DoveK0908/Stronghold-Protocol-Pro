@@ -45,6 +45,8 @@ import { copyText } from './clipboard.js';
 import { ScreenFitSection } from './screenFit.js';
 import { OwnerKeySection } from './ownerName.js';
 import { AssetSection } from './assetSection.js';
+// 开房默认 (ui/roomDefaults.js): the personal default behind every 实验性选项 switch
+import { RoomDefaultsSection } from './roomDefaultsSection.js';
 import { catalog, loadCatalog, cosmeticPlugins, installedCount, isPersonalCosmetic, personal, personalApplied, personalSet, pluginName, setPersonalPlugin } from '../content.js';
 import { resolveThemeVars, themeVarsOf } from '../../../shared/plugins/theme.js';
 import { setUiPlugin, uiPluginEntries, uiPlugins } from './uiPlugins.js';
@@ -563,6 +565,7 @@ export function SettingsModal({ open, onClose }) {
       <${HotkeySection} keys=${s.keys} touchUi=${touchUi} />
       <${ScreenFitSection} />
       <${CosmeticSection} />
+      <${RoomDefaultsSection} />
       <${UiPluginSection} />
       <${StorageSection} />
       <${DiagSection} />

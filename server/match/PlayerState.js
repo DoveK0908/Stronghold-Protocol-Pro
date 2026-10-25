@@ -119,11 +119,11 @@
 //   views.js      pieceView, effectsView, m.private (privateView)
 //   diy.js        自选编队: the picks (setDiy), the player's data view, the DIY stock (initDiyStock, poolOf), the shop's
 //                 DIY draws (diyRollEntries) and the reward / grant draws (diyStockEntries), the pick of a piece (diyPickOf)
-//   common.js     HAND_SIZE, TEMP_SIZE, MAX_OFFER_SLOTS, OK, fail
+//   common.js     TEMP_SIZE, handSizeOf, MAX_OFFER_SLOTS, OK, fail
 
 import { FIELD } from './board.js';
 import { computeBonds } from './bondsMeta.js';
-import { HAND_SIZE, TEMP_SIZE } from './player/common.js';
+import { TEMP_SIZE, handSizeOf } from './player/common.js';
 import { PlayerBasics } from './player/basics.js';
 import { PlayerPieces } from './player/pieces.js';
 import { PlayerAcquire } from './player/acquire.js';
@@ -218,8 +218,10 @@ export class PlayerState {
     this.shop = { level: 1, upgradePrice: this.gd.upgradeBase(1) ?? 0, slots: [], frozen: false, freeRefreshes: 0 };
     /** reward offers queue (merge rewards, special refreshes): { tier, source, label, slots: [{ kind, id, price, sold }] } */
     this.offers = [];
+    /** 整备区 (hand) capacity: 10 official slots, 13 when the room turned 整备区扩容 on (experimental `benchExpand`) */
+    this.handSize = handSizeOf(m);
     /** @type {Array<any>} */
-    this.hand = new Array(HAND_SIZE).fill(null);
+    this.hand = new Array(this.handSize).fill(null);
     /** @type {Array<any>} */
     this.temp = new Array(TEMP_SIZE).fill(null);
     /** preps of this player that ended so far (endPrep) = index of the current (or next) prep */

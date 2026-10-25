@@ -4,7 +4,7 @@
 // coming enemies; in a boss round's prep on the player's half of the boss field).
 // Installed on Match.prototype by server/match/Match.js (a method container: never instantiated; `this` is the match).
 
-import { PHASE, GEO } from '../../../shared/constants.js';
+import { PHASE, GEO, handSlot } from '../../../shared/constants.js';
 import { REVIVAL_COST, REVIVAL_MIN_DONOR_LP } from './common.js';
 import { TEST_PUBLIC_LOG } from '../../../shared/testMode.js';
 import { boardOrder, pieceDir } from '../board.js';
@@ -469,7 +469,8 @@ export class MatchViews {
       });
     };
     for (let i = 0; i < ps.hand.length; i++) {
-      if (ps.hand[i]) benchUnit(ps.hand[i], i, GEO.HAND_ROW, 'hand');
+      // 整备区扩容: slots 10..12 sit on row 8 (shared/constants.js handSlot), the official ten on row 7 col = idx
+      if (ps.hand[i]) { const slot = handSlot(i); benchUnit(ps.hand[i], slot.col, slot.row, 'hand'); }
     }
     for (let i = 0; i < Math.min(ps.temp.length, GEO.TEMP_SIZE); i++) {
       if (ps.temp[i]) benchUnit(ps.temp[i], GEO.TEMP_C0 + i, GEO.TEMP_ROW, 'temp');

@@ -71,6 +71,7 @@ export function mergeTarget(priv, chessId, getChess = () => null) {
 /** Whether every hand slot is taken (the server refuses every purchase / reward pick then: HAND_FULL, GitHub #82). */
 export function handFull(priv) {
   const hand = Array.isArray(priv?.hand) ? priv.hand : [];
+  // 整备区扩容: the server's array is the capacity (10, or HAND_MAX when the room asked for the extra row-8 slots)
   return hand.length >= GEO.HAND_SIZE && hand.every((p) => p != null);
 }
 

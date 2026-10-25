@@ -35,6 +35,7 @@ export function experimentalSummary(input) {
   if (options.luckConsole) rules = `${rules} · ${t('测试插件')}`;
   if (options.bossHitSoftCap === true) rules = `${rules} · ${t('限伤改为封顶')}`;
   if (options.prepUnlimited === true) rules = `${rules} · ${t('无限休整期')}`;
+  if (options.benchExpand === true) rules = `${rules} · ${t('整备区扩容')}`;
   if (Array.isArray(options.bannedStages) && options.bannedStages.length) rules = `${rules} · ${t('禁用战场 {n} 张', { n: options.bannedStages.length })}`;
   return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
 }
@@ -114,6 +115,11 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <span><strong>${t('无限休整期')}</strong><small>${t('休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。')}</small></span>
         <input id="experimental-prep-unlimited" type="checkbox" role="switch" checked=${options.prepUnlimited === true}
           disabled=${!editable || busy} onChange=${e => change('prepUnlimited', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-bench-expand">
+        <span><strong>${t('整备区扩容')}</strong><small>${t('待销毁区左边那三格空位变成整备区：整备区从 10 格变 13 格，多拿三个单位。')}</small></span>
+        <input id="experimental-bench-expand" type="checkbox" role="switch" checked=${options.benchExpand === true}
+          disabled=${!editable || busy} onChange=${e => change('benchExpand', e.currentTarget.checked)} />
       </label>` : null}
       ${source !== 'matchmaking' && choices.length > 1 ? html`<div class="experimental-stages">
         <div class="experimental-stages__head">

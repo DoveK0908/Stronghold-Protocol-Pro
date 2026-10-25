@@ -1,7 +1,7 @@
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
-import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, EMOTES, GEO } from './constants.js';
+import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, EMOTES, GEO, HAND_MAX } from './constants.js';
 import { MAX_PLAYER_CAPACITY, MAX_DRAFT_CARDS } from './playerCapacity.js';
 import { isExperimental } from './experimental.js';
 
@@ -536,7 +536,10 @@ const isCardAvatarImg = (v) => v === '' || (typeof v === 'string' && /^[0-9a-f]{
 const target = (v) => {
   if (!v || typeof v !== 'object') return false;
   if (v.area === 'board') return isInt(v.row, 0, GEO.ROWS - 1) && isInt(v.col, 0, GEO.COLS - 1);
-  if (v.area === 'hand') return isInt(v.idx, 0, GEO.HAND_SIZE - 1);
+  // hand slots: the official ten (row 7) plus the 整备区扩容 three (idx 10..12, row 8 cols 1..3). A match whose room never
+  // turned the option on keeps a ten-slot hand and rejects idx >= 10 on its own (PlayerState.hand.length), so the wire
+  // bound only has to know the widest bench.
+  if (v.area === 'hand') return isInt(v.idx, 0, HAND_MAX - 1);
   return false;
 };
 

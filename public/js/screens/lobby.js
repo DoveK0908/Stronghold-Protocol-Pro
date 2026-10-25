@@ -66,6 +66,8 @@ import { QueueFlow, queueActive } from '../ui/matchmaking.js';
 import { queueCancellation } from '../queueCancellation.js';
 import { TestMark } from '../ui/testConsole.js';
 import { t, tc, N_ } from '../../../shared/i18n.js';
+// 开房默认 (ui/roomDefaults.js): the personal default behind every 实验性选项 switch
+import { roomDefaultsExperimental, roomDefaultsStore } from '../ui/roomDefaults.js';
 
 /** Official mode texts (activity_table act2autochess.modeDataDict), fallback when config.json is absent. */
 export const MODE_TEXT = {
@@ -966,6 +968,8 @@ export function LobbyScreen() {
   const create = (mode) => run('create', () => net.request('room.create', {
     mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
     ...(mode === 'solo' && soloFree && soloTimed === true ? { soloUnlimited: true } : {}),
+    // the player's 开房默认 (设置 → 开房默认): only when one is on, so an ordinary room still sends no rules
+    ...(roomDefaultsExperimental(roomDefaultsStore.get()) ? { experimental: roomDefaultsExperimental(roomDefaultsStore.get()) } : {}),
   }));
   const queueMatch = () => run('queue', () => net.request('queue.join', { difficulty }));
   // an offer while the hub shows: 选择模拟协议 comes up with 确认入场 (the 30-second window must not go unseen)

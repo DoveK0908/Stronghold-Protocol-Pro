@@ -138,7 +138,7 @@
 // working. createFieldView stays here: it is one closure over the view's own state.
 
 import { attackRateEvents } from './attackRate.js';
-import { GEO, ANIM } from '../../../shared/constants.js';
+import { GEO, ANIM, HAND_MAX, handSlot } from '../../../shared/constants.js';
 import { fxForm } from '../../../shared/protocol.js';
 import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } from './projection.js';
 import { SnapshotBuffer, frameTime } from './interp.js';
@@ -337,6 +337,7 @@ export async function createFieldView(host, options = {}) {
   const meleePending = new Map(); // target id → { src, t }
   const consumedIds = new Set();  // battle ids used up by their own effect (fx `consumed`): no death particles
   let canPlaceFn = null;
+  let prepHandSize = GEO.HAND_SIZE;   // 整备区扩容: the bench capacity of the prep state last handed in (10 or HAND_MAX)
   let editable = false;
   let dragState = null;       // { uid, key, view, from, home: {x,y,z} }
   const pending = new Map();  // key → { t, home } dropped pieces awaiting the server
@@ -853,6 +854,8 @@ export async function createFieldView(host, options = {}) {
     const o = options && typeof options === 'object' ? options : {};
     if (mode !== 'prep') enterPrepMode();
     lastPrep = { ps, o };
+    // 整备区扩容: the private state's hand array carries the match's bench capacity (10 official, HAND_MAX with the option)
+    prepHandSize = Array.isArray(ps?.hand) ? ps.hand.length : GEO.HAND_SIZE;
     editable = !!o.editable;
     canPlaceFn = typeof o.canPlace === 'function' ? o.canPlace : null;
     drag.setCanPlace(canPlaceFn ? adaptCanPlace(canPlaceFn) : null);
@@ -1246,6 +1249,8 @@ export async function createFieldView(host, options = {}) {
   const drag = createDragController({
     hitPiece: (x, y) => pieceAt(x, y),
     pickTile: (x, y) => pickBoardTile(x, y),
+    // 整备区扩容: the prep private state's hand array is the match's bench capacity (10, or HAND_MAX with the option)
+    handSize: () => (Number.isInteger(prepHandSize) ? prepHandSize : GEO.HAND_SIZE),
     isOverCanvas: (cx, cy) => {
       try { const el = document.elementFromPoint(cx, cy); return !el || el === canvas; } catch { return true; }
     },
@@ -1286,7 +1291,7 @@ export async function createFieldView(host, options = {}) {
     const key = hlKey(style, group);
     const range = RANGE_GROUPS.has(key) || style === 'range';
     let t = tilesToDisp(IDENTITY, list);
-    if (range) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.TEMP_ROW);
+    if (range) t = t.filter(([r]) => r !== GEO.HAND_ROW && r !== GEO.HAND_EXTRA_ROW && r !== GEO.TEMP_ROW);
     if (mode === 'prep' && prepXf !== IDENTITY) t = tilesToDisp(prepXf, t);
     tiles.setHighlights(t, style, key, { stripes: range && key !== 'rangeStand' && !board3d });
   }
@@ -1304,8 +1309,10 @@ export async function createFieldView(host, options = {}) {
     for (let r = F.r0; r <= F.r1; r++) for (let c = F.c0; c <= F.c1; c++) {
       try { if (fn(piece, r, c, { area: 'board', row: r, col: c })) out.push([r, c]); } catch { /* illegal */ }
     }
-    for (let i = 0; i < GEO.HAND_SIZE; i++) {
-      try { if (fn(piece, GEO.HAND_ROW, i, { area: 'hand', idx: i })) out.push([GEO.HAND_ROW, i]); } catch { /* illegal */ }
+    // 整备区扩容: the hand may be the official ten slots or HAND_MAX; the legality callback rejects what this match lacks
+    for (let i = 0; i < HAND_MAX; i++) {
+      const slot = handSlot(i);
+      try { if (fn(piece, slot.row, slot.col, { area: 'hand', idx: i })) out.push([slot.row, slot.col]); } catch { /* illegal */ }
     }
     return out;
   }
@@ -1347,9 +1354,8 @@ export async function createFieldView(host, options = {}) {
     }
     // the drop target (p.target, highlighted) is the tile under the pointer
     if (p.target && p.target.area !== 'temp') {
-      const r = p.target.area === 'board' ? p.target.row : GEO.HAND_ROW;
-      const c = p.target.area === 'board' ? p.target.col : p.target.idx;
-      drawHighlight([[r, c]], p.legal ? 'target' : 'illegal', 'dragTarget');
+      const slot = p.target.area === 'board' ? { row: p.target.row, col: p.target.col } : handSlot(p.target.idx);
+      drawHighlight([[slot.row, slot.col]], p.legal ? 'target' : 'illegal', 'dragTarget');
     } else clearHl('dragTarget');
   }
 
@@ -1359,7 +1365,8 @@ export async function createFieldView(host, options = {}) {
     v._follow = null;
     const t = p.target;
     if (t && (t.area === 'board' || t.area === 'hand')) {
-      const row = t.area === 'board' ? t.row : GEO.HAND_ROW, col = t.area === 'board' ? t.col : t.idx;
+      const to = t.area === 'board' ? { row: t.row, col: t.col } : handSlot(t.idx);
+      const row = to.row, col = to.col;
       const w = boardWorld(row, col, t.area === 'hand');
       v._tween = { fx: v.x, fy: v.y, fz: v.z, tx: w.x, ty: w.y, tz: w.z, t: 0 };
       pending.set(dragState.key, { t: performance.now(), view: v, board: t.area === 'board' ? { row, col } : null });

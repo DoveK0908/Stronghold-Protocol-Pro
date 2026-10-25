@@ -75,8 +75,33 @@ export const GEO = Object.freeze({
   BOSS_RECT: { r0: 0, r1: 5, c0: 0, c1: 20 },
   HAND_ROW: 7, HAND_SIZE: 10,                      // hand slot idx = col 0..9
   TEMP_ROW: 8, TEMP_C0: 4, TEMP_SIZE: 5,           // temp slot idx 0..4 = cols 4..8
+  // 整备区扩容 (experimental `benchExpand`): three extra hand slots on row 8, the dead `#` cells left of the temp row
+  // (`####AAAAA##I#########` — cols 0..3 are ground-forbidden FLY-only cells and no enemy route crosses row 8). Slot
+  // idx 10..12 = (8,1)..(8,3); the room option decides whether a match's hand is 10 or HAND_MAX long.
+  HAND_EXTRA_ROW: 8, HAND_EXTRA_C0: 1, HAND_EXTRA: 3,
   PARTNER_COL_OFFSET: 8,
 });
+
+/** A match's hand capacity: the ten official slots, plus three when the room turned 整备区扩容 on. */
+export const HAND_MAX = GEO.HAND_SIZE + GEO.HAND_EXTRA;
+
+/** Hand slot idx → the grid tile it sits on (row 7 col idx, or row 8 cols 1..3 for the extra slots). */
+export function handSlot(idx) {
+  return idx < GEO.HAND_SIZE
+    ? { row: GEO.HAND_ROW, col: idx }
+    : { row: GEO.HAND_EXTRA_ROW, col: GEO.HAND_EXTRA_C0 + idx - GEO.HAND_SIZE };
+}
+
+/** Grid tile → hand slot idx, or −1 when the tile is not a hand slot of a `size`-slot hand (default: the official ten). */
+export function handIndex(row, col, size = GEO.HAND_SIZE) {
+  if (row === GEO.HAND_ROW && col >= 0 && col < GEO.HAND_SIZE) return col;
+  const extra = Math.min(size, HAND_MAX) - GEO.HAND_SIZE;
+  if (extra > 0 && row === GEO.HAND_EXTRA_ROW
+    && col >= GEO.HAND_EXTRA_C0 && col < GEO.HAND_EXTRA_C0 + extra) {
+    return GEO.HAND_SIZE + col - GEO.HAND_EXTRA_C0;
+  }
+  return -1;
+}
 
 export const AREA = Object.freeze({ BOARD: 'board', HAND: 'hand', TEMP: 'temp', OUTSIDE: 'outside' });
 

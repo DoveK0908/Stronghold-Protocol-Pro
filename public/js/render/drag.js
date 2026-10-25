@@ -25,12 +25,13 @@
 //   pieceDrop      { uid, piece, from, target }
 //   pieceDragEnd   { uid, piece, dropped, cancelled }
 
-import { GEO } from '../../../shared/constants.js';
+import { GEO, HAND_MAX, handSlot, handIndex } from '../../../shared/constants.js';
 
 /** Where a piece currently sits, as a tile. `piece.area` 'board' uses row/col; 'hand'/'temp' use idx. */
 export function pieceTile(piece) {
   if (!piece || typeof piece !== 'object') return null;
-  if (piece.area === 'hand' && Number.isInteger(piece.idx)) return { row: GEO.HAND_ROW, col: piece.idx };
+  // 整备区扩容: hand slots 10..12 sit on row 8 cols 1..3 (shared/constants.js handSlot)
+  if (piece.area === 'hand' && Number.isInteger(piece.idx)) return handSlot(piece.idx);
   if (piece.area === 'temp' && Number.isInteger(piece.idx)) return { row: GEO.TEMP_ROW, col: GEO.TEMP_C0 + piece.idx };
   if (Number.isInteger(piece.row) && Number.isInteger(piece.col)) return { row: piece.row, col: piece.col };
   return null;
@@ -47,12 +48,16 @@ export function pieceSlot(piece) {
 
 /**
  * Classify a grid tile as a potential drop slot.
+ * `size` is the hand capacity to recognise: 10 for an official room, HAND_MAX when 整备区扩容 is on (default). Legality
+ * is decided later (`canPlace` reads the match's own hand length), so recognising the widest bench never accepts a drop
+ * a ten-slot match would refuse.
  * @returns {{area:'board',row,col}|{area:'hand',idx}|{area:'temp',idx}|null}
  */
-export function tileSlot(tile, geo = GEO) {
+export function tileSlot(tile, geo = GEO, size = geo.HAND_SIZE) {
   if (!tile || !Number.isInteger(tile.row) || !Number.isInteger(tile.col)) return null;
   const { row, col } = tile;
-  if (row === geo.HAND_ROW && col >= 0 && col < geo.HAND_SIZE) return { area: 'hand', idx: col };
+  const idx = handIndex(row, col, size);
+  if (idx >= 0) return { area: 'hand', idx };
   if (row === geo.TEMP_ROW && col >= geo.TEMP_C0 && col < geo.TEMP_C0 + geo.TEMP_SIZE) return { area: 'temp', idx: col - geo.TEMP_C0 };
   const F = geo.FIELD;
   if (row >= F.r0 && row <= F.r1 && col >= F.c0 && col <= F.c1) return { area: 'board', row, col };
@@ -73,7 +78,7 @@ export function resolveDrop(p) {
   if (!overCanvas || !tile) {
     return { kind: 'drop', target: { area: 'outside', clientX: Number(clientX) || 0, clientY: Number(clientY) || 0 } };
   }
-  const slot = tileSlot(tile, p.geo || GEO);
+  const slot = tileSlot(tile, p.geo || GEO, Number.isInteger(p.handSize) ? p.handSize : undefined);
   if (!slot) return { kind: 'cancel', reason: 'notTarget' };
   if (slot.area === 'temp') return { kind: 'cancel', reason: 'temp' };
   if (sameSlot(slot, from) && slot.area !== 'board') return { kind: 'cancel', reason: 'same' };
@@ -81,13 +86,12 @@ export function resolveDrop(p) {
   return { kind: 'drop', target: slot };
 }
 
-/** Legality via the UI callback (board → (piece,row,col); hand → (piece, HAND_ROW, idx)). Throwing ⇒ illegal. */
+/** Legality via the UI callback (board → (piece,row,col); hand → (piece, HAND_ROW, idx) / the extra row-8 slots). Throwing ⇒ illegal. */
 export function isLegal(canPlace, piece, slot) {
   if (!slot || slot.area === 'temp' || slot.area === 'outside') return false;
   if (typeof canPlace !== 'function') return true;
-  const row = slot.area === 'board' ? slot.row : GEO.HAND_ROW;
-  const col = slot.area === 'board' ? slot.col : slot.idx;
-  try { return canPlace(piece, row, col, slot) !== false; } catch { return false; }
+  const tile = slot.area === 'board' ? { row: slot.row, col: slot.col } : handSlot(slot.idx);
+  try { return canPlace(piece, tile.row, tile.col, slot) !== false; } catch { return false; }
 }
 
 const DEFAULTS = { threshold: 6, touchThreshold: 10, longPressMs: 480 };
@@ -120,8 +124,17 @@ export function createDragController(hooks) {
   const pieceAt = (x, y) => { try { return h.hitPiece(x, y); } catch { return null; } };
   const overCanvas = (cx, cy) => { try { return h.isOverCanvas ? h.isOverCanvas(cx, cy) !== false : true; } catch { return true; } };
 
+  // 整备区扩容: the host knows the match's hand capacity (the private state's hand array length); official ten otherwise
+  const handSize = () => {
+    try {
+      const n = typeof h.handSize === 'function' ? h.handSize() : h.handSize;
+      return Number.isInteger(n) && n > GEO.HAND_SIZE ? n : GEO.HAND_SIZE;
+    } catch { return GEO.HAND_SIZE; }
+  };
+  const slotAt = (tile) => (tile ? tileSlot(tile, GEO, handSize()) : null);
+
   function setHoverTile(tile) {
-    const slot = tile ? tileSlot(tile) : null;
+    const slot = slotAt(tile);
     const key = tile ? `${tile.row},${tile.col}` : '';
     if (key === hoverTileKey) return;
     hoverTileKey = key;
@@ -149,7 +162,7 @@ export function createDragController(hooks) {
     st.last = e;
     const tile = tileAt(e.x, e.y);
     const over = overCanvas(e.clientX, e.clientY);
-    const slot = over && tile ? tileSlot(tile) : null;
+    const slot = over && tile ? slotAt(tile) : null;
     const legal = !!slot && slot.area !== 'temp' && (slot.area === 'board' || !sameSlot(slot, st.from)) && isLegal(canPlace, st.piece, slot);
     setHoverTile(over ? tile : null);
     emit('pieceDragMove', { uid: st.piece.uid, piece: st.piece, x: e.x, y: e.y, clientX: e.clientX, clientY: e.clientY, pointerType: st.pointerType, target: slot, legal });
@@ -162,7 +175,7 @@ export function createDragController(hooks) {
     let dropped = false;
     if (!cancelled) {
       const tile = tileAt(e.x, e.y);
-      const d = resolveDrop({ piece: s.piece, from: s.from, tile, overCanvas: overCanvas(e.clientX, e.clientY), clientX: e.clientX, clientY: e.clientY, canPlace });
+      const d = resolveDrop({ piece: s.piece, from: s.from, tile, overCanvas: overCanvas(e.clientX, e.clientY), clientX: e.clientX, clientY: e.clientY, canPlace, handSize: handSize() });
       if (d.kind === 'drop') {
         dropped = true;
         emit('pieceDrop', { uid: s.piece.uid, piece: s.piece, from: s.from, target: d.target });

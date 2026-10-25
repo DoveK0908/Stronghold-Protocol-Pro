@@ -20,9 +20,20 @@
   二倍速投票移到「准备就绪」左侧同一行。
 - **商店**：保持官方版式，另带本树的「剩余 N 张」与皮肤立绘（`shopBar.js` + `game-shop.css` 相对官方仅 +12 行）。
 
+### 实验性选项
+
+- **整备区扩容**（维护者 2026-10-25 提出）：待销毁区左边那三格（第 8 行 1–3 列，原本只能飞行通过的死格）作为实验性
+  选项打开，整备区从 **10 格变 13 格**。槽位几何进 `shared/constants.js` 的 `HAND_MAX` / `handSlot` / `handIndex`，
+  容量由 `PlayerState.handSize` 按本局决定；服务端（`server/match/Match.js`）与浏览器（`public/js/screens/game.js`）
+  各自对同一份 stage 打运行时补丁（`shared/benchExpand.js`），两边画出来的地块一致。只在本树实测过的 11 张正式
+  战场上生效；两张 `escaped` 教学图没有那些空位，保持 10 格并提示一次。
+- **开房默认**：设置 → 开房默认，给每个实验性选项一个个人开关（队友复活 / 禁用共享卡池 / Luck 测试插件 /
+  限伤改为封顶 / 无限休整期 / 整备区扩容），自己开的房间按它预置规则。存本机 `sp.pref.roomDefaults`；全关时
+  `room.create` 不带任何规则（标准房间的协议形状不变）；房间内仍可随时改，别人开的房间不受影响。
+
 ### 其它
 
-- **日/韩/繁中翻译**：三包从 81.1% 补到 **95.9%**（3099/3230）；剩下 131 条是 `shared/skin-catalogue.js` 的时装与
+- **日/韩/繁中翻译**：三包从 81.1% 补到 **95.6%**（3099/3239）；剩下 140 条是 `shared/skin-catalogue.js` 的时装与
   品牌专名，官方包本身没有译名，按 `_meta.fallback = ['en']` 保留英文。
 - **测试基础设施**：新增 `test/e2e/chrome.mjs`，90 个测试文件的硬编码浏览器路径改为跨平台解析
   （`CHROME_PATH` → macOS/Windows/Linux 的 Chrome/Chromium/Edge）；`test/cluster-config.test.js` 在 Windows 上跳过

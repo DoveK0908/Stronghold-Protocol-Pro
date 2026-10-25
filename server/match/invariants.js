@@ -24,7 +24,7 @@
 //            with one to three different cards
 //   match    phase known; teamLp / boss pool within range; combat fields match the alive players
 
-import { PHASE, BOND_LAYER_CAP } from '../../shared/constants.js';
+import { PHASE, BOND_LAYER_CAP, GEO } from '../../shared/constants.js';
 import { morphSlotPolicy, ruleOption } from '../../shared/plugins/rules.js';
 import { FIELD, canPlace, placeClass, positionClass, parseKey } from './board.js';
 import { computeBonds } from './bondsMeta.js';
@@ -65,7 +65,9 @@ export function collectViolations(m, { limit = 25 } = {}) {
     if (!Number.isInteger(ps.pendingFunds) || ps.pendingFunds < 0) fail(`${id}: pendingFunds ${ps.pendingFunds}`);
     if (!Number.isFinite(ps.lp)) fail(`${id}: lp ${ps.lp}`);
     if (ps.alive && m.phase !== PHASE.SETTLE && ps.lp <= 0 && m.teamLp == null && m.round > 0 && ps.bandId) fail(`${id}: alive with lp ${ps.lp}`);
-    if (ps.hand.length !== gd.benchSize) fail(`${id}: hand has ${ps.hand.length} slots`);
+    // 整备区扩容 (experimental `benchExpand`): the match's hand is gd.benchSize ten official slots, plus the option's
+    // three extra row-8 slots — never a different arbitrary size.
+    if (ps.hand.length !== gd.benchSize && ps.hand.length !== gd.benchSize + GEO.HAND_EXTRA) fail(`${id}: hand has ${ps.hand.length} slots`);
     if (ps.temp.length < gd.tempSize) fail(`${id}: temp has fewer than ${gd.tempSize} visible slots`);
     if (ps.temp.length > gd.tempSize && ps.temp.some((x) => x == null)) fail(`${id}: overflow queue has an unfilled slot`);
     // 临时整备区 = overflow only (PRTS 卫戍协议/帮助 §手牌区 "常规手牌区出现空位时自动移入", GitHub #82)

@@ -80,6 +80,7 @@ import { AiTakeoverPanel } from '../ui/aiTakeover.js';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { PHASE, GEO } from '../../../shared/constants.js';
+import { benchExpandable, benchExpanded, stageWithBenchExpand } from '../../../shared/benchExpand.js';
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { html, Spinner, PhaseBanner, ResultDialog, Icon, Button, confirmDialog, closeAllDialogs, useTicker } from '../ui/components.js';
 import { useGameData, GIcon } from '../ui/gameComponents.js';
@@ -488,7 +489,19 @@ function MatchScreen() {
   togglePenRef.current = togglePen;
 
   // the stage as the own board looks: terrain 机变 cards open / reclassify tiles and remove crates (stageOverrides)
-  const baseStage = gd.ready ? gd.stage(pub?.stageId) : null;
+  // 整备区扩容 (experimental `benchExpand`): the three dead cells left of the 临时整备区 open as bench slots. The server
+  // patches its own copy of the same stage (server/match/Match.js), so both sides draw the same tiles.
+  const rawStage = gd.ready ? gd.stage(pub?.stageId) : null;
+  const baseStage = benchExpanded(pub) ? stageWithBenchExpand(rawStage) : rawStage;
+  // 整备区扩容 only opens cells on the layout it was measured on: another battlefield is played untouched, and the host is
+  // told once rather than left wondering why the bench still holds ten (the server keeps the hand at ten there too).
+  const benchUnsupported = benchExpanded(pub) && !!rawStage && !benchExpandable(rawStage);
+  const benchSaidRef = useRef(false);
+  useEffect(() => {
+    if (!benchUnsupported || benchSaidRef.current) return;
+    benchSaidRef.current = true;
+    toast(t('本局战场没有可扩容的空位，整备区仍是 10 格'), 'info', { ttl: 5000 });
+  }, [benchUnsupported]);
   const overrides = stageOverrides(priv, gd.effect);
   const overridesKey = JSON.stringify(overrides);
   const ownStage = useMemo(() => effectiveStage(baseStage, overrides), [baseStage, overridesKey]);

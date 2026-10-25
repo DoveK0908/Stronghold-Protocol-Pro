@@ -1,5 +1,4 @@
 {
-  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "_meta": {
     "type": "lang",
     "lang": "en",
@@ -15,6 +14,7 @@
     "complete": true
   },
   "_about": "English UI strings: Chinese msgid → English (shared/i18n.js t(); docs/I18N.md). Placeholders {name} and {n|one|other} as in the msgid; a 'context::msgid' key is a tc() variant. Seeded from GitHub PR #70 (branch en-translation) by @YuriRestia, reused with credit (NOTICE.md). Game texts are not here: data/i18n/en.json (tools/build-i18n.mjs).",
+  "离线导入（不下载官方数据表）": "Import offline (do not download official data tables)",
   "你已在其他同盟中，请先离开当前同盟": "You are already in another Alliance. Leave it first.",
   "你已不在该同盟中": "You are no longer in this Alliance",
   "创建者已离开，同盟已解散": "The host left. The Alliance has been disbanded.",
@@ -3514,5 +3514,15 @@
   "允许观战者接替 AI": "Allow spectators to take over AI seats",
   "默认关闭。开启后，观战者可在休整期经同房间真人投票接替 AI；继承记录不计个人统计或奖励。": "Off by default. When enabled, spectators can take over AI seats during preparation with a room vote; inherited records do not count toward personal stats or rewards.",
   "多人匹配中，请先取消匹配": "Cancel matchmaking first",
-  "开启后，观战者可在休整期经同房间真人投票接替 AI；继承记录不计个人统计或奖励": "Once on, a spectator may take over an AI seat during a break, on a vote of the humans in the room; the inherited record counts toward neither your stats nor your rewards."
+  "开启后，观战者可在休整期经同房间真人投票接替 AI；继承记录不计个人统计或奖励": "Once on, a spectator may take over an AI seat during a break, on a vote of the humans in the room; the inherited record counts toward neither your stats nor your rewards.",
+  "当前设备无法启用 3D / WebGL 渲染，已切换为简化视图（功能不受影响）": "This device cannot run 3D / WebGL rendering, so the simplified view is on (everything still works).",
+  "本局战场没有可扩容的空位，整备区仍是 10 格": "This battlefield has no spare cells to expand: the bench still holds 10.",
+  "整备区扩容": "Bench expansion",
+  "待销毁区左边那三格空位变成整备区：整备区从 10 格变 13 格，多拿三个单位。": "The three empty cells left of the disposal row become bench slots: the bench grows from 10 to 13, three more pieces.",
+  "开房默认": "Room defaults",
+  "你开的房间会带着这些规则开局；房间里的「实验性选项」仍然可以随时改，别人开的房间不受影响。": "Rooms you open start with these rules. Experimental options inside the room still change them, and rooms someone else opens are unaffected.",
+  "这些开关只影响你自己开的房间；都是关闭时按标准房间开局。": "These switches only affect rooms you open yourself. With all of them off, a room starts as the standard one.",
+  "扩展同盟人数与地图禁用属于每一局的单独决定，不在这里预设（可容纳 {n} 人）。": "Expanded alliance size and banned stages are decided per room and are not preset here (up to {n} players).",
+  "开局后允许打开 Luck 测试面板（改资金、回合、地图、盟约层数等）。": "Once the match starts, the Luck test panel can be opened (gold, rounds, map, bond layers and more).",
+  "本会被限伤取消的那一下按 29 万 9999 结算，打首领的大伤害不再白打。": "The hit that the boss-hit limit would cancel settles at 299,999 instead, so a huge hit on a leader is not wasted."
 }

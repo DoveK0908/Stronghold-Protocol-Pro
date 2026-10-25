@@ -849,6 +849,9 @@
 /* 素材存储 (ui/settings.js StorageSection; official 0.3.1): persistent storage + 清理旧版本素材 */
 .set-storage { display: flex; flex-direction: column; gap: .08rem; padding-top: .1rem; border-top: 1px solid var(--line); }
 .set-storage__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .08rem; }
+/* 开房默认 (ui/roomDefaultsSection.js; the owner, 2026-10-25): one switch per 实验性选项, the rows reuse .experimental-option */
+.set-room-defaults { display: flex; flex-direction: column; gap: .08rem; padding-top: .1rem; border-top: 1px solid var(--line); }
+.set-room-defaults .experimental-option { padding: .08rem 0; }
 .set-keys__note { min-height: 1.5em; font-size: calc(.14 * var(--t)); line-height: 1.5; color: var(--mint-400); }
 .set-keys__note.is-warn { color: var(--amber); }
 .set-keys__more > summary { padding: .06rem 0; font-size: calc(.15 * var(--t)); color: var(--mint-400); cursor: pointer; }
