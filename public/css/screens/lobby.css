@@ -2905,9 +2905,10 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 
 .ally-recent:lang(ja) { word-break: auto-phrase; }
 
-/* the top bar's ping pill grows with its text at 大 / 特大, as in the room (§35.18 review: its fixed .32rem cut it) */
-
-.lobby-hub > .topbar .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
+/* The official hub grew the top bar's ping pill to fit 大 / 特大 (§35.18 review). This fork does not: its
+   `.ping` (css/components.css) is already sized by --ui, and growing it here made it taller than the buttons beside
+   it (the owner's report of 2026-10-25: the latency read-out no longer lined up with the rest of the row). The room's
+   own pill still grows — `.rs-clock__ping .ping` below — which is what test/ui/seat-art.test.js records. */
 
 /* the official layers are drawn on black: `screen` keeps only their light. Their place, size and opacity below are
    eyeballed from the event video [ASSUMED: no official layout data] */

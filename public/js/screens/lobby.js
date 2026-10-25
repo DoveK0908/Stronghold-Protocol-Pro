@@ -731,7 +731,7 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
                 placeholder=${short ? t('同盟密钥') : t('输入同盟密钥 / 粘贴邀请链接')} placeholderShort=${t('同盟密钥')} ariaLabel=${t('同盟密钥')}
                 modalFocus=${!!focusKey} />
               <button type="button" class="ally-key__spec join-spectate" disabled=${!codeOk || !online || busy === 'spectate'} onClick=${() => onSpectate()}
-                title=${spectateHint()}><${busy === 'spectate' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="eye" />`}${t('观战')}</button>
+                title=${spectateHint()}>${busy === 'spectate' ? html`<${Spinner} size="sm" />` : html`<${Icon} name="eye" />`}${t('观战')}</button>
             </div>
             <span class="ally-recent join-foot">
               ${recent.length ? html`<span class="t-lo">${t('最近的同盟')}</span>

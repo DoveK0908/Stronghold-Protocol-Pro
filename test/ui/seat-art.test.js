@@ -132,7 +132,12 @@ test('the pick\'s store: a string pref, \'\' for 默认; setCard persists and te
 });
 
 test('room.css: the seat cards and the picker follow 文字大小, no !important / :has()', () => {
-  const block = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+  const whole = readFileSync(path.join(ROOT, 'public/css/screens/room.css'), 'utf8');
+  // The official rules only: the fork's own room look is appended after this marker (the owner's report of
+  // 2026-10-25 — the fork's 名片 picker and seat plates win in the room), and those are its older sizes, not this
+  // contract. The fork's rules carry their own floor convention (css/screens/lobby.css, test/ui/ui-size.test.js).
+  const FORK = '/* ==========================================================================================\n   The fork\'s own room look';
+  const block = whole.slice(0, whole.indexOf(FORK));
   const sizes = [...block.matchAll(/font-size:\s*([^;}]+)[;}]/g)].map((m) => m[1].trim());
   assert.ok(sizes.length >= 30, sizes.join(' | '));
   // (a capped size still follows 文字大小 below the cap — §35.18 review: the room's big button, and on a short screen the

@@ -56,14 +56,13 @@ test('every generated attack/hit reference resolves to a valid pool and its sele
       }
     }
   }
-  // 0.3.1 release fetch-assets: 952 references over 941 pools (+ 琳琅诗怀雅 S3, 刻俄柏, 风丸 attacks, 松果's hit).
-  // Pro content adds 丰川祥子 (char_4182_oblvns): UNIT_SFX_BANKS / SKILL_SFX_BANKS name her talent and per-skill
-  // projectile banks, which the official ON_ABILITY_* convention cannot see — 2 more unit references over 6 pools.
-  // The committed data/assets.json is still the fork's own fetch: official 0.3.3 adds 19 operators and 66 pools to the
-  // four-version art union (987 / 1013), which land only when `node tools/fetch-assets.mjs` runs against a client that
-  // has them (this machine's public/assets lacks their avatar/portrait/spine, so the offline rebuild cannot).
-  assert.equal(refs, 954);
-  assert.equal(Object.keys(pools).length, 947);
+  // The committed data/assets.json is upstream 0.3.3's plan (987 references over 1013 pools) plus this fork's own
+  // content: 丰川祥子 (char_4182_oblvns) and 结城理 (char_4217_makoto) bring their UNIT_SFX_BANKS / SKILL_SFX_BANKS
+  // entries — the official ON_ABILITY_* convention cannot see those banks — and 10 pools the upstream plan does not
+  // name, so 993 references over 1023 pools. 结城理's per-skill banks are absent (the client dump has no
+  // skchr_makoto_1..3 icons; test/assets-diy.test.js records that as a dump miss).
+  assert.equal(refs, 993);
+  assert.equal(Object.keys(pools).length, 1023);
   const p = pools[units.char_4064_mlynar.attackPools[2]];
   assert.equal(p.sounds['player/p_imp/p_imp_loyalsword_h.mp3'].delay, 0.1);
 });
