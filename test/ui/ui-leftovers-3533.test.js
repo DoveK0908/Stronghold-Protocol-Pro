@@ -85,36 +85,32 @@ test('the other event screens at a big 文字大小: 成就统计\'s banner, the
   assert.match(stats, /\.achv__title \{[^}]*grid-template-areas: "mark en" "mark name";/);
   assert.doesNotMatch(stats, /margin: 0 0 0 -\.9rem/, 'the name no longer slides under the decorative ALLIANCE');
   const brief = css('public/css/screens/briefing.css');
-  const briefShort = block(brief, '@media (max-height: 520px) {');
-  for (const r of [/\.stephead__micro \{ display: none; \}/, /\.stephead__guide \.btn__label \{ display: none; \}/]) assert.match(briefShort, r);
-  // the review: the bars grow at every height (1024×600 at 特大 too), the micro gives way at 大 / 特大 up to 640 px
-  assert.match(brief, /\.brief \.brief-h \{[^}]*height: auto; min-height: \.66rem;/);
-  assert.match(block(brief, '@media (max-height: 640px) {'), /:root\[data-text="xl"\] \.stephead__micro \{ display: none; \}/);
-  assert.match(readFileSync(path.join(ROOT, 'public/js/ui/matchEnemies.js'), 'utf8'), /<b>\$\{slashBreaks\(name\)\}<\/b>/);
-  const draft = block(css('public/css/screens/draft.css'), '@media (max-height: 520px) {');
-  assert.match(draft, /\.dband__taken \{ white-space: nowrap;[^}]*font-size: min\(calc\(\.21 \* var\(--t\)\), calc\(12px \+ var\(--t-step\) \/ 2\)\); \}/);
-  assert.match(draft, /\.dband__name \{[^}]*text-wrap: balance;[^}]*-webkit-line-clamp: 2;/);
-  assert.match(draft, /\.draft\.has-status \.stephead__name \{ display: none; \}/);
-  assert.match(draft, /\.draft-skip \{[^}]*white-space: nowrap;/);
-  // the review: Japanese names by the line-breaking rules, Korean names on one line; the header's status wraps beside 2/2
-  assert.match(draft, /\.dband__name:lang\(ja\) \{ line-break: strict; \}/);
-  assert.match(draft, /\.dband__name:lang\(ko\) \{ display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; \}/);
+  // FORK NOTE (2026-10-25 逐屏裁决: 确认本局信息取回 0.3.2-pro.6 的版式): the official 0.3.3 briefing carries its own
+  // section-bar header (grey gradient bar + mask icon) with a short-window block (≤ 520 px hides the micro and the guide
+  // label) and a ≤ 640 px one for 大 / 特大. The fork's briefing keeps the older mint-rule section heads and none of those
+  // media blocks, so those three assertions are dropped here; the fork's own short-screen rules live in draft.css.
+  assert.doesNotMatch(brief, /@media \(max-height: 520px\)/, 'the fork briefing has no short-window block of its own');
+  // FORK NOTE (2026-10-25 逐屏裁决: 确认本局信息取回 pro.6): the fork's MatchEnemies paints the type's name and its
+  // description in the cell (the official PR #643 one kept the description in a Tooltip and split the name with <wbr />)
+  assert.match(readFileSync(path.join(ROOT, 'public/js/ui/matchEnemies.js'), 'utf8'), /brief-faction__text/);
+  // FORK NOTE (2026-10-25 逐屏裁决: 确认本局信息与选择策略都取回 0.3.2-pro.6): the official 0.3.3 sheets carry a
+  // responsive pass (§35.51 / §35.56: short-window blocks at 520 / 640 px, `:root[data-text="lg"|"xl"]` rules that drop the
+  // step name, the grey section bars, the two-line English / Korean step name) that the fork's older draft.css and
+  // briefing.css never had and that this tree does not want to reproduce — the fork's own short-screen handling lives in
+  // its `.dband` / `.stephead` rules. The official assertions for those blocks are dropped; the bits both trees share
+  // (the panels, the loadout deck and the lobby cards below) are still pinned.
   const draftAll = css('public/css/screens/draft.css');
-  assert.match(draftAll, /\.draft \.stephead__right \{ flex: 1 1 0;/);
-  assert.match(draftAll, /\.draft \.dturn__go b \{ white-space: normal; text-wrap: balance;/);
-  assert.match(draftAll, /\.draft \.draft-skip \{ height: auto;/, 'above the base rule (`.draft`)');
-  // §35.56: the step's name gives way by text size (大 / 特大) and on short screens, not by window width; 玩法说明 keeps its box
-  assert.doesNotMatch(draftAll, /@media \(max-width: 1440px\)/);
-  assert.match(draftAll, /:root\[data-text="lg"\] \.draft\.has-status \.stephead__name, :root\[data-text="xl"\] \.draft\.has-status \.stephead__name \{ display: none; \}/);
-  assert.match(block(draftAll, '@media (max-height: 640px) {'), /\.draft\.has-status \.stephead__name \{ display: none; \}/);
-  assert.match(draftAll, /\.draft \.stephead__guide \{ flex: none; \}/);
-  assert.match(brief, /margin: \.1rem \.5rem max\(1\.6rem, calc\(\.76rem \+ \.58 \* var\(--t\)\)\);/);
-  assert.match(briefShort, /\.brief \.stephead__name \{ min-width: 0; white-space: normal; text-wrap: balance;/);
+  assert.doesNotMatch(draftAll, /@media \(max-height: 520px\)/, 'the fork draft has no short-window block of its own');
+  assert.doesNotMatch(draftAll, /@media \(max-width: 1440px\)/, 'nor the old width-based fallback');
   const panels = css('public/css/screens/game-panels.css');
   assert.match(panels, /\.spov \.rt:lang\(ko\), \.spov \.rt-note:lang\(ko\), \.spov \.rt-vup:lang\(ko\) \{ word-break: keep-all; overflow-wrap: break-word; \}/);
   assert.match(block(panels, '@media (max-height: 520px) {\n  .spov__titles'), /\.spov__sub \{ grid-row: 3; grid-column: 1 \/ -1;/);
-  assert.match(readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8'), /held && 'is-held', head && 'has-status'\)/);
-  assert.match(css('public/css/screens/game.css'), /\.gtop__net \.ping \{ height: auto; min-height: \.32rem; padding-top: 1px; padding-bottom: 1px; \}/);
+  // FORK NOTE (2026-10-25 逐屏裁决: 选择策略取回 pro.6): the fork's order row carries its own state classes
+  // (is-cur / is-done / is-self / is-flash / has-nc) instead of the official held / has-status pair.
+  assert.match(readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8'), /class=\$\{cx\('dorder', cur && 'is-cur'/);
+  // FORK NOTE (2026-10-25): the official rule above made the latency cell 1 px taller than its neighbours; the fork's
+  // strip now stretches every cell to the strip's height instead (the same alignment the room's top bar uses)
+  assert.match(css('public/css/screens/game.css'), /\.gtop__net \.ping, \.gtop__net \.specpill \{ height: 100%; min-height: 0; padding-top: 0; padding-bottom: 0; \}/);
   const lo = css('public/css/screens/loadout.css');
   assert.match(lo, /\.lo-top__note \{ margin: 0; max-width: min\(8\.4rem, 100%\);/);
   assert.match(lo, /\.lo-bbar__tiers \{[^}]*padding-top: max\(\.24rem, calc\(17px \* var\(--sp-ui, 1\)\)\); \}/);
@@ -127,7 +123,9 @@ test('the other event screens at a big 文字大小: 成就统计\'s banner, the
 
 test('the draft\'s name cards fall back to the default picture when an outfit\'s fails, as the seat cards do', () => {
   const js = readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8');
-  assert.match(js, /const art = seatArtSrc\(arts, badArt\);/);
+  // FORK NOTE (2026-10-25 逐屏裁决: 选择策略取回 pro.6): the fork's order row paints the doctor's 名片立绘 as a
+  // background layer from seatPortrait(); the official row built an <img> candidate list with seatArtSrc(arts, badArt)
+  assert.match(js, /const artOf = \(pl\) => \(pl\.isBot \? null : seatPortrait\(/);
   // the fork's name cards paint the fallback as a background layer (.dorder__art: background-size: cover;
   // background-position: 50% 12%), the official ones as an <img> (object-fit: cover; object-position: 50% 16%)
   assert.match(css('public/css/screens/draft.css'), /\.dorder__art \{[^}]*(object-fit: cover; object-position: 50% 16%|background-size: cover; background-position: 50% 12%);/);

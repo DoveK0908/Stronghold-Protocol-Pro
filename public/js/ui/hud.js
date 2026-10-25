@@ -43,6 +43,8 @@ import { hotkeyLabelOf } from './settings.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { UnofficialMark, ruleLine } from './pluginTag.js';
 import { TestMark } from './testConsole.js';
+// 维护者 2026-10-25: 二倍速投票 sits in the top-right, left of 准备就绪 (it used to live in the team panel's notice strip).
+import { SpeedAction } from './speedVote.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -538,25 +540,40 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
     <${ServerStatusModal} open=${loadOpen} online=${conn?.status === 'online'} state=${conn?.loadState}
       details=${conn?.loadDetails} clusterLoad=${conn?.clusterLoad} scope="game" onClose=${() => setLoadOpen(false)} />
 
-    <div class="gtop__center brackets">
-      <${Tooltip} text=${btn.left.tip} placement="bottom">
-        <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
-          chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
-      <//>
-      <div class="roundbox">
-        <span class="roundbox__label">${t('回合')}</span>
-        <b class="roundbox__num num">${roundText}</b>
+    <div class="gtop__center">
+      <span class="gtop__frame gtop__frame--l">
+        <${Tooltip} text=${btn.left.tip} placement="bottom">
+          <${CheckBtn} sprite=${btn.left.sprite} cls=${cx('gtop__iconbtn', btn.left.back && 'is-back')} label=${btn.left.label}
+            chev=${btn.left.back ? '◀◀' : null} on=${!!drawer && !pen} onClick=${onLeft} testid="check-player" />
+        <//>
+      </span>
+      <i class="gtop__plus gtop__plus--l" aria-hidden="true"></i>
+      <div class="gtop__band">
+        <${DecoType} k="txt1" text="RHODES ISLAND TERMINAL SERVICE" side="l" />
+        <${DecoType} k="txt2" text="STRONGHOLD PROTOCOL" side="c" />
+        <${DecoType} k="txt3" text="RHODES ISLAND TERMINAL SERVICE" side="r" />
+        <div class="gtop__half gtop__half--l">
+          <div class="roundbox">
+            <span class="roundbox__label">${t('回合')}</span>
+            <b class="roundbox__num num" key=${roundText}>${roundText}</b>
+          </div>
+        </div>
+        <div class=${cx('gtop__cap', fx.kind && `is-fx-${fx.kind}`)} key=${`cap${fx.seq}`}>
+          <${PhaseCapsule} pub=${pub} hud=${hud} miss=${!boss && Number.isFinite(live?.left) ? live.left : null} />
+          ${fx.kind && fx.kind !== 'enter' ? html`<${CapsuleScene} kind=${fx.kind} />` : null}
+        </div>
+        <div class="gtop__half gtop__half--r">
+          <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
+            note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
+        </div>
       </div>
-      <div class=${cx('gtop__cap', fx.kind && `is-fx-${fx.kind}`)} key=${`cap${fx.seq}`}>
-        <${PhaseCapsule} pub=${pub} hud=${hud} miss=${!boss && Number.isFinite(live?.left) ? live.left : null} />
-        ${fx.kind && fx.kind !== 'enter' ? html`<${CapsuleScene} kind=${fx.kind} />` : null}
-      </div>
-      <${LpTower} value=${lp} size="lg" tone=${lowLp ? 'danger' : boss ? 'team' : null} pending=${pending}
-        note=${pending > 0 && live?.unite ? t('联防中') : null} tip=${pendingTip(lp, pending, { unite: !!live?.unite, cap, left: live?.left ?? null })} />
-      <${Tooltip} text=${btn.right.tip} placement="bottom">
-        <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
-          chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
-      <//>
+      <i class="gtop__plus gtop__plus--r" aria-hidden="true"></i>
+      <span class="gtop__frame gtop__frame--r">
+        <${Tooltip} text=${btn.right.tip} placement="bottom">
+          <${CheckBtn} sprite=${btn.right.sprite} cls=${cx('enemybtn', btn.right.grey && 'is-grey')} label=${btn.right.label}
+            chev=${btn.right.grey ? null : '▶▶'} disabled=${btn.right.grey && !pen} onClick=${onRight} testid="check-enemy" />
+        <//>
+      </span>
     </div>
 
     <div class="gtop__right">
@@ -570,10 +587,21 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       </div>
       <${OvertimeWarning} ot=${ot} />
       <${AfkWarning} pub=${pub} priv=${priv} />
-      ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
+      <div class="gtop__go">
+        <${SpeedAction} pub=${pub} myId=${myId} />
+        ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
+      </div>
       <${UniteBudgetNote} pub=${pub} />
     </div>
   </header>`;
+}
+
+/** 顶部中栏的字样贴图 (官方 0.3.3, DESIGN §35.18): hudPanel/frame_deco_txt1|txt2|txt3, 文字副本在贴图未画好时顶上。
+    维护者 2026-10-25: 顶部中栏改回官方版式（frame · band · frame，见下 TopBar 的 .gtop__center）。 */
+function DecoType({ k, text, side }) {
+  return html`<span class=${`gtop__deco gtop__deco--${side}`} aria-hidden="true" data-deco=${k}>
+    <${Sprite} k=${`hudPanel/frame_deco_${k}`} class=${`gtop__decoimg gtop__decoimg--${k}`} fallback=${html`<span class="gtop__decotxt">${text}</span>`} />
+  </span>`;
 }
 
 /** DP counter shown at the right edge during combat. */

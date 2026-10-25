@@ -70,13 +70,9 @@
 .gtop__center { position: relative; display: flex; align-items: center; margin-top: .02rem; }
 /* 界面#12 (maintainer 2026-10-20): 本局信息 and 查看即将迎击的敌方单位 each sit in their own bracket frame,
    回合 / 血量 in their own dark plates — the centre no longer reads as one long undivided band. */
-.gtop__center { gap: .1rem; }
-.gtop__plate { position: relative; display: flex; align-items: center; justify-content: center; height: .64rem;
-  padding: 0 .14rem; background: linear-gradient(180deg, rgba(16, 20, 20, .92), rgba(9, 12, 12, .92));
-  border: 1px solid rgba(200, 206, 208, .28); }
-.gtop__plate--lp { padding: 0 .1rem; }
-.gtop__plate .roundbox__num { min-width: .3rem; padding: 0; background: none; clip-path: none; color: var(--text-hi); font-size: .34rem; }
-.gtop__plate .roundbox { gap: .1rem; }
+/* 维护者 2026-10-25 (逐屏裁决): 顶部中栏改回官方 0.3.3 的 frame · band · frame 版式 (ui/hud.js), 所以把 fork 的
+   「三段各自成深色盘 + 中栏留 .1rem 缝」这套 (界面#12, 2026-10-20) 连同 .gtop__plate 一起撤掉; 旧版式的
+   剩余规则仍收在下面 .gtop__center.brackets 里。 */
 .gtop__frame { position: relative; display: flex; align-items: center; justify-content: center; height: .64rem; padding: 0 .17rem; }
 .gtop__frame::before, .gtop__frame::after { content: ''; position: absolute; top: 0; bottom: 0; width: .12rem; border: 2px solid rgba(200, 206, 208, .42); pointer-events: none; }
 .gtop__frame::before { left: 0; border-right: 0; }
@@ -85,10 +81,6 @@
   background: linear-gradient(#c8cecf, #c8cecf) center / 100% 1px no-repeat, linear-gradient(#c8cecf, #c8cecf) center / 1px 100% no-repeat; }
 .gtop__band { position: relative; display: grid; grid-template-columns: minmax(2.3rem, auto) auto minmax(2.3rem, auto); align-items: center;
   filter: drop-shadow(0 .04rem .1rem rgba(0, 0, 0, .45)); }
-.gm__hud .gtop__band::before, .gm__hud .gtop__band::after { content: 'STRONGHOLD TERMINAL SERVICE'; position: absolute; top: -.16rem; font-family: var(--font-num);
-  font-size: .085rem; font-weight: 700; line-height: 1; letter-spacing: .14em; color: rgba(225, 232, 232, .28); white-space: nowrap; pointer-events: none; }
-.gtop__band::before { left: .24rem; }
-.gtop__band::after { right: .24rem; }
 .gtop__half { position: relative; display: flex; align-items: center; justify-content: center; height: .42rem; padding: 0 .3rem; }
 .gtop__half::before, .gtop__half::after { content: ''; position: absolute; pointer-events: none; }
 .gtop__half::before { inset: 0; background: rgba(176, 184, 186, .45); }
@@ -105,8 +97,14 @@
 .gtop__half .lp--lg { font-size: .32rem; gap: .03rem; }
 .gtop__half .lp--lg:not(.lp--danger):not(.lp--team) .lp__val { color: #eef2f2; }
 .gtop__half .lp--lg .lp__icon { width: .34rem; height: .34rem; }
-/* 顶栏中段对齐官方后不再用 Pro 的八边形胶囊底板：直接露出官方 .capsule（圆角、2px 阶段色边框）。 */
-.gtop__cap { position: relative; display: flex; }
+/* 维护者 2026-10-25 (逐屏裁决: 顶部中栏取官方 0.3.3): the capsule sits in the official octagon plate again — the grey
+   outer frame (padding .08rem .13rem around the .5rem capsule) that makes the 休息一下 capsule the official 205x55 box. */
+.gtop__cap { position: relative; z-index: 2; display: flex; padding: .08rem .13rem; }
+.gtop__cap::before, .gtop__cap::after { content: ''; position: absolute; pointer-events: none;
+  clip-path: polygon(.2rem 0, calc(100% - .2rem) 0, 100% .2rem, 100% calc(100% - .2rem), calc(100% - .2rem) 100%, .2rem 100%, 0 calc(100% - .2rem), 0 .2rem); }
+.gtop__cap::before { inset: 0; background: rgba(176, 184, 186, .5); }
+.gtop__cap::after { inset: 1px; background: rgba(9, 12, 12, .9); }
+.gtop__cap > .capsule { position: relative; z-index: 1; }
 .gtop__cap .capsule { height: .5rem; min-width: 2.2rem; }
 .gtop__cap .capsule__icon { width: .36rem; height: .36rem; }
 .gtop__cap .capsule__label { font-size: .21rem; letter-spacing: .12em; }
@@ -285,10 +283,6 @@
 .capsule--combat { --cap: var(--orange-hi); }
 .capsule--boss { --cap: var(--orange-hi); min-width: 4.2rem; }
 /* ---- phase capsule scenes (官方 0.3.1, hud.js CapsuleScene; 由分批对齐补入) ---- */
-/* phase capsule scenes (ui/hud.js CapsuleScene, capsuleFxKind): the official hudPanel/trans_* sprites at ×1.3 of their
-   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
-   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
-.gtop__cap { position: relative; display: flex; }
 .gtop__cap[class*="is-fx-"] .capsule { overflow: hidden; }
 .capfx {
   position: absolute; inset: 2px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: .1rem;
@@ -1564,9 +1558,17 @@
 
 /* the latency pill and, beside it, the 观战席 capsule (ui/hud.js SpectatorPill: an eye + how many are watching; opens the roster) */
 
-/* the ping pill as tall as its value at a big 文字大小 (§35.51: cut 1 px at 特大 on the phones), as in the room and the hub */
-
-.gtop__net .ping { height: auto; min-height: .32rem; padding-top: 1px; padding-bottom: 1px; }
+/* 局内左上 (维护者 2026-10-25, UI 反馈): 已连接 / 延迟 / 服务 as one strip of the *same* height, the way the room's
+   .rs-top already does it. Only the alignment lives here — the strip's own look (one plate, hairline seams, .32rem) is
+   the fork's .gtop__net rules at the top of this file; the official rule this replaces gave the ping
+   height:auto + min-height .32rem + 1 px padding, so it stood a pixel over its neighbours and the three chips read as
+   three plates instead of one strip. */
+/* 维护者 2026-10-25: the three cells keep the strip's own gap (.04rem, components.css .latency-status) — I had flattened
+   it to 0, which glued 已连接/延迟/服务 into one block and made the in-match strip read differently from the room's. */
+.gtop__net .latency-status { align-items: stretch; flex: none; flex-wrap: nowrap; gap: .048rem; height: 100%; }
+.gtop__net .latency-status > *, .gtop__net .latency-status .tt-anchor { display: inline-flex; align-items: center;
+  height: 100%; min-height: 0; padding-block: 0; box-sizing: border-box; }
+.gtop__net .ping, .gtop__net .specpill { height: 100%; min-height: 0; padding-top: 0; padding-bottom: 0; }
 
 /* the roster inside its modal */
 
@@ -1985,3 +1987,9 @@
 .ai-vote { display:flex; flex-wrap:wrap; gap:.12rem; align-items:center; margin:.15rem 0; padding:.1rem; border:1px solid #426055; }
 
 .ai-participation-entry { flex:none; }
+
+/* 二倍速投票 (维护者 2026-10-25): 就在 准备就绪 的左边一行，不是上面一行 —— .gtop__right 是纵向 flex，所以给这两个
+   包一层横向的 .gtop__go；票型/取消仍居同一行。 */
+.gtop__go { display: flex; align-items: center; justify-content: flex-end; gap: .1rem; }
+.gtop__go .team-speed { margin-top: 0; max-width: none; flex-wrap: nowrap; }
+.gtop__go .team-speed .btn { min-height: .32rem; }

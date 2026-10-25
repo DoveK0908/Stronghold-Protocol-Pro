@@ -20,21 +20,24 @@ test('the draft order row always draws its index, so the last column holds the f
   assert.match(rule, /grid-template-columns: auto auto minmax\(0, 1fr\) auto/, 'four columns: index, face, text, box');
 });
 
-test('the in-match top bar centre is the official undivided band (one bracket, white round plate, official capsule)', () => {
+test('the in-match top bar centre is the official band, frames and all (逐屏裁决 2026-10-25: 战斗中顶部中间取官方 0.3.3)', () => {
   const src = read('public/js/ui/hud.js');
-  const center = src.slice(src.indexOf('<div class="gtop__center brackets">'), src.indexOf('<div class="gtop__right">'));
-  assert.ok(center.length > 0, 'the centre is one .gtop__center.brackets band');
-  assert.doesNotMatch(center, /class="gtop__frame"/, 'no per-button bracket frames');
-  assert.doesNotMatch(center, /class="gtop__plate/, 'no per-item plates');
-  assert.ok(center.indexOf('重(roundbox') < center.indexOf('gtop__cap'), 'round before the capsule');
+  const center = src.slice(src.indexOf('<div class="gtop__center">'), src.indexOf('<div class="gtop__right">'));
+  assert.ok(center.length > 0, 'the centre is the official band');
+  assert.doesNotMatch(center, /class="gtop__center brackets"/, 'the fork bracket band is gone from the centre');
+  assert.match(center, /class="gtop__frame gtop__frame--l"/, 'the left frame holds the round 本局信息 button');
+  assert.match(center, /class="gtop__frame gtop__frame--r"/, 'the right frame holds the enemy-preview button');
+  assert.match(center, /class="gtop__band"/, 'inside them, the official band');
+  assert.match(center, /class="gtop__plus--l"|class="gtop__plus gtop__plus--l"/, 'the band hangs off two plus joints');
+  assert.match(center, /<\$\{DecoType\}/, 'the deco text is the official sprite type');
+  assert.ok(center.indexOf('<${RoundBox}') < center.indexOf('gtop__cap'), 'round box before the capsule');
   assert.ok(center.indexOf('gtop__cap') < center.indexOf('<${LpTower}'), 'LP after the capsule');
+  assert.match(read('public/js/ui/hud.js'), /function DecoType\(/, 'DecoType is defined beside the top bar');
 
   const css = read('public/css/screens/game.css');
-  const band = css.match(/\.gtop__center\.brackets \{[^}]*\}/)?.[0] ?? '';
-  assert.match(band, /height: \.78rem/, 'the band is as tall as the official one');
-  assert.match(band, /gap: \.18rem/, 'official spacing');
-  assert.match(band, /padding: 0 \.24rem 0 \.14rem/, 'official padding');
-  assert.doesNotMatch(css, /\.gtop__center\.brackets \.capsule \{ min-width: 1\.9rem/, 'the capsule keeps the official 2.2rem pill');
+  assert.match(css, /\.gtop__frame\b/, 'the frames are styled');
+  assert.match(css, /\.gtop__band\b/, 'the band is styled');
+  assert.doesNotMatch(css, /^\.gtop__plate\b/m, 'no per-item plates are left behind');
 });
 
 test('the status strip is back to 已连接 / 延迟 / 服务 with separators (not the one-line pill)', () => {

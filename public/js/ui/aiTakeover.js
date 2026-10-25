@@ -9,6 +9,10 @@ export function AiTakeoverPanel() {
   const room = useStore(s => s.room), pub = useStore(s => s.match.public), myId = useStore(s => s.me.playerId);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false);
   if (!room || room.aiTakeoverEnabled !== true || room.mode === 'solo' || roomVersion(room) !== DEFAULT_VERSION || room.content?.vanilla === false) return null;
+  // 维护者 2026-10-25 (逐屏裁决: 局内左下取官方 0.3.3): the footer keeps the official four buttons — this entry shows for
+  // the players it is meant for (a spectator who may apply) and while a vote is open; a seated player has nothing to do
+  // with it, so the row stays the official one. The panel itself is unchanged.
+  if (!(room.spectators || []).some((s) => s.playerId === myId) && !(room.aiTakeoverVotes || []).length) return null;
   const run = async (kind, body) => { if (busy) return; setBusy(true); try { await net.request(kind, body); } catch (e) { toastError(e); } finally { setBusy(false); } };
   const spectator = room.spectators?.some(s => s.playerId === myId);
   const requests = room.aiTakeoverVotes || [], votes = requests;

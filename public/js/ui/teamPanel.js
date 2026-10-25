@@ -41,7 +41,8 @@ import { MissTag, uniteRemaining } from './hud.js';
 import { localAsset, getBand } from '../data.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
 import { KickAction, KickVoteNotice } from './kickVote.js';
-import { SpeedAction, SpeedVoteNotice } from './speedVote.js';
+// 二倍速 (SpeedAction) moved to the top-right HUD on 2026-10-25; the open vote still shows in this notice strip.
+import { SpeedVoteNotice } from './speedVote.js';
 import { t } from '../../../shared/i18n.js';
 import { uniteRelayKey } from '../battle/observe.js';
 import { PHONE_QUERY, rosterPools, rosterStartsOpen, teamDensity, teamEmoteMode, teamPanelLayout } from './teamLayout.js';
@@ -339,7 +340,7 @@ export function TeamPanel({ pub, myId, watching, onWatch, roster, emoteTtl = 300
         <${Icon} name="users" /><span>${t('同盟成员')}</span><b class="num">${players.length}</b><${Icon} name="chevronRight" />
       </button>
     </div>
-    <div ref=${noticeRef} class="team__notice"><${RevivalNotice} pub=${pub} /><${SpeedVoteNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /><${SpeedAction} pub=${pub} myId=${myId} /></div>
+    <div ref=${noticeRef} class="team__notice"><${RevivalNotice} pub=${pub} /><${SpeedVoteNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} />></div>
     <div class="team__players" id="team-roster" hidden=${!rosterOpen}>${pools
       ? pools.map((pool) => html`<section key=${pool.id ?? 'rest'} class=${cx('team__pool', pool.mine && 'is-mine')}><${PoolHead} pool=${pool} />${pool.players.map(row)}</section>`)
       : players.map(row)}</div>

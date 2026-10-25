@@ -133,6 +133,8 @@ export function StepHeader({ step, of, title, micro, pub, total, onExit, extra =
     <div class="stephead__left">
       <div class="stephead__exit">
         <${Button} variant="danger" size="lg" square=${true} icon="exit" onClick=${onExit} aria-label=${t('离开')} title=${t('离开')} />
+      </div>
+      <div class="stephead__ping">
         <${PingPill} ms=${conn.ping} online=${conn.status === 'online'} />
       </div>
       <div class=${`stephead__mode${extra ? ' has-extra' : ''}`}>

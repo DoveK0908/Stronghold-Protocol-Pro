@@ -5,6 +5,7 @@ import { cropFile } from './imageCropper.js';
 // uploaded); the choice and its dim / blur / overlay / motion settings are a localStorage pref. The ridges and the
 // stronghold silhouette are generated from fixed seeds, so every visit draws the same skyline.
 import { html } from './components.js';
+import { Sprite } from './gameComponents.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { loadPref, savePref } from '../store.js';
 import { toast } from './toasts.js';
@@ -288,6 +289,19 @@ function HubVideo({bg}) {
 export function HubBackdrop({ bg }) {
   const scene = sceneOf(bg);
   const { pref } = bg;
+  // 维护者 2026-10-25 (逐屏裁决: 大厅背景取官方 0.3.3): the default 夜巡 backdrop is the official one — the glow
+  // (entry/entry_bkg_01) and the Rhodes Island hologram (entry/entry_bkg_02) over a dark field with a faint grid
+  // (public/css/screens/lobby.css `.hub-bg__glow` / `__ship` / `__grid`, the upstream rules). The fork's drawn scenes
+  // stay for the other themes, and a custom picture still wins over all of them.
+  if (scene === 'night') {
+    return html`<div class="hub-bg" data-scene="official" data-motion=${pref.motion ? 'on' : 'off'} aria-hidden="true">
+      <${Sprite} k="entry/entry_bkg_01" class="hub-bg__glow" />
+      <${Sprite} k="entry/entry_bkg_02" class="hub-bg__ship" />
+      <span class="hub-bg__grid"></span>
+      <div class="hub-bg__scan"></div>
+      <div class="hub-bg__vignette"></div>
+    </div>`;
+  }
   return html`<div class="hub-bg" data-scene=${scene} data-motion=${pref.motion ? 'on' : 'off'} aria-hidden="true">
     ${scene === 'photo'
       ? html`${bg.mediaKind==='video'?html`<${HubVideo} key=${bg.imageUrl} bg=${bg} />`:html`<div class="hub-bg__photo" style=${`background-image:url("${bg.imageUrl}");filter:${pref.blur ? `blur(${pref.blur}px)` : 'none'}`}></div>`}

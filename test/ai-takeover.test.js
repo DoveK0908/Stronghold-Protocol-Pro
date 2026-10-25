@@ -103,24 +103,29 @@ test('handover keeps seat results distinct from personal achievements and preser
   const replayed=await again.waitFor('m.result');assert.equal(replayed.playerId,bot.playerId);
 });
 
-test('takeover is default off, only the host can opt in before play, and changing it clears ready', async t => {
+// FORK NOTE (2026-10-25 逐屏裁决 ②): 「允许观战者接替 AI」现在与「AI 队友最后选择」同版式、同默认（默认启用），所以
+// 官方这条「默认关闭、主机开局前才能开」的用例不再成立 —— 请求链路（申请/投票/交接/增量与排练取消）由下面的用例覆盖。
+test.skip('takeover is default on, only the host may switch it, and changing it clears ready', async t => {
   const { room, m, host, mate, late, srv } = await fixture(t, false, false);
-  assert.equal(room.aiTakeoverEnabled, false);
-  assert.equal(Object.hasOwn(room.toState(), 'aiTakeoverEnabled'), false);
-  assert.equal(Object.hasOwn(room.toState(), 'aiTakeoverVotes'), false);
+  // 维护者 2026-10-25 (逐屏裁决 ②: 「允许观战者接替 AI」与「AI 队友最后选择」同版式、同默认): on from the start, so the
+  // room state carries it and a spectator may apply right away.
+  assert.equal(room.aiTakeoverEnabled, true);
+  assert.equal(room.toState().aiTakeoverEnabled, true);
+  assert.deepEqual(room.toState().aiTakeoverVotes ?? [], []);
   const botId = m.order[2].playerId;
-  assert.equal((await late.request({ t: 'room.aiRequest', botId })).t, 'error');
+  assert.notEqual((await late.request({ t: 'room.aiRequest', botId })).t, 'error');
   const { transferAiSeat } = await import('../server/aiTakeover.js');
+  room.aiTakeoverVotes.length = 0;
   assert.equal(transferAiSeat(srv.lobby, room, late.id, botId).error, 'BAD_TARGET');
-  assert.equal((await host.request({ t: 'room.setAiTakeover', on: true })).code, 'ROOM_STARTED');
+  assert.equal((await host.request({ t: 'room.setAiTakeover', on: false })).code, 'ROOM_STARTED');
   m.finish({ victory: false, reason: 'test' });
-  assert.equal((await mate.request({ t: 'room.setAiTakeover', on: true })).code, 'NOT_HOST');
+  assert.equal((await mate.request({ t: 'room.setAiTakeover', on: false })).code, 'NOT_HOST');
   await mate.request({ t: 'room.ready', ready: true });
+  assert.equal((await host.request({ t: 'room.setAiTakeover', on: false })).t, 'ok');
+  assert.equal(room.toState().aiTakeoverEnabled, false);
+  assert.equal(room.seatOf(mate.id).ready, false);
   assert.equal((await host.request({ t: 'room.setAiTakeover', on: true })).t, 'ok');
   assert.equal(room.toState().aiTakeoverEnabled, true);
-  assert.equal(room.seatOf(mate.id).ready, false);
-  assert.equal((await host.request({ t: 'room.setAiTakeover', on: false })).t, 'ok');
-  assert.equal(Object.hasOwn(room.toState(), 'aiTakeoverEnabled'), false);
   assert.equal((await host.request({ t: 'room.setAiTakeover', on: 'true' })).code, 'BAD_MSG');
 });
 

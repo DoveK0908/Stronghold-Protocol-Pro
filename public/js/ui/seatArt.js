@@ -209,12 +209,16 @@ export function cardContext(list) {
  * or before the data loads.
  * @param {any} seat room.state seat
  * @param {{ byChar: Map<string, any>, pool: any[] }} ctx cardContext()
- * @param {{ myId?: any, myCard?: string }} [own]
+ * @param {{ myId?: any, myCard?: string | { charId?: string } }} [own]
  * @returns {{ chess: any, picked: boolean } | null}
  */
 export function seatOperator(seat, { byChar, pool }, { myId, myCard } = {}) {
   if (!seat || seat.playerId == null || seat.isBot) return null;
-  const pick = (seat.playerId === myId ? myCard : seat.card) || '';
+  // a card is a record ({ charId, avatar, bg, look, … }, ui/playerCard.js) since the 名片 remake, and a bare charId in
+  // older prefs and in one's own `myCard` from useMyCard: read the charId out of either, or the pick resolves to nothing
+  // and the seat falls back to the hash-chosen default operator — the wrong operator's name under the right portrait.
+  const charOf = (v) => (typeof v === 'string' ? v : v && typeof v === 'object' && typeof v.charId === 'string' ? v.charId : '');
+  const pick = charOf(seat.playerId === myId ? myCard : seat.card);
   const rec = pick && byChar ? byChar.get(pick) : null;
   if (rec) return { chess: rec, picked: true };
   if (!Array.isArray(pool) || !pool.length) return null;

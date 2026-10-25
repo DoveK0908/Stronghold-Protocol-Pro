@@ -904,14 +904,17 @@
 .hub-center.is-hidden { opacity: 0; pointer-events: none; }
 .hub-center { grid-column: 1 / -1; grid-row: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; pointer-events: none; }
-.hub-center__mark { position: relative; display: grid; place-items: center; margin-bottom: .14rem; }
-.hub-center__mark .emblem { margin: 0; z-index: 1; }
-.hub-center__en { position: relative; font: 700 .2rem/1 ui-monospace, Consolas, monospace; letter-spacing: .32em; color: rgba(223, 230, 226, .72);
+/* 维护者 2026-10-25 (逐屏裁决: 大厅的图标与标题取官方 0.3.3): the emblem keeps the official reserved height and the
+   title the official measure, so the centre reads at the official size (our own values were .14rem / .46rem) */
+.hub-center__mark { position: relative; display: grid; place-items: center; min-height: 1.4rem; margin-bottom: .1rem; }
+.hub-center__mark .emblem { position: relative; margin: 0; z-index: 1; }
+.hub-center__en { position: relative; font-family: var(--font-display); font-size: calc(.17 * var(--t)); letter-spacing: .32em; color: rgba(223, 230, 226, .72);
   text-shadow: 0 1px .08rem rgba(0, 0, 0, .85); }
 /* a bright custom picture: keep the emblem readable */
 [data-hub-theme="custom"] .hub-center__mark .emblem { filter: drop-shadow(0 0 .1rem rgba(0, 0, 0, .7)); }
 .hub-center__en b { color: var(--mint-400); }
-.hub-center__title { position: relative; margin: .1rem 0 0; font-size: calc(.46 * var(--t)); font-weight: 900; letter-spacing: .14em; color: var(--text-hi);
+.hub-center__title { position: relative; margin: 0; font-size: min(calc(.56 * var(--t)), calc((100vw - 9.52rem) / 8.2));
+  max-width: calc(100% - 8.8rem); font-weight: 900; letter-spacing: .14em; line-height: 1.15; color: var(--text-hi);
   text-shadow: 0 .04rem .3rem rgba(0, 0, 0, .8); }
 .hub-radar { position: absolute; left: 50%; top: 50%; width: 5.2rem; height: 5.2rem; transform: translate(-50%, -50%); }
 .hub-radar svg { width: 100%; height: 100%; overflow: visible; fill: none; stroke: var(--radar); stroke-width: 1; }
@@ -1772,13 +1775,15 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 
 .rs-seats { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; justify-content: center; gap: max(.3rem, 2.2vw); padding: .3rem .4rem .1rem;
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
-.rs--big .rs-seats { justify-content: flex-start; gap: .16rem; }
+.rs--big .rs-seats { justify-content: flex-start; gap: max(.22rem, 1.7vw); }
 /* 按住鼠标左右拖动（ui/dragScroll.js）：拖起来时整条带子跟着手走，光标变成抓握、别顺手选中文字。 */
 .rs-seats.is-dragging { cursor: grabbing; user-select: none; }
 .rs-seats.is-dragging * { cursor: grabbing; user-select: none; }
-.rseat { --w: min(18vw, 3.4rem, calc((100vw - 1.6rem) / var(--n, 4) - .3rem)); position: relative; flex: none; width: var(--w); display: flex; flex-direction: column;
+.rseat { --w: min(18vw, 3.4rem); position: relative; flex: none; width: var(--w); display: flex; flex-direction: column;
   animation: sw-in 260ms var(--ease-out) backwards; animation-delay: calc(var(--i) * 60ms); }
-.rs--big .rseat { --w: max(1.7rem, 120px); }
+/* 界面#14 (维护者 2026-10-25): a bigger 同盟 compresses nobody — 8–20 seats keep the four-seat card size and the row
+   scrolls sideways (drag / wheel / scrollbar), instead of squeezing every 立绘 and 名片 into the window. */
+.rs--big .rseat { --w: min(18vw, 3.4rem); }
 /* 独立模拟也按四人房的席位宽度（界面#15 反馈：单人/同盟的立绘大小要一致） */
 .rs--solo .rseat { --w: min(18vw, 3.4rem, calc((100vw - 1.6rem) / 4 - .3rem)); }
 /* 界面#15: claiming an empty seat (co-op, before the match) and the four-a-group dividers of an 8–20 seat room. */
@@ -1832,7 +1837,10 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rseat__kick .icon + .icon { width: max(.14rem, 9px); margin-left: -2px; }
 .rseat__kick:hover:not(:disabled) { filter: brightness(1.3); }
 .rseat__plate { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .1rem; align-items: center;
-  min-height: max(.76rem, 46px); margin-top: .08rem; padding: .06rem .1rem; background: linear-gradient(90deg, #232626, #161818); border: 1px solid rgba(255, 255, 255, .1); }
+  min-height: max(.86rem, 72px); margin-top: .08rem; padding: .06rem .12rem; background: linear-gradient(90deg, #232626, #161818); border: 1px solid rgba(255, 255, 255, .1); }
+/* 名片 (维护者 2026-10-25): 席位卡下面那张和大厅右上角的名片一样高、头像一样大 —— .hub-topbar .me-card */
+.rseat__plate .avatar { --av: .74rem; }
+.rseat__plate .rseat__who { gap: .08rem; font-size: max(calc(.19 * var(--t)), 13px); }
 .rseat.is-ready .rseat__plate { border-color: rgba(79, 232, 192, .55); }
 .rseat.is-me .rseat__plate { background: linear-gradient(90deg, #26302d, #161a19); }
 .rseat__plate .avatar { grid-row: 1 / 3; }

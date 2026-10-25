@@ -537,16 +537,15 @@ function RoomProtocol({ room, onClose, onPick, busy, leaving = false, pluginMode
 
 function AiTakeoverToggle({ option, busy, onToggle }) {
   if (!option) return null;
-  return html`<div class="ailast">
-    <${Tooltip} text=${t('默认关闭。开启后，观战者可在休整期经同房间真人投票接替 AI；继承记录不计个人统计或奖励。')}>
-      <button type="button" role="switch" aria-checked=${option.on ? 'true' : 'false'} data-testid="room-ai-takeover"
-          class=${`dpick__opt ailast__opt${option.on ? ' is-active' : ''}`} disabled=${!option.editable || !!busy}
-          onClick=${() => option.editable && onToggle(!option.on)}>
-        <${Icon} name="check" class=${option.on ? 'is-on' : ''} />${t('允许观战者接替 AI')}
-      </button>
-    <//>
-    ${option.editable ? null : html`<span class="t-dim">${t('由创建者设置')}</span>`}
-  </div>`;
+  // 维护者 2026-10-25：「允许观战者接替 AI」和右边「AI 队友最后选择」同一个版式（rs-exp + 开关），默认启用
+  const why = option.editable
+    ? t('开启后，观战者可在休整期经同房间真人投票接替 AI；继承记录不计个人统计或奖励')
+    : t('由创建者设置');
+  return html`<button type="button" role="switch" aria-checked=${option.on ? 'true' : 'false'} data-testid="room-ai-takeover"
+      class=${`rs-exp rs-exp--ai${option.on ? ' is-on' : ''}`} disabled=${!option.editable || !!busy} title=${why}
+      onClick=${() => option.editable && onToggle(!option.on)}>
+    <span class=${`rs-exp__switch${option.on ? ' is-on' : ''}`} aria-hidden="true" />
+    <span><b>${t('允许观战者接替 AI')}</b><small>${option.on ? t('已开启') : t('已关闭')}${option.editable ? '' : ` · ${t('由创建者设置')}`}</small></span></button>`;
 }
 
 /**
@@ -915,7 +914,6 @@ export function RoomScreen() {
         // 界面#14: in an 8–20 seat room a dashed divider every four seats shows who plays in the same group.
         if (facts.seats.length <= 4 || i === 0 || i % 4 !== 0) return card;
         return [html`<div key=${`sep${i}`} class="rseat-sep" data-testid="seat-group-sep"><span>${t('第 {n} 组', { n: i / 4 + 1 })}</span></div>`, card];
-      })}
       })}
       ${coop ? null : html`<aside class="solo-brief rs-brief brackets">
         <${MicroLabel} tone="mint">BRIEFING<//>

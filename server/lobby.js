@@ -506,7 +506,8 @@ export class Room {
      */
     this.aiPicksLast = mode !== 'solo';
     // [ASSUMED] Remake cooperation option, approved 2026-10-24; host opt-in before the match.
-    this.aiTakeoverEnabled = false;
+    // 维护者 2026-10-25: on by default — the switch sits beside 「AI 队友最后选择」, which defaults on as well.
+    this.aiTakeoverEnabled = true;
     /**
      * 「不限时」 (room.setSoloUnlimited, DESIGN §35.23.10; a timed solo only, off by default): the match is built with
      * opts.soloUnlimited. room.state omits the key unless this is true.
