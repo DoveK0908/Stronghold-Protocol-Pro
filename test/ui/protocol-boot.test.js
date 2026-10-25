@@ -80,7 +80,10 @@ test('screens/bandDraft.js: the 请选择策略 band and the 轮到你 sound, co
   const d = read('public/js/screens/bandDraft.js');
   // (§35.18's leftover: a cold cache skipped the solo band at 1 s — the sprites are fetched early, the band waits for them)
   assert.match(d, /useEffect\(\(\) => \{ preloadBootArt\(\); \}, \[\]\);\n\s+const \[turnBanner, setTurnBanner\] = useState\(0\);/, 'fetched as the draft mounts');
-  assert.match(d, /if \(!myTurn\) return undefined;\n\s+setPeek\(null\);\n\s+audio\.sfx\('yourTurn'\);\n\s+if \(reducedMotion\(\)\) return undefined;\n\s+const since = Date\.now\(\);\n\s+return onBootArt\(\(\) => \{ if \(Date\.now\(\) - since <= TURN_BANNER_LATE_MS\) setTurnBanner\(\(n\) => n \+ 1\); \}\);/);
+  // FORK NOTE (2026-10-25 逐屏裁决: 选择策略取回 0.3.2-pro.6): the fork draft screen has no hover-preview state, so
+  // it sets no `setPeek(null)`; the rest of the cue is the official one — fetched at mount, played once the art
+  // lands, bounded by TURN_BANNER_LATE_MS, silent with reduced motion.
+  assert.match(d, /if \(!myTurn\) return undefined;\n\s+(?:setPreview[^\n]*\n\s+)?audio\.sfx\('yourTurn'\);\n\s+if \(reducedMotion\(\)\) return undefined;\n\s+const since = Date\.now\(\);\n\s+return onBootArt\(\(\) => \{ if \(Date\.now\(\) - since <= TURN_BANNER_LATE_MS\) setTurnBanner\(\(n\) => n \+ 1\); \}\);/);
   assert.doesNotMatch(d, /if \(!solo\) audio\.sfx\('yourTurn'\)/, 'no co-op-only sound');
   const banner = read('public/js/ui/turnBanner.js');
   assert.match(banner, /export const TURN_BANNER_LATE_MS = 5000;/, 'a bounded wait [ASSUMED], not the 1 s that skipped a cold cache');

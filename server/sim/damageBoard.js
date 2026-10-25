@@ -36,7 +36,10 @@ export function damageRows(battle) {
       const key = operatorDamageKey(ps.playerId, u.uid, u.id);
       if (!metadata.has(key)) {
         const input = u.uid == null ? null : ps.input?.units?.find((p) => p.uid === u.uid && p.kind !== 'token');
-        metadata.set(key, { key, uid: u.uid ?? null, defId: input?.chessId ?? u.defId ?? null });
+        // 自选 (DIY): the input carries the slot's id (`chess_char_5_diy1_a`), whose record is the slot's stand-in — the
+        // operator actually fielded is only on the unit's def. `charId` lets the client name and draw that operator.
+        const charId = u.def?.charId ?? input?.diy?.charId ?? null;
+        metadata.set(key, { key, uid: u.uid ?? null, defId: input?.chessId ?? u.defId ?? null, charId });
       }
     }
     rows.set(ps.playerId, { playerId: ps.playerId, total: damage(battle._perPlayer?.[ps.playerId]?.damageDealt),
@@ -62,7 +65,8 @@ export function damageRows(battle) {
 export function emptyDamageRows(spec) {
   return { owners: (spec.players || []).map((p) => ({ playerId: p.playerId, total: 0, healing: 0,
     operators: (p.units || []).filter((u) => u.kind !== 'token').map((u, i) => ({
-      key: operatorDamageKey(p.playerId, u.uid, `input:${i}`), uid: u.uid ?? null, defId: u.chessId ?? null, damage: 0, healing: 0,
+      key: operatorDamageKey(p.playerId, u.uid, `input:${i}`), uid: u.uid ?? null, defId: u.chessId ?? null,
+      charId: u.diy?.charId ?? null, damage: 0, healing: 0,
     })), otherDamage: 0, otherHealing: 0 })) };
 }
 

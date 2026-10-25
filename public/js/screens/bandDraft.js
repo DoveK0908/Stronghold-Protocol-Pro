@@ -34,8 +34,8 @@ import { plannableBonds, bondPlanOpen, bondPlanHolders, BondPlanTag, BondPlanPic
 import { useStore } from '../store.js';
 import { data } from '../data.js';
 import { audio } from '../audio.js';
-import { TurnBanner } from '../ui/turnBanner.js';
-import { bootArtReady } from '../ui/protocolBoot.js';
+import { TurnBanner, TURN_BANNER_LATE_MS } from '../ui/turnBanner.js';
+import { bootArtReady, onBootArt, preloadBootArt } from '../ui/protocolBoot.js';
 import { reducedMotion } from '../ui/device.js';
 import { modeOffBonds, bandOffBonds, bandOffLine } from '../ui/gameLogic.js';
 import { t, tParts, tName } from '../../../shared/i18n.js';
@@ -231,7 +231,7 @@ function OrderRow({ p, i, picked, cur, self, solo, nc, art, card, gd, turnSecs }
   </div>`;
 }
 
-export function BandDraftScreen() {
+export function BandDraftScreen({ held = false } = {}) {
   const pub = useStore((s) => s.match.public);
   const priv = useStore((s) => s.match.private);
   const myId = useStore((s) => s.me.playerId);
@@ -300,12 +300,19 @@ export function BandDraftScreen() {
     const next = draftSelection(sel, { bands, taken, myPick, myTurn, defaultId });
     if (next !== sel) setSel(next);
   }, [bands.length, myPick, myTurn, takenKey]);
-  // "your turn" cue: the sound, and the event's 请选择策略 band (ui/turnBanner.js) once its art is in
+  // "your turn" cue: the sound and the event's 请选择策略 band (ui/turnBanner.js) once its art is in — co-op and solo
+  // alike (the maintainer's decision of 2026-10-21, as in PR #643; [ASSUMED] for solo, see the header). The sprites are
+  // fetched early (a room entered, the match screen, this screen's mount); a turn whose art is still loading plays the
+  // band as soon as it arrives — never blocking input — up to TURN_BANNER_LATE_MS after the turn began, past which the
+  // header's 请选择策略 says it alone.
+  useEffect(() => { preloadBootArt(); }, []);
   const [turnBanner, setTurnBanner] = useState(0);
   useEffect(() => {
-    if (!myTurn || solo) return;
+    if (!myTurn) return undefined;
     audio.sfx('yourTurn');
-    if (bootArtReady() && !reducedMotion()) setTurnBanner((n) => n + 1);
+    if (reducedMotion()) return undefined;
+    const since = Date.now();
+    return onBootArt(() => { if (Date.now() - since <= TURN_BANNER_LATE_MS) setTurnBanner((n) => n + 1); });
   }, [myTurn]);
   // the 本局信息 dialog never outlives the turn it was opened in: a turn change (a pick, a skip, a turn that ran out, an
   // AI pick) or my pick closes it, so whoever's turn begins sees the draft
@@ -352,7 +359,7 @@ export function BandDraftScreen() {
   const infoStatus = infoOpen ? draftInfoStatus({ myPick, pickName: myPick ? gd.band(myPick)?.name : null, myTurn, turnName, secs: turnSecs,
     waiting: !solo && !draft.done }) : null;
 
-  return html`<div class="screen draft">
+  return html`<div class=${cx('screen draft', held && 'is-held')} inert=${held ? true : undefined} aria-busy=${held ? 'true' : undefined}>
     <div class="brief__bg" aria-hidden="true"></div>
     <${StepHeader} step=${2} of=${2} title=${t('选择策略')} micro="STRATEGY // BAND CHECK" pub=${clock ? { ...pub, deadline: clock.deadline } : { ...pub, deadline: 0 }}
       total=${clock ? clock.total : null} onExit=${() => setExit(true)} />

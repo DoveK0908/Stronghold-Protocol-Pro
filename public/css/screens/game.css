@@ -117,68 +117,23 @@
    the round number and the kills flip; at a phase change the capsule's content rises in from below, after the little
    scene of that phase (kettles while the round starts; robot meets enemy → 开始作战 / 联防开始). */
 .gtop__center { animation: gtop-drop 420ms var(--ease-out) both; }
-.gtop__half .roundbox__num, .gtop__cap .capsule__kills b { display: inline-block; animation: capfx-flip 260ms var(--ease-out) both; }
 /* the round number keeps its centred box (inline-block above dropped .roundbox__num's grid: the digit sat top-left) */
 .gtop__half .roundbox__num { display: inline-grid; place-items: center; line-height: 1; }
-.gtop__cap.is-fx-wait .capsule > * { visibility: hidden; }
-.gtop__cap.is-fx-enter .capsule__icon { animation: capfx-rise 260ms var(--ease-out) both; }
-.gtop__cap.is-fx-enter .capsule > :not(.capsule__icon) { animation: capfx-slide 280ms 120ms var(--ease-out) both; }
-.gtop__cap.is-fx-rest .capsule__icon { animation: capfx-rise 260ms 200ms var(--ease-out) both; }
-.gtop__cap.is-fx-rest .capsule > :not(.capsule__icon) { animation: capfx-slide 300ms 440ms var(--ease-out) both; }
-.gtop__cap.is-fx-clash .capsule > * { animation: capfx-rise 260ms 2100ms var(--ease-out) both; }
-.gtop__cap.is-fx-unite .capsule > * { animation: capfx-rise 260ms 2750ms var(--ease-out) both; }
-.gtop__cap.is-fx-clash .capsule { animation: capfx-glow 700ms 1100ms ease-out both; }
-.gtop__cap.is-fx-unite .capsule { animation: capfx-glow 700ms 1420ms ease-out both; }
-.capsule-fx { position: absolute; inset: .1rem .15rem; z-index: 3; display: flex; align-items: center; justify-content: center; gap: .1rem;
   overflow: hidden; pointer-events: none; color: var(--mint-400);
   clip-path: polygon(.13rem 0, calc(100% - .13rem) 0, 100% .13rem, 100% calc(100% - .13rem), calc(100% - .13rem) 100%, .13rem 100%, 0 calc(100% - .13rem), 0 .13rem); }
-.capsule-fx .pix { flex: none; height: auto; }
-.capsule-fx .pix__b { opacity: .6; }
-.capsule-fx__k { width: .36rem; animation: capfx-drop 260ms calc(var(--i) * 140ms) var(--ease-out) both, capfx-bob 900ms calc(420ms + var(--i) * 150ms) ease-in-out infinite; }
-.capsule-fx--rest .capsule-fx__k { animation: capfx-up 220ms calc(var(--i) * 40ms) ease-in forwards; }
-.capsule-fx--clash { color: #ffbf3a; animation: capfx-out 200ms 1950ms ease-in forwards; }
-.capsule-fx--unite { color: #ff8a3a; animation: capfx-out 200ms 2600ms ease-in forwards; }
-.capsule-fx__meet, .capsule-fx__clash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
-.capsule-fx__meet { gap: .12rem; }
-.capsule-fx__allies, .capsule-fx__foes { display: flex; align-items: flex-end; gap: .04rem; }
-.capsule-fx__ally { width: .36rem; animation: capfx-drop 240ms var(--ease-out) both; }
-.capsule-fx__ally--2 { opacity: .8; animation: capfx-join 260ms 900ms var(--ease-out) both; }
-.capsule-fx__foe { width: .42rem; animation: capfx-hop 900ms 120ms linear both; }
-.capsule-fx__foe--2 { animation-delay: 260ms; }
-.capsule-fx--clash .capsule-fx__meet { animation: capfx-ghost 260ms 1080ms forwards; }
-.capsule-fx--unite .capsule-fx__meet { animation: capfx-ghost 260ms 1400ms forwards; }
-.capsule-fx__clash { gap: .08rem; }
-.capsule-fx__swords { width: .34rem; filter: drop-shadow(0 0 .05rem currentColor); }
-.capsule-fx__word { font-size: .27rem; font-weight: 900; letter-spacing: .08em; color: #ffd76a; text-shadow: 0 0 .1rem rgba(255, 170, 40, .8); white-space: nowrap; }
-.capsule-fx--unite .capsule-fx__word { color: #ffb06a; text-shadow: 0 0 .1rem rgba(255, 110, 40, .85); }
-.capsule-fx--clash .capsule-fx__swords { animation: capfx-pop 280ms 1100ms var(--ease-out) both; }
-.capsule-fx--clash .capsule-fx__word { animation: capfx-word 320ms 1240ms var(--ease-out) both; }
-.capsule-fx--unite .capsule-fx__swords { animation: capfx-pop 280ms 1420ms var(--ease-out) both; }
-.capsule-fx--unite .capsule-fx__word { animation: capfx-word 320ms 1560ms var(--ease-out) both; }
 @keyframes gtop-drop { from { transform: translateY(-.5rem); opacity: 0; } }
-@keyframes capfx-flip { from { transform: translateY(-55%); opacity: 0; } }
-@keyframes capfx-rise { from { transform: translateY(110%); opacity: 0; } }
-@keyframes capfx-slide { from { transform: translateX(.4rem); opacity: 0; } }
-@keyframes capfx-drop { from { transform: translateY(-130%); opacity: 0; } }
-@keyframes capfx-up { to { transform: translateY(-140%); opacity: 0; } }
-@keyframes capfx-bob { 50% { transform: translateY(-14%); } }
-@keyframes capfx-out { to { transform: translateY(-100%); opacity: 0; } }
-@keyframes capfx-join { from { transform: translateX(-.3rem); opacity: 0; } }
-@keyframes capfx-hop {
+   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
+   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
+
   0% { transform: translateX(1.5rem); opacity: 0; } 10% { opacity: 1; }
   25% { transform: translateX(1.1rem) translateY(-18%); } 50% { transform: translateX(.72rem); }
   75% { transform: translateX(.34rem) translateY(-18%); } 100% { transform: translateX(0); }
 }
-@keyframes capfx-ghost { to { opacity: .22; filter: blur(.6px); } }
-@keyframes capfx-glow { 30% { filter: brightness(1.55); } }
-@keyframes capfx-pop { 0% { transform: scale(1.9) rotate(-12deg); opacity: 0; filter: brightness(2.4); } 60% { opacity: 1; } }
-@keyframes capfx-word {
   0% { transform: translateX(.12rem); opacity: 0; text-shadow: -.04rem 0 rgba(255, 60, 60, .8), .04rem 0 rgba(60, 220, 255, .8); }
   60% { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .gtop__center, .gtop__half .roundbox__num, .gtop__cap .capsule__kills b, .gtop__cap .capsule, .gtop__cap .capsule > * { animation: none; }
-  .capsule-fx { display: none; }
   .gtop__cap.is-fx-wait .capsule > * { visibility: visible; }
 }
 /* the two official 🔍 buttons (ui/hud.js CheckBtn): btn_check_player (mint, left) and btn_check_enemy (amber, right);
@@ -282,12 +237,23 @@
 .misstag.is-clear .misstag__n { color: var(--mint-400); }
 .capsule--combat { --cap: var(--orange-hi); }
 .capsule--boss { --cap: var(--orange-hi); min-width: 4.2rem; }
-/* ---- phase capsule scenes (官方 0.3.1, hud.js CapsuleScene; 由分批对齐补入) ---- */
+/* phase capsule scenes (ui/hud.js CapsuleScene, capsuleFxKind): the official hudPanel/trans_* sprites at ×1.3 of their
+   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
+   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
+/* the capsule plate: a grey outer frame around the phase capsule */
+.gtop__cap { position: relative; z-index: 2; display: flex; padding: .08rem .13rem; }
+.gtop__cap::before, .gtop__cap::after { content: ''; position: absolute; pointer-events: none;
+  clip-path: polygon(.2rem 0, calc(100% - .2rem) 0, 100% .2rem, 100% calc(100% - .2rem), calc(100% - .2rem) 100%, .2rem 100%, 0 calc(100% - .2rem), 0 .2rem); }
+.gtop__cap::before { inset: 0; background: rgba(176, 184, 186, .5); }
+.gtop__cap::after { inset: 1px; background: rgba(9, 12, 12, .9); }
+.gtop__cap > .capsule { position: relative; z-index: 1; }
 .gtop__cap[class*="is-fx-"] .capsule { overflow: hidden; }
 .capfx {
   position: absolute; inset: 2px; z-index: 2; display: flex; align-items: center; justify-content: center; gap: .1rem;
   border-radius: .23rem; overflow: hidden; pointer-events: none;
 }
+/* inside the plate's padding: the scene stays on the capsule pill it was sized for, off the plate's frame (PR #827) */
+.gtop__cap > .capfx { inset: calc(.08rem + 2px) calc(.13rem + 2px); }
 .capfx .sprite { display: block; image-rendering: pixelated; }
 .gtop__cap.is-fx-wait .capsule > * { visibility: hidden; }
 .gtop__cap.is-fx-enter .capsule > * { animation: capfx-rise 240ms var(--ease-out) both; }
@@ -368,7 +334,6 @@
   .capfx { display: none; }
   .gtop__cap .capsule > * { animation: none; visibility: visible; }
 }
-
 .bossbar { position: relative; flex: 1; min-width: 2.2rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 122, 51, .5); overflow: hidden; }
 .bossbar__fill { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #b8340d, var(--orange-hi)); box-shadow: 0 0 .1rem rgba(255, 110, 40, .8); transition: width 300ms var(--ease-out); }
 .bossbar__txt { position: absolute; inset: 0; display: grid; place-items: center; font-size: .14rem; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
@@ -1642,9 +1607,6 @@
 
 .team__line .misstag__icon { font-size: .13rem; }
 
-/* phase capsule scenes (ui/hud.js CapsuleScene, capsuleFxKind): the official hudPanel/trans_* sprites at ×1.3 of their
-   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
-   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
 
 /* the capsule plate: a grey outer frame around the phase capsule */
 
@@ -1659,7 +1621,6 @@
 
 /* inside the plate's padding: the scene stays on the capsule pill it was sized for, off the plate's frame (PR #827) */
 
-.gtop__cap > .capfx { inset: calc(.08rem + 2px) calc(.13rem + 2px); }
 
 /* 回合开始: three kettles (trans_cup 31×29) drop in one after another and bob out of step; at 休整期 they fly up */
 

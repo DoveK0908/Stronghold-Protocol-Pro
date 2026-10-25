@@ -83,8 +83,9 @@ export function combineCombat(records, ownerId = null) {
       if (ownerId != null && r.ownerId !== ownerId) continue;
       owners.add(r.ownerId);
       // Keep per-piece records in the collector, but display same-name units together for each player.
-      // Distinct definitions (including promoted copies) with the same display name share one row.
-      const key = JSON.stringify([r.ownerId, r.kind, r.name || r.defId]);
+      // Distinct definitions (including promoted copies) with the same display name share one row. A row without a name
+      // (a 自选 piece whose slot has no display name) still groups by its operator body, so it cannot split a piece in two.
+      const key = JSON.stringify([r.ownerId, r.kind, r.name || r.picture?.charId || r.defId]);
       let row = rows.get(key);
       if (!row) {
         row = { ...r, key, damage: 0, healing: 0, types: Object.fromEntries(DAMAGE_TYPES.map((t) => [t, 0])) };

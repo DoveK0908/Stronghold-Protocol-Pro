@@ -64,8 +64,8 @@ test('same definition remains two UID rows; nested expired summons and dead-sour
   b.units.push(u); // a historical duplicate reference must not double count the same stats
   const r = row(b);
   assert.deepEqual(r.operators, [
-    { key: operatorDamageKey('p1', 11), uid: 11, defId: 'score_op', damage: 97, healing: 0 },
-    { key: operatorDamageKey('p1', 12), uid: 12, defId: 'score_op', damage: 30, healing: 0 },
+    { key: operatorDamageKey('p1', 11), uid: 11, defId: 'score_op', charId: 'score_op', damage: 97, healing: 0 },
+    { key: operatorDamageKey('p1', 12), uid: 12, defId: 'score_op', charId: 'score_op', damage: 30, healing: 0 },
   ]);
   assert.equal(r.total, 127);
   assert.equal(r.otherDamage, 0);

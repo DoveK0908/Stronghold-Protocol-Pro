@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const enabled = process.env.SP_E2E === '1' && fs.existsSync(CHROME);
@@ -71,7 +72,6 @@ function fixture() {
   fs.writeFileSync(path.join(root, 'public/dev/build-runtime.js'), SCRIPT);
   fs.writeFileSync(path.join(root, 'start.mjs'), `
 import { startServer } from './server/index.js';
-import { CHROME } from '../e2e/chrome.mjs';
 const srv = await startServer({ port: Number(process.env.PORT), host: '127.0.0.1', quiet: true });
 process.send({ port: srv.port });
 process.on('SIGTERM', async () => { await srv.close(); process.exit(0); });

@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
@@ -68,7 +69,6 @@ function trackPixiApplications() {
 
 const FACTORY_WRAPPER = `export * from '/js/render/app.js?implementation';
 import { createFieldView as create } from '/js/render/app.js?implementation';
-import { CHROME } from '../e2e/chrome.mjs';
 export async function createFieldView(...args) {
   window.__initialization.calls++;
   if (window.__initialization.ignoreSignal) args[1] = { ...args[1], signal: undefined };

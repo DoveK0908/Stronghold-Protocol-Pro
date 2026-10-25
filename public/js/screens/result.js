@@ -148,10 +148,12 @@ function BossDamageLedger({ ledger, gd, names }) {
         </div>
         <div class="result__bossrows">
           ${rows.length ? rows.map((op) => {
-      const chess = chessRecordOf(gd, op.defId);
+      // 自选 (DIY) rows carry the slot's chess id, whose record is the slot's stand-in: resolve the operator actually
+      // fielded by its charId first (the row's own charId from damageBoard, else the picture body).
+      const chess = chessRecordOf(gd, op.charId || op.picture?.charId) || chessRecordOf(gd, op.defId);
       const dps = damageRate(op.damage, seconds);
       return html`<div key=${op.key} class="result__bossop">
-              ${op.defId ? html`<${UnitThumb} kind="chess" id=${op.defId} rec=${chess} size="sm" />` : null}
+              ${op.defId || op.charId ? html`<${UnitThumb} kind="chess" id=${op.charId || op.picture?.charId || op.defId} rec=${chess} size="sm" />` : null}
               <span class="result__bossopname">${chess?.name || op.defId || t('干员')}</span>
               <b class="num">${damageNumber(op.damage)}</b>
               ${dps ? html`<span class="result__bossdps t-lo num">DPS ${damageNumber(dps)}</span>` : null}
