@@ -8,7 +8,7 @@ import { mostimaVisionContext } from './lateranoVisionValue.js';
 import { enemyRosterPlans, enemyTypeInfo } from './lateranoEnemyTypes.js';
 import { stealthRosterPlans, stealthBattleInput, stealthWaveInfo } from './lateranoStealthWave.js';
 import { applyControlPositions } from './lateranoControlBoss.js';
-import { coopEntryState, selectCoopSafety } from './lateranoCoopSafety.js';
+import { coopEntryState, selectCoopSafety, coopGrowthFirstEnabled } from './lateranoCoopSafety.js';
 import { withLateranoIncomeDoll } from './lateranoIncomeDoll.js';
 import { withLateranoMergeOrder } from './lateranoMergeOrder.js';
 
@@ -50,17 +50,25 @@ function preserveBonds(ps, plan) {
 }
 
 /** Supply may improve layers only with no loss of transferable critical survival, readiness or Skillful coverage. */
-export function selectCoopSupply(plans, outcomes, visionContext) {
+export function selectCoopSupply(plans, outcomes, visionContext, { ignoreReadiness = false, growthFirst = false, defenseFallback = false } = {}) {
   const base = outcomes.filter(r => r.index === 0).sort((a, b) => a.sample - b.sample);
   const filtered = outcomes.map(r => {
     if (r.index === 0) return r;
     const before = base[r.sample];
     const safe = before && [r.entryReady, r.criticalDown, r.skillfulCovered].every(Number.isFinite)
-      && r.criticalDown <= before.criticalDown && r.entryReady + 1e-6 >= before.entryReady
+      && r.criticalDown <= before.criticalDown && (ignoreReadiness || growthFirst || r.entryReady + 1e-6 >= before.entryReady)
       && r.skillfulCovered >= before.skillfulCovered;
     return safe ? r : { ...r, valid: false };
   });
-  return selectMostimaAmmo(plans, filtered, { protectVision: 'value', visionContext });
+  const selected = selectMostimaAmmo(plans, filtered, { protectVision: 'value', visionContext });
+  if (!defenseFallback || selected.index || !base.some(r => r.lost > 0)) return selected;
+  // No extra risk or role loss: only a strict per-sample non-regressing LP improvement can release growth.
+  const safer = new Set(plans.map((_, i) => i).filter(i => i > 0 && filtered.filter(r => r.index === i).length === FORECAST_SAMPLES
+    && filtered.filter(r => r.index === i).every(r => r.valid && Number.isFinite(r.deaths)
+      && r.deaths <= base[r.sample]?.deaths && r.lost <= base[r.sample]?.lost && r.leaks <= base[r.sample]?.leaks)
+    && filtered.some(r => r.index === i && r.lost < base[r.sample]?.lost)));
+  const fallback = selectCoopSafety(plans, filtered.filter(r => r.index === 0 || safer.has(r.index)), { growthFirst });
+  return fallback.index ? { ...fallback, defenseFallback: true } : selected;
 }
 
 /** One-to-one roster swaps use the real placement API. No shop, sale or item actions are allowed here. */
@@ -99,22 +107,28 @@ function* rosterJob(m, ps, plans, { select, extra = () => ({}) }) {
     positions: p.lineup.map(u => ({ uid: u.uid, id: u.id, key: p.get(u.uid), dir: p.dirs.get(u.uid) })) })) };
 }
 
-export function* coopSupplySteps(m, ps, h, recipe) {
+export function* coopSupplySteps(m, ps, h, recipe, { loneReadiness = false } = {}) {
   if (!normal(m, ps)) return;
   const start = performance.now();
   const plans = mostimaAmmoPlans(m, ps, h, recipe, { protectVision: 'value' });
   const context = mostimaVisionContext(m, ps, recipe);
+  const ignoreReadiness = loneReadiness && m.alivePlayers().length === 1;
+  const growthFirst=coopGrowthFirstEnabled(m,ps);
   const job = yield* rosterJob(m, ps, plans, {
-    select: (plans, outcomes) => selectCoopSupply(plans, outcomes, context),
+    select: (plans, outcomes) => selectCoopSupply(plans, outcomes, context, { ignoreReadiness, growthFirst,
+      defenseFallback: !!ps._botCoopSupplyDefenseFallback }),
     extra: plan => ({ skillfulCovered: coopSkillfulCoverage(ps, plan) }),
   });
-  if (job) (ps._botCoopFactorHistory ||= []).push({ factor: 'supply', round: m.round, ...job, ms: performance.now() - start });
+  if (job) (ps._botCoopFactorHistory ||= []).push({ factor: 'supply', round: m.round, ...job, growthFirst,
+    ...(ps._botCoopSupplyDefenseFallback ? { defenseFallback: true } : {}),
+    ...(growthFirst?{visionContext:context}:{}),
+    ...(loneReadiness ? { loneReadinessBypassed: ignoreReadiness } : {}), ms: performance.now() - start });
 }
 
-export function withLateranoCoopSupply(recipe) {
+export function withLateranoCoopSupply(recipe, options = {}) {
   return Object.freeze({ ...recipe, *finalBoardSteps(m, ps, h) {
     if (recipe.finalBoardSteps) yield* recipe.finalBoardSteps(m, ps, h);
-    yield* coopSupplySteps(m, ps, h, recipe);
+    yield* coopSupplySteps(m, ps, h, recipe, options);
   } });
 }
 
@@ -138,13 +152,14 @@ export function withLateranoCoopEnemyRoster(recipe) {
 }
 
 /** Two complete all-clear samples, no downed critical unit, and a usable living board before early investment. */
-export function coopTempoSafe(outcomes) {
+export function coopTempoSafe(outcomes, { maxLoss = 0 } = {}) {
   return outcomes.length === FORECAST_SAMPLES && outcomes.every((r, i) => r.valid && r.sample === i
-    && r.leaks === 0 && r.lost === 0 && r.criticalDown === 0 && r.entryReady >= .6);
+    && Number.isFinite(r.leaks) && Number.isFinite(r.lost) && r.leaks >= 0 && r.lost >= 0
+    && r.leaks <= maxLoss && r.lost <= maxLoss && r.criticalDown === 0 && r.entryReady >= .6);
 }
 
-function tempoWindow(m, ps) {
-  return scoped(m, ps) && ps.lp >= 16 && (ps.shop.level === 1 && m.round >= 2 && m.round <= 3
+function tempoWindow(m, ps, { minLP = 16 } = {}) {
+  return scoped(m, ps) && ps.lp >= minLP && (ps.shop.level === 1 && m.round >= 2 && m.round <= 3
     || ps.shop.level === 2 && m.round >= 3 && m.round <= 4);
 }
 
@@ -156,14 +171,14 @@ export function coopTempoBoardReady(ps) {
     && records.filter(r => !['heal', 'none'].includes(r.attackKind)).length >= 2);
 }
 
-export function coopTempoReady(m, ps) {
+export function coopTempoReady(m, ps, options = {}) {
   const state = ps._botCoopTempo;
-  return tempoWindow(m, ps) && coopTempoBoardReady(ps) && state?.round === m.round && state.level === ps.shop.level
-    && state.signature === JSON.stringify(ps.battleInput()) && coopTempoSafe(state.outcomes);
+  return tempoWindow(m, ps, options) && coopTempoBoardReady(ps) && state?.round === m.round && state.level === ps.shop.level
+    && state.signature === JSON.stringify(ps.battleInput()) && coopTempoSafe(state.outcomes, options);
 }
 
-export function* coopTempoSteps(m, ps, h) {
-  if (!normal(m, ps) || !tempoWindow(m, ps) || !coopTempoBoardReady(ps)) return;
+export function* coopTempoSteps(m, ps, h, options = {}) {
+  if (!normal(m, ps) || !tempoWindow(m, ps, options) || !coopTempoBoardReady(ps)) return;
   const start = performance.now(), plan = currentPlan(ps, h), signature = JSON.stringify(ps.battleInput());
   function* inputSteps() { yield; return ps.battleInput(); }
   const job = yield* createForecastSteps(m, ps, plan.lineup, [plan], inputSteps, {
@@ -172,7 +187,7 @@ export function* coopTempoSteps(m, ps, h) {
   });
   if (!job) return; while (!job.run(4)) yield;
   const state = { factor: 'tempo', round: m.round, level: ps.shop.level, signature,
-    outcomes: job.outcomes, ready: coopTempoSafe(job.outcomes), ms: performance.now() - start };
+    outcomes: job.outcomes, ready: coopTempoSafe(job.outcomes, options), ms: performance.now() - start };
   ps._botCoopTempo = state; (ps._botCoopFactorHistory ||= []).push(state);
 }
 

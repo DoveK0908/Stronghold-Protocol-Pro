@@ -1508,7 +1508,6 @@ export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false, 
   const distinct = distinctPlans(plans);
   if ((!m.wave && !boss) || distinct.length < 2 || !(m.botRehearsal > 0)) return null;
   // [ASSUMED] #315: a boss field has no time limit. Cap the rehearsal; do not use the live fight's seed.
-  // [ASSUMED] #315: a boss field has no time limit. Cap the rehearsal; do not use the live fight's seed.
   const cap = boss ? faRehearsalTicks(m) : rehearsalCap(m.wave && m.wave.timeLimit);
   const cands = distinct.slice(0, Math.min(8, candidateLimit));
   const byUid = new Map(chosen.map((p) => [p.uid, p]));
@@ -1528,6 +1527,7 @@ export function* createRehearsalSteps(m, ps, chosen, plans, { delegate = false, 
   let built = 0;
   const buildInline = () => {
     if (limits) return;
+    // loop-cap: `built` advances once per pass and `inputs` is bounded by cands (<= candidateLimit)
     while (built < inputs.length) { const o = inputs[built++]; battles.push(m.newBattle(o, { preview: true })); }
   };
   for (const plan of cands) {

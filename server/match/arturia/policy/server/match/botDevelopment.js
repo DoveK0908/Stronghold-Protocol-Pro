@@ -20,7 +20,7 @@ import { mitigate } from '../../../../../sim/attack.js';
 import { HOVER_KEYS } from '../../../../../sim/content/enemies.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../../../../../shared/loadoutRecord.js';
 import { coreTarget, fixedBandCore, openingCore, selectRoute, growthValue, developmentBuy, refreshGrowth, layoutGrowth, promotionGrowth } from './botStrategy.js';
-import { coreStrategy } from './botCoreStrategies.js';
+import { coreStrategy, readsTeammateRoster } from './botCoreStrategies.js';
 import { economyItemBonus, economyChessBonus, useEconomyItems } from './botEconomy.js';
 import { isLineCaster, linePlacementGate, engagementFronts, frontlineCoverage, isFormationAnchor, formationValue, healingTiles, acceptsHealing } from './botPositioning.js';
 import { bodyKeys } from '../../../../../sim/body.js';
@@ -297,11 +297,12 @@ function mainCoreBond(m, p) {
  * across rounds.
  */
 export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
-  const key = `${ps.bandId}|${m.round}|${ps.shop.level}|${[...owned.counts.entries()].map(([k, v]) => k + v).join()}|${Object.values(ps.layers).join()}|${m.alivePlayers().map((p) => mainCoreBond(m, p)).join()}`;
+  const publicMates = readsTeammateRoster(m, ps) ? m.alivePlayers() : [];
+  const key = `${ps.bandId}|${m.round}|${ps.shop.level}|${[...owned.counts.entries()].map(([k, v]) => k + v).join()}|${Object.values(ps.layers).join()}|${publicMates.map((p) => mainCoreBond(m, p)).join()}`;
   if (ps._botFocus && ps._botFocus.key === key) return ps._botFocus;
   const prev = ps._botFocusId ?? null;
   const mates = new Set();
-  for (const p of m.alivePlayers()) {
+  for (const p of publicMates) {
     if (p === ps) continue;
     const b = mainCoreBond(m, p);
     if (b) mates.add(b);
@@ -595,7 +596,7 @@ function buyScore(m, ps, id, ctx, reward = false) {
   // [ASSUMED] A soft 18-point cooperation weight (PR #407), not an official rule or a reserved card.
   // Leave high-tier shared chess to living teammates whose opening strategy needs its faction.
   // Humans and bots count equally; a single soft penalty still allows valuable own merges.
-  if (c.tier >= 5 && !c.isGolden && !c.diyFor && m.pool.has(base) && m.alivePlayers().some((mate) =>
+  if (readsTeammateRoster(m, ps) && c.tier >= 5 && !c.isGolden && !c.diyFor && m.pool.has(base) && m.alivePlayers().some((mate) =>
     mate !== ps && gd.bandBondIds(mate.bandId).some((b) => !gd.modeInactiveBonds.has(b) && c.bonds.includes(b)))) s -= 18;
   return s;
 }
@@ -1803,6 +1804,12 @@ export function* botPrepEndSteps(m, ps, job = null) {
   if (bodyPlan) yield* applyPlanSteps(m, ps, [...ps.board.values()].filter((p) => p.kind === 'chess'), bodyPlan);
   const finalBoardSteps = coreStrategy(m, ps._botFocusId)?.finalBoardSteps;
   if (finalBoardSteps) yield* finalBoardSteps(m, ps, { LayoutPlan, rangeRec, rangeTiles, fieldModel, bossInputSteps, applyPlanSteps,
+    *recoverEconomySteps() {
+      // Explicit opt-in emergency hook: visible cards/rewards only, no extra upgrades or refreshes.
+      takeOffers(m, ps); useEconomyItems(m, ps); coreStrategy(m, ps._botFocusId)?.useEconomy(m, ps);
+      yield* buyLoopSteps(m, ps, { spendAll: true, maxRefreshes: 0 });
+      takeOffers(m, ps); yield* arrangeSteps(m, ps); equipItems(m, ps); yield;
+    },
     planLayoutSteps: (owner, pieces, options) => planLayoutSteps(m, owner, pieces, LAYOUT_PARAMS, options) });
   tryDo(() => ps.setReady(true));
 }
@@ -1972,6 +1979,8 @@ export function levelUp(m, ps, { spare = false } = {}) {
         audit.purchases.push(slot.id);
         useEconomyItems(m, ps); recipe.useEconomy?.(m, ps); takeOffers(m, ps);
       }
+      if (order.pendingSlots?.some(s => !s.sold && ps.completesChessMerge(s.id)
+        && ps.priceOf(s) > ps.funds) && !ps.shop.frozen) ps.freeze();
       return;
     }
   }
@@ -2128,6 +2137,9 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, spendAll = f
     }
     if (canRefresh) {
       if (holdCriticalShop(m, ps)) return;
+      if (ctx.strategy?.beforeRefreshSteps && (yield* ctx.strategy.beforeRefreshSteps(m,ps,{
+        LayoutPlan,takeOffers:()=>takeOffers(m,ps),
+      }))) continue;
       if ((ctx.strategy?.shoppingRepair || ctx.strategy?.holdShop) && ps.shop.frozen) tryDo(()=>ps.freeze());
       if (!tryDo(() => spendAction(m, ps, () => ps.refresh()))) return;
       refreshes++;
@@ -2156,6 +2168,18 @@ export function* arrangeSteps(m, ps, { final = false, defer = false } = {}) {
   // withdraw board chess that are not chosen (to free cap) when the hand has space
   for (const [, p] of [...ps.board]) {
     if (p.kind !== 'chess' || chosenSet.has(p.uid)) continue;
+    if (freeSlot(ps.hand) < 0 && ctx.strategy?.beforeWithdrawal?.(m, ps, p, { chosen, freeShoppingSlot }) === true) continue;
+    if(freeSlot(ps.hand)<0&&ctx.strategy?.withdrawalPriority?.(m,ps,p)>0){
+      const priority=ctx.strategy.withdrawalPriority(m,ps,p);
+      freeShoppingSlot(m,ps);
+      if(freeSlot(ps.hand)<0){
+        const reserve=ps.hand.filter(q=>q?.kind==='chess'&&!chosenSet.has(q.uid)&&!(q.items?.length)
+          &&!preserveChess(m,ps,q)&&!ctx.strategy.keep(m,ps,chessRec(m,q.id,ps),ctx)
+          &&(ctx.strategy.withdrawalPriority(m,ps,q)||0)<priority)
+          .sort((a,b)=>pieceValue(m,ps,a,ctx)-pieceValue(m,ps,b,ctx)||a.uid-b.uid)[0];
+        if(reserve&&sellChess(m,ps,reserve)) (ps._botCoopUnusedHistory||=[]).push({kind:'withdrawal-reserve',round:m.round,kept:p.id,sold:reserve.id});
+      }else (ps._botCoopUnusedHistory||=[]).push({kind:'withdrawal-item-space',round:m.round,kept:p.id});
+    }
     if (freeSlot(ps.hand) < 0 && preserveChess(m, ps, p)) {
       const safe = ctx.strategy?.safeWithdrawals;
       if (typeof safe === 'function' ? safe(m, ps, p) : safe === true) freeShoppingSlot(m, ps);

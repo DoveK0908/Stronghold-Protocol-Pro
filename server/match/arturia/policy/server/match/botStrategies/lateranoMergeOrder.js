@@ -1,5 +1,6 @@
 // [ASSUMED] Compare nominal pick-three rewards, not the seeded next offer or a combat replay.
 // Copy weights use public initial stock minus this player's holdings; hidden pool depletion is not inspected.
+import { readsTeammateRoster } from '../botCoreStrategies.js';
 const gdOf = (m, ps) => ps.gd || m.gd;
 
 /** Exact expected best value of up to three distinct, copy-weighted identities. No random draws. */
@@ -24,7 +25,7 @@ export function expectedMergeReward(entries, count = 3) {
   return value;
 }
 
-export function lateranoMergeOrder(m, ps, recipe, scoreReward, { publicTeammates = false } = {}) {
+export function lateranoMergeOrder(m, ps, recipe, scoreReward, { publicTeammates = false, partialBundle = false } = {}) {
   const gd = gdOf(m, ps), level = ps.shop.level, price = Math.max(0, ps.shop.upgradePrice);
   if (level >= gd.maxShopLevel || gd.rewardOffer().count > 3 || !ps.hand.some(p => !p)) return null;
   const seen = new Set(), slots = [];
@@ -35,6 +36,20 @@ export function lateranoMergeOrder(m, ps, recipe, scoreReward, { publicTeammates
     seen.add(base); slots.push(slot);
   }
   if (!slots.length) return null;
+  const allSlots = slots.slice();
+  let pendingSlots = [];
+  if (partialBundle && ps.funds < price + slots.reduce((s, slot) => s + ps.priceOf(slot), 0)) {
+    let best = null;
+    for (let mask = 1; mask < 2 ** slots.length; mask++) {
+      const subset = slots.filter((_, i) => mask & 2 ** i), cost = subset.reduce((s, p) => s + ps.priceOf(p), 0);
+      if (cost + price > ps.funds) continue;
+      const value = subset.reduce((s, p) => s + Math.max(0, scoreReward(p.id)), 0);
+      if (!best || value > best.value || value === best.value && cost < best.cost) best = { subset, value, cost };
+    }
+    if (!best) return null;
+    pendingSlots = slots.filter(s => !best.subset.includes(s));
+    slots.splice(0, slots.length, ...best.subset);
+  }
   const cost = slots.reduce((s, slot) => s + ps.priceOf(slot), 0);
   if (ps.funds < price + cost || ps.funds < price + recipe.upgradeReserve(m, ps)) return null;
   const owned = new Map();
@@ -44,7 +59,7 @@ export function lateranoMergeOrder(m, ps, recipe, scoreReward, { publicTeammates
     owned.set(base, (owned.get(base) || 0) + (publicTeammates ? copies : p.poolCopies ?? copies));
   }
   // Only visible deployed teammate holdings, never their private hands, shops or actual hidden pool depletion.
-  if (publicTeammates) for (const other of m.players.values()) {
+  if (publicTeammates && readsTeammateRoster(m, ps)) for (const other of m.players.values()) {
     if (other.playerId === ps.playerId || !other.alive) continue;
     for (const p of other.board.values()) if (p.kind === 'chess') {
       const base = gd.baseIdOf(p.id);
@@ -67,7 +82,8 @@ export function lateranoMergeOrder(m, ps, recipe, scoreReward, { publicTeammates
   const view = Object.create(ps);
   // Keep all other inherited critical-card, equipment and six-member gates intact.
   view.shop = { ...ps.shop, slots: ps.shop.slots.map(s => s?.kind === 'chess' && seen.has(gd.baseIdOf(s.id)) ? null : s) };
-  return { upgradeFirst, slots, gatePlayer: view, current, next, level, cost };
+  return { upgradeFirst, slots, gatePlayer: view, current, next, level, cost,
+    ...(partialBundle ? { pendingSlots, allSlots } : {}) };
 }
 
 export function withLateranoMergeOrder(recipe, { cooperative = false } = {}) {
