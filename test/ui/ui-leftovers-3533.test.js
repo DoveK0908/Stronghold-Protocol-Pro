@@ -110,7 +110,8 @@ test('the other event screens at a big 文字大小: 成就统计\'s banner, the
   assert.match(readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8'), /class=\$\{cx\('dorder', cur && 'is-cur'/);
   // FORK NOTE (2026-10-25): the official rule above made the latency cell 1 px taller than its neighbours; the fork's
   // strip now stretches every cell to the strip's height instead (the same alignment the room's top bar uses)
-  assert.match(css('public/css/screens/game.css'), /\.gtop__net \.ping, \.gtop__net \.specpill \{ height: 100%; min-height: 0; padding-top: 0; padding-bottom: 0; \}/);
+  assert.match(css('public/css/screens/game.css'),
+    /\.gtop__net \.ping, \.gtop__net \.specpill,\s*\.gtop__net \.latency-status \.server-load-button \{ height: 100%; min-height: 0; padding-top: 0; padding-bottom: 0; \}/);
   const lo = css('public/css/screens/loadout.css');
   assert.match(lo, /\.lo-top__note \{ margin: 0; max-width: min\(8\.4rem, 100%\);/);
   assert.match(lo, /\.lo-bbar__tiers \{[^}]*padding-top: max\(\.24rem, calc\(17px \* var\(--sp-ui, 1\)\)\); \}/);
