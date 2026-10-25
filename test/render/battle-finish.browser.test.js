@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+import { CHROME } from '../e2e/chrome.mjs';
 const skip = process.env.RENDER_E2E !== '1' || !existsSync(CHROME);
 
 test('finished field idles living Spine models and drains effects; paused feed does neither', { skip, timeout: 90000 }, async () => {

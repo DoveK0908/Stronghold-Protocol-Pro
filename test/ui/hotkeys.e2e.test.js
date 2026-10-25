@@ -8,9 +8,9 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const OUT = fileURLToPath(new URL('../e2e/out/', import.meta.url));
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 
 describe('rebindable shortcuts (设置 → 快捷键)', { skip: !ENABLED && 'set SP_E2E=1 and CHROME_PATH to run' }, () => {

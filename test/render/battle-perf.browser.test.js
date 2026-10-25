@@ -11,13 +11,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gpuArgs } from '../../tools/perfbench.mjs';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const CHROME = process.env.CHROME_PATH || {
-  win32: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  linux: '/usr/bin/google-chrome',
-}[process.platform];
 const enabled = process.env.RENDER_E2E === '1' && !!CHROME && existsSync(CHROME) && existsSync(path.join(ROOT, 'public/assets'));
 const skip = enabled ? false : 'set RENDER_E2E=1 (needs Chrome and the downloaded assets)';
 const index = JSON.parse(readFileSync(path.join(ROOT, 'public/dev/perf/index.json'), 'utf8'));

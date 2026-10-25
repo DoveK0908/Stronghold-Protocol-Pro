@@ -13,7 +13,6 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = process.env.SP_E2E === '1' && fs.existsSync(CHROME);
 
 const PAGE = `<!doctype html><title>Build runtime regression</title><link rel="icon" href="data:,">
@@ -72,6 +71,7 @@ function fixture() {
   fs.writeFileSync(path.join(root, 'public/dev/build-runtime.js'), SCRIPT);
   fs.writeFileSync(path.join(root, 'start.mjs'), `
 import { startServer } from './server/index.js';
+import { CHROME } from '../e2e/chrome.mjs';
 const srv = await startServer({ port: Number(process.env.PORT), host: '127.0.0.1', quiet: true });
 process.send({ port: srv.port });
 process.on('SIGTERM', async () => { await srv.close(); process.exit(0); });

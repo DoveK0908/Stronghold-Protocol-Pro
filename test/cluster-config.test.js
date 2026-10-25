@@ -7,6 +7,12 @@ import { randomBytes } from 'node:crypto';
 import { loadClusterConfig } from '../server/cluster/config.js';
 
 const build = 'a'.repeat(40);
+// POSIX file modes are not enforced on Windows: `stat.mode` there is always 0o666, so every fixture key file below
+// reads as world-writable and server/cluster/config.js rejects it before the test reaches its subject. The guard is
+// meaningful on the Linux hosts that run the cluster (CI is Ubuntu-only), so the cases are skipped here rather than
+// weakened for everyone.
+const winSkip = process.platform === 'win32'
+  && 'POSIX file modes are not enforced on Windows (stat.mode is 0o666); run the cluster config guard on a POSIX host';
 async function fixture(t) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'owned-cluster-config-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -17,7 +23,7 @@ async function fixture(t) {
 }
 const game = keyFile => ({ role: 'game', nodeId: 'game-1', build, host: '127.0.0.1', port: 34111, keyFile, coordinatorUrl: 'http://10.253.77.2:34110/' });
 
-test('game configuration loads exactly one external binary key without accepting inline credentials', async t => {
+test('game configuration loads exactly one external binary key without accepting inline credentials', { skip: winSkip }, async t => {
   const f = await fixture(t), config = await f.write(game(f.keyFile));
   assert.ok(Buffer.isBuffer(config.key)); assert.equal(config.key.length, 32);
   assert.equal(Object.hasOwn(config, 'keyFile'), false);
@@ -25,7 +31,7 @@ test('game configuration loads exactly one external binary key without accepting
   await assert.rejects(f.write({ ...game(f.keyFile), generation: 'static-generation-must-not-reuse' }));
 });
 
-test('node URLs must remain credential-free private IP endpoints', async t => {
+test('node URLs must remain credential-free private IP endpoints', { skip: winSkip }, async t => {
   const f = await fixture(t);
   for (const coordinatorUrl of ['http://8.8.8.8/', 'https://external.invalid/', 'http://user:password@127.0.0.1/', 'http://127.0.0.1/?token=invalid', 'http://127.0.0.1/other']) {
     await assert.rejects(f.write({ ...game(f.keyFile), coordinatorUrl }));
@@ -33,7 +39,7 @@ test('node URLs must remain credential-free private IP endpoints', async t => {
   assert.equal((await f.write({ ...game(f.keyFile), coordinatorUrl: 'http://[::1]:34110/' })).role, 'game');
 });
 
-test('only fixed revisions, legal worker counts and bounded future clock allowances are accepted', async t => {
+test('only fixed revisions, legal worker counts and bounded future clock allowances are accepted', { skip: winSkip }, async t => {
   const f = await fixture(t);
   for (const extra of [{ build: 'master' }, { build: build + '\n' }, { combatWorkers: 0 }, { combatWorkers: 33 }, { trialWorkers: 3 }, { futureSkewMs: 2001 }, { role: 'games' }]) {
     await assert.rejects(f.write({ ...game(f.keyFile), ...extra }));
@@ -42,7 +48,7 @@ test('only fixed revisions, legal worker counts and bounded future clock allowan
   assert.equal(value.combatWorkers, 12);
 });
 
-test('world-readable/writable, wrong-size and symbolic-link key files fail closed', async t => {
+test('world-readable/writable, wrong-size and symbolic-link key files fail closed', { skip: winSkip }, async t => {
   const f = await fixture(t);
   await chmod(f.keyFile, 0o644); await assert.rejects(f.write(game(f.keyFile)));
   await chmod(f.keyFile, 0o600);
@@ -53,7 +59,7 @@ test('world-readable/writable, wrong-size and symbolic-link key files fail close
   await assert.rejects(f.write(game(link)));
 });
 
-test('runtime config itself is protected and rejects raw/malformed/non-object documents', async t => {
+test('runtime config itself is protected and rejects raw/malformed/non-object documents', { skip: winSkip }, async t => {
   const f = await fixture(t);
   await f.write(game(f.keyFile));
   await chmod(f.file, 0o644); await assert.rejects(loadClusterConfig(f.file));
@@ -63,7 +69,7 @@ test('runtime config itself is protected and rejects raw/malformed/non-object do
   }
 });
 
-test('coordinator nodes are unique, use separate files and preserve unlimited capacity default', async t => {
+test('coordinator nodes are unique, use separate files and preserve unlimited capacity default', { skip: winSkip }, async t => {
   const f = await fixture(t);
   const cfg = { role: 'coordinator', build, host: '127.0.0.1', port: 34100, privateHost: '127.0.0.1', privatePort: 34110,
     nodes: [{ nodeId: 'game-1', url: 'http://10.253.77.2:34111/', keyFile: f.keyFile }] };
@@ -76,7 +82,7 @@ test('coordinator nodes are unique, use separate files and preserve unlimited ca
   for (const receiptWorker of ['true', 1, null]) await assert.rejects(f.write({ ...cfg, receiptWorker }));
 });
 
-test('one ingress configuration can later be copied to many entries without introducing keys or shard selection', async t => {
+test('one ingress configuration can later be copied to many entries without introducing keys or shard selection', { skip: winSkip }, async t => {
   const f = await fixture(t);
   const cfg = { role: 'ingress', host: '127.0.0.1', port: 34101, coordinatorUrl: 'http://10.253.77.2:34100/',
     nodes: [{ nodeId: 'game-1', url: 'http://10.253.77.2:34111/' }], origins: ['https://ark-proto.stardust.matce.cn'] };
@@ -86,7 +92,7 @@ test('one ingress configuration can later be copied to many entries without intr
   await assert.rejects(f.write({ ...cfg, origins: ['*'] }));
 });
 
-test('public game display slots are bounded, unique and available only on game or keyed coordinator nodes', async t => {
+test('public game display slots are bounded, unique and available only on game or keyed coordinator nodes', { skip: winSkip }, async t => {
   const f = await fixture(t);
   assert.equal((await f.write({ ...game(f.keyFile), publicSlot: 16, combatWorkers: 8 })).publicSlot, 16);
   for (const publicSlot of [0, 257, '16', 1.5, null]) await assert.rejects(f.write({ ...game(f.keyFile), publicSlot }));
@@ -100,7 +106,7 @@ test('public game display slots are bounded, unique and available only on game o
     nodes: [{ nodeId: 'game-1', publicSlot: 1, url: 'http://10.253.77.2:34111/' }], origins: ['https://ark-proto.stardust.matce.cn'] }));
 });
 
-test('opt-in ingress links: the coordinator loads one key per ingress id, an ingress only its own key and a private link URL', async t => {
+test('opt-in ingress links: the coordinator loads one key per ingress id, an ingress only its own key and a private link URL', { skip: winSkip }, async t => {
   const f = await fixture(t), other = path.join(f.dir, 'ingress-02-key');
   await writeFile(other, randomBytes(32), { mode: 0o600 });
   const coordinator = { role: 'coordinator', build, host: '127.0.0.1', port: 34100, privateHost: '127.0.0.1', privatePort: 34110,

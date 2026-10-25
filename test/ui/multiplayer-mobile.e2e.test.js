@@ -10,6 +10,7 @@ import { startServer } from '../../server/index.js';
 import { Match } from '../../server/match/Match.js';
 import { PROTOCOL_VERSION, MATCHMAKING_VERSION } from '../../shared/constants.js';
 import { PLAYER_CAPACITY_VERSION } from '../../shared/playerCapacity.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const enabled = process.env.SP_E2E === '1';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -25,7 +26,7 @@ test('mobile lobby, same-pool count and every expanded roster seat remain operab
     class MobileMatch extends Match { constructor(opts) { super({ ...opts, clientCombat: false, botRehearsal: 0 }); } }
     srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true, MatchClass: MobileMatch, seedFn: () => 173,
       combatWorkers: 1, trialWorkers: 0, snapshotHz: 10, wsCompression: 'on' });
-    browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true,
+    browser = await puppeteer.launch({ executablePath: CHROME, headless: true,
       args: ['--no-sandbox', '--mute-audio', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     const page = await browser.newPage();
     // 界面大小 at 100 %: the pixel floors checked here are the design's 100 % sizes; the phone default 80 % scales them

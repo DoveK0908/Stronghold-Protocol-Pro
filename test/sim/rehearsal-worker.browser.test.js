@@ -12,8 +12,8 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { makeMatch } from '../match/harness.js';
 import { simulateRehearsal } from '../match/simClient.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = (process.env.RENDER_E2E === '1' || process.env.SIM_E2E === '1') && existsSync(CHROME);
 const skip = enabled ? false : 'set SIM_E2E=1 or RENDER_E2E=1 (needs Chrome)';
 

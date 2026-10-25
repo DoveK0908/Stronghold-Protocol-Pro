@@ -4,8 +4,8 @@ import { existsSync } from 'node:fs';
 import { startServer } from '../../server/index.js';
 import { makeBattle } from '../helpers/battleHarness.js';
 import { spawnMapChar } from '../../server/sim/content/tokens.js';
+import { CHROME as chrome } from '../e2e/chrome.mjs';
 
-const chrome = process.env.CHROME_PATH;
 const enabled = process.env.SP_E2E === '1' && chrome && existsSync(chrome);
 
 test('user Given a real battle with strategy medics When clicking units and closing details Then attack tiles follow selection',

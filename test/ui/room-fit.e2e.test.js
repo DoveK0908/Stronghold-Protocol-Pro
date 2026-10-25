@@ -26,10 +26,10 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { textProblems } from '../e2e/text-fit.mjs';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 // without the art pack (CI) every card shows its avatar frame, and the pictures and music the manifest names answer 404
 const ART = existsSync(path.join(ROOT, 'public/assets'));

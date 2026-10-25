@@ -9,6 +9,7 @@ import { startServer } from '../../server/index.js';
 import { Match } from '../../server/match/Match.js';
 import { PROTOCOL_VERSION, MATCHMAKING_VERSION } from '../../shared/constants.js';
 import { PLAYER_CAPACITY_VERSION } from '../../shared/playerCapacity.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const enabled = process.env.SP_E2E === '1';
@@ -33,7 +34,7 @@ test('phone online count and full-size shops stay visible, touchable and reconne
     srv = await startServer({ port: 0, host: '127.0.0.1', quiet: true, MatchClass: PhoneMatch, seedFn: () => 173,
       combatWorkers: 1, trialWorkers: 0, snapshotHz: 10, wsCompression: 'off' });
     assert.equal((await fetch(srv.url + '/healthz')).status, 200);
-    browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || '/usr/bin/google-chrome', headless: true,
+    browser = await puppeteer.launch({ executablePath: CHROME, headless: true,
       args: ['--no-sandbox', '--mute-audio', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
     page = await browser.newPage();
     // 界面大小 at 100 %: the pixel floors checked here are the design's 100 % sizes; the phone default 80 % scales them

@@ -8,7 +8,6 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const skip = process.env.RENDER_E2E === '1' && existsSync(CHROME) ? false : 'set RENDER_E2E=1 (needs Chrome)';
 const HTML = `<!doctype html><html><head><link rel="stylesheet" href="/css/theme.css"><link rel="stylesheet" href="/css/screens/game.css"></head>
 <body style="margin:0"><div id="host" style="position:relative;width:1000px;height:650px"></div><div id="hooks"></div></body></html>`;
@@ -69,6 +68,7 @@ function trackPixiApplications() {
 
 const FACTORY_WRAPPER = `export * from '/js/render/app.js?implementation';
 import { createFieldView as create } from '/js/render/app.js?implementation';
+import { CHROME } from '../e2e/chrome.mjs';
 export async function createFieldView(...args) {
   window.__initialization.calls++;
   if (window.__initialization.ignoreSignal) args[1] = { ...args[1], signal: undefined };

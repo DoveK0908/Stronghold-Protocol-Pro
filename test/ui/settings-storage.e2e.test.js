@@ -10,8 +10,8 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { CHROME } from '../e2e/chrome.mjs';
 
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 const KEPT = '已持久保存：存储空间不足时，浏览器不会自动清掉导入的素材。';
 const NOT_KEPT = '未持久保存：存储空间不足时，浏览器可能清掉导入的素材。';

@@ -2,7 +2,7 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+import { CHROME } from '../e2e/chrome.mjs';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 describe('0.2.3 follow-up client features', { skip: !ENABLED }, () => {
   let server, browser, base;

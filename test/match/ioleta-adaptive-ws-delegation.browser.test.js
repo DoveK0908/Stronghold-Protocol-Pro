@@ -10,8 +10,8 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import { TestClient } from '../helpers/wsClient.js';
 import { attachWsSimClient, simulateRehearsal } from './simClient.js';
+import { CHROME as chrome } from '../e2e/chrome.mjs';
 
-const chrome = process.env.CHROME_PATH;
 const enabled = process.env.SIM_E2E === '1' && chrome && existsSync(chrome);
 const MODES = ['answer', 'mute', 'delay'];
 const HOLD_MS = 4000; // past the scaled 1.5 s answer window

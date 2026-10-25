@@ -38,9 +38,9 @@ import { GameData } from '../../server/match/gamedata.js';
 import { computeBonds, bondSnapshot } from '../../server/match/bondsMeta.js';
 import { tileKey } from '../../server/match/board.js';
 import { makeMatch, DATA } from '../match/harness.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = (process.env.RENDER_E2E === '1' || process.env.SIM_E2E === '1') && existsSync(CHROME);
 const skip = enabled ? false : 'set SIM_E2E=1 or RENDER_E2E=1 (needs Chrome)';
 // game seconds (Battle.runToEnd), a safety net only: every field must clear before it. The bots' boards follow the rules

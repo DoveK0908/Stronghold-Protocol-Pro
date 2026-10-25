@@ -9,8 +9,8 @@ import { getDefaultSource } from '../../server/sim/simdata.js';
 import { buildBattleSpec } from '../../server/sim/spec.js';
 import { Grid } from '../../server/sim/grid.js';
 import { GEO } from '../../shared/constants.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = process.env.SIM_E2E === '1' && existsSync(CHROME);
 const raw = getData({ log: { info() {}, warn() {}, error() {} } });
 const gd = new GameData(raw, 'mode_multi_hard');

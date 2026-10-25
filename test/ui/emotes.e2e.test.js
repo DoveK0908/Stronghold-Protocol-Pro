@@ -13,10 +13,10 @@ import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { EMOTE_THEMES } from '../../shared/constants.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 // The official pictures reach the wheel through a two-link chain (data.js artUrls): the local-client extraction
 // first (tools/local-extract → data/local-assets.json), then the copies tools/fetch-assets.mjs downloads into

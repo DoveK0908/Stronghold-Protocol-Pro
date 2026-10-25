@@ -7,13 +7,10 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { gpuArgs } from '../../tools/perfbench.mjs';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const OUT = process.env.SP_CLIP_SHOTS ? path.resolve(process.env.SP_CLIP_SHOTS) : null;
-const CHROME = process.env.CHROME_PATH || {
-  darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  linux: '/usr/bin/google-chrome', win32: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
-}[process.platform];
 const enabled = process.env.SP_E2E === '1' || process.env.RENDER_E2E === '1';
 const cases = [
   ['char_102_texas', 0, 'Attack_Loop'], ['char_102_texas', 1, 'Attack_Loop'],

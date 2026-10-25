@@ -18,14 +18,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decodePng } from '../../tools/crop-board-atlas.mjs';
 import { gpuArgs } from '../../tools/perfbench.mjs';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
-const CHROME = process.env.CHROME_PATH || {
-  win32: 'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  darwin: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  linux: '/usr/bin/google-chrome',
-}[process.platform];
 const INDEX = path.join(ROOT, 'public/assets/local/fx/index.json');
 // the full set (the units' floating units are not in the Phase 1a sample)
 const hasFx = existsSync(INDEX) && (() => { try { return !!JSON.parse(readFileSync(INDEX, 'utf8')).units?.char_1038_whitw2; } catch { return false; } })();

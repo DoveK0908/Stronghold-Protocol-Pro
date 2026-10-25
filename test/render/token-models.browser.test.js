@@ -15,10 +15,10 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHROME } from '../e2e/chrome.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'test/e2e/out');
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const MODELS = JSON.parse(readFileSync(path.join(ROOT, 'tools/assets/local-token-spines.json'), 'utf8')).models;
 const IDS = Object.keys(MODELS).sort();
 const extracted = IDS.every((id) => existsSync(path.join(ROOT, 'public/assets/local/spine/token', id)));

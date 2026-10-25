@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { makeMatch } from '../match/harness.js';
+import { CHROME } from '../e2e/chrome.mjs';
 
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const ENABLED = process.env.SP_E2E === '1' && existsSync(CHROME);
 
 describe('expandable bench display', { skip: !ENABLED && 'set SP_E2E=1 and CHROME_PATH to run' }, () => {

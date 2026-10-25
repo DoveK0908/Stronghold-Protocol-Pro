@@ -2,8 +2,8 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { CHROME } from '../e2e/chrome.mjs';
 
-const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const enabled = process.env.RENDER_E2E === '1' && existsSync(CHROME);
 const art = existsSync(new URL('../../public/assets/local/map/autochess/TX_autochessi_D.png', import.meta.url));
 describe('renderer recovery after transient resource failures', { skip: !enabled }, () => {

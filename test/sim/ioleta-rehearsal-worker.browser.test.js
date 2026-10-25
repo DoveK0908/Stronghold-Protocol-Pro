@@ -9,8 +9,8 @@ import { simulateRehearsal } from '../match/simClient.js';
 import { createIoletaPrepSteps } from '../../server/match/botIoleta.js';
 import { getBotStrategy } from '../../server/match/botStrategies.js';
 import { arrangeSteps, contactCandidatePlansSteps } from '../../server/match/bot.js';
+import { CHROME as chrome } from '../e2e/chrome.mjs';
 
-const chrome = process.env.CHROME_PATH;
 const enabled = process.env.SIM_E2E === '1' && chrome && existsSync(chrome);
 const combined = { id: 'ioleta-contact', base: getBotStrategy('ioleta'), ...createIoletaPrepSteps({
   arrangeSteps: (m, ps, opts = {}) => arrangeSteps(m, ps, { ...opts, candidatePlans: contactCandidatePlansSteps }),
