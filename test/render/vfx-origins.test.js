@@ -512,6 +512,32 @@ describe('UnitView.boneOffset (render/units.js)', () => {
     w._muzzleName = undefined;
     assert.ok(w._muzzleBone(only), 'a lone marker bone is still used');
   });
+
+  // The marker is tested at the pose the caller READS, not at the setup pose: 隐现's `F_Muzzle` is swung out to the
+  // muzzle by the Attack clip, so a shot must take it (the model's own marker) instead of passing over it and ending on
+  // the weapon / hand bones of the rest pose — the hip, "still fires from the middle of the sprite".
+  test('a marker on the setup origin is used once the attack clip poses it out', () => {
+    class MarkerSkel {
+      constructor(data) {
+        this.data = data;
+        this.bones = [bone('F_Muzzle', 0, 0)];
+        this.bones[0].data = { name: 'F_Muzzle', x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1, parent: null };
+      }
+      findBone(n) { return this.bones.find((b) => b.data.name === n) || null; }
+      setToSetupPose() { pose(this.bones[0], 0, 0); }
+      updateWorldTransform() {}
+    }
+    const { v } = makeView();
+    v.actor.spine.skeleton = new MarkerSkel({ height: 667 });
+    v.actor.mode = 'attack';
+    // the strike frame poses the marker at (300, −200) → 0.9375 / 0.625 tiles, like any other muzzle
+    const s = v.boneOffset(['F_Muzzle'], undefined, true);
+    assert.ok(s, 'the strike pose is what is read, so the marker is not the rest pose');
+    near(s.x, 300 / 320, 1e-9, 'strike x'); near(s.up, 200 / 320, 1e-9, 'strike up');
+    // the rest pose still has nothing to read (a marker parked on the feet is not a muzzle)
+    v.actor.mode = 'base';
+    assert.equal(v.boneOffset(['F_Muzzle']), null, 'no pose: the marker is still skipped');
+  });
 });
 
 // With the local client's art and extraction (assets fetched, extract.py --only fx): a skin's static Muzzle is its bone

@@ -178,20 +178,26 @@ const _bo = { x: 0, up: 0, angle: 0, flip: 1 };
 
 /** The bone names to try for a point kind on a model that carries no skin point table (front and back skeletons). */
 export function boneNames(kind) {
-  const base = POINT_NAMES[kind] || [];
+  // A Special point (`s0`..`s5`: the client's per-skin spawn targets — a hand, a weapon, a funnel) has no entry in
+  // POINT_NAMES, so this list used to come back EMPTY and every effect spawned on one was placed by the caller's own
+  // default: the chest, i.e. the middle of the sprite.
+  const specialKind = !!kind && kind[0] === 's';
+  const base = specialKind ? [...special(kind.slice(1)), ...POINT_NAMES.muzzle] : POINT_NAMES[kind] || [];
   const out = [];
   for (const n of base) out.push(n, `F_${n}`, `B_${n}`);
   // Last resort: the names operators and skins actually use besides `Muzzle`. The client's BoneFollower reads a bone
   // per prefab point, but the extracted index has no point for 578 of 787 skins, so the bone has to be found by name:
   // `F_OriginMuzzle` (伊内丝's 蝶舞华章), `F_Gun` / `F_Weapon` (德克萨斯, 隐现's 甜品大奖) and the hands when nothing
   // better exists. Without these the shot leaves from the chest, i.e. the middle of the sprite.
-  if (kind === 'muzzle') {
+  if (kind === 'muzzle' || specialKind) {
     // A bone with muzzle in its name is the model's own marker for where a shot leaves, whatever it is called — and the
     // one thing the client itself names (`F_OriginMuzzle` on 伊内丝's 蝶舞华章, `F_Darts_Muzzle` on 断崖, a bare `F_Muzzle`
     // everywhere else) — so it is tried BEFORE the weapon / hand guesses. `boneOffset` skips a marker that sits on the
-    // skeleton's origin in its setup pose (隐现's `F_Muzzle`, which is where the sprite's feet are) and keeps going.
+    // skeleton's origin at the pose the caller reads (隐现's `F_Muzzle` at rest, swung out by the Attack clip) and
+    // keeps going. A Special point falls back to the same bones: its skin point names a bone the extracted skeleton
+    // may not carry, and the prefab's Default-pose `pos` is in the middle of the sprite.
     out.push(/originmuzzle/i, /muzzle/i, /gunpoint/i, /firepoint/i);
-    for (const n of ['OriginMuzzle', 'Gun', 'Weapon', 'HandHold', 'R_Hand', 'L_Hand', 'MuzzlePoint']) out.push(n, `F_${n}`, `B_${n}`);
+    for (const n of ['OriginMuzzle', 'Gun', 'Weapon', 'WeaponPoint', 'HandHold', 'R_Hand', 'L_Hand', 'MuzzlePoint']) out.push(n, `F_${n}`, `B_${n}`);
     out.push(/weapon/i, /(^|_)gun$/i, /handhold|_hand$/i);
   } else if (kind === 'head') out.push(/^(F_|B_)?head(anchor|point)?$/i);
   return out;
@@ -240,9 +246,11 @@ export function unitPoint(skin, kind, unit, out = [0, 0, 0]) {
     // No such point and no bone to follow (578 of the 787 skin records in the extracted index carry no Muzzle point; a
     // model that is not drawn yet has no bone either). A muzzle at 0.4 tiles straight up sits in the middle of the
     // sprite, which read as "every ranged operator fires from its centre": put it in front of the chest instead
-    // (hand height ≈ two thirds of a tile, a third of a tile towards the facing side).
-    const h = kind === 'head' ? 0.75 : kind === 'muzzle' ? 0.62 : 0.3;
-    if (kind === 'muzzle') out[0] += (unit.left ? -0.3 : 0.3) * k;
+    // (hand height ≈ two thirds of a tile, a third of a tile towards the facing side). A Special point is a hand /
+    // weapon point of the client's too, so it takes the same place rather than the belt buckle.
+    const hand = kind === 'muzzle' || kind[0] === 's';
+    const h = kind === 'head' ? 0.75 : hand ? 0.62 : 0.3;
+    if (hand) out[0] += (unit.left ? -0.3 : 0.3) * k;
     out[1] += h * 0.866 * k; out[2] -= h * 0.5 * k;
   }
   return out;

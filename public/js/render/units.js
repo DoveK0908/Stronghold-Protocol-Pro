@@ -1501,28 +1501,42 @@ export class UnitView {
     const sk = sp && sp.skeleton;
     if (!sk || typeof sk.findBone !== 'function') return null;
     const height = sk.data && Number.isFinite(sk.data.height) ? sk.data.height : NaN;
-    let b = null;
-    // A bone that sits on the skeleton's ORIGIN in its setup pose is a marker the weapon does not follow (隐现's
-    // `F_Muzzle` is exactly there; only the Attack clip swings it out): a shot read off it leaves from the feet, i.e. the
-    // middle of the sprite, which this path exists to fix. Pass over it and take the next candidate — and when the list
-    // has nothing else, answer null rather than that marker, so the caller falls through to its own wider scan
+    const hit = strike && typeof a.strikePose === 'function' ? a.strikePose() : null;
+    // The pose this read will take the bone at, if any: the attack clip's strike frame for a shot, else a clip started
+    // since the model was last posed.
+    const posed = hit ? (bone) => bonePose(sp, bone, hit.anim, hit.time)
+      : (!a._applied && !a.frozen ? (bone) => bonePose(sp, bone) : null);
+    // A bone that sits on the skeleton's ORIGIN at the pose read is a marker the weapon does not follow (隐现's
+    // `F_Muzzle` is exactly there at rest): a shot read off it leaves from the feet, i.e. the middle of the sprite,
+    // which this path exists to fix. Test it AT THE POSE the caller reads, though — that same `F_Muzzle` is swung out
+    // to the muzzle by the Attack clip, so discarding it before posing it dropped every operator whose marker only
+    // moves during the shot back onto the weapon / hand bones of the rest pose (the hip: "still fires from the middle
+    // of the sprite"). Pass over a bone that is on the origin *as read* and take the next candidate — and when the
+    // list has nothing else, answer null rather than that marker, so the caller falls through to its own wider scan
     // (render/vfx/mounts.js unitPoint asks `boneNames(kind)`, whose patterns reach `F_Funnel_Muzzle_A1`).
+    const onOrigin = (bone) => {
+      const p = posed ? posed(bone) : null;
+      const m = p && p.matrix;
+      if (m && Number.isFinite(m.tx) && Number.isFinite(m.ty)) {
+        return Math.hypot(m.tx, m.ty) <= (Number.isFinite(height) && height > 0 ? height * 0.02 : 1);
+      }
+      return originMarker(bone, height);
+    };
+    let b = null;
     for (const n of Array.isArray(names) ? names : [names]) {
       if (!n) continue;
       // a RegExp matches any bone name (a muzzle bone some operators name GunPoint / Muzzle_01): the first in order
       if (n instanceof RegExp) {
         const list = Array.isArray(sk.bones) ? sk.bones : [];
-        b = list.find((bone) => n.test(String((bone && bone.data && bone.data.name) || '')) && !originMarker(bone, height)) || null;
+        b = list.find((bone) => n.test(String((bone && bone.data && bone.data.name) || '')) && !onOrigin(bone)) || null;
       } else {
         const bone = boneOf(sk, n);
-        b = bone && !originMarker(bone, height) ? bone : null;
+        b = bone && !onOrigin(bone) ? bone : null;
       }
       if (b) break;
     }
     if (!b) return null;
-    const hit = strike && typeof a.strikePose === 'function' ? a.strikePose() : null;
-    if (hit) b = bonePose(sp, b, hit.anim, hit.time) || b;
-    else if (!a._applied && !a.frozen) b = bonePose(sp, b) || b;
+    if (posed) b = posed(b) || b;
     // pixi-spine keeps the bone's world transform in `matrix` (skeleton space, y down; spine-ts's worldX / worldY else)
     const m = b.matrix;
     const tx = m ? m.tx : b.worldX, ty = m ? m.ty : b.worldY;

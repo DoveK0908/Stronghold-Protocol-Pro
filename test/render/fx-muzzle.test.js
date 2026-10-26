@@ -65,6 +65,17 @@ test('the weapon bones of the official-effect layer are what the procedural shot
   assert.equal(muzzleBones().length, names.length, 'muzzleBones() is that list, not a copy that can drift again');
 });
 
+test('a Special point asks for its own bone, then the weapon / hand bones (not an empty list)', () => {
+  // Spawn Special0..Special5 (index `s0`..`s5`) are the client's per-skin targets for casts, auras and funnels. They had
+  // no POINT_NAMES entry, so the candidate list came back empty and every effect on one was placed at the chest.
+  const s0 = boneNames('s0'), s2 = boneNames('s2');
+  assert.ok(s0.length > 0, 'a Special point has bones to look for');
+  for (const n of ['SpecialPoint0', 'F_SpecialPoint0', 'B_SpecialPoint0', 'F_Muzzle', 'F_Gun', 'F_HandHold']) assert.ok(s0.includes(n), `${n} is tried for s0`);
+  for (const n of ['SpecialPoint2', 'F_SpecialPoint2', 'F_Muzzle']) assert.ok(s2.includes(n), `${n} is tried for s2`);
+  assert.equal(boneNames('muzzle').length, 40, 'the muzzle list is the weapon / hand fallback the Special points add to');
+  for (const n of boneNames('muzzle').filter((n) => typeof n === 'string')) assert.ok(s0.includes(n), `${n} is still tried on a Special point`);
+});
+
 test('muzzleOffset is null without a model / a bone / finite numbers', () => {
   assert.equal(muzzleOffset(null), null);
   assert.equal(muzzleOffset({}), null, 'no boneOffset (2D board path)');
