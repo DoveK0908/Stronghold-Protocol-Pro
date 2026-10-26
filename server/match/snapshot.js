@@ -29,6 +29,7 @@
 // must be added to one of the lists (and SNAPSHOT_VERSION raised when a saved field changes meaning).
 
 import { PHASE } from '../../shared/constants.js';
+import { stageWithBenchExpand } from '../../shared/benchExpand.js';
 import { SharedPool, createItemPools, createPoolGroups } from './pool.js';
 import { SPEED_BOOST } from './match/speedVote.js';
 
@@ -87,6 +88,8 @@ export const MATCH_FIELDS = Object.freeze({
     'BattleClass', 'battleContent', 'timerScale', 'gameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
     'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'bot', 'externalAI', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
     'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
+    // 整备区扩容: rebuilt from the options like `experimental` (Match ctor: options + whether the stage has the cells)
+    'benchExpand',
     // the room version this match plays in (server/versions.js): rebuilt from the room's own options like `mode`
     'version',
     'capacityExperiment', 'twentyPlayerMode', 'disableDuckLord', 'players', 'order', 'spectators', 'botBands', 'stage', 'pool',
@@ -125,6 +128,8 @@ export const PLAYER_FIELDS = Object.freeze({
   special: Object.freeze(['ready', 'connected', 'loadout', 'ops', 'skins', 'diyStock']),
   derived: Object.freeze([
     'm', 'gd', 'playerId', 'seat', 'name', 'tag', 'card', 'isBot', 'standIns', '_standInSet', 'diy', '_diyRecords', 'diyBanned', 'bonds',
+    // 整备区扩容: the bench capacity the constructor set from `handSizeOf(m)` (10, or HAND_MAX when the room turned it on)
+    'handSize',
   ]),
   transient: Object.freeze([
     '_deployMap', '_deployField', '_legalityStale', '_botPrepToken', '_botPrepWork', '_lastPriv', '_botRangeRecs',
@@ -377,6 +382,9 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
   }
   if (doc.damageBoard && typeof doc.damageBoard === 'object') Object.assign(m.damageBoard, decodeValue(doc.damageBoard));
   m.stage = m.stageId ? m.gd.stage(m.stageId) : null;
+  // 整备区扩容 (experimental `benchExpand`): `gd.stage` hands out the shared data stage, so a restored match repatches it
+  // from `benchExpand` exactly as the constructor did (Match.js) — a plain copy keeps the other matches' stage untouched
+  if (m.stage && m.benchExpand) m.stage = stageWithBenchExpand(m.stage);
   // the game data a release ships may have dropped what the checkpoint holds: such a match does not come back
   if ((m.stageId && !m.stage) || (m.bossId && !m.gd.boss(m.bossId))) { log?.warn?.(`[snapshot] ${m.roomCode}: checkpoint refused (data)`); return false; }
 
