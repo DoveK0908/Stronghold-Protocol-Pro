@@ -6,7 +6,7 @@
 //
 // ANONYMITY: the board never learns who posted — the server keeps a hash of a random secret that this browser stores, and
 // that secret is the only way to edit or withdraw one's own post later.
-import { html, Button, Icon, Modal, Spinner } from './components.js';
+import { html, Button, Icon, Modal, Spinner, confirmDialog } from './components.js';
 import { useEffect, useState } from '../../vendor/hooks.module.js';
 import { loadPref, savePref } from '../store.js';
 import { t } from '../../../shared/i18n.js';
@@ -170,11 +170,20 @@ export function FeedbackBoard({ onClose }) {
     });
   };
 
-  const withdraw = (id) => {
+  const withdraw = async (id) => {
     const secret = secrets[id];
-    if (!secret) return;
+    if (!secret && maintainer.ready !== 'yes') return;
+    // destructive and irreversible: the post and its whole thread go, so ask first (the author and the maintainer alike)
+    const ok = await confirmDialog({
+      title: t('撤回这条反馈'),
+      text: t('撤回后这条反馈和它的讨论都会消失，无法恢复。确定撤回吗？'),
+      okText: t('撤回'),
+      cancelText: t('取消'),
+      danger: true,
+    });
+    if (!ok) return;
     return write(async () => {
-      await call({ action: 'withdraw', id, secret });
+      await call({ action: 'withdraw', id, secret, token: maintainer.token });
       const next = { ...secrets };
       delete next[id];
       setSecrets(next);
@@ -232,9 +241,9 @@ export function FeedbackBoard({ onClose }) {
           ${FEEDBACK_STATUSES.map((status) => html`<${Button} key=${status} size="sm" variant=${p.status === status ? 'primary' : 'ghost'}
             disabled=${busy || p.status === status} onClick=${() => setStatus(p.id, status)}>${t(FEEDBACK_STATUS_LABEL[status])}<//>`)}
         </div>` : null}
-        ${mine(p) ? html`<div class="fb-manage">
-          <${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
-            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>
+        ${mine(p) || maintainer.ready === 'yes' ? html`<div class="fb-manage">
+          ${mine(p) ? html`<${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
+            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>` : null}
           <${Button} size="sm" variant="ghost" icon="minus" disabled=${busy} onClick=${() => withdraw(p.id)}>${t('撤回这条反馈')}<//>
         </div>` : null}
       </div>` : null}

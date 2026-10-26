@@ -205,12 +205,12 @@ export function createFeedbackBoard({ file = defaultFile(), log = console, now =
       save(post);
       return { ok: true, post: publicPost(post) };
     },
-    /** Withdraw a post this browser wrote — the same secret: gone from the board for everyone. */
-    withdraw(id, { secret } = {}) {
+    /** Withdraw a post: its author (by secret) or the maintainer clearing the board — gone for everyone. */
+    withdraw(id, { secret, token } = {}) {
       const i = posts.findIndex((p) => p.id === id);
       if (i < 0) throw new FeedbackError('NOT_FOUND', 404, {});
       const post = posts[i];
-      if (!post.key || post.key !== secretKey(String(secret || ''))) throw new FeedbackError('NOT_YOURS', 403, {});
+      if (!sessionLive(token) && (!post.key || post.key !== secretKey(String(secret || '')))) throw new FeedbackError('NOT_YOURS', 403, {});
       posts.splice(i, 1);
       schedule();
       return { ok: true };
@@ -306,7 +306,7 @@ export function createFeedbackApi({ board, log = console }) {
           case 'create': send(res, 200, board.create(body, ip)); return;
           case 'reply': send(res, 200, board.reply(String(body.id || ''), body, ip)); return;
           case 'edit': send(res, 200, board.edit(String(body.id || ''), body, { secret: body.secret })); return;
-          case 'withdraw': send(res, 200, board.withdraw(String(body.id || ''), { secret: body.secret })); return;
+          case 'withdraw': send(res, 200, board.withdraw(String(body.id || ''), { secret: body.secret, token: body.token })); return;
           case 'status': send(res, 200, board.setStatus(String(body.id || ''), body.status, { token: body.token })); return;
           case 'login': send(res, 200, board.login(body.password, ip)); return;
           case 'session': send(res, 200, board.session(body.token)); return;

@@ -34,15 +34,21 @@ test('the board talks to one same-origin route and never to another host', () =>
   assert.match(board, /发帖不记录任何身份/);
 });
 
-test('only the browser that wrote a post sees its edit and withdraw buttons', () => {
+test('only the author sees Edit; the maintainer may only withdraw, and every withdraw asks first', () => {
   const board = source('../../public/js/ui/feedbackBoard.js');
-  // one gate, and it is the browser's own secret — not the maintainer session, not "any open card"
+  // authorship is the browser's own secret — never the maintainer session
   assert.match(board, /const mine = \(p\) => !!secrets\[p\.id\]/);
-  assert.doesNotMatch(board, /const may =/, 'no second gate: a maintainer session must not reveal author controls');
-  assert.match(board, /\$\{mine\(p\) \? html`<div class="fb-manage">/);
+  assert.doesNotMatch(board, /const may =/);
+  // the withdraw row opens for the author *or* a live maintainer session…
+  assert.match(board, /\$\{mine\(p\) \|\| maintainer\.ready === 'yes' \? html`<div class="fb-manage">/);
+  // …but Edit sits inside that row behind `mine(p)` alone
+  assert.match(board, /\$\{mine\(p\) \? html`<\$\{Button\} size="sm" variant="ghost" icon="edit"/);
+  // and withdraw is confirmed before it is sent (destructive, irreversible)
+  assert.match(board, /const ok = await confirmDialog\(\{/);
+  assert.match(board, /撤回后这条反馈和它的讨论都会消失/);
+  assert.match(board, /if \(!ok\) return;/);
+  assert.match(board, /await call\(\{ action: 'withdraw', id, secret, token: maintainer\.token \}\)/);
   assert.match(board, /await call\(\{ action: 'edit', id: editing\.id, title, body, secret: secrets\[editing\.id\] \}\)/);
-  assert.match(board, /await call\(\{ action: 'withdraw', id, secret \}\)/);
-  assert.doesNotMatch(board, /action: 'withdraw'[^)]*token/, 'the session token is never offered as authorship');
 });
 
 test('the chip keeps the lobby-contact styling', () => {

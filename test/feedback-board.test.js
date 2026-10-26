@@ -78,10 +78,10 @@ test('a maintainer session marks replies and moves a post between the four colum
   }
   assert.throws(() => board.setStatus(post.id, 'archived', { token }), (e) => e.error === 'BAD_STATUS');
   assert.throws(() => board.setStatus(post.id, 'done', {}), (e) => e.error === 'NOT_MAINTAINER');
-  // …but not edit or withdraw: those belong to the author alone, the maintainer session does not stand in for the secret
-  assert.throws(() => board.withdraw(post.id, { token }), (e) => e.error === 'NOT_YOURS');
+  // the maintainer may clear a post off the board (the panel asks first), but never rewrite someone else's words
   assert.throws(() => board.edit(post.id, { title: 'x' }, { token }), (e) => e.error === 'NOT_YOURS');
-  assert.equal(board.list().posts.length, 1);
+  board.withdraw(post.id, { token });
+  assert.equal(board.list().posts.length, 0);
 });
 
 test('a maintainer session expires, and a password-less board never mints one', () => {

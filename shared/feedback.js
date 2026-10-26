@@ -7,7 +7,7 @@ export const FEEDBACK_STATUSES = Object.freeze(['open', 'declined', 'planned', '
 
 /** The heading of each column, in the game's own words (the client passes these through `t()`). */
 export const FEEDBACK_STATUS_LABEL = Object.freeze({
-  open: '未读',
+  open: '未读或讨论中',
   declined: '无计划',
   planned: '已计划',
   done: '已完成',
