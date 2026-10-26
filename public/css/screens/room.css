@@ -889,13 +889,14 @@
   overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
 
 
-.rseat { --w: min(18vw, 3.4rem, calc((100vw - 1.6rem) / var(--n, 4) - .3rem)); position: relative; flex: none; width: var(--w); display: flex; flex-direction: column;
+/* 席位宽度 (维护者 2026-10-26): 4rem —— 名片按画幅随席位放大，和上面的立绘框同宽。 */
+.rseat { --w: min(18vw, 4rem, calc((100vw - 1.6rem) / var(--n, 4) - .3rem)); position: relative; flex: none; width: var(--w); display: flex; flex-direction: column;
   animation: sw-in 260ms var(--ease-out) backwards; animation-delay: calc(var(--i) * 60ms); }
 
 .rseat { animation: tr-card 480ms var(--tr-ease) backwards; animation-delay: calc(150ms + var(--i, 0) * 70ms); }
 
 
-.rs--solo .rseat { --w: min(18vw, 3.4rem, calc((100vw - 1.6rem) / 4 - .3rem)); }
+.rs--solo .rseat { --w: min(18vw, 4rem, calc((100vw - 1.6rem) / 4 - .3rem)); }
 
 
 
@@ -926,9 +927,10 @@
 
 .rseat__plate { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .1rem; align-items: center; align-content: center;
   min-height: max(.76rem, 46px); margin-top: .08rem; padding: .06rem .1rem; background: linear-gradient(90deg, #232626, #161818); border: 1px solid rgba(255, 255, 255, .1); }
-/* 席位卡按名片画幅 (维护者 2026-10-26): 高度只由席位宽度定 —— 显示不显示编号、名字多长都不改变它的大小；名片底图和
-   别处同一个 600:186（lobby.css 的 .has-nc 给了 --nc-ar）。小屏窄到比例高小于 min-height 时让位给 min-height。 */
-.rseat__plate { height: auto; aspect-ratio: var(--nc-ar, 600 / 186); overflow: hidden; }
+/* 席位卡按名片画幅 (维护者 2026-10-26): 高度 = 席位宽 × 186/600，直接由 --w 算出来 —— 显示不显示编号、
+   名字多长都不改变它的大小；宽度跟着 .rseat 走，和上面的立绘框同宽。底色图在 --nc-ar 上也用同一个 600:186
+   （lobby.css 的 .has-nc 给值），所以这里不再用 aspect-ratio，免得内容把高度顶开。 */
+.rseat__plate { height: calc(var(--w) * 186 / 600); width: 100%; box-sizing: border-box; overflow: hidden; }
 
 
 .rseat__who { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: max(calc(.18 * var(--t)), 12px); }
