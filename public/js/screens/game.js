@@ -492,7 +492,15 @@ function MatchScreen() {
   // 整备区扩容 (experimental `benchExpand`): the three dead cells left of the 临时整备区 open as bench slots. The server
   // patches its own copy of the same stage (server/match/Match.js), so both sides draw the same tiles.
   const rawStage = gd.ready ? gd.stage(pub?.stageId) : null;
-  const baseStage = benchExpanded(pub) ? stageWithBenchExpand(rawStage) : rawStage;
+  // memoised: stageWithBenchExpand hands back a copy, and a fresh object on every render re-ran the board's setStage
+  // (a tile rebuild that also tears down and recreates the pen's figures) on every state push — which is why the enemy
+  // previews flashed on each player action while the option was on (reported 2026-10-26). The copy only changes with the
+  // stage or the option.
+  const benchExpandOn = benchExpanded(pub);
+  const baseStage = useMemo(
+    () => (benchExpandOn ? stageWithBenchExpand(rawStage) : rawStage),
+    [rawStage, benchExpandOn],
+  );
   // 整备区扩容 only opens cells on the layout it was measured on: another battlefield is played untouched, and the host is
   // told once rather than left wondering why the bench still holds ten (the server keeps the hand at ten there too).
   const benchUnsupported = benchExpanded(pub) && !!rawStage && !benchExpandable(rawStage);
