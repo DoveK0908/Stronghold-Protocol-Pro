@@ -88,6 +88,21 @@ test('support: gainLayers is a no-op when layer gains are disabled (联防 / bos
   assert.equal(bondLayers(h.b, 'p1', 'yanShip'), 0);
 });
 
+test('support: topActiveBond never picks a bond without layers (bonds.json noStack: 独行 绝技 协防干员 调和)', () => {
+  // 号角's trait grants to 「层数最多的盟约」: a noStack bond is never displayed with layers, so a stray gain written into
+  // one (华法琳's 重点监护, 协防's addon) must not win it — the trait used to do nothing (maintainer 2026-10-26).
+  assert.equal(bondRecord('soloShip').noStack, true);
+  assert.ok(!bondRecord('yanShip').noStack);
+  const h = makeBattle({
+    defs: { chess: { t_yan_a: guard('t_yan_a', ['yanShip']) } },
+    units: [{ chessId: 't_yan_a', row: 10, col: 3 }],
+    bonds: { yanShip: { count: 3, active: true, tier: 1, layers: 2 }, soloShip: { count: 1, active: true, tier: 1, layers: 9 } },
+  });
+  h.step();
+  assert.equal(bondLayers(h.b, 'p1', 'soloShip'), 9, 'the stray layers are still there');
+  assert.equal(topActiveBond(h.b, 'p1'), 'yanShip', 'but 独行 is not 「层数最多的盟约」');
+});
+
 test('support meta: global:contentb_info writes contentInfo into every battle input', () => {
   const reg = createRegistry();
   assert.ok(reg.has('global:contentb_info'));

@@ -201,11 +201,16 @@ export function activeBondIds(battle, pid) {
   if (bonds && typeof bonds === 'object') for (const [id, b] of Object.entries(bonds)) if (b && b.active) out.push(id);
   return out;
 }
-/** Active bond with the most layers (ties → data order); null when none is active. */
+/**
+ * Active bond with the most layers (ties → data order); null when none is active. A bond without layers
+ * (bonds.json `noStack`: 独行 绝技 协防干员 调和) is never 「层数最多的盟约」 even when a gain wrote layers into it —
+ * its layers are never displayed, and picking it made the gain invisible (maintainer 2026-10-26: 号角等).
+ */
 export function topActiveBond(battle, pid) {
   let best = null, bl = -1;
   for (const id of Object.keys(gameData().bonds || {})) {
     if (!bondActive(battle, pid, id)) continue;
+    if (bondRecord(id)?.noStack) continue;
     const l = bondLayers(battle, pid, id);
     if (l > bl) { bl = l; best = id; }
   }

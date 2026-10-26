@@ -185,6 +185,34 @@ describe('the rotation an effect takes from its spawn location', () => {
     assert.ok(hm.place.mountRot && !hm.place.flipY, 'MUZZLE_POINT takes the point\'s rotation, the facing turn included: no flip of its own');
   });
 
+  test('an operator\'s own body effects lie along its deploy direction, never along the blow (望 S3, 松果, 圣约送葬人)', async () => {
+    const keyed = (key, f) => { const d = standing(f); d.key = key; return compileEffect(d); };
+    const two = keyed('pinecn_attack_01_hit', { _spawnLocation: 2, _rotateType: 1 });
+    const four = keyed('excu2_attack_01_range_01', { _spawnLocation: 2, _rotateType: 2 });
+    const plain = keyed('other_attack_01_hit', { _spawnLocation: 2, _rotateType: 1 });
+    const plainfour = keyed('other_attack_01_range', { _spawnLocation: 2, _rotateType: 2 });
+    assert.equal(two.key, 'pinecn_attack_01_hit', 'a compiled prefab keeps its key (DEPLOY_DIR_FX reads it)');
+    const { w, spawned, view } = await wired({ two, four, plain, plainfour });
+    const at = (dir) => view({ dir, visFacing: dir === 'LEFT' ? -1 : 1 });
+    // FLIP_TWO_SIDE: left / right keep the mirror; up / down would still be drawn to the right, so they take the quarter
+    // turn a muzzle point takes (mounts.js mountRotation: DOWN −90°, UP +90°)
+    for (const [dir, yaw] of [['DOWN', -Math.PI / 2], ['UP', Math.PI / 2], ['RIGHT', 0], ['LEFT', 0]]) {
+      w.playOn('two', at(dir), {});
+      near(spawned.at(-1).place.yaw, yaw, 1e-9, `松果 facing ${dir}`);
+    }
+    // an operator outside the list is untouched: the blow's side still decides the flip
+    w.playOn('plain', at('DOWN'), {});
+    near(spawned.at(-1).place.yaw, 0, 1e-9, 'another operator facing down keeps the two-side mirror only');
+    // FOUR_DIRECTION: the deploy direction wins over the target (a blow to the right no longer draws it to the right)
+    w.playOn('four', at('DOWN'), { toward: { x: 5 + 3, y: 10 } });
+    near(spawned.at(-1).place.yaw, -Math.PI / 2, 1e-9, '圣约送葬人 facing down at a target to its right');
+    w.playOn('four', at('UP'), { toward: { x: 5 - 3, y: 10 } });
+    near(spawned.at(-1).place.yaw, Math.PI / 2, 1e-9, '圣约送葬人 facing up at a target to its left');
+    // … while an operator outside the list still turns to the target
+    w.playOn('plainfour', at('DOWN'), { toward: { x: 8, y: 10 } });
+    near(spawned.at(-1).place.yaw, 0, 1e-9, 'another operator facing down at a target to its right still aims right');
+  });
+
   test('a FollowMountPoint with `_keepOriginRotation` keeps its spawn location\'s tilt (the status loops); without it a FOOT point turns with the unit', async () => {
     const fmp = (mount, keep) => ({ class: 'FollowMountPoint', enabled: true, fields: { _mountPointType: mount, _keepOriginRotation: keep ? 1 : 0 } });
     const stun = compileEffect(standing({ _spawnLocation: 4 }, [fmp(3, true)]));

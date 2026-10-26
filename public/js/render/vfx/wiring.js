@@ -57,6 +57,21 @@ import { UF } from '../../../../shared/constants.js';
 
 /** Battle seconds a non-oneshot cast effect lasts without its end event. */
 export const CAST_LOOP_S = 0.6;
+
+/**
+ * Effects that lie along their operator's deploy direction instead of along the blow they make: 望 (`wang_skill_03`),
+ * 松果 (`pinecn_*`), 圣约送葬人 (`excu2_*`). The official client draws a unit only facing left or right and these
+ * prefabs carry no `_useBodyRotation`, so a FLIP_TWO_SIDE one (or a FOUR_DIRECTION one without it) took the blow's side
+ * / the target and pointed right while its owner faced down. Our units deploy in four directions: their own body
+ * effects must follow that (maintainer 2026-10-26).
+ */
+const DEPLOY_DIR_FX = /^(wang_skill_03|pinecn_|excu2_)/;
+
+/** A yaw snapped to the four directions (FOUR_DIRECTION's `_mainDir` grid). */
+const quarter = (a) => Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+
+/** The quarter turn a two-side effect takes for a unit drawn facing up / down (mounts.js DIR_YAW). */
+const VERTICAL_YAW = Object.freeze({ DOWN: -Math.PI / 2, UP: Math.PI / 2 });
 /** Battle seconds a melee blow waits for its damage. */
 const MELEE_WINDOW = 0.4;
 /** Battle seconds a projectile's arrival covers the damage event it stands for. */
@@ -704,21 +719,27 @@ export class FxWiring {
     // an effect that takes its mount point's rotation faces with the unit already (the FaceSwitcher's turn is part of
     // that rotation): FLIP_TWO_SIDE adds no flip of its own [ASSUMED]
     if (rt === 1 && place.mountRot) return;
+    // An operator's own body effect lies along its deploy direction, never along the blow it happens to make: the
+    // official client only has left / right, so their prefabs carry no `_useBodyRotation` (see DEPLOY_DIR_FX).
+    const body = !!(v && v.dir && DEPLOY_DIR_FX.test(def.key || ''));
     if (rt === 1) {
       let left = pose.left;
       if (o.flipFrom) left = o.flipFrom.x > pose.x; // a blow from the right splashes to the left
       const flip = left !== def.leftIsDefault;
       if (def.rotY >= 0) place.flipY = flip; else place.mirror = flip;
+      // a two-side effect has no turn of its own: facing up / down our Front skeleton would still draw it to the right,
+      // so it takes a quarter turn the way a muzzle point does (mounts.js mountRotation). Left / right keep the mirror.
+      if (body && VERTICAL_YAW[v.dir]) place.yaw = VERTICAL_YAW[v.dir];
     } else if (rt === 2 || rt === 4) {
       let a;
       // CastEffectOptions.CreateEffect (official client): useFourDirectionalFace selects the owner's
       // four-direction vector, not owner→target. Wild Mane S2 sets it; her hit row does not.
-      if (o.fourFace || def.useBodyRotation || !o.toward) a = bodyYaw(v, pose);
+      if (body || o.fourFace || def.useBodyRotation || !o.toward) a = bodyYaw(v, pose);
       else {
         const dx = o.toward.x - pose.x, dy = o.toward.y - pose.y;
         a = Math.abs(dx) + Math.abs(dy) > 1e-4 ? Math.atan2(dy, dx) : bodyYaw(v, pose);
       }
-      if (rt === 2) a = Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+      if (rt === 2) a = quarter(a);
       place.yaw = a;
     }
   }

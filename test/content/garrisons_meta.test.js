@@ -748,6 +748,28 @@ test('余 37: a chess of the bond with the most members (normal: 3 in the row; �
   }
 });
 
+test('余 37: 「人数最多的盟约」 is never 绝技 — its count (every elite on the board) is not a member count', () => {
+  // 绝技 counts every 精锐 chess on the board (countMode BOARD_ALL_CHESS) and has no members of its own, so it used to win
+  // 「人数最多」 and `rollChess({ bond: 'suntShip' })` drew from an empty list: the gift never came (maintainer
+  // 2026-10-26: 余 不发干员).
+  for (const { gid, owners } of idsOf('SERVER_PREP_START', 'SERVER_MOST_BOND')) {
+    for (const owner of owners) {
+      const s = setup();
+      give(s.m, s.ps, owner, 'board', [10, 4]);
+      // two 精锐 in the row: 绝技's count is 2, more than any real bond's
+      give(s.m, s.ps, 'chess_char_1_01_b', 'board', [10, 6]);
+      give(s.m, s.ps, 'chess_char_1_04_b', 'board', [10, 8]);
+      s.ps.recompute();
+      assert.ok(s.ps.bonds.suntShip.count >= 2, `${gid}: 绝技 counts the elites`);
+      s.prepStart();
+      const got = handChess(s.ps);
+      assert.equal(got.length, 1, `${gid}: a chess came anyway`);
+      assert.ok(!CH(got[0]).bonds.includes('suntShip'), `${gid} ${got[0]}`);
+    }
+    cover(gid);
+  }
+});
+
 // ---------------------------------------------------------------------------------------------------------------------
 // re-triggers / copies
 

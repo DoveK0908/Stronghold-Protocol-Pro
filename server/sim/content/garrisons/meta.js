@@ -42,11 +42,17 @@ export function requireActiveOf(g) {
 
 const bondOrder = (ctx) => (Array.isArray(ctx.gd && ctx.gd.bondIds) ? ctx.gd.bondIds : Object.keys(ctx.data.bonds || {}));
 
-/** Active bond with the most layers (ties → bond data order), or null. */
+/**
+ * Active bond with the most layers (ties → bond data order), or null. A bond without layers (bonds.json `noStack`:
+ * 独行 绝技 协防干员 调和) never holds layers — 华法琳's 重点监护 and 协防's addon may still write some into the player's
+ * state, and they are never shown — so it cannot be 「层数最多的盟约」: letting one win sent the gain to a bond the game
+ * displays no layers for and the operator's trait did nothing (maintainer 2026-10-26: 号角等).
+ */
 export function topActiveBondMeta(ctx) {
   let best = null, bl = -1;
   for (const id of bondOrder(ctx)) {
     if (!ctx.bondActive(id)) continue;
+    if (ctx.gd.bond(id)?.noStack) continue;
     const l = ctx.layers(id);
     if (l > bl) { bl = l; best = id; }
   }
@@ -337,6 +343,10 @@ H.SERVER_MOST_BOND = {
     if (!rowCondition(ctx, selfView(ctx))) return;
     let best = [], bc = 0;
     for (const id of bondOrder(ctx)) {
+      // a bond without members of its own (bonds.json `noStack` 绝技 / 协防干员 …) is not 「人数最多的盟约」: 绝技 counts
+      // every elite chess on the board (countMode BOARD_ALL_CHESS), so it won the tie, and rollChess({ bond: 'suntShip' })
+      // rolled from an empty member list — the gift never came (maintainer 2026-10-26: 余 不发干员).
+      if (ctx.gd.bond(id)?.noStack) continue;
       const c = ctx.bondCount(id);
       if (c > bc) { bc = c; best = [id]; } else if (c === bc && c > 0) best.push(id);
     }
