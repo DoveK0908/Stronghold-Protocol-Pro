@@ -13,7 +13,7 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 //   prepUnlimited           无限休整期 (玩法#04): the prep has no countdown; a co-op room enters combat only once every
 //                           living player is ready (off by default: the official timed prep stays the default)
 //   benchExpand             整备区扩容: the hand keeps 13 pieces instead of 10 — the three dead ground-forbidden cells
-//                           left of the 临时整备区 (row 8, cols 1..3) become 整备区 slots (owner's request, 2026-10-25;
+//                           left of the 临时整备区 (row 8, cols 0..2) become 整备区 slots (owner's request, 2026-10-25;
 //                           off by default: the official ten-slot bench stays the default)
 //   shopLeft                牌库剩余张数: the shop card's 「剩余 N 张」 badge (m.private.shop.slots[].left). On by default —
 //                           the badge has shipped since 0.3.1, so the switch only lets a room hide it

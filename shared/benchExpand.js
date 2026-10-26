@@ -2,8 +2,9 @@
 // 整备区 slots.
 //
 // Every stage draws row 8 as `####AAAAA##I#########` (act1autochess m01): cols 0..3 are `#` — ground-forbidden, FLY-only
-// cells that no enemy route crosses, so nothing in the battle reads them. The option opens cols 1..3 as `a` (整备区) and
-// the hand keeps 13 pieces instead of 10; slot idx 10..12 sit there (shared/constants.js handSlot).
+// cells that no enemy route crosses, so nothing in the battle reads them. The option opens cols 0..2 as `a` (整备区) and
+// the hand keeps 13 pieces instead of 10; slot idx 10..12 sit there (shared/constants.js handSlot) — the row's leftmost
+// three cells, lining up under hand slots 0..2.
 //
 // The rows reach the board from the generated data/stages.json on both sides — the server's Match.stage and the browser's
 // data.stage — so the patch is a copy per match rather than a data rebuild (data/*.json is tools/build-data.mjs output).

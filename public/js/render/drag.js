@@ -30,7 +30,7 @@ import { GEO, HAND_MAX, handSlot, handIndex } from '../../../shared/constants.js
 /** Where a piece currently sits, as a tile. `piece.area` 'board' uses row/col; 'hand'/'temp' use idx. */
 export function pieceTile(piece) {
   if (!piece || typeof piece !== 'object') return null;
-  // 整备区扩容: hand slots 10..12 sit on row 8 cols 1..3 (shared/constants.js handSlot)
+  // 整备区扩容: hand slots 10..12 sit on row 8 cols 0..2 (shared/constants.js handSlot)
   if (piece.area === 'hand' && Number.isInteger(piece.idx)) return handSlot(piece.idx);
   if (piece.area === 'temp' && Number.isInteger(piece.idx)) return { row: GEO.TEMP_ROW, col: GEO.TEMP_C0 + piece.idx };
   if (Number.isInteger(piece.row) && Number.isInteger(piece.col)) return { row: piece.row, col: piece.col };
