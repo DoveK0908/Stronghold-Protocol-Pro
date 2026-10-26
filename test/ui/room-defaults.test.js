@@ -1,6 +1,8 @@
 // 开房默认 (the owner, 2026-10-25): every 实验性选项 switch also has a personal default, and a room the player creates
 // starts with it. The rules the panel edits inside a room are unchanged; these defaults only decide the opening shape,
-// and an all-off set must keep sending no rules at all (an ordinary room's wire shape).
+// and a set that matches the rules' own defaults must keep sending no rules at all (an ordinary room's wire shape).
+// 维护者 2026-10-26: the default of a switch is the RULE's default, not "off" — 牌库剩余张数 and 二倍速 ship on, so a
+// browser that never opened this section must still create rooms with the badge and the vote.
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -20,24 +22,34 @@ function fakeStorage() {
   return map;
 }
 
+/** The neutral value of a switch: the rule's own default. */
+const neutralOf = (key) => EXPERIMENTAL_OPTIONAL_DEFAULTS[key] === true;
+
 beforeEach(() => { fakeStorage(); resetRoomDefaults(); });
 
 test('the keys: the two base rules first, then every optional switch', () => {
   assert.deepEqual([...ROOM_DEFAULT_KEYS], ['revivalEnabled', 'disableSharedPool', ...EXPERIMENTAL_OPTIONAL]);
   assert.ok(ROOM_DEFAULT_KEYS.includes('benchExpand'), '整备区扩容 is one of them');
+  assert.ok(ROOM_DEFAULT_KEYS.includes('goldPreview'), '查看下回合资金 is one of them');
+  assert.ok(ROOM_DEFAULT_KEYS.includes('shopLeft'), '牌库剩余张数 is one of them');
+  assert.ok(ROOM_DEFAULT_KEYS.includes('speedVote'), '二倍速 is one of them');
 });
 
-test('sanitize: anything that is not true is off, and a broken value reads as the standard room', () => {
+test('sanitize: absent or non-boolean keeps the rule default; a broken value reads as the standard room', () => {
   const none = sanitizeRoomDefaults(null);
-  for (const k of ROOM_DEFAULT_KEYS) assert.equal(none[k], false);
+  for (const k of ROOM_DEFAULT_KEYS) assert.equal(none[k], neutralOf(k), k);
   assert.deepEqual(sanitizeRoomDefaults('nonsense'), none);
   assert.deepEqual(sanitizeRoomDefaults({ benchExpand: 'yes' }), none);
   const one = sanitizeRoomDefaults({ benchExpand: true });
   assert.equal(one.benchExpand, true);
   assert.equal(one.luckConsole, false);
+  assert.equal(one.shopLeft, true, 'an absent switch keeps the rule default, so the badge stays on');
+  assert.equal(one.speedVote, true);
+  assert.equal(one.goldPreview, false);
+  assert.equal(sanitizeRoomDefaults({ shopLeft: false }).shopLeft, false, 'an explicit off is kept');
 });
 
-test('an all-off set is the standard room and sends nothing', () => {
+test('a set matching the rules sends nothing', () => {
   assert.equal(roomDefaultsAreDefault({}), true);
   assert.equal(roomDefaultsExperimental({}), undefined, 'the room.create call carries no experimental field');
   assert.equal(roomDefaultsExperimental(null), undefined);
@@ -47,8 +59,12 @@ test('an enabled default becomes the room payload, in the panel wire shape', () 
   const rules = roomDefaultsExperimental({ benchExpand: true, prepUnlimited: true });
   assert.deepEqual(rules, { revivalEnabled: false, disableSharedPool: false, benchExpand: true, prepUnlimited: true });
   assert.equal(roomDefaultsAreDefault({ benchExpand: true }), false);
-  // every optional switch rides only when it differs from its own default (all of them default to off today)
-  for (const key of EXPERIMENTAL_OPTIONAL) assert.equal(EXPERIMENTAL_OPTIONAL_DEFAULTS[key], false, key);
+  // every optional switch rides only when it differs from its own default
+  const off = roomDefaultsExperimental({ shopLeft: false, goldPreview: true });
+  assert.deepEqual(off, { revivalEnabled: false, disableSharedPool: false, shopLeft: false, goldPreview: true });
+  assert.equal(off.speedVote, undefined, '二倍速 at its default (on) does not ride the wire');
+  assert.equal(off.benchExpand, undefined);
+  assert.equal(off.prepUnlimited, undefined);
 });
 
 test('setting a default stores it on this device and the store notifies', () => {
@@ -64,4 +80,5 @@ test('setting a default stores it on this device and the store notifies', () => 
   assert.equal(roomDefaultsStore.get().notAKey, undefined, 'an unknown key is ignored');
   resetRoomDefaults();
   assert.equal(roomDefaultsAreDefault(readRoomDefaults()), true);
+  assert.equal(readRoomDefaults().shopLeft, true, '重置 goes back to the rule defaults, not to off');
 });

@@ -35,6 +35,7 @@ import { itemIconUrl, profIconUrl, uiUrl, skillIconUrl, skillRecordIconUrl, modu
 import { data } from '../data.js';
 import { hotkeyLabelOf } from './settings.js';
 import { t } from '../../../shared/i18n.js';
+import { optionalValue } from '../../../shared/experimental.js';
 import { ownAppearance } from './skinAssets.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -76,11 +77,12 @@ function ArmedTag({ reason, free }) {
 }
 
 /**
- * Operator card (shop and merge reward). `armed`: first tap done (second tap = `onBuy(idx)`).
+ * Operator card (shop and merge reward). `armed`: first tap done (second tap = `onBuy(idx)`). `showLeft`: the
+ * 「剩余 N 张」 badge — the room's experimental shopLeft switch (on by default, shared/experimental.js).
  * @param {{ slot:any, idx:number, priv:any, frozen?:boolean, reason?:string|null, free?:boolean, armed?:boolean,
- *   onTap?:(idx:number)=>void, onBuy:Function, onDetail:Function }} props
+ *   onTap?:(idx:number)=>void, onBuy:Function, onDetail:Function, showLeft?:boolean }} props
  */
-export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, onTap = null, onBuy, onDetail, offBonds = null }) {
+export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free = false, armed = false, onTap = null, onBuy, onDetail, offBonds = null, showLeft = true }) {
   const c0 = data.lookup('chess', slot.id);
   // 0.2.0 自选编队: a DIY slot the player filled is its operator (shared/diy.js, the pick of m.private.diy)
   const diyData = { chess: data.get('chess'), backups: data.get('backups') };
@@ -132,7 +134,7 @@ export function ChessCard({ slot, idx, priv, frozen = false, reason = null, free
         <span>${c?.subProfessionName || ''}</span>
       </span>
     </span>
-    ${Number.isFinite(slot.left) ? html`<span class="scard__left" data-left=${slot.left}
+    ${showLeft && Number.isFinite(slot.left) ? html`<span class="scard__left" data-left=${slot.left}
       title=${t('卡池中还剩 {n} 张', { n: slot.left })}>${t('剩余 {n} 张', { n: slot.left })}</span>` : null}
     ${willMerge ? html`<span class="scard__mergetag" title=${hint}>${t('可晋升')}</span>` : null}
     ${frozen ? html`<span class="scard__ice" aria-hidden="true"><${Icon} name="snow" /></span>` : null}
@@ -304,8 +306,10 @@ export function RewardCards({ offer, priv, editable, onPick, onDetail, onLater, 
  *   the bonds this mode never activates (gameLogic modeOffBonds), struck through on the operator cards
  */
 export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onCollapse, onBuy, onLevel, onRefresh, onFreeze, onDetail, onDetailClose, onRefuse, barRef,
-  reward = null, onReward, onRewardLater, onArm = null, offBonds = null }) {
+  reward = null, onReward, onRewardLater, onArm = null, offBonds = null, options = null }) {
   const shop = priv?.shop || {};
+  // 牌库剩余张数 (experimental shopLeft, on by default): the room's switch hides the card badge; the ⓘ detail keeps it.
+  const showLeft = optionalValue(options, 'shopLeft');
   const slots = Array.isArray(shop.slots) ? shop.slots : [];
   // Empty slots have no kind. In 第一期 the first equipment slot opens empty at level 5; use the server's layout
   // to keep it in the equipment column. [ASSUMED] Older saved frames / mocks infer kinds from their cards;
@@ -316,6 +320,9 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
   const itemSlots = indexed.filter(({ s, i }) => layout ? i >= layout.chess && i < layout.chess + layout.item : s && s.kind === 'item');
   const frozen = !!shop.frozen;
   const funds = Number(priv?.funds) || 0;
+  // 查看下回合资金 (experimental goldPreview, off by default): the server's prediction, present only when the room asked
+  const ng = priv?.nextGold;
+  const nextGold = ng && Number.isFinite(ng.income) ? { income: ng.income, pending: Number.isFinite(ng.pending) ? ng.pending : 0 } : null;
   const remaining = Math.max(0, (priv?.deployCap ?? 8) - (priv?.deployCount ?? 0));
   const lvReason = shopBlockReason('levelUp', { priv, editable });
   const refReason = shopBlockReason('refresh', { priv, editable });
@@ -388,7 +395,7 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           if (s.sold) return html`<${SoldCard} key=${`s${i}`} />`;
           const reason = shopBlockReason('buy', { priv, editable, slot: s, ...LOOKUPS });
           return html`<${ChessCard} key=${`c${i}:${s.id}`} slot=${s} idx=${i} priv=${priv} frozen=${slotFrozen(s, frozen)} onBuy=${onBuy} onDetail=${onDetail} offBonds=${offBonds}
-              reason=${reason} armed=${armed === armKey('c', i, s)} onTap=${editable ? (idx) => tapCard('c', idx, s, 'chess', reason, onBuy) : null} />`;
+              showLeft=${showLeft} reason=${reason} armed=${armed === armKey('c', i, s)} onTap=${editable ? (idx) => tapCard('c', idx, s, 'chess', reason, onBuy) : null} />`;
         })}
       </div>`}
       ${showReward ? null : html`<div class="shopbar__item">
@@ -408,6 +415,10 @@ export function ShopBar({ priv, editable, collapsed, refreshBusy = false, onColl
           <b class="funds__num num">${funds}</b>
         </div>
         <span class="funds__label">${t('目前资金')}</span>
+        ${nextGold ? html`<span class="funds__next" data-next-gold=${nextGold.income + nextGold.pending}
+            title=${t('下回合开局到账：收入 {income} + 结转 {pending}。预估值，收入类效果和之后到账的奖励会改变实际数字。', {
+              income: nextGold.income, pending: nextGold.pending })}>
+          ${t('下回合 +{n}', { n: nextGold.income + nextGold.pending })}</span>` : null}
         <button type="button" class="funds__collapse" onClick=${() => onCollapse(true)}><${Icon} name="close" />${t('收起')}</button>
       </div>
     </div>

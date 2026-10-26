@@ -44,7 +44,9 @@ import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { UnofficialMark, ruleLine } from './pluginTag.js';
 import { TestMark } from './testConsole.js';
 // 维护者 2026-10-25: 二倍速投票 sits in the top-right, left of 准备就绪 (it used to live in the team panel's notice strip).
+// 维护者 2026-10-26: it is a room rule now (experimental speedVote, on by default) — a room that turns it off draws no button.
 import { SpeedAction } from './speedVote.js';
+import { optionalValue } from '../../../shared/experimental.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -588,7 +590,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <${OvertimeWarning} ot=${ot} />
       <${AfkWarning} pub=${pub} priv=${priv} />
       <div class="gtop__go">
-        <${SpeedAction} pub=${pub} myId=${myId} />
+        ${optionalValue(pub?.experimental, 'speedVote') ? html`<${SpeedAction} pub=${pub} myId=${myId} />` : null}
         ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
       </div>
       <${UniteBudgetNote} pub=${pub} />

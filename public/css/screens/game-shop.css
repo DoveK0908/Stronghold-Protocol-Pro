@@ -177,6 +177,8 @@
 .funds__coin { width: .34rem; height: .34rem; fill: var(--gold); filter: drop-shadow(0 0 .06rem rgba(255, 198, 0, .6)); }
 .funds__num { font-size: .36rem; line-height: 1; font-weight: 700; color: #fff; }
 .funds__label { font-size: .14rem; color: var(--text-lo); letter-spacing: .1em; }
+/* 查看下回合资金 (experimental goldPreview): a quiet line under 目前资金 — readable, never louder than the hex */
+.funds__next { font-size: .13rem; line-height: 1.2; color: var(--gold); letter-spacing: .04em; opacity: .85; white-space: nowrap; }
 .funds__collapse { display: flex; align-items: center; gap: .04rem; font-size: .15rem; background: none; border: 1px solid var(--line-2); color: var(--text-lo); padding: .02rem .1rem; }
 .funds__collapse .icon { width: .14rem; height: .14rem; }
 .funds__collapse:hover { color: var(--text-hi); border-color: var(--line-3); }

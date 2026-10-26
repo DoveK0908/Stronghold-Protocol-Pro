@@ -15,11 +15,27 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 //   benchExpand             整备区扩容: the hand keeps 13 pieces instead of 10 — the three dead ground-forbidden cells
 //                           left of the 临时整备区 (row 8, cols 1..3) become 整备区 slots (owner's request, 2026-10-25;
 //                           off by default: the official ten-slot bench stays the default)
+//   shopLeft                牌库剩余张数: the shop card's 「剩余 N 张」 badge (m.private.shop.slots[].left). On by default —
+//                           the badge has shipped since 0.3.1, so the switch only lets a room hide it
+//   speedVote               二倍速: the in-match 二倍速 vote button in the top bar (server/match/match/speedVote.js). On by
+//                           default, same reason: the vote shipped before the switch existed (owner's request, 2026-10-26)
+//   goldPreview             查看下回合资金: m.private.nextGold — the income the next round start credits, plus what carries
+//                           over right now (off by default: it is new information the official HUD never shows). A
+//                           prediction only: an onIncome handler (老鲤 withholds R1–R2) can still rewrite the real credit,
+//                           and battle rewards arriving later in this prep add to the carried part.
 // The strategy draft's 本局信息 dialog and the briefing share the official enemy column (ui/matchEnemies.js, GitHub #484),
 // so there is no room switch for it any more.
-export const EXPERIMENTAL_OPTIONAL = Object.freeze(['luckConsole', 'bossHitSoftCap', 'prepUnlimited', 'benchExpand']);
-export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({ luckConsole: false, bossHitSoftCap: false, prepUnlimited: false, benchExpand: false });
-const OPTIONAL_TAGS = Object.freeze({ luckConsole: 'luck', bossHitSoftCap: 'cap', prepUnlimited: 'prep', benchExpand: 'bench' });
+export const EXPERIMENTAL_OPTIONAL = Object.freeze([
+  'luckConsole', 'bossHitSoftCap', 'prepUnlimited', 'benchExpand', 'shopLeft', 'speedVote', 'goldPreview',
+]);
+export const EXPERIMENTAL_OPTIONAL_DEFAULTS = Object.freeze({
+  luckConsole: false, bossHitSoftCap: false, prepUnlimited: false, benchExpand: false,
+  shopLeft: true, speedVote: true, goldPreview: false,
+});
+const OPTIONAL_TAGS = Object.freeze({
+  luckConsole: 'luck', bossHitSoftCap: 'cap', prepUnlimited: 'prep', benchExpand: 'bench',
+  shopLeft: 'shop', speedVote: 'speed', goldPreview: 'gold',
+});
 
 /** The switch's value as the game reads it: the stored boolean, or the option's own default when absent. */
 export function optionalValue(value, key) {
@@ -58,7 +74,7 @@ export function isExperimental(value) {
   });
 }
 
-/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean, prepUnlimited?: boolean, benchExpand?: boolean, bannedStages?: string[] }} [value] */
+/** @param {{ revivalEnabled: boolean, disableSharedPool: boolean, playerCapacity?: number, disableDuckLord?: boolean, luckConsole?: boolean, bossHitSoftCap?: boolean, prepUnlimited?: boolean, benchExpand?: boolean, shopLeft?: boolean, speedVote?: boolean, goldPreview?: boolean, bannedStages?: string[] }} [value] */
 export function experimentalOptions(value = EXPERIMENTAL_DEFAULTS) {
   if (!isExperimental(value)) throw new TypeError('invalid experimental options');
   const capacity = roomCapacity('coop', value);

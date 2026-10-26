@@ -14,13 +14,16 @@ import { EXPERIMENTAL_OPTIONAL, EXPERIMENTAL_OPTIONAL_DEFAULTS } from '../../../
 export const ROOM_DEFAULT_KEYS = Object.freeze(['revivalEnabled', 'disableSharedPool', ...EXPERIMENTAL_OPTIONAL]);
 
 const STORE_KEY = 'roomDefaults';
-const NONE = Object.freeze(Object.fromEntries(ROOM_DEFAULT_KEYS.map((k) => [k, false])));
+// The neutral default of a switch is the rule's own default, not "off": 牌库剩余张数 and 二倍速 ship on, so a browser
+// that never touched this section must still open rooms with the badge and the vote (off would strip both from every
+// room it creates). Keys absent from the stored object keep their neutral value.
+const NEUTRAL = Object.freeze(Object.fromEntries(ROOM_DEFAULT_KEYS.map((k) => [k, EXPERIMENTAL_OPTIONAL_DEFAULTS[k] === true])));
 
-/** A stored value → every switch as a boolean (anything that is not `true` is off). */
+/** A stored value → every switch as a boolean (absent or non-boolean keeps the rule's own default). */
 export function sanitizeRoomDefaults(v) {
-  const out = { ...NONE };
+  const out = { ...NEUTRAL };
   if (!v || typeof v !== 'object') return out;
-  for (const k of ROOM_DEFAULT_KEYS) out[k] = v[k] === true;
+  for (const k of ROOM_DEFAULT_KEYS) if (typeof v[k] === 'boolean') out[k] = v[k];
   return out;
 }
 
@@ -29,10 +32,10 @@ export function readRoomDefaults() {
   return sanitizeRoomDefaults(loadPref(STORE_KEY, null));
 }
 
-/** Whether these defaults are the standard room's (all off) — an ordinary room then carries no `experimental` at all. */
+/** Whether these defaults are the standard room's — an ordinary room then carries no `experimental` at all. */
 export function roomDefaultsAreDefault(value) {
   const v = sanitizeRoomDefaults(value);
-  return ROOM_DEFAULT_KEYS.every((k) => v[k] === false);
+  return ROOM_DEFAULT_KEYS.every((k) => v[k] === NEUTRAL[k]);
 }
 
 /**
@@ -61,9 +64,9 @@ export function setRoomDefault(key, on) {
   savePref(STORE_KEY, next);
 }
 
-/** Back to the standard room (the section's 重置). */
+/** Back to the standard room (the section's 重置) — each switch back to the rule's own default, not to "off". */
 export function resetRoomDefaults() {
-  const next = { ...NONE };
+  const next = { ...NEUTRAL };
   roomDefaultsStore.set(next);
   savePref(STORE_KEY, next);
 }

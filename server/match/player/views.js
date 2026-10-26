@@ -4,6 +4,7 @@
 // the player state).
 
 import { PHASE } from '../../../shared/constants.js';
+import { optionalValue } from '../../../shared/experimental.js';
 import { boardOrder, pieceDir } from '../board.js';
 import { bondList, offBondCounts } from '../bondsMeta.js';
 import { bountyText, bountyCard } from '../choices.js';
@@ -87,6 +88,12 @@ export class PlayerViews {
       revivalUnavailableReason: this.revivalUnavailableReason,
       lp: this.lp,
       funds: this.funds,
+      // 查看下回合资金 (experimental, off by default; shared/experimental.js): what the next round start credits —
+      // gd.income(m.round + 1) — plus the pending funds this seat carries right now. A prediction: an onIncome handler
+      // (老鲤 withholds R1–R2) can still rewrite the real credit, and rewards granted later in this prep join the carry.
+      ...(optionalValue(this.m.experimental, 'goldPreview')
+        ? { nextGold: { round: this.m.round + 1, income: this.gd.income(this.m.round + 1), pending: this.pendingFunds } }
+        : {}),
       bandId: this.bandId,
       ready: this.ready,
       canReady: this.alive && this.tempEmpty && !this.personalChoice && this.m.phase === PHASE.PREP,

@@ -36,6 +36,9 @@ export function experimentalSummary(input) {
   if (options.bossHitSoftCap === true) rules = `${rules} · ${t('限伤改为封顶')}`;
   if (options.prepUnlimited === true) rules = `${rules} · ${t('无限休整期')}`;
   if (options.benchExpand === true) rules = `${rules} · ${t('整备区扩容')}`;
+  if (options.goldPreview === true) rules = `${rules} · ${t('显示下回合资金')}`;
+  if (options.shopLeft === false) rules = `${rules} · ${t('不显示牌库剩余张数')}`;
+  if (options.speedVote === false) rules = `${rules} · ${t('关闭二倍速')}`;
   if (Array.isArray(options.bannedStages) && options.bannedStages.length) rules = `${rules} · ${t('禁用战场 {n} 张', { n: options.bannedStages.length })}`;
   return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
 }
@@ -120,6 +123,21 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <span><strong>${t('整备区扩容')}</strong><small>${t('待销毁区左边那三格空位变成整备区：整备区从 10 格变 13 格，多拿三个单位。')}</small></span>
         <input id="experimental-bench-expand" type="checkbox" role="switch" checked=${options.benchExpand === true}
           disabled=${!editable || busy} onChange=${e => change('benchExpand', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-gold-preview">
+        <span><strong>${t('查看下回合资金')}</strong><small>${t('休整期显示下回合开局会到账的资金（本回合收入 + 当前结转），方便提前规划。只是预估值：收入类效果和之后到账的奖励会改变实际数字。')}</small></span>
+        <input id="experimental-gold-preview" type="checkbox" role="switch" checked=${options.goldPreview === true}
+          disabled=${!editable || busy} onChange=${e => change('goldPreview', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-shop-left">
+        <span><strong>${t('牌库剩余张数')}</strong><small>${t('商店卡片上显示该干员在牌库里还剩几张，方便判断还能不能追到晋升。')}</small></span>
+        <input id="experimental-shop-left" type="checkbox" role="switch" checked=${options.shopLeft !== false}
+          disabled=${!editable || busy} onChange=${e => change('shopLeft', e.currentTarget.checked)} />
+      </label>` : null}
+      ${source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-speed-vote">
+        <span><strong>${t('二倍速')}</strong><small>${t('局内顶栏的「二倍速」投票按钮；关闭后整局不显示，全场仍是一倍速。')}</small></span>
+        <input id="experimental-speed-vote" type="checkbox" role="switch" checked=${options.speedVote !== false}
+          disabled=${!editable || busy} onChange=${e => change('speedVote', e.currentTarget.checked)} />
       </label>` : null}
       ${source !== 'matchmaking' && choices.length > 1 ? html`<div class="experimental-stages">
         <div class="experimental-stages__head">

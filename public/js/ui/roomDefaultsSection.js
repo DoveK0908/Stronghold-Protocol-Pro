@@ -18,6 +18,9 @@ export function roomDefaultCopy(key) {
   if (key === 'bossHitSoftCap') return [t('限伤改为封顶'), t('本会被限伤取消的那一下按 29 万 9999 结算，打首领的大伤害不再白打。')];
   if (key === 'prepUnlimited') return [t('无限休整期'), t('休整期不再倒计时；所有还活着的博士都点「准备就绪」之后才进入战斗。')];
   if (key === 'benchExpand') return [t('整备区扩容'), t('待销毁区左边那三格空位变成整备区：整备区从 10 格变 13 格，多拿三个单位。')];
+  if (key === 'goldPreview') return [t('查看下回合资金'), t('休整期显示下回合开局会到账的资金（本回合收入 + 当前结转），方便提前规划。只是预估值。')];
+  if (key === 'shopLeft') return [t('牌库剩余张数'), t('商店卡片上显示该干员在牌库里还剩几张，方便判断还能不能追到晋升。')];
+  if (key === 'speedVote') return [t('二倍速'), t('局内顶栏的「二倍速」投票按钮；关闭后整局不显示，全场仍是一倍速。')];
   return null;
 }
 
