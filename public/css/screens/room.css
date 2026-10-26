@@ -924,8 +924,11 @@
   background: #3b1218; border: 1px solid rgba(255, 120, 130, .6); border-radius: 999px; cursor: pointer; }
 
 
-.rseat__plate { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .1rem; align-items: center;
+.rseat__plate { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .1rem; align-items: center; align-content: center;
   min-height: max(.76rem, 46px); margin-top: .08rem; padding: .06rem .1rem; background: linear-gradient(90deg, #232626, #161818); border: 1px solid rgba(255, 255, 255, .1); }
+/* 席位卡按名片画幅 (维护者 2026-10-26): 高度只由席位宽度定 —— 显示不显示编号、名字多长都不改变它的大小；名片底图和
+   别处同一个 600:186（lobby.css 的 .has-nc 给了 --nc-ar）。小屏窄到比例高小于 min-height 时让位给 min-height。 */
+.rseat__plate { height: auto; aspect-ratio: var(--nc-ar, 600 / 186); overflow: hidden; }
 
 
 .rseat__who { display: flex; align-items: center; gap: .06rem; min-width: 0; font-size: max(calc(.18 * var(--t)), 12px); }

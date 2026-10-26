@@ -192,7 +192,10 @@
 .dorder { overflow: hidden; }
 .draft-order__rows > .dorder { flex: none; } /* rows keep their height; the strip scrolls instead of squashing them */
 .dorder__nc, .dorder__art { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-.dorder__nc { opacity: .5; }
+/* 名片按画幅 (维护者 2026-10-26): 和其它名片底板同一个 600:186，只由行高推宽度、贴在行右边，左边渐隐接到文字下 ——
+   行高不变，所以有没有名片、显示不显示编号，行的大小都一样。 */
+.dorder__nc { left: auto; right: 0; width: auto; aspect-ratio: var(--nc-ar, 600 / 186); opacity: .5;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 26%); mask: linear-gradient(90deg, transparent, #000 26%); }
 .dorder__art { width: 1.8rem; max-width: 58%; left: auto; background-size: cover; background-position: 50% 12%; opacity: .42;
   -webkit-mask: linear-gradient(90deg, transparent, #000 45%); mask: linear-gradient(90deg, transparent, #000 45%); }
 .dorder.has-nc { border-color: rgba(255, 255, 255, .2); }

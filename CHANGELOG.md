@@ -60,6 +60,15 @@
   `Invalid token in pseudo element: WhiteSpace`，`npm run build` 与 vite 构建用例都过不去；残体已删除。
 - **默认版本守卫的夹具**：`test/fixtures/versions-default-guard.json` 的 `roomState` 补上 `aiTakeoverEnabled` /
   `aiTakeoverVotes`（`server/lobby.js` 的默认房间状态早就带这两个字段，夹具没跟上）。
+- **名片在所有地方同一个画幅**（维护者 2026-10-26 报：「大厅右上角…准备大厅，选择策略等等能看见名片的地方，名片的
+  行和高的比例要相同」）：官方底图是 600×186，各处底板却各用一个比例（大厅 `me-card` 3.55:1、`ach-card` 3.20:1、
+  席位卡随内容变高、选择策略整行铺底），`cover` 裁出来的画面因此各不相同。现在 `.has-nc` 给出 `--nc-ar: 600 / 186`，
+  大厅右上角名片（`lobby.css` 的 `.me-card`）、我的信息与成就统计的名片（`.ach-card`）、准备大厅的席位卡
+  （`room.css` / `lobby.css` 的 `.rseat__plate`）、选择策略行里的名片（`draft.css` 的 `.dorder__nc`，改成正比例的一块
+  贴在行右侧、左边渐隐）都只由宽度推高度。上传与挑名片的预览本来就是这个比例，不动。
+- **准备大厅的名片不再随「编号」变大小**（同上维护者 2026-10-26 报）：席位卡之前是 `min-height` + 自动行高，显示编号
+  就多一行、整块变高；现在高度由席位宽度按画幅算，两行文字居中放在里面，有没有编号都一样大（小屏窄到比例高
+  小于 `min-height` 时才让位，那时头像与两行文字必须放得下）。
 
 ### 实验性选项
 
