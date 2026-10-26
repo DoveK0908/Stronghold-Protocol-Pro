@@ -934,7 +934,7 @@ export function RoomScreen() {
       <div class="rs-foot__left">
         <button type="button" class=${`rs-exp${experimentalChanged(room.experimental) ? ' is-on' : ''}`} disabled=${!!busy || queued} onClick=${() => setExperimentalOpen(true)}
           aria-haspopup="dialog" title=${experimentalSummary(room.experimental)}>
-          <${Icon} name="edit" /><span><b>${t('实验性选项')}</b><small>${experimentalSummary(room.experimental)}</small></span></button>
+          <${Icon} name="edit" /><span><b>${t('实验性选项')}</b></span></button>
         ${soloOpt ? html`<${SoloUnlimitedToggle} option=${soloOpt} busy=${!!busy || queued} onToggle=${setSoloUnlimited} />` : null}
         ${takeoverOption ? html`<${AiTakeoverToggle} option=${takeoverOption} busy=${!!busy || queued} onToggle=${setAiTakeover} />` : null}
         ${aiLast ? html`<button type="button" class=${`rs-exp rs-exp--ai${aiLast.on ? ' is-on' : ''}`} disabled=${!aiLast.editable || !!busy || queued}

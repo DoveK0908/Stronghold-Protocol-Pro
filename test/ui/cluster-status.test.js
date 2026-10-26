@@ -128,9 +128,10 @@ test('experimental switches default off and send immutable full options only whe
 test('experimental options are room-only and lobby creation uses server defaults', () => {
   const lobby = source('../../public/js/screens/lobby.js');
   assert.doesNotMatch(lobby, /ExperimentalOptions|experimentalSummary|setExperimental|setOverlay\('experimental'\)/);
-  // the fork's own payload: the difficulty comes from the hub's pickers (shownSolo / shownCoop), and since 0.3.2 the
-  // official version and the 不限时 pref ride along — the lobby still sends no experimental options of its own.
-  assert.match(lobby, /net\.request\('room\.create', \{\n\s+mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),\n\s+\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),\n\s+\}\)/);
+  // the fork's own payload: the difficulty comes from the hub's pickers (shownSolo / shownCoop); since 0.3.2 the
+  // official version and the 不限时 pref ride along; since 2026-10-25 the player's 开房默认 ride along too — but only
+  // when one of them is on, so an ordinary room still sends nothing (the panel itself stays room-only: the assert above).
+  assert.match(lobby, /net\.request\('room\.create', \{\n\s+mode, difficulty: mode === 'solo' \? shownSolo : shownCoop, \.\.\.\(testMode && asTest \? \{ test: true \} : \{\}\), \.\.\.\(versions \? \{ version \} : \{\}\),\n\s+\.\.\.\(mode === 'solo' && soloFree && soloTimed === true \? \{ soloUnlimited: true \} : \{\}\),\n\s+\/\/ the player's 开房默认[\s\S]{0,400}?roomDefaultsExperimental\(roomDefaultsStore\.get\(\)\) \? \{ experimental: roomDefaultsExperimental\(roomDefaultsStore\.get\(\)\) \} : \{\}\),\n\s+\}\)/);
   const room = source('../../public/js/screens/room.js');
   assert.match(room, /editable=\$\{facts\.isHost && online\}/);
   assert.match(room, /mode=\$\{room\.mode\}/);
@@ -142,7 +143,10 @@ test('room options sit in the footer bar, not among the ready actions', () => {
   // 维护者 2026-10-20: 同盟设置 popover 去掉，实验性选项 与 AI 队友最后选择 并排在底栏左下，中间只留难度按钮
   assert.doesNotMatch(room, /function RoomOptions\(|rs-pill__gear/, 'no ⚙ popover wraps the options any more');
   const left = room.slice(room.indexOf('<div class="rs-foot__left">'), room.indexOf('<div class="rs-foot__center">'));
-  assert.match(left, /<b>\$\{t\('实验性选项'\)\}<\/b><small>\$\{experimentalSummary\(room\.experimental\)\}<\/small>/);
+  // 维护者 2026-10-26: 下面的小字（experimentalSummary）去掉，按钮只留标题；摘要仍作为 title 悬浮说明
+  assert.match(left, /<b>\$\{t\('实验性选项'\)\}<\/b><\/span><\/button>/);
+  assert.doesNotMatch(left, /<small>\$\{experimentalSummary/, 'no summary line under the label');
+  assert.match(left, /title=\$\{experimentalSummary\(room\.experimental\)\}/, 'the summary survives as the hover title');
   assert.match(left, /onClick=\$\{\(\) => setExperimentalOpen\(true\)\}/);
   const pill = room.slice(room.indexOf('<div class="rs-pill">'), room.indexOf('<div class="rs-foot__right">'));
   assert.match(pill, /class="rs-pill__diff"/, 'the middle keeps only the difficulty button');
