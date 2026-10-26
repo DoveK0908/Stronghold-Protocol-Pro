@@ -43,6 +43,7 @@ import { levelProgress, levelOf } from './settle.js';
 import { AnnouncementBoard, announcementRevision, announcementDismissed, dismissAnnouncement, announcementBanner, parseAnnouncements } from '../ui/announcements.js';
 import { ServerStatusModal } from '../ui/serverStatus.js';
 import { LobbyFeedback } from '../ui/lobbyFeedback.js';
+import { FeedbackBoard } from '../ui/feedbackBoard.js';
 import { SiteBoards } from '../ui/siteBoards.js';
 import { toast, toastError } from '../ui/toasts.js';
 import { GuideButton, openGuide } from '../ui/guide.js';
@@ -901,6 +902,7 @@ export function LobbyScreen() {
   const bg = useHubBackdrop();
   const [bgOpen, setBgOpen] = useState(false);
   const [sweepOpen, setSweepOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false); // 反馈板 (ui/feedbackBoard.js)
   const [achOpen, setAchOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false); // 我的信息 (界面#09)
   // 自传头像：上传过的浏览器在每次连上服务器后重认领一次（服务端按 owner 只认自己的文件）
@@ -1050,7 +1052,7 @@ export function LobbyScreen() {
         <${HubTile} icon="key" label=${t('密钥加入')} en="JOIN WITH KEY" class="hub-tile--key" onClick=${() => setJoinOpen(true)} />
         <${LobbyMusicPanel} />
         <${TipsPanel} />
-        <div class="hub-contact"><div class="hub-contact__row"><${LobbyFeedback} /><${SiteBoards} /></div><${DesignCredit} /><${HubFoot} /></div>
+        <div class="hub-contact"><div class="hub-contact__row"><${LobbyFeedback} onOpen=${() => setFeedbackOpen(true)} /><${SiteBoards} /></div><${DesignCredit} /><${HubFoot} /></div>
       </aside>
 
       <aside class="hub-right">
@@ -1124,6 +1126,7 @@ export function LobbyScreen() {
 
     <${ServerStatusModal} open=${loadOpen} online=${conn.status === 'online'} state=${conn.loadState} details=${conn.loadDetails} clusterLoad=${conn.clusterLoad} onClose=${() => setLoadOpen(false)} />
     ${overlay === 'announcements' ? html`<${LobbyAnnouncements} snapshot=${announcements} onClose=${closeAnnouncements} />` : null}
+    ${feedbackOpen ? html`<${FeedbackBoard} onClose=${() => setFeedbackOpen(false)} />` : null}
     ${infoOpen ? html`<${MyInfoDialog} me=${me} onClose=${() => setInfoOpen(false)} />` : null}
     ${achOpen ? html`<${AchievementDialog} onClose=${() => setAchOpen(false)} />` : null}
     ${sweepOpen ? html`<${SweepReport} onClose=${() => setSweepOpen(false)} />` : null}

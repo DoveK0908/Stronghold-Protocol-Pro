@@ -74,6 +74,7 @@ import { t } from '../shared/i18n.js';
 import { createTrustedRuntime } from './plugins/trustedRuntime.js';
 import { trustedHostAllowed } from './plugins/trusted.js';
 import { createStudio } from './studio/index.js';
+import { createFeedbackApi, createFeedbackBoard } from './feedbackBoard.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, pickEncoding, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
@@ -196,6 +197,7 @@ export async function startServer(opts = {}) {
   const scriptMode = process.env.SP_PLUGIN_SCRIPTS;
   let registry, lobby, network, packs, serveStatic, browserBuild, assetIndex = null, views = null;
   let content = null, visual = null, contents = null, hosts = null, studio = null, trustedRuntime = null, persistence = null;
+  let feedbackBoard = null, feedback = null;
   let versions = null, versionHosts = null, simPool = null, eventLoop = null;
   const startedAt = Date.now();
   // The online cap and the lobby's room / AI caps (server/onlineLimit.js): a JSON file re-read while the server runs; none = no cap.
@@ -272,6 +274,9 @@ export async function startServer(opts = {}) {
     studio = opts.studio === false ? null : createStudio({ publicDir, pluginsDir, dataDir, registry: packs, lobby, sessions: registry, log, fetch: opts.fetch });
     trustedRuntime = await createTrustedRuntime({ registry: packs, log });
     lobby.trustedRuntime = trustedRuntime;
+    // the lobby's anonymous feedback board (server/feedbackBoard.js): state/feedback-board.json, or SP_FEEDBACK_FILE
+    feedbackBoard = createFeedbackBoard({ log });
+    feedback = createFeedbackApi({ board: feedbackBoard, log });
     // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
     resetBuildTag();
     browserBuild = buildTag(ROOT, { publicDir, servedVersionDirs: versions.servedDirs() });
@@ -298,7 +303,7 @@ export async function startServer(opts = {}) {
     getHealthMetrics: () => healthMetrics, traffic, assetIndex, views, trusted: trustedRuntime?.health,
     persistence: persistence ? () => persistence.snapshot() : null, versions, versionHosts };
   const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health, log,
-    trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
+    trustProxy: network.opts.trustProxy, studio, feedback, trustedRuntime }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, wsCompression, traffic });
 
@@ -383,6 +388,7 @@ export async function startServer(opts = {}) {
       }
       // the last checkpoints first: then the rooms close quietly, their players are coming back (server/persist/)
       try { await persistence?.shutdown(); } catch (e) { log.error('[shutdown] checkpoints', e); }
+      try { feedbackBoard?.flush(); } catch (e) { log.error('[shutdown] feedback board', e); }
       try { lobby.shutdown('shutdown'); } catch (e) { log.error('[shutdown] lobby', e); }
       try { hosts.close(); } catch (e) { log.error('[shutdown] match hosts', e); }
       try { versionHosts?.close(); } catch (e) { log.error('[shutdown] version hosts', e); }

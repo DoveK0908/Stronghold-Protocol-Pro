@@ -1,21 +1,17 @@
-import { html, Button } from './components.js';
-import { copyText } from './clipboard.js';
-import { toast } from './toasts.js';
+import { html, Icon } from './components.js';
 import { t } from '../../../shared/i18n.js';
 
 export const FEEDBACK_GROUP = '243859707';
 
-export async function copyFeedbackGroup(copy = copyText, notify = toast) {
-  let copied = false;
-  try { copied = await copy(FEEDBACK_GROUP); } catch { /* manual copy remains available */ }
-  notify(copied ? t('已复制反馈群号 {group}', { group: FEEDBACK_GROUP }) : t('复制失败，请手动复制'), copied ? 'success' : 'warn');
-  return copied;
-}
-
 /**
- * Hidden on this deployment (the maintainer's request of 2026-10-16): 243859707 is the upstream site's group, not ours.
- * The copy helper, the constant and `lobby.js`'s mount stay untouched, so bringing the chip back is one line here.
+ * The lobby's 反馈 chip (hub-contact row). It opens the in-game anonymous feedback board (ui/feedbackBoard.js) — no group
+ * number, no external site, so it works on this deployment.
+ * @param {{ onOpen?: () => void }} props
  */
-export function LobbyFeedback() {
-  return null;
+export function LobbyFeedback({ onOpen }) {
+  if (!onOpen) return null;
+  return html`<button type="button" class="lobby-feedback" onClick=${onOpen} aria-haspopup="dialog"
+      title=${t('反馈板：不需要登录，发帖不记录任何身份')}>
+    <${Icon} name="edit" /><span class="lobby-feedback__label">${t('反馈板')}</span>FEEDBACK
+  </button>`;
 }
