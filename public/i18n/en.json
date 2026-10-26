@@ -3536,7 +3536,7 @@
   "休整期显示下回合开局会到账的资金（本回合收入 + 当前结转），方便提前规划。只是预估值。": "In the prep, show the funds the next round start pays in (this round’s income + what carries over). An estimate only.",
   "下回合开局到账：收入 {income} + 结转 {pending}。预估值，收入类效果和之后到账的奖励会改变实际数字。": "Next round start: income {income} + carried {pending}. An estimate — income effects and later rewards change the real number.",
   "下回合 +{n}": "Next round +{n}",
-  "讨论中": "Under discussion",
+  "未读": "Unread",
   "无计划": "Not planned",
   "已计划": "Planned",
   "已完成": "Done",

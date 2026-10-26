@@ -1,6 +1,6 @@
 // The lobby's anonymous feedback board (the maintainer's request of 2026-10-26): players post feedback without a name,
 // discuss each other's posts, and the maintainer — after typing the board password — replies and moves a post between
-// the four columns 未读·讨论中 / 无计划 / 已计划 / 已完成.
+// the four columns 未读 / 无计划 / 已计划 / 已完成.
 //
 // WHY A FILE OF ITS OWN: the board is the one piece of this server's state that is not a match, a claim or a plugin, and
 // it is small (a few hundred posts). It lives in `state/feedback-board.json` beside the name-tag claims (server/tags.js),
