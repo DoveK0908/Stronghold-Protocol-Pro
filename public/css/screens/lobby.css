@@ -2653,7 +2653,8 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .rseat__plate.has-nc, .me-chip.has-nc { overflow: hidden; }
 .nc-layer--camp { background: var(--nc-shade, linear-gradient(90deg, rgba(8, 11, 11, .86), rgba(8, 11, 11, .5) 55%, rgba(8, 11, 11, .12))),
   var(--nc) right 6% center / auto 150% no-repeat, var(--nc-tint, #1d2624); }
-.rseat__bg { position: absolute; right: .04rem; top: .04rem; z-index: 1; display: grid; place-items: center; width: max(.3rem, 22px); height: max(.3rem, 22px); padding: 0;
+/* 更换名片底图 (维护者 2026-10-26): 放在名片的右下角，别压住上面的名字 / 编号 */
+.rseat__bg { position: absolute; right: .04rem; bottom: .04rem; z-index: 1; display: grid; place-items: center; width: max(.3rem, 22px); height: max(.3rem, 22px); padding: 0;
   color: #eef0ef; background: rgba(0, 0, 0, .45); border: 1px solid rgba(255, 255, 255, .25); border-radius: 3px; cursor: pointer; opacity: .7; }
 .rseat__bg:hover, .rseat__bg:focus-visible { opacity: 1; border-color: #5df0c6; }
 .rseat__bg .icon { width: 70%; height: 70%; }
