@@ -114,6 +114,17 @@ const CHAIN = new Set(['chain', 'chainHeal']);
  * 而是发射强化追踪版的音符」). Add a def here when its kit owns its attack visual.
  */
 const SELF_ATTACK_VIS = new Set(['char_4182_oblvns']);
+/**
+ * The CHARACTER a view belongs to: the DIY pick's own character first (`charId`), then its Spine, then the live/chess
+ * defId. A deployed 自选 unit is a chess (`chess_char_5_diy1_a`), so `info.defId` is NOT the character and a content-id
+ * list keyed by character (SELF_ATTACK_VIS) must resolve it — a defId-only match silently missed every DIY operator and
+ * the straight "for show" projectile came back (owner report 2026-10-26: 「她还是会朝攻击范围内的敌人发射一条直着过去的
+ * 弹幕」 while the notes home and land their own damage).
+ */
+function contentIdOf(v) {
+  const i = v?.info;
+  return i?.diy?.charId || i?.charId || i?.spine || i?.defId || null;
+}
 /** A point past `b` on the line from `a` (an effect on the target turned along the blow). */
 const beyond = (a, b) => ({ x: b.x + (b.x - a.x), y: b.y + (b.y - a.y) });
 /** Group abilities whose sub-abilities all cast together (index v2). */
@@ -956,7 +967,7 @@ export class FxWiring {
     // a sim-melee attack whose official ability is a ranged one with a projectile (蒂比): the projectile flies for show
     const heal = !!tgt && !tgt.isEnemy && !src.isEnemy;
     const display = !isShot && !!proj && !!tgt && !src.isEnemy && !sk?.projectile
-      && !SELF_ATTACK_VIS.has(src.info?.defId) && fitsAttack(set?.shotClass, { heal, ranged: true });
+      && !SELF_ATTACK_VIS.has(contentIdOf(src)) && fitsAttack(set?.shotClass, { heal, ranged: true });
     const flies = !!proj && !!tgt && (isShot || display);
     if (flies && fun?.skipBody) return true;
     if (flies) {

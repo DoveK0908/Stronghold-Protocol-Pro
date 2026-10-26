@@ -80,7 +80,8 @@ async function setup() {
   const view = (id, key, x, y = 10, o = {}) => {
     const enemy = /^enemy_/.test(key) || o.enemy;
     const v = { id, x, y, z: 0, visFacing: enemy ? -1 : 1, isEnemy: !!enemy, alive: true, flags: o.flags || 0, anim: 0, sp: 0, spMax: 0, energy: null,
-      info: { id, spine: key, defId: key, side: enemy ? 'enemy' : 'ally', kind: enemy ? 'enemy' : 'op', skillIndex: 0 } };
+      info: { id, spine: o.spine ?? key, defId: o.defId ?? key, side: enemy ? 'enemy' : 'ally', kind: enemy ? 'enemy' : 'op', skillIndex: 0,
+        ...(o.diy ? { diy: o.diy } : {}) } };
     views.set(id, v);
     return v;
   };
@@ -233,5 +234,23 @@ describe('official hits after the effects audit (round 46)', () => {
     assert.equal(w.attack(s, e, 'none', 1), true);
     assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
     assert.equal(count(spawned, 'note_trail'), 0, "no projectile flown for show: the kit's notes are the visual");
+  });
+
+  test('R18: a 自选 deployment (chess defId) is still matched by its character — no shot for show', async () => {
+    // Owner report 2026-10-26: 「她还是会朝攻击范围内的敌人发射一条直着过去的弹幕」. A DIY unit is a chess on the
+    // board (`chess_char_5_diy1_a`), so `info.defId` is not the character; the content-id list must be read off the
+    // DIY pick / spine, else the "fly it for show" path draws a straight shot next to the homing notes.
+    const { w, spawned, view, frame } = await setup();
+    const s = view(1, 'char_4182_oblvns', 5, 10, { defId: 'chess_char_5_diy1_a', diy: { charId: 'char_4182_oblvns', skillIndex: 0 } });
+    const e = view(2, 'enemy_800_foe', 6);
+    frame();
+    assert.equal(w.attack(s, e, 'none', 1), true);
+    assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
+    assert.equal(count(spawned, 'note_trail'), 0, 'the straight shot stays off even when the board unit is a chess');
+    // and a plain character id keeps matching without a DIY pick
+    const s2 = view(3, 'char_4182_oblvns', 5, 12, { defId: 'chess_char_6_diy1_a' });
+    frame();
+    assert.equal(w.attack(s2, e, 'none', 2), true);
+    assert.equal(count(spawned, 'note_trail'), 0, 'the spine alone resolves the character too');
   });
 });
