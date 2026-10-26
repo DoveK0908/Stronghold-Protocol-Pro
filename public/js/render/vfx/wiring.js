@@ -105,6 +105,15 @@ const DIRS = ['UP', 'RIGHT', 'DOWN', 'LEFT'];
 const CAST_START_EVENTS = new Set([0, 2]);
 /** Bounces of a chain: no attack of the unit's own. */
 const CHAIN = new Set(['chain', 'chainHeal']);
+/**
+ * Defs whose KIT plays the attack's whole visual (the sim's profile flag `noAttackVis`, kits/ops/op-oblvns.js 丰川祥子:
+ * her ordinary attack is a note the kit fires itself, `b.snap.proj`). The sim reports such an attack with kind 'none'
+ * and the index still lists a projectile on the mode's ability, so the "fly the official projectile for show" path below
+ * (蒂比's sim-melee attack) must NOT fire here too: that shot flies dead straight at the target while the notes home,
+ * which is the barrage the owner saw next to the homing notes (2026-10-26 report 「对攻击范围内的敌人不直接发射弹幕，
+ * 而是发射强化追踪版的音符」). Add a def here when its kit owns its attack visual.
+ */
+const SELF_ATTACK_VIS = new Set(['char_4182_oblvns']);
 /** A point past `b` on the line from `a` (an effect on the target turned along the blow). */
 const beyond = (a, b) => ({ x: b.x + (b.x - a.x), y: b.y + (b.y - a.y) });
 /** Group abilities whose sub-abilities all cast together (index v2). */
@@ -946,7 +955,8 @@ export class FxWiring {
     const grouped = !!(rec.groups || rec.modeGroups);
     // a sim-melee attack whose official ability is a ranged one with a projectile (蒂比): the projectile flies for show
     const heal = !!tgt && !tgt.isEnemy && !src.isEnemy;
-    const display = !isShot && !!proj && !!tgt && !src.isEnemy && !sk?.projectile && fitsAttack(set?.shotClass, { heal, ranged: true });
+    const display = !isShot && !!proj && !!tgt && !src.isEnemy && !sk?.projectile
+      && !SELF_ATTACK_VIS.has(src.info?.defId) && fitsAttack(set?.shotClass, { heal, ranged: true });
     const flies = !!proj && !!tgt && (isShot || display);
     if (flies && fun?.skipBody) return true;
     if (flies) {

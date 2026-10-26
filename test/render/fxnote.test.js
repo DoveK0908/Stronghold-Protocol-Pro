@@ -540,3 +540,69 @@ test('the note wears the官方 note-with-trail prefab, not the talent trail', as
   assert.match(src, /oblvns_skill_0\$\{si \+ 1\}_trail/);
   assert.match(src, /_noteTrailKey/);
 });
+
+// The official note prefab is placed once on the note's birth point and then TRANSLATED by how far the note has flown
+// (render/fx/notes.js `_noteOfficialOn` track). Its anchor is world units and a note's `x`/`y` are board units — the two
+// are 1:1 on this field, which is exactly why the delta is applied to the anchor and not the note's raw position.
+describe('the official note prefab follows the note', () => {
+  const fakeFxw = (handles, at = (x, y) => [x - 10, y - 9, 0]) => ({
+    idx: { prefabs: { oblvns_attack_01_trail: { key: 'oblvns_attack_01_trail' } } },
+    playOn(key, carrier, opts) {
+      const h = { anchor: at(carrier.x, carrier.y), key, stopped: false, done: false, stop() { this.stopped = true; } };
+      h.track = opts.track;
+      handles.push(h);
+      return h;
+    },
+  });
+
+  test('the anchor moves by the note displacement (and only by it)', () => {
+    const fx = makeFx();
+    const handles = [];
+    const fxw = fakeFxw(handles);
+    fx.syncNotes([[7, 5, 5, 'note']], null, fxw);
+    const h = handles[0];
+    assert.ok(h, 'one prefab per note');
+    h.track(h);                                   // first update: captures the placed anchor and its board point
+    const a0 = h.anchor.slice();
+    fx.syncNotes([[7, 8, 6, 'note']], null, fxw); // the note flew 3 columns and 1 row
+    h.track(h);
+    assert.equal(h.anchor[0] - a0[0], 3, 'x delta in world units');
+    assert.equal(h.anchor[1] - a0[1], 1, 'y delta in world units');
+  });
+
+  test('a prefab that already ended is replaced at the note spot (never an invisible note)', () => {
+    const fx = makeFx();
+    const handles = [];
+    const fxw = fakeFxw(handles);
+    fx.syncNotes([[8, 5, 5, 'note']], null, fxw);
+    run(fx, 2 * DT);
+    assert.equal(fx.notes.get(8).core.visible, false, 'the official prefab is the note while it lives');
+    fx.syncNotes([[8, 6, 5, 'note']], null, fxw);  // it flew a column while the handle was alive
+    handles[0].done = true;                        // the handle finished (an authored duration, the pool cap)
+    run(fx, 2 * DT);
+    assert.equal(handles.length, 2, 'a fresh prefab continues the flight');
+    assert.deepEqual(handles[1].anchor.slice(0, 2), [6 - 10, 5 - 9], 'spawned at where the note is now');
+    assert.equal(fx.notes.get(8).official, true);
+  });
+
+  test('with no prefab left to continue the flight the glyph draws (never an invisible note)', () => {
+    const fx = makeFx();
+    const handles = [];
+    let refuse = false;
+    const fxw = {
+      idx: { prefabs: { oblvns_attack_01_trail: {} } },
+      playOn(key, carrier, opts) {
+        if (refuse) return null;
+        const h = { anchor: [carrier.x - 10, carrier.y - 9, 0], key, done: false, stop() { this.stopped = true; } };
+        h.track = opts.track; handles.push(h); return h;
+      },
+    };
+    fx.syncNotes([[9, 5, 5, 'note']], null, fxw);
+    run(fx, 2 * DT);
+    assert.equal(fx.notes.get(9).core.visible, false);
+    handles[0].done = true; refuse = true;
+    run(fx, 2 * DT);
+    assert.equal(fx.notes.get(9).official, false);
+    assert.equal(fx.notes.get(9).core.visible, true, 'the glyph is what is left when the official layer cannot continue');
+  });
+});

@@ -47,6 +47,19 @@
   在 `boneNames()` 里没有条目，候选表直接是空的，于是 `unitPoint` 退回「胸前一个通用点」，一切挂在这类点上的出手
   （技能起手、光环、浮游的枪口闪光与弹道）都从人物正中发出；现在会先找 `SpecialPointN` / `Special_N`，再顺延到
   枪口与手骨，没有骨骼可读时也按「手的高度、朝面向侧偏三分之一格」兜底而不再用腰。
+- **丰川祥子的音符只看得见一部分**（维护者 2026-10-26 报）:官方 prefab 跟着音符飞的那段把
+  `fx.anchor`（世界像素）当位移量加到 `n.base`（格子坐标）上，`playOn` 每帧都按 `n.base` 摆位，于是音符
+  被甩出几十格外。现在只记第一次读出锚点时的差（`t0` / `a0`），按差值平移 `n.base`，prefab 就稳稳贴在音符上。
+- **她不再朝攻击范围内的敌人飞直线弹幕**（维护者 2026-10-26 报：「对攻击范围内的敌人是不直接发射弹幕的，而是发射
+  强化追踪版的音符」）：她普通的攻击在服务端是 `noAttackVis`（`kits/ops/op-oblvns.js`，音符由 `b.snap.proj` 自己飞），
+  但客户端 `attack()` 见 kind `'none'`、官方索引里又列出了弹道，就走了「蒂比那种给演示用的官方弹道」——它笔直
+  飞向目标，和追踪音符一起出现，看着就是多了一发弹幕。新增 `SELF_ATTACK_VIS`（`render/vfx/wiring.js`）把这类
+  「自己的 kit 负责出手视觉」的干员排除在演示弹道之外；`test/render/vfx-hits.test.js` 的 R17 钉住这条。
+- **CSS 注释残体让构建失败**（2026-10-26 自查）：`public/css/screens/game.css` 里删掉 `capsule-fx` 那段时留下了
+  孤立的 `overflow` / `clip-path` 声明和两个 keyframes 的残体（`1440f357`），lightningcss 压缩直接报
+  `Invalid token in pseudo element: WhiteSpace`，`npm run build` 与 vite 构建用例都过不去；残体已删除。
+- **默认版本守卫的夹具**：`test/fixtures/versions-default-guard.json` 的 `roomState` 补上 `aiTakeoverEnabled` /
+  `aiTakeoverVotes`（`server/lobby.js` 的默认房间状态早就带这两个字段，夹具没跟上）。
 
 ### 实验性选项
 

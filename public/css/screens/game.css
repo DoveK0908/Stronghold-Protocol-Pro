@@ -119,19 +119,7 @@
 .gtop__center { animation: gtop-drop 420ms var(--ease-out) both; }
 /* the round number keeps its centred box (inline-block above dropped .roundbox__num's grid: the digit sat top-left) */
 .gtop__half .roundbox__num { display: inline-grid; place-items: center; line-height: 1; }
-  overflow: hidden; pointer-events: none; color: var(--mint-400);
-  clip-path: polygon(.13rem 0, calc(100% - .13rem) 0, 100% .13rem, 100% calc(100% - .13rem), calc(100% - .13rem) 100%, .13rem 100%, 0 calc(100% - .13rem), 0 .13rem); }
 @keyframes gtop-drop { from { transform: translateY(-.5rem); opacity: 0; } }
-   pixels over the capsule, which hides or holds its own content meanwhile. Timings from the event's top bar (video
-   7:55–7:58 回合开始 → 休整期, 8:32–8:34 作战, 8:38–8:41 联防); [ASSUMED] positions, sizes and timings estimated from it. */
-
-  0% { transform: translateX(1.5rem); opacity: 0; } 10% { opacity: 1; }
-  25% { transform: translateX(1.1rem) translateY(-18%); } 50% { transform: translateX(.72rem); }
-  75% { transform: translateX(.34rem) translateY(-18%); } 100% { transform: translateX(0); }
-}
-  0% { transform: translateX(.12rem); opacity: 0; text-shadow: -.04rem 0 rgba(255, 60, 60, .8), .04rem 0 rgba(60, 220, 255, .8); }
-  60% { opacity: 1; }
-}
 @media (prefers-reduced-motion: reduce) {
   .gtop__center, .gtop__half .roundbox__num, .gtop__cap .capsule__kills b, .gtop__cap .capsule, .gtop__cap .capsule > * { animation: none; }
   .gtop__cap.is-fx-wait .capsule > * { visibility: visible; }

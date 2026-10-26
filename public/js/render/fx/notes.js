@@ -99,6 +99,7 @@ export class FxNotes {
         if (!n) {
           n = this._takeNote();
           n.id = id; n.emit = Math.random(); n.out = 0;
+          n.rearm = 0; n.kind = 'note'; n.official = false; n.base = null; n.h = null;
           n.seed = ((typeof id === 'number' ? id : this.notes.size) * 1.7) % 6.283;   // off-phase float / sway per note
           n.frame = pickNoteFrame();                                                  // 八分 / 十六分 / 高音谱号
           this.notes.set(id, n);
@@ -106,6 +107,7 @@ export class FxNotes {
           this._noteOfficialOn(n, e[3], x, y);                                        // the official note prefab (if usable)
         }
         n.spec = PROJ[e[3]] && PROJ[e[3]].look === 'note' ? PROJ[e[3]] : PROJ.note;
+        n.kind = typeof e[3] === 'string' && e[3] ? e[3] : 'note';
         n.x = x; n.y = y; n.out = 0;
       }
     }
@@ -191,7 +193,7 @@ export class FxNotes {
 
   _freeNote(n) {
     if (n.h) { try { n.h.stop(); } catch { /* already gone */ } n.h = null; }
-    n.official = false; n.base = null;
+    n.official = false; n.base = null; n.rearm = 0;
     n.core.visible = n.halo.visible = false;
     n.core.alpha = n.halo.alpha = 0;
     n.id = null;
@@ -233,13 +235,16 @@ export class FxNotes {
         x, y, z: 0, hover: 0, dir: owner?.dir ?? 'RIGHT', visFacing: owner?.visFacing ?? 1,
         alive: true, destroyed: false, anim: owner?.anim ?? null, info: owner?.info ?? { id: n.id, kind: 'item' },
       };
-      const base = { x, y };
       const h = w.playOn(key, carrier, {
         loop: true,
         track: (fx) => {
-          if (!n.base) n.base = [fx.anchor[0], fx.anchor[1]];
-          fx.anchor[0] = n.base[0] + (n.x - base.x);
-          fx.anchor[1] = n.base[1] + (n.y - base.y);
+          // The prefab is placed once (`playOn` puts it on the note's birth point — board units, exactly like the
+          // note's own `x`/`y`), and every frame it is translated by how far the note has flown SINCE. The first call
+          // captures both halves of that pair (the placed anchor and the board point it belongs to), because the note
+          // may already have moved by the time the first update runs.
+          if (!n.base) { n.base = [fx.anchor[0], fx.anchor[1], n.x, n.y]; }
+          fx.anchor[0] = n.base[0] + (n.x - n.base[2]);
+          fx.anchor[1] = n.base[1] + (n.y - n.base[3]);
         },
       });
       if (h) { n.h = h; n.official = true; n.base = null; }
@@ -306,12 +311,21 @@ export class FxNotes {
       // a slow float and sway: the note reads as playing in the air, not as a sprite pinned to the tile
       const py = p.y - (NOTE_BOB * (0.6 + 0.4 * Math.sin(this.time * 2.2 + n.seed))) * s;
       const k = 0.85 + 0.15 * fade;
-      if (n.official) {   // the official prefab IS the note: nothing of ours is drawn for it
+      // The official prefab IS the note — but only while its handle really is alive. A prefab that ended on its own
+      // (an authored duration, the effect pool's cap) is replaced by a fresh one AT the note's current spot, so the
+      // official look continues for the whole flight; failing that (a prefab that is not there any more) the drawn
+      // glyph takes over. Either way a note is never invisible (owner report 「她发射的音符好像只有一部分显示了」).
+      if (n.official && n.h && n.h.done === true && (n.rearm | 0) < 4) {
+        n.h = null; n.official = false; n.base = null; n.rearm = (n.rearm | 0) + 1;
+        this._noteOfficialOn(n, n.kind, n.x, n.y);
+      }
+      if (n.official && n.h && n.h.done !== true) {
         n.core.visible = n.halo.visible = false;
         n.core.alpha = n.halo.alpha = 0;
         if (n.out > 0 && !n.burst) { n.burst = true; n.h?.stop?.(); }
         continue;
       }
+      n.official = false;
       const core = n.core;
       // the official flipbook: four frames in order, 30 fps, phase-shifted per note (its `seed`)
       const flip = NOTE_FLIP[Math.floor((this.time + n.seed * 0.13) * NOTE_FLIP_HZ) % NOTE_FLIP.length];

@@ -7,6 +7,8 @@
   },
   "roomState": {
     "t": "room.state",
+    "aiTakeoverEnabled": true,
+    "aiTakeoverVotes": [],
     "code": "<code>",
     "hostId": "<player>",
     "mode": "coop",

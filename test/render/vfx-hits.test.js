@@ -4,7 +4,8 @@
 // arrival stays the procedural one's; a direct ranged attack with official rows draws no procedural shot, one with none
 // keeps it (R4); a projectile attack's own hit rows play with its hit, a timer projectile's too (R12); a chain's bounces
 // draw the line of the shot that opened the chain and its hit (R14); a 领主's ranged-kind 'atk' on the enemy it blocks
-// is its Combat blow (R15); a sim-melee attack whose official ability shoots flies its projectile for show (R16).
+// is its Combat blow (R15); a sim-melee attack whose official ability shoots flies its projectile for show (R16);
+// a def whose kit plays its attack's whole visual (丰川祥子, sim `noAttackVis`) flies no shot for show (R17).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ import { FxWiring, CHAIN_LINE_S } from '../../public/js/render/vfx/wiring.js';
 const BLOCKED = 1;
 const row = (k, o = {}) => ({ effects: [k], directionType: 0, oneshot: 1, startEvent: 4, endEvent: 3, ...o });
 const KEYS = ['shot_trail', 'shot_hit', 'rows_trail', 'rows_hit', 'timer_hit', 'dir_cast', 'dir_hit', 'heal_trail', 'healer_hit', 'chain_trail',
-  'chain_line', 'chain_hit', 'lord_trail', 'lord_hit', 'lord_cast', 'lord_combat_cast', 'lord_combat_hit', 'sky_cast', 'sky_trail', 'sky_hit', 'g_hit', 'g_enemy', 'g_heal'];
+  'chain_line', 'chain_hit', 'lord_trail', 'lord_hit', 'lord_cast', 'lord_combat_cast', 'lord_combat_hit', 'sky_cast', 'sky_trail', 'sky_hit', 'note_cast', 'note_trail', 'g_hit', 'g_enemy', 'g_heal'];
 
 function makeIndex() {
   const prefabs = Object.fromEntries(KEYS.map((k) => [k, { file: `prefabs/${k}.json`, looping: k === 'chain_line' }]));
@@ -36,6 +37,8 @@ function makeIndex() {
       char_706_lord: unit([{ name: 'Default', attack: ranged('proj_lord', [], [row('lord_cast')]), combat: { class: 'MeleeAttack', cast: [row('lord_combat_cast')], hit: [row('lord_combat_hit')] } }]),
       // 蒂比: a RangedAttack the sim makes melee
       char_707_sky: unit([{ name: 'Default', attack: ranged('proj_sky', [], [row('sky_cast')]) }]),
+      // 丰川祥子: a RangedAttack whose kit fires the note itself (wiring.js SELF_ATTACK_VIS)
+      char_4182_oblvns: unit([{ name: 'Default', attack: ranged('proj_note', [], [row('note_cast')]) }]),
       enemy_800_foe: { kind: 'enemy', modes: [{ name: 'Default', attack: ranged('proj_sky'), combat: null }], skills: {}, startEffect: null, deadEffect: null },
     },
     skills: {},
@@ -50,6 +53,7 @@ function makeIndex() {
       ] },
       proj_lord: { main: 'lord_trail', onHit: ['lord_hit'], effects: ['lord_trail', 'lord_hit'] },
       proj_sky: { main: 'sky_trail', onHit: ['sky_hit'], effects: ['sky_trail', 'sky_hit'], movement: { class: 'AdvancedMovement', speed: 10 } },
+      proj_note: { main: 'note_trail', effects: ['note_trail'], movement: { class: 'AdvancedMovement', speed: 10 } },
     },
     skins: {},
     generic: { hit: { phys: 'g_hit', arts: 'g_hit', enemy: 'g_enemy', heal: 'g_heal' }, die: {}, birth: {}, status: {} },
@@ -220,5 +224,14 @@ describe('official hits after the effects audit (round 46)', () => {
     frame();
     w.attack(en, op, 'none', 2);
     assert.equal(count(spawned, 'sky_trail'), 1);
+  });
+
+  test('R17: a def whose kit plays its attack visual (丰川祥子) flies no shot for show', async () => {
+    const { w, spawned, view, frame } = await setup();
+    const s = view(1, 'char_4182_oblvns', 5), e = view(2, 'enemy_800_foe', 6);
+    frame();
+    assert.equal(w.attack(s, e, 'none', 1), true);
+    assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
+    assert.equal(count(spawned, 'note_trail'), 0, "no projectile flown for show: the kit's notes are the visual");
   });
 });
