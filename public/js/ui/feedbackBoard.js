@@ -84,6 +84,8 @@ export function FeedbackBoard({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [replyDraft, setReplyDraft] = useState('');
+  // the post this browser is rewriting (`{ id, title, body }`), or null: only the author may open it
+  const [editing, setEditing] = useState(null);
   const [secrets, setSecrets] = useState(loadSecrets);
   const [maintainer, setMaintainer] = useState(() => {
     const token = loadPref('feedback.token', '');
@@ -157,6 +159,17 @@ export function FeedbackBoard({ onClose }) {
 
   const setStatus = (id, status) => write(() => call({ action: 'status', id, status, token: maintainer.token }));
 
+  /** Rewrite one's own post: the same secret that withdraws it proves the edit. */
+  const saveEdit = () => {
+    if (!editing) return;
+    const title = editing.title.trim(), body = editing.body.trim();
+    if (!title || !body) { setError(message('EMPTY')); return; }
+    return write(async () => {
+      await call({ action: 'edit', id: editing.id, title, body, secret: secrets[editing.id], token: maintainer.token });
+      setEditing(null);
+    });
+  };
+
   const withdraw = (id) => {
     const secret = secrets[id];
     if (!secret && maintainer.ready !== 'yes') return;
@@ -189,12 +202,22 @@ export function FeedbackBoard({ onClose }) {
 
   const card = (p) => {
     const open = openId === p.id;
+    const isEditing = editing?.id === p.id;
     return html`<article key=${p.id} class=${`fb-card${open ? ' is-open' : ''}`}>
       <button type="button" class="fb-card__head" aria-expanded=${open} onClick=${() => setOpenId(open ? null : p.id)}>
         <span class="fb-card__title">${p.title}</span>
         <span class="fb-card__meta num">${stamp(p.u)}${p.replies.length ? ` · ${p.replies.length}` : ''}</span>
       </button>
-      <p class="fb-card__body">${p.body}</p>
+      ${isEditing ? html`<div class="fb-compose fb-compose--edit">
+        <input class="fb-input" type="text" maxlength=${state.limits?.title || 80} value=${editing.title}
+          aria-label=${t('反馈标题')} onInput=${(e) => setEditing((d) => ({ ...d, title: e.currentTarget.value }))} />
+        <textarea class="fb-input" rows="3" maxlength=${state.limits?.body || 2000} value=${editing.body}
+          aria-label=${t('反馈内容')} onInput=${(e) => setEditing((d) => ({ ...d, body: e.currentTarget.value }))} />
+        <div class="fb-manage">
+          <${Button} size="sm" disabled=${busy || !editing.title.trim() || !editing.body.trim()} onClick=${saveEdit}>${t('保存修改')}<//>
+          <${Button} size="sm" variant="ghost" disabled=${busy} onClick=${() => setEditing(null)}>${t('取消')}<//>
+        </div>
+      </div>` : html`<p class="fb-card__body">${p.body}</p>`}
       ${open ? html`<div class="fb-card__thread">
         ${p.replies.map((r, i) => html`<div key=${i} class=${`fb-reply${r.maintainer ? ' is-maintainer' : ''}`}>
           <span class="fb-reply__who">${r.maintainer ? t('维护者') : t('玩家')}</span>
@@ -211,6 +234,8 @@ export function FeedbackBoard({ onClose }) {
             disabled=${busy || p.status === status} onClick=${() => setStatus(p.id, status)}>${t(FEEDBACK_STATUS_LABEL[status])}<//>`)}
         </div>` : null}
         ${may(p) ? html`<div class="fb-manage">
+          ${mine(p) ? html`<${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
+            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>` : null}
           <${Button} size="sm" variant="ghost" icon="minus" disabled=${busy} onClick=${() => withdraw(p.id)}>${t('撤回这条反馈')}<//>
         </div>` : null}
       </div>` : null}
