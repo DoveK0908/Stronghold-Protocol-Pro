@@ -195,22 +195,22 @@ export function createFeedbackBoard({ file = defaultFile(), log = console, now =
       save(post);
       return { ok: true, post: publicPost(post) };
     },
-    /** Rewrite a post this browser wrote (its secret, or the maintainer's session). */
-    edit(id, input, { secret, token } = {}) {
+    /** Rewrite a post this browser wrote — the secret it was handed at creation, nothing else. */
+    edit(id, input, { secret } = {}) {
       const post = find(id);
       if (!post) throw new FeedbackError('NOT_FOUND', 404, {});
-      if (!sessionLive(token) && (!post.key || post.key !== secretKey(String(secret || '')))) throw new FeedbackError('NOT_YOURS', 403, {});
+      if (!post.key || post.key !== secretKey(String(secret || ''))) throw new FeedbackError('NOT_YOURS', 403, {});
       if (input?.title !== undefined) post.title = text(input.title, FEEDBACK_LIMITS.title);
       if (input?.body !== undefined) post.body = text(input.body, FEEDBACK_LIMITS.body);
       save(post);
       return { ok: true, post: publicPost(post) };
     },
-    /** Withdraw a post this browser wrote: gone from the board for everyone. */
-    withdraw(id, { secret, token } = {}) {
+    /** Withdraw a post this browser wrote — the same secret: gone from the board for everyone. */
+    withdraw(id, { secret } = {}) {
       const i = posts.findIndex((p) => p.id === id);
       if (i < 0) throw new FeedbackError('NOT_FOUND', 404, {});
       const post = posts[i];
-      if (!sessionLive(token) && (!post.key || post.key !== secretKey(String(secret || '')))) throw new FeedbackError('NOT_YOURS', 403, {});
+      if (!post.key || post.key !== secretKey(String(secret || ''))) throw new FeedbackError('NOT_YOURS', 403, {});
       posts.splice(i, 1);
       schedule();
       return { ok: true };
@@ -305,8 +305,8 @@ export function createFeedbackApi({ board, log = console }) {
         switch (action) {
           case 'create': send(res, 200, board.create(body, ip)); return;
           case 'reply': send(res, 200, board.reply(String(body.id || ''), body, ip)); return;
-          case 'edit': send(res, 200, board.edit(String(body.id || ''), body, { secret: body.secret, token: body.token })); return;
-          case 'withdraw': send(res, 200, board.withdraw(String(body.id || ''), { secret: body.secret, token: body.token })); return;
+          case 'edit': send(res, 200, board.edit(String(body.id || ''), body, { secret: body.secret })); return;
+          case 'withdraw': send(res, 200, board.withdraw(String(body.id || ''), { secret: body.secret })); return;
           case 'status': send(res, 200, board.setStatus(String(body.id || ''), body.status, { token: body.token })); return;
           case 'login': send(res, 200, board.login(body.password, ip)); return;
           case 'session': send(res, 200, board.session(body.token)); return;

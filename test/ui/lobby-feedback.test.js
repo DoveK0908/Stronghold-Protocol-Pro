@@ -34,6 +34,17 @@ test('the board talks to one same-origin route and never to another host', () =>
   assert.match(board, /发帖不记录任何身份/);
 });
 
+test('only the browser that wrote a post sees its edit and withdraw buttons', () => {
+  const board = source('../../public/js/ui/feedbackBoard.js');
+  // one gate, and it is the browser's own secret — not the maintainer session, not "any open card"
+  assert.match(board, /const mine = \(p\) => !!secrets\[p\.id\]/);
+  assert.doesNotMatch(board, /const may =/, 'no second gate: a maintainer session must not reveal author controls');
+  assert.match(board, /\$\{mine\(p\) \? html`<div class="fb-manage">/);
+  assert.match(board, /await call\(\{ action: 'edit', id: editing\.id, title, body, secret: secrets\[editing\.id\] \}\)/);
+  assert.match(board, /await call\(\{ action: 'withdraw', id, secret \}\)/);
+  assert.doesNotMatch(board, /action: 'withdraw'[^)]*token/, 'the session token is never offered as authorship');
+});
+
 test('the chip keeps the lobby-contact styling', () => {
   const css = source('../../public/css/screens/lobby.css');
   assert.match(css, /\.lobby-feedback \{[^}]*min-height: 40px/);

@@ -165,16 +165,16 @@ export function FeedbackBoard({ onClose }) {
     const title = editing.title.trim(), body = editing.body.trim();
     if (!title || !body) { setError(message('EMPTY')); return; }
     return write(async () => {
-      await call({ action: 'edit', id: editing.id, title, body, secret: secrets[editing.id], token: maintainer.token });
+      await call({ action: 'edit', id: editing.id, title, body, secret: secrets[editing.id] });
       setEditing(null);
     });
   };
 
   const withdraw = (id) => {
     const secret = secrets[id];
-    if (!secret && maintainer.ready !== 'yes') return;
+    if (!secret) return;
     return write(async () => {
-      await call({ action: 'withdraw', id, secret, token: maintainer.token });
+      await call({ action: 'withdraw', id, secret });
       const next = { ...secrets };
       delete next[id];
       setSecrets(next);
@@ -198,7 +198,6 @@ export function FeedbackBoard({ onClose }) {
   const columns = FEEDBACK_STATUSES.map((status) => ({ status, posts: state.posts.filter((p) => p.status === status) }));
   const total = state.posts.length;
   const mine = (p) => !!secrets[p.id];
-  const may = (p) => mine(p) || maintainer.ready === 'yes';
 
   const card = (p) => {
     const open = openId === p.id;
@@ -233,9 +232,9 @@ export function FeedbackBoard({ onClose }) {
           ${FEEDBACK_STATUSES.map((status) => html`<${Button} key=${status} size="sm" variant=${p.status === status ? 'primary' : 'ghost'}
             disabled=${busy || p.status === status} onClick=${() => setStatus(p.id, status)}>${t(FEEDBACK_STATUS_LABEL[status])}<//>`)}
         </div>` : null}
-        ${may(p) ? html`<div class="fb-manage">
-          ${mine(p) ? html`<${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
-            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>` : null}
+        ${mine(p) ? html`<div class="fb-manage">
+          <${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
+            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>
           <${Button} size="sm" variant="ghost" icon="minus" disabled=${busy} onClick=${() => withdraw(p.id)}>${t('撤回这条反馈')}<//>
         </div>` : null}
       </div>` : null}
