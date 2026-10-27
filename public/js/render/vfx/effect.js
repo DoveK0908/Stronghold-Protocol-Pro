@@ -238,7 +238,7 @@ export function compileEffect(desc, lib = {}) {
   def.loops = def.isLoop || def.ps.some((p) => p && p.looping && p.playOnAwake !== false) || def.animators.some((a) => def.clips[a.clip]?.loop);
   def.material = (i, lite) => {
     const list = lite ? def.lite : def.materials;
-    if (list[i] === undefined) list[i] = desc?.materials?.[i] ? compileMaterial(desc.materials[i], { lite }) : null;
+    if (list[i] === undefined) list[i] = desc?.materials?.[i] ? compileMaterial(desc.materials[i], { lite, dim: dimOf(def.key) }) : null;
     return list[i];
   };
   return def;
@@ -897,6 +897,36 @@ export const DIR_YAW = Object.freeze([Math.PI / 2, 0, -Math.PI / 2, Math.PI]);
 
 /** Battle seconds a stopped effect takes at most to fade out (see _lifecycle). */
 export const STOP_FADE = 0.6;
+
+/**
+ * Per-effect opacity scale (1 = the official authored brightness), applied to every material of that prefab when it is
+ * compiled (`compileMaterial(def.key → dim)`).
+ *
+ * Why a table here and not a data edit: the prefabs are extracted verbatim from the official bundles, so the authored
+ * brightness is the official one — what looks too strong in our renderer is our additive pass stacking the same ring
+ * on the same spot (结城理 keeps three Stand modes' 常驻 rings, and the ground ring of `…_range_01` + `…_range_02` are
+ * drawn twice at a mode switch). The user report behind these entries (2026-10-26): 「结城理的脚下特效太亮太突兀了」.
+ * Keep entries rare and keyed by the exact prefab key; a unit whose every loop needs dimming gets a `makoto_` prefix
+ * group rather than 14 separate numbers.
+ */
+export const FX_DIM = Object.freeze({
+  // 结城理 (Persona 3, char_4217_makoto): the passive ground rings / body buffs of all three Stand modes.
+  makoto_skill_01_buff_01: 0.45,
+  makoto_skill_02_buff_01: 0.45,
+  makoto_skill_02_range_01: 0.4,
+  makoto_skill_02_range_02: 0.4,
+  makoto_skill_02_range_02_start: 0.4,
+  makoto_skill_03_p1_buff_01_l: 0.45,
+  makoto_skill_03_p1_range_01: 0.4,
+  makoto_skill_03_p1_range_01_start: 0.4,
+  makoto_skill_03_p2_buff_01: 0.45,
+  makoto_skill_03_p2_range_01: 0.4,
+  makoto_skill_03_p2_range_02: 0.4,
+  makoto_skill_03_p2_range_02_start: 0.4,
+});
+
+/** The FX_DIM scale of one prefab key (1 when not listed). */
+export const dimOf = (key) => (key && Object.prototype.hasOwnProperty.call(FX_DIM, key) ? FX_DIM[key] : 1);
 
 function entry(part, node, submesh, mat, ov, order, layer, dist, ground, effect, meshKey) {
   return { part, node, submesh, mat, ov, order, layer, queue: mat.queue, dist, ground, effect, meshKey, kind: null, first: 0, count: 0, seq: 0 };

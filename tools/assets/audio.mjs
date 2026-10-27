@@ -565,6 +565,16 @@ export const UNIT_SFX_BANKS = Object.freeze({
     attack: Object.freeze(['battle.ON_ABILITY_START.char_4182_oblvns.attack.4.1']),
     hit: Object.freeze(['battle.ON_PROJECTILE_HIT.projectile_chr_oblvns', 'battle.ON_PROJECTILE_HIT.projectile_chr_oblvns_talent']),
   }),
+  // 结城理 (Persona 3, 傀儡师/Stand): his swings and impacts are his own banks — `p_atk_Pskptldr_n` / `p_imp_Pskptldr_n` —
+  // and the conventional pick never reaches them: his 傀儡师 class falls back to the generic blade sound, which is what
+  // the manifest carried until now (user report 2026-10-26: 「结城理的攻击没有音效」 — the generic picker's sound is not
+  // his, and his Stand attacks are what the user hears as silence). The two banks below are the plain attack / impact;
+  // the numbered variants (`attack.1.1` `p_atk_Pskptldrh_d`, `attack.2` `p_atk_Pskptldr_h`, `attack.3`
+  // `p_atk_Pskptldr_s1…3`) belong to his forms' swings and are left to the mode banks, not this pin.
+  char_4217_makoto: Object.freeze({
+    attack: Object.freeze(['battle.ON_ABILITY_START.char_4217_makoto.attack']),
+    hit: Object.freeze(['battle.ON_ABILITY_HIT.char_4217_makoto.attack']),
+  }),
 });
 
 /**

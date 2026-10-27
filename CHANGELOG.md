@@ -20,6 +20,16 @@
   二倍速投票移到「准备就绪」左侧同一行。
 - **商店**：保持官方版式，另带本树的「剩余 N 张」与皮肤立绘（`shopBar.js` + `game-shop.css` 相对官方仅 +12 行）。
 
+### 结城理：常驻环降亮、打击音效钉到自己的 bank（维护者 2026-10-26 报）
+
+- **脚下的常驻环太亮**：`vfx/effect.js` 新增按 prefab key 的透明度表 `FX_DIM`（`dimOf(key)`），编译材质时按比例
+  压 alpha/tint。结城理三个替身形态的常驻 buff 环与地面范围环降到 0.4–0.45——他一个形态就叠着 `…_buff_01`
+  与 `…_range_01/_02` 两三层加色环，官方素材本身的亮度在我们的加色叠加下会翻倍。表里只收他这 12 个 key，
+  其余干员不受影响（`test/render/vfx-dim.test.js`）。
+- **攻击没有音效**：`tools/assets/audio.mjs` 的 `UNIT_SFX_BANKS` 为 `char_4217_makoto` 钉死
+  `ON_ABILITY_START.char_4217_makoto.attack` / `ON_ABILITY_HIT.char_4217_makoto.attack`。他的职业是傀儡师，
+  常规挑选会退到通用刃声；他真正的挥击/命中是 `p_atk_Pskptldr_n` / `p_imp_Pskptldr_n`（`test/sfx-makoto.test.js`）。
+
 ### 修复（维护者 2026-10-26 报）
 
 - **干员自身的方向性特效跟着部署方向**：望三技能（`wang_skill_03_*`）、松果（`pinecn_*`）、圣约送葬人（`excu2_*`）

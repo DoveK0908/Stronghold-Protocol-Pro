@@ -91,10 +91,11 @@ const DEFAULT_VEC = Object.freeze({ _Rotation0: [1, 0, 0, 1], _Rotation1: [1, 0,
 /**
  * Compile a descriptor material.
  * @param {any} m descriptor.materials[i]
- * @param {{ lite?: boolean }} [opts]
+ * @param {{ lite?: boolean, dim?: number }} [opts] `dim` scales the compiled opacity/tint alpha (effect.js FX_DIM)
  */
 export function compileMaterial(m, opts = {}) {
   const lite = !!opts.lite;
+  const dim = Number.isFinite(opts.dim) ? Math.min(1, Math.max(0, opts.dim)) : 1;
   let { family, fallback } = familyOf(m?.shader);
   if (lite && (family === 'rimTex' || family === 'rimTint')) { family = 'basic'; fallback = true; }
   const kw = new Set(Array.isArray(m?.keywords) ? m.keywords : []);
@@ -124,6 +125,17 @@ export function compileMaterial(m, opts = {}) {
     colorMask: num(p.colorMask, 15) | 0,
   };
   const queue = typeof m?.queue === 'number' ? m.queue : m?.queue === 'Geometry' ? 2000 : m?.queue === 'AlphaTest' ? 2450 : m?.queue === 'Overlay' ? 4000 : 3000;
+  // An effect kept dimmer than authored (effect.js FX_DIM): scale what the particle families multiply their colour by —
+  // the disturb family's `_Opacity`, and the tint/_MainColor alpha the particle families read (a family that declares
+  // neither ignores it, which is the same as today's behaviour).
+  if (dim < 1) {
+    floats._Opacity = (Number.isFinite(floats._Opacity) ? floats._Opacity : 1) * dim;
+    for (const k of ['_MainColor', '_TintColor']) {
+      const v = vecs[k];
+      if (v) v[3] = v[3] * dim;
+      else vecs[k] = [1, 1, 1, dim];
+    }
+  }
   const defs = { cvs: kw.has('_HGCUSTOMVERTEXSTREAM_ON') || num(floats._HGCustomVertexStream, 0) > 0.5, weight: kw.has('_WEIGHT_ON') || num(floats._Weight, 0) > 0.5, lite };
   const key = `${family}|${defs.cvs ? 1 : 0}${defs.weight ? 1 : 0}${lite ? 1 : 0}`;
   return { name: m?.name || '', shader: m?.shader || '', family, defs, key, floats, vecs, textures, state, queue, fallback: !!fallback };

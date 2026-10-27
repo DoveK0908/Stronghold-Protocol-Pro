@@ -385,7 +385,7 @@ describe('UNIT_SFX_BANKS (audio.mjs): the two unit sounds the port lost, pinned 
   const assetUrl = (p) => `/assets/audio/sfx/${p}`;
 
   test('her attack / hit resolve to the 0.1.4 files, from the banks the table names', { skip: noAudio }, () => {
-    assert.deepEqual(Object.keys(UNIT_SFX_BANKS), [CHAR], 'the table names her and nobody else');
+    assert.deepEqual(Object.keys(UNIT_SFX_BANKS), [CHAR, 'char_4217_makoto'], 'the table names her, 结城理 and nobody else');
     assert.deepEqual(unitSfxBanks(audio, CHAR), {
       attack: ['player/p_atk/p_atk_mjckyrdslnt.mp3'],
       hit: ['player/p_imp/p_imp_mjckyrdnt.mp3'],
@@ -426,7 +426,7 @@ describe('UNIT_SFX_BANKS (audio.mjs): the two unit sounds the port lost, pinned 
   test('no other unit of the plan can be affected by the table', { skip: noAudio }, () => {
     assert.ok(skills.size > 100, `${skills.size} operators in the plan`);
     const named = [...skills.keys()].filter((id) => unitSfxBanks(audio, id));
-    assert.deepEqual(named, [CHAR], 'only her');
+    assert.deepEqual(named, [CHAR, 'char_4217_makoto'], 'only the pinned units');
   });
 });
 
