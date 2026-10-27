@@ -6,6 +6,7 @@
 // the official music (audio.js _startBgm). 联防 / 最终攻势 / 隐秘核心 keep their own tracks.
 
 import { N_ } from '../../shared/i18n.js';
+import { lobbyTrack } from './lobbyMusicLibrary.js';
 
 /**
  * The 上海Major pause BGM, offered beside 官方 (the owner's request of 2026-10-15). It is no official file and not in
@@ -29,8 +30,10 @@ export const BGM_CHOICES = Object.freeze(['official', ...BGM_TRACKS.map((t) => t
 
 /** A library entry of the player's own music (ui/lobbyMusic.js): `custom:<id>`. */
 const CUSTOM_PICK = /^custom:[A-Za-z0-9_-]{1,64}$/;
+/** A 主界面音乐库 track (lobbyMusicLibrary.js) — the same catalogue 对局音乐 offers (玩家 2026-10-27). */
+const LIB_PICK = /^lib_[0-9a-f]{20}(?:_[0-9a-f]+)?$/;
 /** @param {any} v @returns {string} a valid pick ('official' for anything else) */
-export const sanitizeBgmChoice = (v) => (BGM_CHOICES.includes(v) || (typeof v === 'string' && CUSTOM_PICK.test(v)) ? v : 'official');
+export const sanitizeBgmChoice = (v) => (BGM_CHOICES.includes(v) || (typeof v === 'string' && (CUSTOM_PICK.test(v) || LIB_PICK.test(v))) ? v : 'official');
 
 /**
  * Which pick a BGM key follows: 'prep' (休整期 and the other prep-like phases) or 'combat' (a normal 作战, the round's own
@@ -72,6 +75,8 @@ export function pickedBgm(manifest, key, choices, failed = null, local = null) {
   }
   if (failed?.has(id)) return null;
   const track = BGM_TRACKS.find((t) => t.id === id)?.of(manifest?.audio?.bgm);
-  if (!track || typeof track.loop !== 'string') return null;
-  return { intro: typeof track.intro === 'string' ? track.intro : null, loop: track.loop, choice: id };
+  if (track && typeof track.loop === 'string') return { intro: typeof track.intro === 'string' ? track.intro : null, loop: track.loop, choice: id };
+  // 主界面音乐库 (玩家 2026-10-27 「对局音乐可选项也要和音乐库同步」): a packaged library track plays its own file
+  const lib = lobbyTrack(id);
+  return lib ? { intro: null, loop: lib.url, choice: id } : null;
 }

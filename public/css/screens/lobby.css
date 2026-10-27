@@ -2838,12 +2838,21 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .hub-topbar .stats-entry .me-chip__stats { width: .26rem; height: .26rem; margin-left: .06rem; }
 
 /* 大厅音乐 card (ui/lobbyMusicPanel.js; the owner's request of 2026-10-20) — top-left, above 成就统计 */
-.lobmusic { flex: none; min-width: 0; background: linear-gradient(180deg, rgba(9, 17, 16, .9), rgba(6, 11, 10, .92));
+.lobmusic { position: relative; left: var(--dx, 0); top: var(--dy, 0); z-index: 24; flex: none; min-width: 0;
+  background: linear-gradient(180deg, rgba(9, 17, 16, .9), rgba(6, 11, 10, .92));
   border: 1px solid rgba(223, 230, 226, .16); border-top: 2px solid var(--mint-500);
   box-shadow: 0 .06rem .22rem rgba(0, 0, 0, .45); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.lobmusic[data-moved="1"] { box-shadow: 0 .12rem .4rem rgba(0, 0, 0, .6); }
+/* the head is the drag handle (玩家 2026-10-27): no text selection, and touch drags do not scroll the page */
 .lobmusic__head { display: flex; align-items: center; gap: .08rem; height: .44rem; padding: 0 .08rem 0 .12rem;
-  border-bottom: 1px solid rgba(223, 230, 226, .08); }
+  border-bottom: 1px solid rgba(223, 230, 226, .08); cursor: grab; touch-action: none;
+  -webkit-user-select: none; user-select: none; }
+.lobmusic__head:active { cursor: grabbing; }
 .lobmusic[data-open="0"] .lobmusic__head { border-bottom: 0; }
+/* 展开不再挤压下面（成就统计 / 反馈板）: the body floats over the page instead of growing the column */
+.lobmusic__body { position: absolute; left: -1px; right: -1px; top: 100%; max-height: min(72vh, 7.6rem); overflow: auto;
+  background: linear-gradient(180deg, rgba(9, 17, 16, .98), rgba(6, 11, 10, .99));
+  border: 1px solid rgba(223, 230, 226, .16); border-top: 0; box-shadow: 0 .16rem .42rem rgba(0, 0, 0, .62); }
 .lobmusic__icon { display: grid; place-items: center; width: .24rem; height: .24rem; flex: none; color: var(--mint-400);
   font-size: calc(.14 * var(--t)); border: 1px solid var(--mint-a35); }
 .lobmusic__titles { display: flex; flex: 1 1 auto; align-items: baseline; gap: .08rem; min-width: 0; }
@@ -2891,6 +2900,8 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .lobmusic__group > summary::before { content: '▸'; font-size: .08rem; color: var(--mint-400); }
 .lobmusic__group[open] > summary::before { content: '▾'; }
 .lobmusic__group > summary small { margin-left: auto; font: 700 .082rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__group--own > summary { color: var(--mint-300); }
+.lobmusic__group--own > summary::before { color: var(--mint-300); }
 .lobmusic__upload { justify-self: start; padding: .02rem .08rem; font-size: calc(.1 * var(--t)); color: var(--text-dim); cursor: pointer;
   background: transparent; border: 1px dashed var(--mint-a35); border-radius: .03rem; }
 .lobmusic__upload:hover { color: var(--mint-300); border-color: var(--mint-400); }

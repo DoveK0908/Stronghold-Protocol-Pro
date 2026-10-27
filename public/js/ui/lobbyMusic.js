@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { store, selectRoute } from '../store.js';
 import { audio, bgmKeyFor } from '../audio.js';
 import { BGM_TRACKS, BGM_CHOICES } from '../bgmChoice.js';
+import { LOBBY_LIBRARY, LOBBY_GROUPS, lobbyTrack } from '../lobbyMusicLibrary.js';
 import { useSettings, updateSettings, settingsStore } from './settings.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
@@ -296,7 +297,9 @@ export const matchMusic = {
 };
 const PREP_PICKS = BGM_CHOICES.filter((id) => id !== 'prep' && id !== 'custom');
 const COMBAT_PICKS = BGM_CHOICES.filter((id) => id !== 'custom');
-const trackName = (id, customName = '') => (id === 'official' ? t('官方（默认）') : id?.startsWith?.('custom:') ? customName || t('自选上传') : id === 'custom' ? t('自选曲') : t(BGM_TRACKS.find((x) => x.id === id)?.name || id));
+const trackName = (id, customName = '') => (id === 'official' ? t('官方（默认）') : id?.startsWith?.('custom:') ? customName || t('自选上传') : id === 'custom' ? t('自选曲') : t(BGM_TRACKS.find((x) => x.id === id)?.name || lobbyTrack(id)?.title || id));
+// 主界面音乐库的分组（玩家 2026-10-27「对局音乐可选项也要和音乐库同步」）: the same 246 tracks, folded by category.
+const LIB_GROUP_ROWS = LOBBY_GROUPS.map((g) => [g, LOBBY_LIBRARY.filter((x) => x.group === g)]);
 function BgmPick({ kind, label, value, options, tracks, onPick, busy, action }) {
   const input = useRef(null);
   const customId = typeof value === 'string' && value.startsWith('custom:') ? value.slice(7) : '';
@@ -316,7 +319,12 @@ function BgmPick({ kind, label, value, options, tracks, onPick, busy, action }) 
         onPick(next);
       }}>
         ${options.map((id) => html`<option key=${id} value=${id}>${trackName(id)}</option>`)}
-        ${tracks.map((x) => html`<option key=${x.id} value=${`custom:${x.id}`}>${trackName(`custom:${x.id}`, x.name)}</option>`)}
+        ${LIB_GROUP_ROWS.filter(([, rows]) => rows.length).map(([group, rows]) => html`<optgroup key=${group} label=${t('音乐库') + ' · ' + group}>
+          ${rows.map((x) => html`<option key=${x.id} value=${x.id}>${x.title}${x.groupName && x.groupName !== group ? ` · ${x.groupName}` : ''}</option>`)}
+        </optgroup>`)}
+        ${tracks.length ? html`<optgroup label=${t('我上传的')}>
+          ${tracks.map((x) => html`<option key=${x.id} value=${`custom:${x.id}`}>${x.name || t('自选上传')}</option>`)}
+        </optgroup>` : null}
         <option value="__upload">${t('＋ 上传新的…')}</option>
       </select></span>
     </label>

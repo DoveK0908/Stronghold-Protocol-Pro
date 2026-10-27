@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AudioManager, lobbyTrackOf } from '../../public/js/audio.js';
-import { BGM_TRACKS } from '../../public/js/bgmChoice.js';
+import { BGM_TRACKS, pickedBgm, sanitizeBgmChoice } from '../../public/js/bgmChoice.js';
 import { LOBBY_LIBRARY, LOBBY_GROUPS } from '../../public/js/lobbyMusicLibrary.js';
 import { lobbyTrackName } from '../../public/js/ui/lobbyMusicPanel.js';
 import { siteCsp } from '../../server/http/csp.js';
@@ -174,4 +174,44 @@ test('主界面音乐库: every track resolves through lobbyTrackOf and its file
     assert.ok(existsSync(join(ROOT, 'public', track.url)), `${track.title}: ${track.url} ships`);
     assert.equal(lobbyTrackName(track.id), track.title, `${track.title}: the card names it`);
   }
+});
+
+// 玩家 2026-10-27: 「对局音乐可选项也要和音乐库同步啊。还要新加一个条目，就是自己上传的，我说了自己上传不止上传一首。
+// 还有把这个主界面的音乐模块做成可拖动的吧，现在展开会导致挤压下面反馈版的位置。」
+test('对局音乐 offers the whole 音乐库 (grouped) and a 我上传的 group of every upload', () => {
+  const src = read('public/js/ui/lobbyMusic.js');
+  assert.match(src, /const LIB_GROUP_ROWS = LOBBY_GROUPS\.map\(/, 'the picker folds the library by its groups');
+  assert.match(src, /<optgroup key=\$\{group\} label=\$\{t\('音乐库'\)/, 'each group is an <optgroup>');
+  assert.match(src, /<optgroup label=\$\{t\('我上传的'\)\}>/, 'the player\'s own files are a group of their own');
+  assert.match(src, /tracks\.map\(\(x\) => html`<option key=\$\{x\.id\} value=\$\{`custom:\$\{x\.id\}`\}>/, 'every upload is an entry');
+  assert.match(src, /const id = await music\.add\(file\);/, 'uploading appends to the same library');
+  // a library pick plays its own file in a match too (bgmChoice.js), and survives the settings sanitiser
+  assert.match(read('public/js/bgmChoice.js'), /const LIB_PICK = \/\^lib_\[0-9a-f\]\{20\}/, 'lib_* is a valid pick');
+  const lib = LOBBY_LIBRARY[0];
+  assert.deepEqual(pickedBgm(MANIFEST, 'prep', { prep: lib.id }), { intro: null, loop: lib.url, choice: lib.id });
+  assert.equal(sanitizeBgmChoice(lib.id), lib.id, 'the pick survives sanitizeSettings');
+  assert.equal(sanitizeBgmChoice('lib_nonsense'), 'official', 'but only a real library id');
+});
+
+test('the 主界面音乐 card is draggable and its body no longer pushes 成就统计 / 反馈板 down', () => {
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /onPointerDown=\$\{onDown\}/, 'the header drags the card');
+  assert.match(panel, /updateSettings\(\{ lobbyMusicPos: \{ x: Math\.round\(next\.x\), y: Math\.round\(next\.y\) \} \}\)/, 'the offset is kept in settings');
+  assert.match(panel, /onDblClick=\$\{\(\) => updateSettings\(\{ lobbyMusicPos: null \}\)\}/, 'double-click puts it back');
+  assert.match(panel, /style=\$\{`--dx:\$\{Math\.round\(at\.x\)\}px;--dy:\$\{Math\.round\(at\.y\)\}px`\}/, 'the offset drives the card');
+  const css = read('public/css/screens/lobby.css');
+  assert.match(css, /\.lobmusic__body \{ position: absolute; left: -1px; right: -1px; top: 100%/, 'the body floats over the page');
+  assert.match(css, /\.lobmusic__head \{[^}]*cursor: grab; touch-action: none;/, 'the head reads as a drag handle');
+  const settings = read('public/js/ui/gameLogic/settings.js');
+  assert.match(settings, /lobbyMusicPos: null \}\)/, 'the default is where it ships');
+  assert.match(settings, /lobbyMusicPos: Number\.isFinite\(r\.lobbyMusicPos\?\.x\)/, 'and a stored offset is sanitised');
+});
+
+test('the 音乐库 lists 我上传的 as its own group with every file kept', () => {
+  const panel = read('public/js/ui/lobbyMusicPanel.js');
+  assert.match(panel, /class="lobmusic__group lobmusic__group--own"/, 'a dedicated group');
+  assert.match(panel, /<summary>\$\{t\('我上传的'\)\} <small>\$\{tracks\.length\}<\/small><\/summary>/, 'it counts every upload');
+  assert.match(panel, /tracks\.filter\(\(x\) => !q \|\| String\(x\.name \|\| ''\)\.toLocaleLowerCase\(\)\.includes\(q\)\)/, 'search covers the file names too');
+  assert.match(panel, /music\.select\(x\.id\)/, 'a row plays that file');
+  assert.match(panel, /data-testid="lobby-upload"/, 'and it holds the upload button');
 });

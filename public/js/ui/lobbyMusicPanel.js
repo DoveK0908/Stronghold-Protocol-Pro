@@ -92,8 +92,45 @@ export function LobbyMusicPanel() {
     || x.title.toLocaleLowerCase().includes(q)
     || (x.categories || []).some((c) => c.toLocaleLowerCase().includes(q)));
 
-  return html`<section class="lobmusic" data-open=${open ? '1' : '0'} data-track=${pick} aria-label=${t('主界面音乐')}>
-    <header class="lobmusic__head">
+  // 拖动卡片（玩家 2026-10-27：「把这个主界面的音乐模块做成可拖动的吧，现在展开会导致挤压下面反馈板的位置」）:
+  // the section stays one header tall in the column, the expanded body floats over the page (CSS `position: absolute`),
+  // and the card itself can be dragged anywhere — the offset is kept in settings (lobbyMusicPos).
+  const pos = s.lobbyMusicPos && Number.isFinite(s.lobbyMusicPos.x) ? s.lobbyMusicPos : null;
+  const box = useRef(null);
+  const drag = useRef(null);
+  const [live, setLive] = useState(null);
+  const at = live || pos || { x: 0, y: 0 };
+  const onDown = (e) => {
+    if (e.button !== 0 || e.target?.closest?.('button')) return;
+    const r = box.current?.getBoundingClientRect();
+    if (!r) return;
+    drag.current = { px: e.clientX, py: e.clientY, x: at.x, y: at.y, left: r.left - at.x, top: r.top - at.y, w: r.width, h: r.height, moved: false };
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  };
+  const onMove = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    const dx = d.x + (e.clientX - d.px), dy = d.y + (e.clientY - d.py);
+    if (Math.abs(e.clientX - d.px) + Math.abs(e.clientY - d.py) > 3) d.moved = true;
+    // keep the header reachable: never drag the card off screen
+    const maxX = Math.max(0, (window.innerWidth || 0) - d.w - 8);
+    const maxY = Math.max(0, (window.innerHeight || 0) - 44 - 8);
+    setLive({ x: Math.min(Math.max(0, d.left + dx), maxX), y: Math.min(Math.max(0, d.top + dy), maxY) });
+  };
+  const onUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d?.moved) { setLive(null); return; }
+    const next = live || at;
+    setLive(null);
+    updateSettings({ lobbyMusicPos: { x: Math.round(next.x), y: Math.round(next.y) } });
+  };
+
+  return html`<section class="lobmusic" data-open=${open ? '1' : '0'} data-track=${pick} aria-label=${t('主界面音乐')}
+    ref=${box} style=${`--dx:${Math.round(at.x)}px;--dy:${Math.round(at.y)}px`} data-moved=${at.x || at.y ? '1' : '0'}>
+    <header class="lobmusic__head" onPointerDown=${onDown} onPointerMove=${onMove}
+      onPointerUp=${onUp} onPointerCancel=${onUp} onDblClick=${() => updateSettings({ lobbyMusicPos: null })}
+      title=${t('按住拖动；双击复位')}>
       <span class="lobmusic__icon" aria-hidden="true">♫</span>
       <span class="lobmusic__titles">
         <strong>${t('主界面音乐')}</strong>
@@ -130,6 +167,16 @@ export function LobbyMusicPanel() {
       <input class="lobmusic__search" type="search" data-testid="lobby-library-search" aria-label=${t('搜索曲目')}
         placeholder=${t('搜索曲目')} value=${libQuery} onInput=${(e) => setLibQuery(e.currentTarget.value)} />
       <div class="lobmusic__groups" data-testid="lobby-library">
+        ${tracks.length || q ? html`<details class="lobmusic__group lobmusic__group--own" key="__own" open=${!!q || tracks.length <= 3}>
+            <summary>${t('我上传的')} <small>${tracks.length}</small></summary>
+            <div class="lobmusic__list">
+              ${tracks.filter((x) => !q || String(x.name || '').toLocaleLowerCase().includes(q)).map((x) => html`<button type="button" class="lobmusic__track" data-testid="lobby-library-track"
+                data-group="__own" aria-pressed=${column === `custom:${x.id}`}
+                onClick=${() => { setUploadError(''); music.select(x.id).catch((e) => setUploadError(e?.message || t('音乐导入失败'))); }}><span aria-hidden="true">${column === `custom:${x.id}` && !audio.lobbyPaused ? '♫' : '▷'}</span><span>${x.name}</span><small>${t('本机')}</small></button>`)}
+              <button type="button" class="lobmusic__upload" data-testid="lobby-upload" onClick=${() => input.current?.click()}>${t('＋ 上传本地音乐')}</button>
+            </div>
+          </details>` : html`<button type="button" class="lobmusic__upload" data-testid="lobby-upload"
+            onClick=${() => input.current?.click()}>${t('＋ 上传本地音乐')}</button>`}
         ${LOBBY_GROUPS.map((g) => {
           const rows = shown.filter((x) => x.group === g);
           if (!rows.length) return null;
@@ -148,8 +195,7 @@ export function LobbyMusicPanel() {
         <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${t('更换')}<//>
         <${Button} size="sm" variant="secondary" class="lobmusic__remove" data-testid="lobby-remove"
           onClick=${() => music.remove(selectedCustom.id).catch((e) => setUploadError(e?.message || t('音乐导入失败')))}>${t('删除')}<//>
-      </div>` : html`<button type="button" class="lobmusic__upload" data-testid="lobby-upload"
-        onClick=${() => input.current?.click()}>${t('＋ 上传本地音乐')}</button>`}
+      </div>` : null}
       ${uploadError ? html`<p class="lobmusic__note is-bad" data-testid="lobby-upload-error">${uploadError}</p>` : null}
       <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden
         onChange=${(e) => {
