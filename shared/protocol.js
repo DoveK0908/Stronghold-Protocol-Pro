@@ -639,6 +639,10 @@ export const C2S = {
   // picture as seats[].card.bg = 'custom:<id>' (GET /namecard/<id>).
   'me.namecard': { data: (v) => typeof v === 'string' && v.length > 0 && v.length <= 560000,
     id: (v) => typeof v === 'string' && /^[0-9a-f]{16}$/.test(v), $optional: ['data', 'id'] },
+  // 动图上传的一次性凭证 (2026-10-27): 64KB 的 WS 帧放不下动图，客户端拿票去 POST /upload/<kind>（server/uploads.js）。
+  // 答帧是 me.namecard.ticket / me.avatar.ticket { ticket, expiresIn }；票 60 秒过期、用过即废。
+  'me.namecard.ticket': {},
+  'me.avatar.ticket': {},
   // spectator seats (remake feature, community report #26; MAX_SPECTATORS): take one of a co-op room's spectator seats —
   // in its lobby or while its match runs — never a player seat; the host frees one by playerId (the spectator gets
   // room.closed { reason: 'kicked' }). room.leave / g.leave leave a spectator seat like a player seat.
@@ -786,6 +790,9 @@ export const S2C = [
   // me.namecard { id } — the requester's own uploaded 名片底图 was accepted (server/namecards.js); the room sees it as
   // seats[].card.bg = 'custom:<id>' (GET /namecard/<id>)
   'me.namecard',
+  // me.namecard.ticket / me.avatar.ticket { ticket, expiresIn } — a one-shot credential for the big-picture upload
+  // (POST /upload/<kind>, server/uploads.js); only the requester gets it
+  'me.namecard.ticket', 'me.avatar.ticket',
   // Expanded relay only: m.public.uniteRound (1|2), uniteRounds (2); unite.rounds / uniteResult.rounds
   // retain completed { round, fieldId, battleId, helpers, through } rows. Current field helpers <=2,
   // final uniteResult.helpers aggregates <=4 actual participants; b.result limits remain unchanged.
