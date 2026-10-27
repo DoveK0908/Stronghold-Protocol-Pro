@@ -99,6 +99,7 @@ export function HubScene({ theme }) {
   return html`<div class="hub-scene" data-hub-theme=${theme} data-testid="hub-scene">
     <div class="hub-bg__sky"></div>
     ${theme === 'night' || theme === 'frost' ? html`<i class="hub-bg__stars" style=${`box-shadow:${STARS}`}></i>` : null}
+    ${theme === 'frost' ? html`<div class="hub-bg__aurora"></div>` : null}
     <div class="hub-bg__haze"></div>
     ${theme !== 'calm' ? html`<div class="hub-bg__clouds"></div>` : null}
     <svg class="hub-bg__land" viewBox="0 0 1600 600" preserveAspectRatio="xMidYMax slice">
@@ -110,19 +111,24 @@ export function HubScene({ theme }) {
           <stop offset="0" class="hub-beam-0" /><stop offset="1" class="hub-beam-1" />
         </linearGradient>
       </defs>
-      <path class="hub-bg__ridge hub-bg__ridge--far" d=${area(FAR)} />
-      <path class="hub-bg__rim" d=${edge(FAR)} />
-      <path class="hub-bg__ridge--far" d=${MASTS} />
+      <g class="hub-bg__layer hub-bg__layer--far">
+        <path class="hub-bg__ridge hub-bg__ridge--far" d=${area(FAR)} />
+        <path class="hub-bg__rim" d=${edge(FAR)} />
+        <path class="hub-bg__ridge--far" d=${MASTS} />
+      </g>
       <rect x="0" y="290" width="1600" height="170" fill="url(#hubFog)" />
       ${theme === 'night' || theme === 'frost' ? html`<path class="hub-bg__beam" d="M791 300L700 -300H776Z" fill="url(#hubBeam)" />` : null}
-      <path class="hub-bg__fort" d=${FORT} />
-      <g class="hub-bg__windows">${WINDOWS.map(([x, y], i) => html`<rect key=${i} x=${x} y=${y} width="3" height="5" style=${`--dl:${(i * 1.9) % 7}s`} />`)}</g>
-      <g class="hub-bg__beacons">${BEACONS.map(([x, y, r, dl], i) => html`<g key=${i} style=${`--dl:${dl}s`}>
-        <circle class="hub-bg__beacon-glow" cx=${x} cy=${y} r=${r * 4} /><circle cx=${x} cy=${y} r=${r} /></g>`)}</g>
-      <path class="hub-bg__ridge hub-bg__ridge--mid" d=${area(MID)} />
+      <g class="hub-bg__layer hub-bg__layer--mid">
+        <path class="hub-bg__fort" d=${FORT} />
+        <g class="hub-bg__windows">${WINDOWS.map(([x, y], i) => html`<rect key=${i} x=${x} y=${y} width="3" height="5" style=${`--dl:${(i * 1.9) % 7}s`} />`)}</g>
+        <g class="hub-bg__beacons">${BEACONS.map(([x, y, r, dl], i) => html`<g key=${i} style=${`--dl:${dl}s`}>
+          <circle class="hub-bg__beacon-glow" cx=${x} cy=${y} r=${r * 4} /><circle cx=${x} cy=${y} r=${r} /></g>`)}</g>
+        <path class="hub-bg__ridge hub-bg__ridge--mid" d=${area(MID)} />
+      </g>
       <rect x="0" y="430" width="1600" height="120" fill="url(#hubFog)" opacity=".7" />
-      <path class="hub-bg__ridge hub-bg__ridge--near" d=${area(NEAR)} />
+      <g class="hub-bg__layer hub-bg__layer--near"><path class="hub-bg__ridge hub-bg__ridge--near" d=${area(NEAR)} /></g>
     </svg>
+    ${theme === 'frost' || theme === 'ember' ? html`<div class="hub-bg__sweep"></div>` : null}
     ${theme !== 'calm' ? html`<div class="hub-bg__motes">${MOTES.map((m, i) => html`<i key=${i} class="hub-bg__mote"
       style=${`left:${m.x.toFixed(2)}%;top:${m.y.toFixed(2)}%;width:${m.s.toFixed(1)}px;height:${m.s.toFixed(1)}px;--d:${m.d.toFixed(1)}s;--dl:-${m.dl.toFixed(1)}s`}></i>`)}</div>` : null}
   </div>`;

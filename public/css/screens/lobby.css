@@ -805,6 +805,7 @@
   --rim: rgba(240, 248, 255, .62); --fog: rgba(180, 200, 214, .24); --beam: rgba(225, 240, 255, .12);
   --beacon: #9fd8ff; --window: rgba(170, 220, 255, .7); --grid: rgba(170, 215, 240, .26);
   --mote: rgba(240, 248, 255, .85); --radar: rgba(180, 220, 245, .16);
+  --aurora-a: rgba(96, 214, 255, .3); --aurora-b: rgba(170, 140, 255, .26); --sweep: rgba(226, 244, 255, .13);
 }
 [data-hub-theme="ember"] {
   --sky-0: #080605; --sky-1: #120d0b; --sky-2: #251913; --sky-3: #070505;
@@ -813,6 +814,7 @@
   --rim: rgba(255, 150, 80, .28); --fog: rgba(84, 52, 38, .32); --beam: transparent;
   --beacon: #ffae48; --window: rgba(255, 168, 80, .75); --grid: rgba(255, 170, 90, .22);
   --mote: rgba(255, 150, 70, .85); --radar: rgba(255, 180, 110, .14);
+  --aurora-a: transparent; --aurora-b: transparent; --sweep: rgba(255, 176, 96, .12);
 }
 [data-hub-theme="calm"] {
   --sky-0: #040606; --sky-1: #070b0b; --sky-2: #0c1211; --sky-3: #040505;
@@ -821,6 +823,7 @@
   --rim: rgba(89, 244, 202, .14); --fog: rgba(30, 50, 46, .25); --beam: transparent;
   --beacon: #4ed8af; --window: rgba(78, 216, 175, .45); --grid: rgba(89, 244, 202, .22);
   --mote: transparent; --radar: rgba(89, 244, 202, .11);
+  --aurora-a: transparent; --aurora-b: transparent; --sweep: transparent;
 }
 [data-hub-theme="custom"] { --radar: rgba(235, 245, 240, .14); }
 
@@ -853,6 +856,19 @@
 .hub-bg__windows rect { fill: var(--window); animation: hub-window 9s steps(1) infinite; animation-delay: var(--dl); }
 .hub-bg__beacons g { fill: var(--beacon); animation: hub-beacon 2.8s ease-in-out infinite; animation-delay: var(--dl); }
 .hub-bg__beacon-glow { opacity: .22; }
+/* parallax: the three ridges drift at their own speed, so the skyline reads as depth rather than a flat plate */
+.hub-bg__layer { animation: hub-parallax-far 27s ease-in-out infinite alternate; }
+.hub-bg__layer--mid { animation-name: hub-parallax-mid; animation-duration: 36s; }
+.hub-bg__layer--near { animation-name: hub-parallax-near; animation-duration: 47s; }
+.hub-bg__haze { animation: hub-haze 21s ease-in-out infinite alternate; }
+/* 霜原: a slow aurora curtain over the ridge; 霜原/烬野: a soft light band crossing the field */
+.hub-bg__aurora { position: absolute; left: -12%; right: -12%; top: -8%; height: 52%; pointer-events: none; opacity: .55;
+  background: linear-gradient(101deg, transparent 8%, var(--aurora-a) 26%, var(--aurora-b) 48%, var(--aurora-a) 68%, transparent 88%);
+  background-size: 200% 100%; filter: blur(18px); mix-blend-mode: screen;
+  animation: hub-aurora 34s ease-in-out infinite alternate, hub-aurora-pulse 13s ease-in-out infinite alternate; }
+.hub-bg__sweep { position: absolute; inset: -12% -30%; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+  background: linear-gradient(78deg, transparent 44%, var(--sweep) 50%, transparent 56%);
+  animation: hub-sweep-band 26s linear infinite; }
 .hub-bg__motes { position: absolute; inset: 0; }
 .hub-bg__mote { position: absolute; border-radius: 50%; background: var(--mote); box-shadow: 0 0 6px var(--mote); opacity: 0;
   animation: hub-mote var(--d) linear infinite; animation-delay: var(--dl); }
@@ -886,6 +902,19 @@
 @keyframes hub-mote { 0% { transform: translate3d(0, 0, 0); opacity: 0; } 15% { opacity: .8; } 85% { opacity: .45; } 100% { transform: translate3d(2vw, -18vh, 0); opacity: 0; } }
 @keyframes hub-snow { 0% { transform: translate3d(0, -12vh, 0); opacity: 0; } 15% { opacity: .9; } 85% { opacity: .7; } 100% { transform: translate3d(-3vw, 14vh, 0); opacity: 0; } }
 @keyframes hub-sweep { to { transform: rotate(1turn); } }
+@keyframes hub-parallax-far { from { transform: translateX(-.45%); } to { transform: translateX(.45%); } }
+@keyframes hub-parallax-mid { from { transform: translateX(-1%); } to { transform: translateX(1%); } }
+@keyframes hub-parallax-near { from { transform: translateX(-1.8%); } to { transform: translateX(1.8%); } }
+@keyframes hub-haze { from { opacity: .8; transform: scale(1); } to { opacity: 1; transform: scale(1.045); } }
+@keyframes hub-aurora { from { background-position: 0% 0%; transform: translateX(-2%) skewY(-1deg); } to { background-position: 100% 0%; transform: translateX(2%) skewY(1.4deg); } }
+@keyframes hub-aurora-pulse { from { opacity: .34; } to { opacity: .62; } }
+@keyframes hub-sweep-band {
+  0% { transform: translateX(-72%) rotate(6deg); opacity: 0; }
+  14% { opacity: .45; }
+  50% { opacity: .7; }
+  86% { opacity: .35; }
+  100% { transform: translateX(72%) rotate(6deg); opacity: 0; }
+}
 @keyframes hub-pulse { 0% { box-shadow: 0 0 0 0 rgba(89, 244, 202, .55); } 100% { box-shadow: 0 0 0 .1rem rgba(89, 244, 202, 0); } }
 
 .lobby-hub > .topbar, .hub-stage { position: relative; z-index: 1; }
