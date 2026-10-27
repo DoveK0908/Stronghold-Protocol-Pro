@@ -209,6 +209,10 @@ export function GameScreen() {
     const id = setTimeout(() => { hold.current = null; endHold((n) => n + 1); }, Math.max(0, hold.current.until - Date.now()));
     return () => clearTimeout(id);
   }, [held]);
+  // 作战结束：持续段循环音（`sfx.units[id].skillSfx[i].loop`，如丰川祥子 S3 的那段）由技能的结束事件收尾
+  // （audio.js 的 `['skill', id, 0]`）。战斗打完的那一帧之后模拟不再派发事件，结束事件就永远不来，循环只能等
+  // 60 s 的安全上限——结算画面上还挂着一段音乐。结果出来（或房间里已不在对局）时把这类循环一并收掉。
+  useEffect(() => { if (hasResult || ended) audio.stopAllLoops(); }, [hasResult, ended]);
   if (!pub || !gd.ready || !versionReady) {
     return html`<div class="screen gload">
       <${Spinner} size="lg" label=${pub ? 'LOADING DATA' : 'ENTERING SIMULATION'} />
