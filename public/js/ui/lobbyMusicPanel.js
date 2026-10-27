@@ -9,6 +9,7 @@ import { html, Button } from './components.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { audio } from '../audio.js';
 import { BGM_TRACKS } from '../bgmChoice.js';
+import { LOBBY_LIBRARY } from '../lobbyMusicLibrary.js';
 import { t } from '../../../shared/i18n.js';
 import { useSettings, updateSettings } from './settings.js';
 import { music } from './lobbyMusic.js';
@@ -19,11 +20,16 @@ import { music } from './lobbyMusic.js';
 const PACKED_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby' && x.id !== 'major').map((x) => x.id)]);
 const UPLOAD = '__upload';
 
+/** The 主界面音乐库 (lobbyMusicLibrary.js) — the 23 packaged lobby tracks of selena 0.4.1, offered beside the above. */
+const LIB_IDS = Object.freeze(LOBBY_LIBRARY.map((x) => x.id));
+
 /** The name of one column value (`lobbyTrack`) or of a library entry (`custom:<id>`). */
 export function lobbyTrackName(id, customName = '') {
   if (id === 'official') return t('官方大厅音乐');
   if (id?.startsWith?.('custom:')) return customName || t('自选上传');
   if (id === 'custom') return customName || t('自选上传');
+  const lib = LOBBY_LIBRARY.find((x) => x.id === id);
+  if (lib) return lib.title;
   return t(BGM_TRACKS.find((x) => x.id === id)?.name || id);
 }
 
@@ -36,6 +42,7 @@ export function LobbyMusicPanel() {
   const s = useSettings();
   const [state, setState] = useState(() => music.snapshot());
   const [uploadError, setUploadError] = useState('');
+  const [libQuery, setLibQuery] = useState('');
   const input = useRef(null);
   const open = s.lobbyMusicOpen !== false;
   const pick = s.lobbyTrack || 'official';
@@ -64,7 +71,7 @@ export function LobbyMusicPanel() {
     // the player's own file and the packaged tracks share the lobby key: tell ui/lobbyMusic.js the pick moved on
     music.pickChanged();
   };
-  const options = [...PACKED_IDS, ...tracks.map((x) => `custom:${x.id}`)];
+  const options = [...PACKED_IDS, ...LIB_IDS, ...tracks.map((x) => `custom:${x.id}`)];
   const step = (dir) => {
     const at = Math.max(0, options.indexOf(column));
     let next;
@@ -117,6 +124,16 @@ export function LobbyMusicPanel() {
           aria-label=${t('大厅音乐音量')} onChange=${(e) => updateSettings({ lobbyVolume: Number(e.currentTarget.value) / 100 })} />
         <b>${volume}</b>
       </label>
+      <details class="lobmusic__library" data-testid="lobby-library">
+        <summary>${t('音乐库')} <small>${LOBBY_LIBRARY.length}</small></summary>
+        <input class="lobmusic__search" type="search" data-testid="lobby-library-search" aria-label=${t('搜索曲目')}
+          placeholder=${t('搜索曲目')} value=${libQuery} onInput=${(e) => setLibQuery(e.currentTarget.value)} />
+        <div class="lobmusic__list">
+          ${LOBBY_LIBRARY.filter((x) => !libQuery || x.title.toLocaleLowerCase().includes(libQuery.toLocaleLowerCase())).map((x) => html`<button
+            type="button" class="lobmusic__track" data-testid="lobby-library-track" aria-pressed=${pick === x.id}
+            onClick=${() => choose(x.id)}><span aria-hidden="true">${pick === x.id && !audio.lobbyPaused ? '♫' : '▷'}</span><span>${x.title}</span></button>`)}
+        </div>
+      </details>
       ${custom ? html`<div class="lobmusic__file">
         <small data-testid="lobby-file">${selectedCustom.name}</small>
         <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${t('更换')}<//>

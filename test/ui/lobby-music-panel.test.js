@@ -2,11 +2,13 @@
 // audio.js plumbing behind them — a packaged track instead of the lobby's own, the lobby's own gain, its own volume.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AudioManager, lobbyTrackOf } from '../../public/js/audio.js';
 import { BGM_TRACKS } from '../../public/js/bgmChoice.js';
+import { LOBBY_LIBRARY } from '../../public/js/lobbyMusicLibrary.js';
+import { lobbyTrackName } from '../../public/js/ui/lobbyMusicPanel.js';
 import { siteCsp } from '../../server/http/csp.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -149,4 +151,20 @@ test('对局音乐 lists the same local library as the lobby card', () => {
   assert.match(bgm, /const CUSTOM_PICK = \/\^custom:\[A-Za-z0-9_-\]\{1,64\}\$\//, 'custom:<id> is a valid pick');
   const audio = read('public/js/audio.js');
   assert.match(audio, /setBgmLocal\(kind, url, id = null\)/, 'audio.js keeps the entry id');
+});
+
+// 主界面音乐库 (维护者 2026-10-27): selena 0.4.1's 23 lobby tracks — the pick resolves to its own file, and every entry
+// ships (a listed track whose file is missing would silently fall back to the lobby music).
+test('主界面音乐库: every track resolves through lobbyTrackOf and its file ships', () => {
+  assert.equal(LOBBY_LIBRARY.length, 23, 'selena 0.4.1 published 23 主界面 tracks');
+  const seen = new Set();
+  for (const track of LOBBY_LIBRARY) {
+    assert.match(track.id, /^lib_[0-9a-f]{20}(?:_[0-9a-f]+)?$/, `${track.title}: a stable file-hash id`);
+    assert.ok(!seen.has(track.id), `${track.title}: the id is unique`);
+    seen.add(track.id);
+    assert.ok(track.title.trim(), `${track.id}: a title`);
+    assert.equal(lobbyTrackOf(MANIFEST, track.id)?.loop, track.url, `${track.title}: the pick plays its own file`);
+    assert.ok(existsSync(join(ROOT, 'public', track.url)), `${track.title}: ${track.url} ships`);
+    assert.equal(lobbyTrackName(track.id), track.title, `${track.title}: the card names it`);
+  }
 });

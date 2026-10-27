@@ -90,6 +90,7 @@ import { fetchMaterial } from './materialFallback.js';
 import { normalizeVoiceLanguage } from './voiceLanguage.js';
 import { unhashedUrl } from '../../shared/assetPaths.js';
 import { BGM_TRACKS, pickedBgm, sanitizeBgmChoice } from './bgmChoice.js';
+import { lobbyTrack } from './lobbyMusicLibrary.js';
 
 const MAX_VOICES = 8;
 // [ASSUMED] Remake anti-spam intervals, retained at high game speeds; not official audio pool parameters (#680).
@@ -227,6 +228,9 @@ export function resolveBgm(manifest, key) {
  * @param {string} id
  */
 export function lobbyTrackOf(manifest, id) {
+  // 主界面音乐库 (lobbyMusicLibrary.js): a packaged lobby track of selena 0.4.1 — its own file, not a manifest key
+  const lib = lobbyTrack(id);
+  if (lib) return { intro: null, loop: lib.url, choice: id };
   const track = BGM_TRACKS.find((t) => t.id === id)?.of(manifest?.audio?.bgm);
   if (!track || typeof track.loop !== 'string') return null;
   return { intro: typeof track.intro === 'string' ? track.intro : null, loop: track.loop, choice: id };
@@ -2203,6 +2207,9 @@ export function installAudio(deps) {
       const sync = (s) => {
         try {
           const pub = s.match?.public ?? null;
+          // Sustained skills belong to a battle, including when no skill-end tuple arrives at round end.
+          if (deps.selectRoute(s) !== 'game'
+            || ![PHASE.COMBAT, PHASE.UNITE, PHASE.FINAL_ASSAULT, PHASE.HIDDEN_CORE].includes(pub?.phase)) audio.stopAllLoops();
           if (deps.selectRoute(s) !== 'game') audio.stopBondCue();
           else if (![PHASE.COMBAT, PHASE.UNITE, PHASE.FINAL_ASSAULT, PHASE.HIDDEN_CORE].includes(pub?.phase)) {
             // A new prep gain can precede its m.public phase update. Cancel only the previous battle's cue.
