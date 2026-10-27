@@ -232,11 +232,11 @@ describe('official hits after the effects audit (round 46)', () => {
     const s = view(1, 'char_4182_oblvns', 5), e = view(2, 'enemy_800_foe', 6);
     frame();
     assert.equal(w.attack(s, e, 'none', 1), true);
-    assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
+    assert.ok(spawned.includes('oblvns_attack_01_start'), "the adopted kit's cast plays");
     assert.equal(count(spawned, 'note_trail'), 0, "no projectile flown for show: the kit's notes are the visual");
   });
 
-  test('R19: 丰川祥子 runs the selena fx layer only when the snapshot says kitSet=selena', async () => {
+  test('R19: the adopted Sakiko layer also owns snapshots without the old comparison marker', async () => {
     // 对比实现（SP_KIT_SET=selena）：快照带 kitSet='selena' 时 render/vfx/sakiko.js 接管她的攻击起手，默认实现的
     // 官方行不再重复画；不带 kitSet 的同一张卡仍是本树自己的实现（R17）。
     const { w, spawned, view, frame } = await setup();
@@ -247,13 +247,13 @@ describe('official hits after the effects audit (round 46)', () => {
     assert.ok(spawned.includes('oblvns_attack_01_start'), 'the selena layer plays her cast');
     assert.ok(!spawned.includes('note_cast'), 'and the default attack rows do not double it');
 
-    spawns: {
+    {
       spawned.length = 0;
       const b = view(3, 'char_4182_oblvns', 5, 10);   // 同一角色，没有 kitSet
       frame();
       assert.equal(w.attack(b, t, 'arrow', 1), true);
-      assert.ok(spawned.includes('note_cast'), 'without kitSet the default official rows play');
-      assert.ok(!spawned.includes('oblvns_attack_01_start'), 'and the selena layer stays off');
+      assert.ok(!spawned.includes('note_cast'), 'the generic attack rows stay off');
+      assert.ok(spawned.includes('oblvns_attack_01_start'), 'the adopted layer also owns an unmarked snapshot');
     }
     assert.equal(w.keysFor([a]).some((k) => k.startsWith('oblvns_')), true,
       'a selena 祥子 asks for the prefabs its layer plays');
@@ -268,7 +268,7 @@ describe('official hits after the effects audit (round 46)', () => {
     const e = view(2, 'enemy_800_foe', 6);
     frame();
     assert.equal(w.attack(s, e, 'none', 1), true);
-    assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
+    assert.ok(spawned.includes('oblvns_attack_01_start'), "the adopted kit's cast plays for a DIY piece");
     assert.equal(count(spawned, 'note_trail'), 0, 'the straight shot stays off even when the board unit is a chess');
     // and a plain character id keeps matching without a DIY pick
     const s2 = view(3, 'char_4182_oblvns', 5, 12, { defId: 'chess_char_6_diy1_a' });

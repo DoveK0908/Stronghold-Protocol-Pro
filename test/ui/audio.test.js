@@ -141,6 +141,32 @@ describe('bgm selection', () => {
   });
 });
 
+test('round end stops sustained skill audio before the next field or whole-match result', () => {
+  const original = { playBgm: audio.playBgm, ctx: audio.ctx };
+  let fire, stopped = 0;
+  let state = { route: 'game', match: { public: { phase: PHASE.COMBAT } } };
+  audio.playBgm = () => {};
+  audio.ctx = { currentTime: 0 };
+  const seed = () => audio.loops.set('skill:1', {
+    token: 1, timer: null, src: { stop() { stopped++; } }, gain: { disconnect() {} },
+  });
+  try {
+    installAudio({ getState: () => state, selectRoute: s => s.route,
+      subscribe: fn => { fire = fn; return () => {}; } });
+    seed();
+    const combat = state;
+    state = { route: 'game', match: { public: { phase: PHASE.PREP } } };
+    fire(state, combat);
+    assert.equal(stopped, 1);
+    assert.equal(audio.loops.size, 0, 'no skill-end tuple or match.result is needed');
+    seed();
+    const prep = state;
+    state = { route: 'lobby', match: {} };
+    fire(state, prep);
+    assert.equal(stopped, 2, 'leaving the game also stops a sustained skill');
+  } finally { audio.stopAllLoops(); Object.assign(audio, original); }
+});
+
 describe('SfxLimiter', () => {
   test('caps concurrent voices', () => {
     const l = new SfxLimiter({ maxVoices: 3, unitCooldownMs: 0, urlGapMs: 0 });

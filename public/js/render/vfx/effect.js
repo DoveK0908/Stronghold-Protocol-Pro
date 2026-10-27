@@ -903,26 +903,26 @@ export const STOP_FADE = 0.6;
  * compiled (`compileMaterial(def.key → dim)`).
  *
  * Why a table here and not a data edit: the prefabs are extracted verbatim from the official bundles, so the authored
- * brightness is the official one — what looks too strong in our renderer is our additive pass stacking the same ring
- * on the same spot (结城理 keeps three Stand modes' 常驻 rings, and the ground ring of `…_range_01` + `…_range_02` are
- * drawn twice at a mode switch). The user report behind these entries (2026-10-26): 「结城理的脚下特效太亮太突兀了」.
- * Keep entries rare and keyed by the exact prefab key; a unit whose every loop needs dimming gets a `makoto_` prefix
- * group rather than 14 separate numbers.
+ * brightness is the official one. This renderer's persistent overlapping passes need a presentation adjustment
+ * (owner: 「结城理的脚下特效太亮太突兀了」). Both directional variants must be covered: Stand_S3_1 selects
+ * `_buff_01_r` when facing right; dimming only `_l` previously left the active variant at full brightness.
+ * Exact keys keep transient attacks, hits and the other operators unchanged.
  */
 export const FX_DIM = Object.freeze({
   // 结城理 (Persona 3, char_4217_makoto): the passive ground rings / body buffs of all three Stand modes.
-  makoto_skill_01_buff_01: 0.45,
-  makoto_skill_02_buff_01: 0.45,
-  makoto_skill_02_range_01: 0.4,
-  makoto_skill_02_range_02: 0.4,
-  makoto_skill_02_range_02_start: 0.4,
-  makoto_skill_03_p1_buff_01_l: 0.45,
-  makoto_skill_03_p1_range_01: 0.4,
-  makoto_skill_03_p1_range_01_start: 0.4,
-  makoto_skill_03_p2_buff_01: 0.45,
-  makoto_skill_03_p2_range_01: 0.4,
-  makoto_skill_03_p2_range_02: 0.4,
-  makoto_skill_03_p2_range_02_start: 0.4,
+  makoto_skill_01_buff_01: 0.2,
+  makoto_skill_02_buff_01: 0.2,
+  makoto_skill_02_range_01: 0.18,
+  makoto_skill_02_range_02: 0.18,
+  makoto_skill_02_range_02_start: 0.18,
+  makoto_skill_03_p1_buff_01_l: 0.12,
+  makoto_skill_03_p1_buff_01_r: 0.12,
+  makoto_skill_03_p1_range_01: 0.18,
+  makoto_skill_03_p1_range_01_start: 0.18,
+  makoto_skill_03_p2_buff_01: 0.2,
+  makoto_skill_03_p2_range_01: 0.18,
+  makoto_skill_03_p2_range_02: 0.18,
+  makoto_skill_03_p2_range_02_start: 0.18,
 });
 
 /** The FX_DIM scale of one prefab key (1 when not listed). */

@@ -35,18 +35,11 @@ describe('FX_DIM', () => {
     const f = 'public/assets/local/fx/index.json';
     if (!existsSync(f)) return;
     const idx = JSON.parse(readFileSync(f, 'utf8'));
-    const keys = new Set();
-    const walk = (v) => {
-      if (!v || typeof v !== 'object') return;
-      if (Array.isArray(v)) { for (const x of v) walk(x); return; }
-      for (const [k, x] of Object.entries(v)) {
-        if (k === 'effects' || k === 'uses') { if (Array.isArray(x)) for (const e of x) if (typeof e === 'string') keys.add(e); }
-        else if (k === 'key' && typeof x === 'string') keys.add(x);
-        walk(x);
-      }
-    };
-    walk(idx);
-    for (const key of Object.keys(FX_DIM)) assert.ok(keys.has(key), `${key} is not in index.json`);
+    const persistent = Object.keys(idx.prefabs).filter(k => /^makoto_skill_.*(?:buff|range)/.test(k));
+    for (const key of persistent) assert.ok(dimOf(key) < 1, `persistent variant ${key} must not retain full brightness`);
+    assert.equal(dimOf('makoto_skill_03_p1_buff_01_r'), dimOf('makoto_skill_03_p1_buff_01_l'), 'both facing variants must be equally dim');
+    // A directional prefab can be reached through SwitchableEffect rather than an ability's direct effects list.
+    for (const key of Object.keys(FX_DIM)) assert.ok(Object.hasOwn(idx.prefabs, key), `${key} is not in index.json`);
   });
 });
 

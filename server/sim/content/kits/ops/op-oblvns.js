@@ -3,7 +3,8 @@
 // Official skill/talent/module BB: tools/data/sakiko-source.json. Native flight notes: PRTS 丰川祥子.
 // [ASSUMED] Safe bounds: 192 live notes, 12s lifetime; removed with their caster. This also bounds empty-field tests.
 import { num, talentBb, moduleOn, up, skillRec } from '../shared/tier1.js';
-import { canTargetEnemy, sortEnemyTargets } from '../../../targeting.js';
+import { absoluteRangeKeys, canTargetEnemy, sortEnemyTargets } from '../../../targeting.js';
+import { bodyInRange } from '../../../body.js';
 import { dirVec } from '../../../dir.js';
 import { hypot, atan2, sin, cos } from '../../../detmath.js';
 import { COLS } from '../../../constants.js';
@@ -22,18 +23,21 @@ export default {
   char_4182_oblvns: (_bb, chess) => {
     const t1 = talentBb(chess), t2 = talentBb(chess, 1), b1 = bbOf(chess, S1), b2 = bbOf(chess, S2), b3 = bbOf(chess, S3);
     const selected = chess.skill?.skillId, mod = moduleOn(chess);
+    const skillGrid = skillRec(chess, selected)?.rangeGrid;
     const tone = (battle, unit) => {
       battle.removeBuff(unit, 'oblvns:tone');
       if (selected === S2) battle.addBuff(unit, { key: 'oblvns:tone', persist: true, allowDead: true,
         mods: unit.mem.oblvnsOrgan ? { aspd: num(b2['attack@attack_speed']) } : { atkPct: num(b2['attack@atk']) } });
       if (selected === S2) { unit.form = unit.mem.oblvnsOrgan ? 'oblvns_organ' : 'oblvns_piano'; battle.fx('phase', { x: unit.x, y: unit.y, id: unit.id, form: unit.form }); }
     };
-    const launch = (unit, type, scale = 1, offset = 0, fever = true, pierce = false, projectile = null) => {
+    const launch = (unit, type, scale = 1, offset = 0, fever = true, pierce = false, projectile = null, aimed = false) => {
       const m = unit.mem.oblvns;
       if (!m || m.notes.length >= NOTE_LIMIT) return;
       const [dy, dx] = dirVec(unit.dir), angle = atan2(dy, dx) + offset;
       const penalty = unit.blocking.length || mod && unit.skill.active ? 1 : 0.8;
       m.notes.push({ x: unit.x, y: unit.y, angle, origin: angle, age: 0, outside: 0, target: null, seen: new Set(),
+        aimed, seekRadius: selected === S2 && pierce ? 0.8 : 1,
+        weakTurn: selected === S3 && unit.skill.active ? 1 / 4 : selected === S2 ? (pierce ? 1 / 2 : 1 / 12) : 1 / 6,
         amount: unit.s.atk * unit.s.atkScaleMul * scale * penalty,
         type, scale, fever, pierce, pass: 0, seq: ++m.seq, speed: pierce ? 3.4 : type === 'arts' && selected === S2 ? 1.2 : 1.7,
         projectile: projectile || (selected === S2 ? `projectile_chr_oblvns_s2${type === 'arts' ? '_slow' : ''}`
@@ -50,7 +54,8 @@ export default {
       trait: { noAttack: true, canHitFly: true },
       skills: {
         [S1]: { kind: 'charges', charges: 2, trigger: 'MANUAL', onStart({ battle, unit, reason }) {
-          for (let i = 0; i < 8; i++) launch(unit, 'arts', num(b1[i ? `atk_scale_${i + 1}` : 'atk_scale'], 0.04), (i - 3.5) * PI / 12, reason !== 'full-charge', false, `projectile_chr_oblvns_s1_${i + 1}`);
+          const aimed = battle.enemies.some(e => valid(unit, e));
+          for (let i = 0; i < 8; i++) launch(unit, 'arts', num(b1[i ? `atk_scale_${i + 1}` : 'atk_scale'], 0.04), (i - 3.5) * PI / 12, reason !== 'full-charge', false, `projectile_chr_oblvns_s1_${i + 1}`, aimed);
           if (reason !== 'full-charge') feverStart(battle, unit);
         } },
         [S2]: { kind: 'instant', trigger: 'MANUAL', onStart({ battle, unit }) { unit.mem.oblvnsOrgan = !unit.mem.oblvnsOrgan; tone(battle, unit); feverStart(battle, unit); } },
@@ -71,26 +76,30 @@ export default {
           const feverWasActive = m.fever > 0;
           m.fever = Math.max(0, m.fever - dt); m.cd -= dt; m.draw -= dt; m.aura -= dt; m.feverCd -= dt;
           if (feverWasActive && m.fever <= 0 && m.deferredDeath) { battle.retreat(unit, { reason: 'oblvns:fever-end', dying: true }); clear(unit); return; }
-          const enemies = sortEnemyTargets(battle, unit, battle.enemies.filter(e => valid(unit, e)));
+          const foes = battle.enemies.filter(e => canTargetEnemy(unit, e, { canHitFly: true }));
+          const enemies = sortEnemyTargets(battle, unit, foes.filter(e => valid(unit, e)));
+          const skillKeys = skillGrid?.length ? new Set(absoluteRangeKeys(skillGrid, unit.tileR, unit.tileC, unit.dir, unit.s.baseRangeExtend || 0)) : unit.rangeKeySet;
+          const skillEnemies = sortEnemyTargets(battle, unit, foes.filter(e => bodyInRange(e, skillKeys)));
           const actionable = !unit.hidden && !unit.s.flags.stun && !unit.s.flags.noAttack;
           if (actionable && m.fever > 0 && selected === S1 && m.feverCd <= 0) {
             m.feverCd = Math.max(0.1, unit.s.interval);
             unit.skill.activate('fever', { free: true });
           }
           if (actionable && unit.skill.ready && !unit.skill.active && !unit.skill.opCooling) {
-            if (selected === S1 && (enemies.length || unit.skill.charges >= 2)) unit.skill.activate(enemies.length ? 'enemy' : 'full-charge');
-            else if (selected === S3 && enemies.length) unit.skill.activate('enemy');
-            else if (selected === S2 && enemies.length) {
+            if (selected === S1 && (skillEnemies.length || unit.skill.charges >= 2)) unit.skill.activate(skillEnemies.length ? 'enemy' : 'full-charge');
+            else if (selected === S3 && skillEnemies.length) unit.skill.activate('enemy');
+            else if (selected === S2 && skillEnemies.length) {
               // [ASSUMED] Automatic operations choose the better tone; manual activation always switches it.
-              const target = enemies[0], wantOrgan = target.s.def > unit.s.atk * Math.max(0.2, target.s.res / 100);
+              const target = skillEnemies[0], wantOrgan = target.s.def > unit.s.atk * Math.max(0.2, target.s.res / 100);
               if (wantOrgan !== unit.mem.oblvnsOrgan || m.gauge >= FEVER_LIMIT) unit.skill.activate('tone');
             }
           }
           if (actionable && m.cd <= 1e-9) {
             m.cd += Math.max(0.1, unit.s.interval);
             const skill3 = selected === S3 && unit.skill.active;
-            if (skill3) for (let i = 0; i < 2; i++) { launch(unit, 'phys', num(b3['attack@atk_scale'], 1.8), (i ? 1 : -1) * 0.15); launch(unit, 'arts', num(b3['attack@atk_scale'], 1.8), (i ? 1 : -1) * 0.25); }
-            else for (let i = 0; i < (selected === S2 && m.fever > 0 ? 2 : 1); i++) launch(unit, selected === S2 && unit.mem.oblvnsOrgan ? 'arts' : 'phys', 1, i * 0.12, true, selected === S2 && !unit.mem.oblvnsOrgan);
+            const aimed = foes.some(e => valid(unit, e)); // activation above may have expanded the range this tick
+            if (skill3) for (let i = 0; i < 2; i++) { launch(unit, 'phys', num(b3['attack@atk_scale'], 1.8), (i ? 1 : -1) * 0.15, true, false, null, aimed); launch(unit, 'arts', num(b3['attack@atk_scale'], 1.8), (i ? 1 : -1) * 0.25, true, false, null, aimed); }
+            else for (let i = 0; i < (selected === S2 && m.fever > 0 ? 2 : 1); i++) launch(unit, selected === S2 && unit.mem.oblvnsOrgan ? 'arts' : 'phys', 1, i * 0.12, true, selected === S2 && !unit.mem.oblvnsOrgan, null, aimed);
             battle._ev(['atk', unit.id, enemies[0]?.id ?? unit.id, 'none']);
             battle.emit('attack', { attacker: unit, targets: enemies.slice(0, 1), isSkill: skill3 });
             unit.skill.onAttackPerformed(enemies.slice(0, 1), skill3);
@@ -98,26 +107,36 @@ export default {
           const keep = [];
           for (const n of m.notes) {
             n.age += dt;
-            n.outside = inRange(unit, n.x, n.y) || valid(unit, n.target) ? 0 : n.outside + dt;
-            if (n.age >= NOTE_LIFETIME || n.outside >= num(t1.delay, 1) || n.pass > 0 && (n.pass -= dt) <= 0) continue;
-            if (!n.pass && !valid(unit, n.target)) n.target = null;
+            // All notes seek locally, regardless of the caster's current range. Launching at an in-range enemy
+            // strengthens steering, never the acquisition radius. Do not turn back toward a passed/distant foe.
+            const radius = n.seekRadius ?? (selected === S2 && n.pierce ? 0.8 : 1);
+            const near = e => canTargetEnemy(unit, e, { canHitFly: true }) && hypot(e.x - n.x, e.y - n.y) <= radius
+              && (e.x - n.x) * cos(n.angle) + (e.y - n.y) * sin(n.angle) >= -1e-9;
+            const nearby = foes.filter(e => !n.seen.has(e.id) && near(e));
+            if (n.age >= NOTE_LIFETIME || n.pass > 0 && (n.pass -= dt) <= 0) continue;
+            if (!n.pass && n.target && !near(n.target)) n.target = null;
             if (!n.target && !n.pass) {
-              const candidates = enemies.filter(e => !n.seen.has(e.id));
+              const candidates = nearby;
               if (selected === S3 && unit.skill.active) candidates.sort((a, b) => (n.type === 'phys' ? b.s.res - a.s.res : b.s.def - a.s.def) || a.spawnSeq - b.spawnSeq);
               else candidates.sort((a, b) => hypot(a.x - n.x, a.y - n.y) - hypot(b.x - n.x, b.y - n.y) || a.spawnSeq - b.spawnSeq);
               n.target = candidates[0] || null;
             }
+            n.outside = inRange(unit, n.x, n.y) || n.target ? 0 : n.outside + dt;
+            if (n.outside >= num(t1.delay, 1)) continue;
             let angle = n.origin + sin(n.age * PI * 2) * Math.min(0.6, n.age * 0.2);
             if (n.target && !n.pass) angle = atan2(n.target.y - n.y, n.target.x - n.x);
             else if (n.pass) angle = n.angle;
             let turn = angle - n.angle;
             while (turn > PI) turn -= 2 * PI;
             while (turn < -PI) turn += 2 * PI;
-            n.angle += Math.max(-PI * 5 * dt, Math.min(PI * 5 * dt, turn));
+            const weak = n.target && !n.aimed && !n.pass;
+            const fraction = n.weakTurn ?? (selected === S3 && unit.skill.active ? 1 / 4
+              : selected === S2 ? (n.pierce ? 1 / 2 : 1 / 12) : 1 / 6);
+            n.angle += weak ? turn * Math.min(1, fraction * dt * 30) : Math.max(-PI * 5 * dt, Math.min(PI * 5 * dt, turn));
             const x0 = n.x, y0 = n.y, speed = n.target && !n.pass ? 2.2 : n.speed;
             n.x += cos(n.angle) * speed * dt; n.y += sin(n.angle) * speed * dt;
             let hit = false;
-            for (const e of enemies) {
+            for (const e of foes) {
               if (!e.alive || n.seen.has(e.id) || distanceToSegment(e, x0, y0, n.x, n.y) > 0.3) continue;
               n.seen.add(e.id); hit = true;
               battle.dealDamage(unit, e, { amount: n.amount, type: n.type,

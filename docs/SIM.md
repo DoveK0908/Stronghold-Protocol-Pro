@@ -1304,13 +1304,22 @@ has the generic spec. Summons: `battle.tokenDef(tokenId, unit)` / `battle.spawnT
 skills: `node tools/kit-coverage.mjs --missing [--tier N] [--strict]`.
 
 自选干员的实现归属（维护者 2026-10-27 定案）：丰川祥子的 kit 整份取自 selena 0.4.1
-（`ops/op-oblvns.js` 就是那份，本树按官方数据还原的 1165 行版本已删除，`test/content/op_oblvns.test.js` 一并移除）；
+（`ops/op-oblvns.js` 以该实现为基线，本树原 1165 行版本及旧测试已移除；现有定向测试另见下文）；
 结城理保留本树实现（`ops/op-makoto.js`），selena 那份（含 `shared/mod-tier3.js` 的盟约加层）不采用。
 没有 A/B 开关了：`OPERATOR_KIT_PATHS` 恒为 `OPERATOR_KIT_FILES`。
 
+2026-10-27 维护者澄清后的音符规则：普攻和技能音符统一只从自身附近、当前前进方向前半侧选择可选中的敌人，
+半径 1 格（S2 钢琴穿透音符为 0.8 格），按技能的转向比例缓慢偏转。半径/转向参数参考旧实现保留的 PRTS 表；
+不再查询远处的干员范围内目标，也不回头追已飞过的敌人。发射时范围内存在攻击目标的音符携带较强追踪标记，
+仅加强近处追踪的转向，不扩大索敌半径。强弱标记和技能转向参数在发射时固定，技能结束也不改变。
+碰撞检测可命中范围外敌人；有目标时重置范围外消失计时，
+无目标时仍按天赋 delay 消失，12 秒安全寿命不变。测试：`test/content/op_oblvns.test.js`。
+技能自动开启按所选技能的攻击范围判断（三技能未开启时也检查扩大的范围），技力/自动操作冷却要求和 S1 满充能自放保留。
+
 客户端特效：`kits/index.js` 的 `CLIENT_SIM_FX_CHARS`（目前只有 `char_4182_oblvns`）会在快照里给她的 Kit 标
-`selena: true`，`render/vfx/sakiko.js` 只接管带这个标记的祥子（音符 `musicNote` 事件、攻击起手、S2 拨档、S3 范围环）；
+`selena: true`，但 `render/vfx/sakiko.js` 按角色身份接管祥子，不依赖旧对比标记（音符 `musicNote` 事件、攻击起手、S2 拨档、S3 范围环）；
 其余干员那一层不动。音效与音频仍走本树 `data/assets.json` 的 `units[char_4182_oblvns]` 与音效 bank，kit 不管音效。
+音符的 0.1 秒模拟位置包在每个渲染帧之间插值，收到新包时从当前显示位置续接；不增加模拟/网络事件频率。
 
 忍冬's 追凶 records the per-enemy start time and applies its arts addition in the same `damaged` callback,
 including the first instance (PRTS talent remarks; DESIGN §30.3). It does not refresh the ten-second window on

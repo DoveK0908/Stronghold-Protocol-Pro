@@ -428,3 +428,13 @@ until the cast clip ends too. `attackTurnSkill` returns the selected ability or 
 瑕光 S3 先贤化身 is a sourced guardian exception (§35.91, #789): DEFAULT activates with an attackable enemy in her
 attack range, even at full HP. The official TAKE_DAMAGE row remains rawRule for provenance. The maintainer accepted
 the author video BV1UdAHzNEVj and their recall on 2026-10-24; other guardian skills keep their class rule.
+
+Pro Sakiko integration (2026-10-27): notes may acquire and hit targetable enemies outside the caster's range when
+within 1 tile of the note (0.8 for S2 piano), in its forward half-plane. Both ordinary and skill notes use this local
+search only; passed or distant caster-range targets cannot make them turn back. Weak notes use gradual
+turn fractions (S1 1/6, S2 piano 1/2 / organ 1/12, active S3 1/4 per 1/30 s), from the historical PRTS note tables.
+A note launched with an enemy in the caster's attack range has stronger turning, without a larger search radius
+(maintainer clarification, 2026-10-27). A valid nearby target resets outside expiry;
+hidden/dead targets are released, and targetless notes retain the talent delay and the 12 s safety cap. SIM §7.2.
+Turn/radius parameters belong to the launched note and survive the skill ending. Automatic activation tests the
+selected skill's own range even before it is active (S3's expanded range); readiness/cooldown and S1 full charges remain.

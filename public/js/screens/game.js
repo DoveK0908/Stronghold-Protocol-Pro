@@ -614,8 +614,8 @@ function MatchScreen() {
     setDetail(d => d?.kind === 'unit' ? null : d);
   }, [relayKey]);
   useEffect(() => {
-    if (showPrep) audio.stopPoolSounds();
-    return () => audio.stopPoolSounds(); // battle exit or game-screen unmount, including while the renderer loads
+    if (showPrep) { audio.stopPoolSounds(); audio.stopAllLoops(); }
+    return () => { audio.stopPoolSounds(); audio.stopAllLoops(); };
   }, [showPrep]);
   useEffect(() => {
     // Read before a view change clears the refs. A later refresh of this same field (g.watch / reshow replaces the
@@ -737,7 +737,10 @@ function MatchScreen() {
     if (!view || showPrep || !field?.fieldId || field.prep) return;
     const pf = pub?.fields?.find((f) => f.fieldId === field.fieldId);
     const done = field.local ? battleState?.fieldId === field.fieldId && battleState.done : pf?.live === false;
-    if (done || field.live === false) view.finishBattle?.();
+    if (done || field.live === false) {
+      view.finishBattle?.();
+      audio.stopAllLoops();
+    }
   }, [view, showPrep, field, battleState?.fieldId, battleState?.done, pub?.fields]);
 
   // the round start (PR #416 by @Cromemadnd; the maintainer's confirmation from official play, 2026-10-13): the own board's
