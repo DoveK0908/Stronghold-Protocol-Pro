@@ -1468,7 +1468,11 @@ export class AudioManager {
     // the slot without stopping the node would leave the displaced sound ringing on top of the one that took its place.
     if (limited) this.voiceEnd.set(token, release);
     const forget = () => { if (limited) this.voiceEnd.delete(token); };
+    // A generic battle cue shares the pool's field lifetime (upstream 0.3.4): a decode that lands after the field ended
+    // or was replaced must not sound over the next one. `_playPool` keeps the same check through its request token.
+    const fieldToken = this.poolFieldToken;
     this._buffer(url).then((buf) => {
+      if (limited && fieldToken !== this.poolFieldToken) { release(); forget(); return; }
       if (!buf && again && this.fellBack.has(url)) {
         release(); forget();
         const next = again();
@@ -1695,6 +1699,17 @@ export class AudioManager {
   }
 
   /**
+   * Everything that belongs to one battle: the pools (generic cues, loads still in flight), the operator lines and the
+   * prep landings, playing or still loading. UI cues, BGM and bond cues are separate lifetimes and keep going.
+   * The screen calls this where a field ends or is replaced; skills' own loops are `stopAllLoops`.
+   */
+  stopFieldSounds() {
+    this.stopPoolSounds();
+    for (const v of [...this.landVoices]) this._stopLanding(v);
+    try { this._stopVoice(); } catch { /* no ctx */ }
+  }
+
+  /**
    * UI sound by name (sfx.ui keys). Unknown names are ignored.
    * @param {string} name
    * @param {{ volume?: number, scope?: string }} [o]
@@ -1914,7 +1929,7 @@ export class AudioManager {
 
   /** Reset the unit map for a new field (m.field.units = UnitInfo[]). */
   setFieldUnits(units) {
-    this.stopPoolSounds();
+    this.stopFieldSounds();
     this.stopBondCue();
     this.units.clear();
     // unit ids belong to one battle: a cast still held for a unit of the field left must not sound for a unit of the new
@@ -1926,7 +1941,7 @@ export class AudioManager {
     this.stopAllLoops();
     // a new field is a new battle: the first operator deployed says 行动出发 again and no cooldown carries over
     this.startVoiceDone = false;
-    try { this.voiceGate.reset(); this._stopVoice(); } catch { /* ignore */ }
+    this.voiceGate.reset();
     for (const u of Array.isArray(units) ? units : []) this._track(u);
   }
 
@@ -1975,7 +1990,7 @@ export class AudioManager {
 
   /**
    * Play a landing sound in the landing voices: never dropped for want of a voice — over LAND_VOICES (any file) the oldest
-   * landing, playing or still loading, gives its voice up (_stealLanding) and the new one starts; only the per-piece
+   * landing, playing or still loading, gives its voice up (_stopLanding) and the new one starts; only the per-piece
    * cooldown refuses one (the same piece twice within UNIT_COOLDOWN_MS: one landing never sounds twice), checked before
    * anything is taken over. The battle limiter is not touched. Muted or at SFX volume 0, nothing happens.
    * @param {string} url
@@ -1989,7 +2004,8 @@ export class AudioManager {
     if (pool.cooling(now, unitKey)) return;
     while (!pool.tryAcquire(now, unitKey, url)) {
       if (!this.landVoices.length) return;   // (a full pool always holds voices; never loop on a refusal it cannot lift)
-      this._stealLanding(this.landVoices[0]);
+      this._stopLanding(this.landVoices[0]);
+      this.landStats.stolen += 1;
     }
     const v = { url, src: null, gain: null, over: false, release: null };
     v.release = () => {
@@ -2019,10 +2035,9 @@ export class AudioManager {
     }, v.release);
   }
 
-  /** A landing sound gives its voice to a newer one: the voice is free at once, the sound fades out over LAND_STEAL_S. */
-  _stealLanding(v) {
+  /** Release a landing on takeover or field cleanup: the voice is free at once, a playing source fades over LAND_STEAL_S. */
+  _stopLanding(v) {
     v.release();
-    this.landStats.stolen += 1;
     if (!v.src || !v.gain || !this.ctx) return;
     try {
       const t = this.ctx.currentTime;

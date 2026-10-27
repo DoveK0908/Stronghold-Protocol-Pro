@@ -2190,3 +2190,41 @@ describe('SFX priority: an event sound is never starved by the decorations', () 
     } finally { restore(); }
   });
 });
+
+describe('field lifetime: sounds still loading at the end of a field never sound', () => {
+  // 官方 0.3.4 的 `fieldToken`（`stopFieldSounds`）：通用战斗音与池子共用一场战斗的生命周期。文件还在解码时战斗结束/
+  // 换场，解码回来的声音必须直接丢掉——否则它会盖到下一场上（延迟加载的旧战场声音）。
+  const setup = () => {
+    const fw = fakeWindow();
+    const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.install();
+    fw.fire('pointerdown');
+    return { fw, a };
+  };
+
+  test('the same decode plays while the field lives (control)', async () => {
+    const { fw, a } = setup();
+    assert.ok(a.ctx, '前提：已安装（有 AudioContext）');
+    let land;
+    a._buffer = () => new Promise((r) => { land = r; });
+    const before = fw.made.started;
+    a._play('/cue/attack.mp3', { limited: true, pri: SFX_PRI.event });
+    land({ duration: 0.5 });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fw.made.started, before + 1, '一场之内照常出声');
+  });
+
+  test('a decode that lands after the field ended is dropped and its voice released', async () => {
+    const { fw, a } = setup();
+    let land;
+    a._buffer = () => new Promise((r) => { land = r; });
+    const before = fw.made.started;
+    a._play('/cue/skill.mp3', { limited: true, pri: SFX_PRI.event });
+    assert.equal(a.limiter.active, 1, '前提：它先占住了一个声道');
+    a.stopFieldSounds();            // 战斗在这一刻结束（或换场），文件还在路上
+    land({ duration: 0.5 });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fw.made.started, before, '旧战场的声音不会在之后响起');
+    assert.equal(a.limiter.active, 0, '为它预留的声道也还回去了');
+  });
+});
