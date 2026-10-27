@@ -1,6 +1,6 @@
 // 自传名片底图 (维护者需求 2026-10-22): one picture per browser, kept by the server (server/namecards.js) and shared
 // with the room through seats[].card.bg = `custom:<id>` (GET /namecard/<id>). The crop / zoom / pan dialog is
-// ui/imageCropper.js; the card is drawn tall behind a name plate, so the frame is 1:2.
+// ui/imageCropper.js; the plate behind a name is wide, so the frame is 4:1 (维护者 2026-10-27).
 import { net } from '../net.js';
 import { loadPref, savePref } from '../store.js';
 import { cropFile } from './imageCropper.js';
@@ -9,8 +9,9 @@ import { t } from '../../../shared/i18n.js';
 
 /** Sent to the server at most this wide; the ladder in imageCropper keeps it under one 64KB WS frame. */
 const WIDTH = 720;
-/** The plate the image is drawn behind is wide, not tall: `.rseat__plate` / `.nc-pick__card` use 600 / 186. */
-export const NAMECARD_ASPECT = 600 / 186;
+/** Every place that draws a 名片 is 4:1 (维护者 2026-10-27): 720×180 out of the cropper, and the CSS plates are all
+ *  `.has-nc { --nc-ar: 4 / 1 }`, so one upload keeps its shape from the picker to the room seat. */
+export const NAMECARD_ASPECT = 4;
 const MAX_RAW = 30 * 1024 * 1024;
 
 /** `/namecard/<id>` — the URL of an uploaded 名片底图 (id = 16 hex, server/namecards.js). */

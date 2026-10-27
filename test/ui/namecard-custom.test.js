@@ -19,7 +19,7 @@ test('the default card is still a preset', () => {
   assert.equal(namecardOf(DEFAULT_NAMECARD).kind, 'loading');
 });
 
-test('the name card crop is wide (the plate is 600 / 186), never a portrait frame', async () => {
+test('the name card crop is 4:1 (维护者 2026-10-27), never a portrait frame', async () => {
   const { NAMECARD_ASPECT } = await import('../../public/js/ui/customNamecard.js');
-  assert.ok(Math.abs(NAMECARD_ASPECT - 600 / 186) < 1e-9, `expected 600/186, got ${NAMECARD_ASPECT}`);
+  assert.equal(NAMECARD_ASPECT, 4, `expected 4:1, got ${NAMECARD_ASPECT}`);
 });

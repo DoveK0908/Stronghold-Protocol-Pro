@@ -1838,11 +1838,12 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 .rseat__kick:hover:not(:disabled) { filter: brightness(1.3); }
 .rseat__plate { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: .1rem; align-items: center; align-content: center;
   min-height: max(.86rem, 72px); margin-top: .08rem; padding: .06rem .12rem; background: linear-gradient(90deg, #232626, #161818); border: 1px solid rgba(255, 255, 255, .1); }
-/* 席位卡按名片画幅 (维护者 2026-10-26): 高度 = 席位宽 × 186/600，直接由 --w 算出来，内容顶不开它（小屏窄到比
-   min-height 还矮时仍让位给 min-height，那时头像与两行文字必须放得下）。底色图在 --nc-ar 上用同一个 600:186。 */
-.rseat__plate { height: calc(var(--w) * 186 / 600); width: 100%; box-sizing: border-box; overflow: hidden; }
+/* 席位卡按名片画幅 (维护者 2026-10-27): 名片一律 4:1，高度 = 席位宽 / 4，直接由 --w 算出来，内容顶不开它（小屏窄到比
+   min-height 还矮时仍让位给 min-height，那时头像与两行文字必须放得下）。底色图在 --nc-ar 上用同一个 4:1。
+   头像跟着席位宽走：4:1 的卡片比 2026-10-25 那版矮两成，固定 .74rem 会把下巴裁掉。 */
+.rseat__plate { height: calc(var(--w) / 4); width: 100%; box-sizing: border-box; overflow: hidden; }
 /* 名片 (维护者 2026-10-25): 席位卡下面那张和大厅右上角的名片一样高、头像一样大 —— .hub-topbar .me-card */
-.rseat__plate .avatar { --av: .74rem; }
+.rseat__plate .avatar { --av: calc(var(--w) / 5); }
 .rseat__plate .rseat__who { gap: .08rem; font-size: max(calc(.19 * var(--t)), 13px); }
 .rseat.is-ready .rseat__plate { border-color: rgba(79, 232, 192, .55); }
 .rseat.is-me .rseat__plate { background: linear-gradient(90deg, #26302d, #161a19); }
@@ -2247,22 +2248,22 @@ button.ally-card:disabled { filter: grayscale(.7) brightness(.7); cursor: defaul
 /* the top area: plate + mode table | the 评语 hexagon */
 .ach-top-area { display: grid; grid-template-columns: minmax(0, 9.1rem) minmax(0, 1fr); gap: .3rem; padding-top: .3rem; }
 .ach-plate { display: flex; gap: .24rem; align-items: flex-start; }
-.ach-card { position: relative; width: 6.15rem; height: auto; aspect-ratio: var(--nc-ar, 600 / 186); flex: none; display: flex; align-items: center; gap: .18rem; padding: .16rem; overflow: hidden; border-radius: .06rem;
+.ach-card { position: relative; width: 6.15rem; height: auto; aspect-ratio: var(--nc-ar, 4 / 1); flex: none; display: flex; align-items: center; gap: .14rem; padding: .1rem .16rem; overflow: hidden; border-radius: .06rem;
   background: linear-gradient(118deg, #e23443 0 46%, #2b2e33 46% 50%, #f2f4f3 50% 56%, #2fb6c6 56%); }
 .ach-card::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0, 0, 0, .25), transparent 60%); pointer-events: none; }
-.ach-card__ava { position: relative; z-index: 1; width: 1.6rem; height: 1.6rem; flex: none; display: grid; place-items: center; background: #1d2423; border: 2px solid #f4f7f6; }
+.ach-card__ava { position: relative; z-index: 1; width: 1.2rem; height: 1.2rem; flex: none; display: grid; place-items: center; background: #1d2423; border: 2px solid #f4f7f6; }
 .ach-card__ava img { width: 100%; height: 100%; object-fit: cover; }
 button.ach-card__ava { padding: 0; font: inherit; color: inherit; cursor: pointer; }
 button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: var(--mint-400); }
-.ach-card__glyph { font-size: .7rem; font-weight: 900; color: #4af2c4; }
-.ach-card__lv { position: absolute; left: -.16rem; top: -.14rem; width: .5rem; height: .5rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: .9;
+.ach-card__glyph { font-size: .6rem; font-weight: 900; color: #4af2c4; }
+.ach-card__lv { position: absolute; left: -.12rem; top: -.1rem; width: .4rem; height: .4rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: .9;
   border-radius: 50%; background: #111; border: 3px solid #ffd21e; color: #fff; }
-.ach-card__lv b { font-family: var(--font-display); font-size: .2rem; }
-.ach-card__lv small { font-size: .09rem; }
-.ach-card__who { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; gap: .08rem; align-self: flex-start; padding-top: .16rem; }
-.ach-card__name { font-size: .3rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 .02rem .04rem rgba(0, 0, 0, .5); }
+.ach-card__lv b { font-family: var(--font-display); font-size: .17rem; }
+.ach-card__lv small { font-size: .08rem; }
+.ach-card__who { position: relative; z-index: 1; min-width: 0; display: flex; flex-direction: column; gap: .05rem; align-self: flex-start; padding-top: .04rem; }
+.ach-card__name { font-size: .24rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 .02rem .04rem rgba(0, 0, 0, .5); }
 .ach-card__tag { margin-left: .02rem; color: rgba(255, 255, 255, .8); font-weight: 400; }
-.ach-card__brand { position: absolute; right: .16rem; bottom: .12rem; z-index: 1; font-family: var(--font-display); font-size: .15rem; line-height: .95; font-weight: 600; color: rgba(255, 255, 255, .85); text-align: right; }
+.ach-card__brand { position: absolute; right: .14rem; bottom: .08rem; z-index: 1; font-family: var(--font-display); font-size: .12rem; line-height: .95; font-weight: 600; color: rgba(255, 255, 255, .85); text-align: right; }
 /* 已获奖杯 / 获赞数, each with its badge */
 .ach-counts { display: grid; grid-template-columns: auto auto; column-gap: .12rem; row-gap: .14rem; align-items: center; padding-top: .06rem; }
 .ach-counts__badge { width: .64rem; height: .64rem; display: grid; place-items: center; }
@@ -2405,9 +2406,10 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
    left where the name sits; then the picker.
    ========================================================================================== */
 .has-nc { position: relative; isolation: isolate; text-shadow: 0 1px 2px rgba(0, 0, 0, .8); }
-/* 名片的画幅 (维护者 2026-10-26): 官方底图是 600×186，凡是铺名片的底板都按同一个比例，只由宽度推高度 —— 大厅右上角、
-   我的信息、上传预览、准备大厅席位、选择策略…… 都一样，图不会被裁成不同的形状。底下几处 `.nc-ar` 就取这个值。 */
-.has-nc { --nc-ar: 600 / 186; }
+/* 名片的画幅 (维护者 2026-10-27): 名片一律 4:1（长比宽 = 4:1），凡是铺名片的底板都只由宽度推高度 —— 大厅右上角、
+   我的信息、上传预览、准备大厅席位、选择策略…… 都一样，图不会被裁成不同的形状。底下几处 `.nc-ar` 就取这个值；
+   上传的裁剪框（ui/customNamecard.js NAMECARD_ASPECT）与它同步，720×180。 */
+.has-nc { --nc-ar: 4 / 1; }
 .nc-layer { position: absolute; inset: 0; z-index: -1; pointer-events: none; border-radius: inherit;
   background: var(--nc-shade, linear-gradient(90deg, rgba(8, 11, 11, .9), rgba(8, 11, 11, .62) 50%, rgba(8, 11, 11, .2))), var(--nc) center / cover no-repeat, #101514; }
 .ach-card.has-nc { background: #101514; --nc-shade: linear-gradient(90deg, rgba(6, 9, 9, .5), rgba(6, 9, 9, .12) 55%, transparent); }
@@ -2436,12 +2438,12 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .nc-pick__theme { grid-column: 1 / -1; margin: 8px 0 0; font-size: 13px; font-weight: 700; color: #b9c2bf; }
 .nc-pick__theme:first-child { margin-top: 0; }
 .nc-pick__card { position: relative; padding: 0; border: 2px solid transparent; border-radius: 4px; background: #101514; cursor: pointer; }
-.nc-pick__card img { width: 100%; height: auto; aspect-ratio: 600 / 186; object-fit: cover; display: block; border-radius: 2px; }
+.nc-pick__card img { width: 100%; height: auto; aspect-ratio: 4 / 1; object-fit: cover; display: block; border-radius: 2px; }
 .nc-pick__card:hover, .nc-pick__card:focus-visible { border-color: rgba(78, 216, 175, .6); outline: none; }
 .nc-pick__card.is-on { border-color: var(--mint-400); }
 .nc-pick__card.is-busy { opacity: .55; }
 .nc-pick__card--upload { width: 100%; }
-.nc-pick__card--upload .nc-pick__upload { width: 100%; min-height: 62px; justify-content: center; gap: .1rem; border: 1px dashed rgba(120,220,190,.45); color: var(--mint-300, #7fe7c9); background: rgba(12,20,18,.6); }
+.nc-pick__card--upload .nc-pick__upload { width: 100%; aspect-ratio: 4 / 1; min-height: 44px; justify-content: center; gap: .1rem; border: 1px dashed rgba(120,220,190,.45); color: var(--mint-300, #7fe7c9); background: rgba(12,20,18,.6); }
 .nc-pick__card--upload .nc-pick__upload .icon { width: .2rem; height: .2rem; }
 .nc-pick__card--upload:disabled { opacity: .5; cursor: default; }
 .nc-pick__on { position: absolute; right: 4px; bottom: 4px; padding: 1px 6px; font-size: 11px; font-weight: 700; color: #06231b; background: var(--mint-400); border-radius: 2px; }
@@ -2672,7 +2674,7 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .rseat__ava:hover .rseat__ava-pen, .rseat__ava:focus-visible .rseat__ava-pen { opacity: 1; }
 .rseat__ava-pen .icon { width: 75%; height: 75%; }
 .nc-pick__card { display: flex; flex-direction: column; text-align: left; }
-.nc-pick__art { position: relative; display: flex; align-items: center; gap: .08rem; width: 100%; aspect-ratio: 600 / 186; padding: 0 12px; border-radius: 2px; overflow: hidden;
+.nc-pick__art { position: relative; display: flex; align-items: center; gap: .08rem; width: 100%; aspect-ratio: 4 / 1; padding: 0 12px; border-radius: 2px; overflow: hidden;
   color: #eef3f1; font-size: 13px; font-weight: 700; background: #101514; }
 
 /* 服主 */
@@ -2845,9 +2847,10 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
   font-size: calc(.1 * var(--t)); color: var(--text-dim); }
 @media (max-width: 64rem) { .lobmusic__row { flex-wrap: wrap; } }
 
-/* 界面#10: the top bar's 名片 button (MeCard) and the 我的信息 dialog */
-.hub-topbar .me-card { --me-w: 3.05rem; position: relative; display: flex; align-items: center; gap: .12rem;
-  width: var(--me-w); height: auto; aspect-ratio: var(--nc-ar, 600 / 186); flex: none; padding: .06rem .14rem .06rem .06rem; overflow: hidden;
+/* 界面#10: the top bar's 名片 button (MeCard) and the 我的信息 dialog. 4:1 (维护者 2026-10-27): the width grew from
+   3.05rem so the .74rem avatar still fits the shorter card and the plate keeps the room seat's height. */
+.hub-topbar .me-card { --me-w: 3.5rem; position: relative; display: flex; align-items: center; gap: .12rem;
+  width: var(--me-w); height: auto; aspect-ratio: var(--nc-ar, 4 / 1); flex: none; padding: .06rem .14rem .06rem .06rem; overflow: hidden;
   border: 1px solid rgba(78, 216, 175, .34); border-radius: .04rem; background: #0b1110; color: inherit;
   text-align: left; cursor: pointer; }
 .hub-topbar .me-card:hover, .hub-topbar .me-card:focus-visible { border-color: var(--mint-400); }
