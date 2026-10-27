@@ -28,12 +28,25 @@
   `public/assets/spine/op/char_4182_oblvns/char_4182_oblvns_avemujica_1/{front,back}`，另带头像
   `skin_avatar`、半身像 `skin_portrait` 与立绘 `illust/char_4182_oblvns_avemujica_1.webp`。
 - `char_4217_makoto_p3r_1`「P3R 服装」（组 `Persona 3`）：前后双模型
-  `public/assets/spine/op/char_4217_makoto_p3r_1/{front,back}`；上游这套不带图片，沿用本人的头像/半身/立绘。
+  `public/assets/spine/op/char_4217_makoto_p3r_1/{front,back}`。半身像与立绘取 selena 包里这套自己的图
+  （`assets/skins/char_4217_makoto_p3r_1/{avatar.png,portrait.png,illustration.webp}`；2026-10-27 修正：先前误按
+  本人的头像/半身/立绘复制，选上皮肤看不出变化。上游没给这套独立头像，头像取半身像上半部 180×180 的方形裁切）。
 - 两个 back atlas 补了 `size:` 行（上游清单不带，本树的 atlas 读取与 `test/assets.test.js`
   「every atlas on disk has size: lines」要求有）。
 - 皮肤键用「干员 id + 序号」的 stem 形式，`test/assets.test.js` 的「皮肤键属于该干员」断言因此成立。
 - 选装链路本身没动：`chars[].skins` → `ui/skins.js availableSkins` → `assets.js spineEntry { skin }`，
   自选干员按 `charId` 取皮肤，所以两张卡都能在「干员皮肤」里选到。
+
+### 丰川祥子：整份换成 selena 0.4.1 的实现（维护者 2026-10-27 对比后拍板）
+
+- 本树按官方数据还原的 1165 行 `ops/op-oblvns.js` 删除，换成 selena 那份（151 行）；结城理的实现保持本树的不动。
+- 随之删除对比开关：`SP_KIT_SET=selena`、`SELENA_KIT_MODE` / `SELENA_KIT_CHARS`、`op-oblvns.selena.js` /
+  `op-makoto.selena.js`、`test/content/selena-kit-set.test.js`、`test/content/op_oblvns.test.js`（后者测的是
+  已删除的实现）。
+- 客户端那层不变：快照里她的 Kit 仍带 `selena: true`（由 `kits/index.js` 的 `CLIENT_SIM_FX_CHARS` 决定），
+  `render/vfx/sakiko.js` 照旧接管音符/起手/拨档/范围环。
+- 音效音频不动（`data/assets.json` 的 `units[char_4182_oblvns]` 与音效 bank，kit 不负责音效）。
+- `test/golden/*` 因行为改变重算（`node tools/golden.mjs --update`），`assets.test.js` / render 侧测试全绿。
 
 ### 结城理：常驻环降亮、打击音效钉到自己的 bank（维护者 2026-10-26 报）
 

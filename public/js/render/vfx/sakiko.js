@@ -6,8 +6,8 @@
 //      `view.info.form` 的变化自行检测（selena 的 wiring 里有回调）；
 //   3. 头注释 + 注释中文。其余逻辑（音符跟随 sim 位置、S1 八个音符、S2/S3 拨档、S3 范围环）一字未改。
 //
-// 与 selena 的 kit 配套：服务端 `server/sim/content/kits/ops/op-oblvns.selena.js` 发 `musicNote` 事件
-// （`fx/kinds.js` + `fx/simfx.js` 的 `musicNote` 分支画 sim 侧的短促记号）。设 `SP_KIT_SET=selena` 时启用。
+// 与 selena 的 kit 配套：服务端 `server/sim/content/kits/ops/op-oblvns.js` 发 `musicNote` 事件
+// （`fx/kinds.js` + `fx/simfx.js` 的 `musicNote` 分支画 sim 侧的短促记号）。默认启用（2026-10-27 定案，本树原实现已删除）。
 //
 // Native independent notes follow the sim's positions, not an extra client-side homing flight. Each caster + note has
 // one handle, including notes without targets.

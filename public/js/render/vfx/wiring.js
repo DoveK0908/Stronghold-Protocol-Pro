@@ -933,7 +933,7 @@ export class FxWiring {
    */
   attack(src, tgt, kind, time, wound = false) {
     if (!this.ofx.active || !src || !this.idx) return false;
-    // 丰川祥子（对比实现）：本体只起手，音符由 sim 的 musicNote 事件画（render/vfx/sakiko.js）
+    // 丰川祥子：本体只起手，音符由 sim 的 musicNote 事件画（render/vfx/sakiko.js）
     if (this.sakiko.attack(src)) return true;
     kind = this._combatKind(src, tgt, kind);
     const u = this.unitOf(src);

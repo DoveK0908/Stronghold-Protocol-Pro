@@ -395,32 +395,16 @@ export const PENDING_KIT_CHARS = Object.freeze([]);
 export const PENDING_DIY_KIT_CHARS = Object.freeze([]);
 
 /**
- * 对比实现开关（selena 0.4.1）：`SP_KIT_SET=selena` 启动时，这两个自选干员改载 selena 包里的实现
- * （`ops/op-oblvns.selena.js` / `ops/op-makoto.selena.js`），用来和本树自己的实现做 A/B 对比 —— 同一个
- * charId 键，两份绝不能同时注册。未设或任何别的值都载本树的（ops/op-oblvns.js / ops/op-makoto.js）。
- *
- * 浏览器里（/sim/ 静态加载）没有 `process`，恒为本树版。
+ * 本次实际加载的 自选 kit 文件列表。2026-10-27 定案后不再有 A/B 开关：丰川祥子整份采用 selena 实现
+ * （ops/op-oblvns.js 就是那份，本树原实现已删除），结城理保留本树的 ops/op-makoto.js。
  */
-const SELENA_SET = (() => {
-  try { return globalThis.process?.env?.SP_KIT_SET === 'selena'; } catch { return false; }
-})();
+export const OPERATOR_KIT_PATHS = OPERATOR_KIT_FILES;
 
-/** 被 selena 版顶掉的默认文件 → selena 版文件名。 */
-const SELENA_SWAPS = Object.freeze({
-  'op-oblvns.js': 'op-oblvns.selena.js',
-  'op-makoto.js': 'op-makoto.selena.js',
-});
-
-/** 本次实际加载的 自选 kit 文件名列表（默认 = OPERATOR_KIT_FILES）。 */
-export const OPERATOR_KIT_PATHS = Object.freeze(
-  SELENA_SET ? OPERATOR_KIT_FILES.map((f) => SELENA_SWAPS[f] ?? f) : OPERATOR_KIT_FILES,
-);
-
-/** True when the selena comparison kits replaced 丰川祥子 / 结城理. */
-export const SELENA_KIT_MODE = SELENA_SET;
-
-/** The charIds the selena comparison kit replaces (empty unless SP_KIT_SET=selena). */
-export const SELENA_KIT_CHARS = Object.freeze(new Set(SELENA_SET ? ['char_4182_oblvns', 'char_4217_makoto'] : []));
+/**
+ * 客户端把哪些干员的技能特效交给模拟侧接管（render/vfx/sakiko.js）：丰川祥子的音符走 selena 那套客户端
+ * 代码，快照随 Kit 的 selena 标记下发（server/sim/content/index.js）。
+ */
+export const CLIENT_SIM_FX_CHARS = Object.freeze(new Set(['char_4182_oblvns']));
 
 async function loadKitFile(file) {
   try {

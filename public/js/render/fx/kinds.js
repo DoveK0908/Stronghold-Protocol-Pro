@@ -17,7 +17,7 @@ export const FX_KINDS = Object.freeze({
   frostNova: { a: 'blast', c: 0x9fe6ff, smoke: 0x1c2630 }, sunBurst: { a: 'blast', c: 0xffe28a }, meltdown: { a: 'blast', c: 0xff5a2a, r: 1.5, heavy: true },
   iceSpike: { a: 'blast', c: 0xbfeeff, smoke: 0x1c2630 }, rockfall: { a: 'blast', c: 0xc8a878, smoke: 0x4a3f33 }, rockslide: { a: 'blast', c: 0xc8a878, smoke: 0x4a3f33 },
   finale: { a: 'blast', c: 0xffd45a, r: 1.5 }, swordStorm: { a: 'blast', c: 0xdfe8ff }, swordRain: { a: 'blast', c: 0xdfe8ff }, liberate: { a: 'blast', c: 0xffffff },
-  // 丰川祥子的音符（对比实现：selena 0.4.1 的 kit 按音符位置发 `musicNote`，这里只画一枚短促记号；
+  // 丰川祥子的音符（selena 0.4.1 的 kit 按音符位置发 `musicNote`，这里只画一枚短促记号；
   // 真正会飞的那枚官方音符由 render/vfx/sakiko.js 跟着 sim 的位置画）
   musicNote: { a: 'musicNote', c: 0xc9a5ff, pt: true, dur: 0.15 },
   // 赤刃明霄陈 S3 赤霄·天喟 的龙剑气: a travelling blade, drawn from the sim's per-interval `chen3Wave` events (its own

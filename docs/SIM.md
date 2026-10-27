@@ -1303,13 +1303,14 @@ has the generic spec. Summons: `battle.tokenDef(tokenId, unit)` / `battle.spawnT
 (token skill of that slot: `variants[owner].bySkill[i]`, module attributes: `.byModule[id]`). Coverage of the selectable
 skills: `node tools/kit-coverage.mjs --missing [--tier N] [--strict]`.
 
-对比实现（`SP_KIT_SET=selena`，维护者 2026-10-27 要求「先搬过来我对比测试」）：启动时读一次环境变量，值为
-`selena` 时 `kits/index.js` 把 丰川祥子 与 结城理 的 kit 换成 selena 0.4.1 包里的
-`ops/op-oblvns.selena.js` / `ops/op-makoto.selena.js`（后者自带 selena 的盟约加层，连同 `shared/mod-tier3.js`），
-`OPERATOR_KIT_PATHS` 是本次实际加载的文件表，`SELENA_KIT_MODE` / `SELENA_KIT_CHARS` 给别处判断用。两名干员是
-同一个 charId 键，两份绝不能同时注册。标了 `kit.selena` 的 Kit 会在快照里带 `kitSet: 'selena'`，客户端
-`render/vfx/sakiko.js` 只接管带这个标记的祥子（音符、攻击起手、S2 拨档、S3 范围环）；默认实现下那一层不动。
-启动脚本 `start-pro-luck-selena.cmd`（`set SP_KIT_SET=selena`），不带这个变量就是本树自己的实现。
+自选干员的实现归属（维护者 2026-10-27 定案）：丰川祥子的 kit 整份取自 selena 0.4.1
+（`ops/op-oblvns.js` 就是那份，本树按官方数据还原的 1165 行版本已删除，`test/content/op_oblvns.test.js` 一并移除）；
+结城理保留本树实现（`ops/op-makoto.js`），selena 那份（含 `shared/mod-tier3.js` 的盟约加层）不采用。
+没有 A/B 开关了：`OPERATOR_KIT_PATHS` 恒为 `OPERATOR_KIT_FILES`。
+
+客户端特效：`kits/index.js` 的 `CLIENT_SIM_FX_CHARS`（目前只有 `char_4182_oblvns`）会在快照里给她的 Kit 标
+`selena: true`，`render/vfx/sakiko.js` 只接管带这个标记的祥子（音符 `musicNote` 事件、攻击起手、S2 拨档、S3 范围环）；
+其余干员那一层不动。音效与音频仍走本树 `data/assets.json` 的 `units[char_4182_oblvns]` 与音效 bank，kit 不管音效。
 
 忍冬's 追凶 records the per-enemy start time and applies its arts addition in the same `damaged` callback,
 including the first instance (PRTS talent remarks; DESIGN §30.3). It does not refresh the ten-second window on
