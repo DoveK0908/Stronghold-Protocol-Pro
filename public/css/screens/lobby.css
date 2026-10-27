@@ -1490,6 +1490,36 @@ button.sw-eth:hover { border-color: #fff; }
 .ps-scan { stroke: currentColor; stroke-opacity: .22; stroke-width: 2; animation: ps-scan 7s linear infinite; }
 @keyframes ps-scan { from { transform: translateY(40px); } to { transform: translateY(620px); } }
 
+/* 选择模拟协议的画面动起来（2026-10-27, the owner's request: selena 的难度界面左半边一直在动）。四层各走各的：
+   网格最慢、舰体略快、浮尘往上飘、全息图有呼吸；换难度时整幅从暗处亮起来。纯 CSS，prefers-reduced-motion 下全部停住。 */
+.ps { animation: ps-in 640ms var(--ease-out) backwards; }
+@keyframes ps-in { from { opacity: 0; filter: brightness(.4); } }
+.ps-layer--grid { animation: ps-float-grid 34s ease-in-out infinite alternate; }
+.ps-layer--ship { animation: ps-float-ship 23s ease-in-out infinite alternate; }
+@keyframes ps-float-grid { from { transform: translate3d(-10px, 8px, 0); } to { transform: translate3d(10px, -8px, 0); } }
+@keyframes ps-float-ship { from { transform: translate3d(6px, -5px, 0); } to { transform: translate3d(-7px, 6px, 0); } }
+.ps-ship { transform-origin: 500px 320px; animation: ps-holo 7.5s ease-in-out infinite; }
+@keyframes ps-holo { 0%, 100% { opacity: 1; } 50% { opacity: .86; } }
+.ps-ship image { animation: ps-art-breathe 9s ease-in-out infinite; }
+@keyframes ps-art-breathe { 0%, 100% { filter: brightness(1) saturate(1); } 50% { filter: brightness(1.14) saturate(1.08); } }
+.ps-hull { animation: ps-hull-breathe 6s ease-in-out infinite; }
+@keyframes ps-hull-breathe { 0%, 100% { opacity: .96; } 50% { opacity: 1; } }
+.ps-mote { fill: currentColor; fill-opacity: .8; animation: ps-mote-rise var(--dur, 9s) linear infinite; animation-delay: var(--delay, 0s); }
+@keyframes ps-mote-rise {
+  0% { transform: translate3d(0, 26px, 0); opacity: 0; }
+  18% { opacity: .75; }
+  82% { opacity: .5; }
+  100% { transform: translate3d(14px, -120px, 0); opacity: 0; }
+}
+/* 难度卡片：进场逐条滑入（选中那张的位移是状态，不参与进场动画，免得跳一下），光晕来回扫 */
+.proto-list .pcard:not(.is-on) { animation: pcard-in 300ms var(--ease-out) backwards; }
+.proto-list .pcard:nth-child(2) { animation-delay: 50ms; }
+.proto-list .pcard:nth-child(3) { animation-delay: 100ms; }
+.proto-list .pcard:nth-child(4) { animation-delay: 150ms; }
+@keyframes pcard-in { from { opacity: 0; transform: translateX(26px); } }
+.pcard.is-on .pcard__glow { animation: pcard-glow 4.6s ease-in-out infinite; }
+@keyframes pcard-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
 .proto-brief { position: absolute; left: .1rem; bottom: .1rem; max-width: min(6rem, 92%); padding: .12rem .2rem .14rem; background: linear-gradient(90deg, rgba(0, 0, 0, .7), rgba(0, 0, 0, .2));
   border-left: 3px solid var(--d-color); }
 .proto-brief__code { margin-right: .1rem; padding: 0 .08rem; font-size: max(calc(.14 * var(--t)), 10px); color: #111; background: var(--d-color); }
@@ -1582,6 +1612,7 @@ button.sw-eth:hover { border-color: #fff; }
 @media (prefers-reduced-motion: reduce) {
   .proto, .ps-fig, .ps-spike, .pcard.is-on .pcard__stamp { animation: none; }
   .ps-scan, .ps-beacon { animation: none; }
+  .ps, .ps-layer, .ps-ship, .ps-ship image, .ps-hull, .ps-mote, .proto-list .pcard, .pcard.is-on .pcard__glow { animation: none; }
 }
 
 /* ==========================================================================================

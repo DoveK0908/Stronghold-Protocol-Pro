@@ -94,6 +94,15 @@ const SPIKE_PATHS = [
 /** Where the official picture (427 × 332) covers the hull: centred on it, the mast inside. */
 const ART_BOX = { x: 170, y: 40, w: 650, h: 505 };
 
+/** 浮尘：一直在往上飘的亮点，取当前难度的颜色 [ASSUMED: 自绘，官方那张画里没有这一层]. */
+const MOTES = Array.from({ length: 18 }, (_, i) => ({
+  x: 110 + ((i * 173) % 780),
+  y: 470 - ((i * 131) % 400),
+  r: 1.1 + (i % 3) * 0.6,
+  delay: ((i * 0.73) % 7).toFixed(2),
+  dur: (7 + (i % 5) * 1.6).toFixed(1),
+}));
+
 /**
  * @param {{ difficulty: string, art?: string|null }} props difficulty FUNNY | NORMAL | HARD | ABYSS; art: the official
  *   picture's URL (null without the art pack)
@@ -112,7 +121,7 @@ export function ProtocolScene({ difficulty, art = null }) {
   const cable = `M${mastTop[0] + 60} -10 C${mastTop[0] + 70} 120 ${mastTop[0] - 20} 110 ${mastTop[0]} ${mastTop[1]}`;
   const callAt = iso(8, -6, 15);
   return html`<svg class=${pic ? 'ps has-art' : 'ps'} viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">
-    <g class="ps-grid">${grid}</g>
+    <g class="ps-layer ps-layer--grid"><g class="ps-grid">${grid}</g></g>
     <path class="ps-cable" d=${cable} />
     <path class="ps-cable__pulse" pathLength="1000" d=${cable} />
     ${pads.map((p, i) => html`<g key=${`pad${i}`} class="ps-pad">
@@ -120,14 +129,14 @@ export function ProtocolScene({ difficulty, art = null }) {
       <polyline class="ps-pad__edge" points=${poly([[p.from[0] - 1.5, p.from[1] - 1.5, 0], [p.to[0] + 1.5, p.from[1] - 1.5, 0], [p.to[0] + 1.5, p.to[1] + 1.5, 0]])} />
     </g>`)}
     <g class="ps-figs ps-figs--back">${defenders(n, pads).filter((f) => f.pad === 0).map((f, i) => html`<${Figure} key=${`a${f.k}`} x=${f.x} y=${f.y} i=${i} />`)}</g>
-    ${pic ? html`<g class="ps-ship">
+    ${pic ? html`<g class="ps-layer ps-layer--ship"><g class="ps-ship">
       <image href=${pic} x=${ART_BOX.x} y=${ART_BOX.y} width=${ART_BOX.w} height=${ART_BOX.h} preserveAspectRatio="xMidYMid meet" onError=${() => setBad(art)} />
       <circle class="ps-beacon" cx=${mastTop[0]} cy=${mastTop[1]} r="4" />
-    </g>` : html`<g class="ps-hull">
+    </g></g>` : html`<g class="ps-layer ps-layer--ship"><g class="ps-hull">
       ${HULL.map(([a, b], i) => box(a, b, i))}
       ${SEAMS.map(([a, b], i) => html`<line key=${`s${i}`} class="ps-seam" x1=${iso(...a)[0]} y1=${iso(...a)[1]} x2=${iso(...b)[0]} y2=${iso(...b)[1]} />`)}
       <circle class="ps-beacon" cx=${mastTop[0]} cy=${mastTop[1]} r="3.5" />
-    </g>`}
+    </g></g>`}
     <g class="ps-figs">${defenders(n, pads).filter((f) => f.pad === 1).map((f, i) => html`<${Figure} key=${`b${f.k}`} x=${f.x} y=${f.y} i=${i} />`)}</g>
     <g class="ps-spikes">${spikes.map(([a, b], i) => html`<${Spike} key=${i} from=${[a[0], a[1], 0]} to=${[b[0], b[1], 0.5]} i=${i} />`)}</g>
     <g class="ps-call">
@@ -141,6 +150,8 @@ export function ProtocolScene({ difficulty, art = null }) {
       <line x1=${callAt[0] + 40} y1=${callAt[1] + 40} x2=${callAt[0] + 82} y2=${callAt[1] + 40} />
       <line x1=${callAt[0] + 40} y1=${callAt[1] + 52} x2=${callAt[0] + 70} y2=${callAt[1] + 52} />
     </g>
+    <g class="ps-motes">${MOTES.map((m, i) => html`<circle key=${`m${i}`} class="ps-mote" cx=${m.x} cy=${m.y} r=${m.r}
+      style=${`--delay:-${m.delay}s;--dur:${m.dur}s`} />`)}</g>
     <line class="ps-scan" x1="0" y1="0" x2="1000" y2="0" />
   </svg>`;
 }
