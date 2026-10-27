@@ -20,6 +20,21 @@
   二倍速投票移到「准备就绪」左侧同一行。
 - **商店**：保持官方版式，另带本树的「剩余 N 张」与皮肤立绘（`shopBar.js` + `game-shop.css` 相对官方仅 +12 行）。
 
+### 皮肤：丰川祥子「旋律的主人」、结城理 P3R 换装（维护者 2026-10-27 要求）
+
+从 selena 0.4.1 包把这两套时装搬进本树的皮肤清单（`data/assets.json` 的 `chars[<charId>].skins`）：
+
+- `char_4182_oblvns_avemujica_1`「旋律的主人」（组 `Ave Mujica`）：前后双模型
+  `public/assets/spine/op/char_4182_oblvns/char_4182_oblvns_avemujica_1/{front,back}`，另带头像
+  `skin_avatar`、半身像 `skin_portrait` 与立绘 `illust/char_4182_oblvns_avemujica_1.webp`。
+- `char_4217_makoto_p3r_1`「P3R 服装」（组 `Persona 3`）：前后双模型
+  `public/assets/spine/op/char_4217_makoto_p3r_1/{front,back}`；上游这套不带图片，沿用本人的头像/半身/立绘。
+- 两个 back atlas 补了 `size:` 行（上游清单不带，本树的 atlas 读取与 `test/assets.test.js`
+  「every atlas on disk has size: lines」要求有）。
+- 皮肤键用「干员 id + 序号」的 stem 形式，`test/assets.test.js` 的「皮肤键属于该干员」断言因此成立。
+- 选装链路本身没动：`chars[].skins` → `ui/skins.js availableSkins` → `assets.js spineEntry { skin }`，
+  自选干员按 `charId` 取皮肤，所以两张卡都能在「干员皮肤」里选到。
+
 ### 结城理：常驻环降亮、打击音效钉到自己的 bank（维护者 2026-10-26 报）
 
 - **脚下的常驻环太亮**：`vfx/effect.js` 新增按 prefab key 的透明度表 `FX_DIM`（`dimOf(key)`），编译材质时按比例
