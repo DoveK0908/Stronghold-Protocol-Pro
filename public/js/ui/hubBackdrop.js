@@ -1,9 +1,9 @@
 import { audio } from '../audio.js';
 import { cropFile } from './imageCropper.js';
-// Lobby hub backdrop (owner's request, 2026-10-13): original procedural scenes without a sun — 夜巡 (default), 霜原,
-// 烬野, 静默 — or the player's own picture. A picture is downscaled on this device and kept in IndexedDB (never
-// uploaded); the choice and its dim / blur / overlay / motion settings are a localStorage pref. The ridges and the
-// stronghold silhouette are generated from fixed seeds, so every visit draws the same skyline.
+// Lobby hub backdrop: the official 0.3.3 entry art (the glow and the Rhodes Island hologram over a dark field with a
+// faint grid), or the player's own picture / video. A picture is downscaled on this device and kept in IndexedDB
+// (never uploaded); the choice and its dim / blur / overlay / motion settings are a localStorage pref.
+// 维护者 2026-10-27: the fork's four drawn scenes (夜巡 / 霜原 / 烬野 / 静默) are gone — 只保留官方背景，玩家自己的图/视频仍然可选。
 import { html } from './components.js';
 import { Sprite } from './gameComponents.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
@@ -11,12 +11,7 @@ import { loadPref, savePref } from '../store.js';
 import { toast } from './toasts.js';
 import { t, N_ } from '../../../shared/i18n.js';
 
-export const HUB_THEMES = [
-  { id: 'night', name: N_('夜巡'), en: 'NIGHT WATCH' },
-  { id: 'frost', name: N_('霜原'), en: 'FROSTLINE' },
-  { id: 'ember', name: N_('烬野'), en: 'EMBERFIELD' },
-  { id: 'calm', name: N_('静默'), en: 'SILENT' },
-];
+export const HUB_THEMES = [{ id: 'official', name: N_('官方背景'), en: 'OFFICIAL' }];
 const THEME_IDS = HUB_THEMES.map((x) => x.id);
 const PREF_KEY = 'hub.backdrop';
 const MAX_EDGE = 2560; // longest edge kept of a custom picture
@@ -30,7 +25,7 @@ export function loadBackdropPref() {
   const raw = loadPref(PREF_KEY, null);
   const o = raw && typeof raw === 'object' ? raw : {};
   return {
-    theme: THEME_IDS.includes(o.theme) || o.theme === 'custom' ? o.theme : 'night',
+    theme: THEME_IDS.includes(o.theme) || o.theme === 'custom' ? o.theme : 'official',
     dim: clamp(num(o.dim, 45), 0, 85),
     blur: clamp(num(o.blur, 0), 0, 16),
     overlay: o.overlay !== false,
@@ -119,7 +114,7 @@ export function useHubBackdrop() {
     ++revision.current;setMediaKind('image');
     try { await idbDel(); } catch { /* nothing stored */ }
     setImageUrl(null);
-    update({ theme: 'night', dim: 45, blur: 0 });
+    update({ theme: 'official', dim: 45, blur: 0 });
   };
   return { pref, update, imageUrl, mediaKind, ready, setImage, clearImage };
 }
@@ -127,123 +122,15 @@ export function useHubBackdrop() {
 /** What the backdrop draws: a theme id, 'photo' (custom picture) or 'blank' (custom picture still loading). */
 function sceneOf(bg) {
   if (bg.pref.theme !== 'custom') return bg.pref.theme;
-  return bg.imageUrl ? 'photo' : bg.ready ? 'night' : 'blank';
+  return bg.imageUrl ? 'photo' : bg.ready ? 'official' : 'blank';
 }
 /** The `data-hub-theme` of the lobby root: the colour tokens shared by the backdrop, the radar and the swatches. */
 export function backdropTheme(bg) {
   const s = sceneOf(bg);
-  return s === 'photo' ? 'custom' : s === 'blank' ? 'night' : s;
+  return s === 'photo' ? 'custom' : s === 'blank' ? 'official' : s;
 }
 
 // ---- the generated skyline (viewBox 1600×600, ground at the bottom) -------------------------------------------------
-function rng(seed) {
-  let s = seed >>> 0;
-  return () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32);
-}
-/** A ridge profile by midpoint displacement: 65 points across the width. */
-function ridgePoints(seed, base, amp, rough) {
-  const rnd = rng(seed);
-  let pts = [base + (rnd() - 0.5) * amp, base + (rnd() - 0.5) * amp];
-  let disp = amp;
-  while (pts.length < 65) {
-    const next = [];
-    for (let i = 0; i < pts.length - 1; i++) next.push(pts[i], (pts[i] + pts[i + 1]) / 2 + (rnd() - 0.5) * disp);
-    next.push(pts[pts.length - 1]);
-    pts = next;
-    disp *= rough;
-  }
-  return pts;
-}
-const DX = 1600 / 64;
-const yAt = (pts, x) => {
-  const i = Math.min(63, Math.max(0, Math.floor(x / DX)));
-  const f = x / DX - i;
-  return pts[i] * (1 - f) + pts[i + 1] * f;
-};
-const edge = (pts) => pts.map((y, i) => `${i ? 'L' : 'M'}${(i * DX).toFixed(1)} ${y.toFixed(1)}`).join('');
-const area = (pts) => `${edge(pts)}V600H0Z`;
-
-// the far range opens into a valley behind the title, its peaks frame the emblem from both sides
-const FAR = ridgePoints(0x51a7, 286, 150, 0.56).map((y, i) => y + 70 * Math.exp(-(((i * DX - 800) / 340) ** 2)));
-// the stronghold stands on a levelled shelf of the middle ridge (x 540–1060)
-const MID = ridgePoints(0x7e11, 440, 90, 0.55).map((y, i) => {
-  const x = i * DX;
-  const w = x < 480 || x > 1120 ? 0 : x < 560 ? (x - 480) / 80 : x > 1040 ? (1120 - x) / 80 : 1;
-  return y * (1 - w) + 424 * w;
-});
-const NEAR = ridgePoints(0x2b3c, 512, 46, 0.5);
-
-/** A crenellated block: base → up the left side → merlons along the top → down the right side. */
-function block(x0, x1, top, base, h, w, gap) {
-  let d = `M${x0} ${base}V${top}`;
-  for (let x = x0 + 3; x + w <= x1 - 3; x += w + gap) d += `H${x}V${top - h}H${x + w}V${top}`;
-  return `${d}H${x1}V${base}Z`;
-}
-const FORT = [
-  block(540, 1060, 400, 440, 5, 7, 6), // curtain wall
-  block(580, 616, 358, 440, 6, 6, 5),
-  'M660 440V394L690 381L720 394V440Z', // depot
-  block(760, 822, 324, 440, 7, 8, 6), // keep
-  block(777, 805, 302, 330, 5, 5, 4),
-  'M790 302V266h2v36zM785 278h12v1.6h-12z', // mast
-  block(930, 962, 350, 440, 6, 6, 5),
-  'M945 350V318h1.6v32z',
-  block(1020, 1046, 368, 440, 5, 5, 4),
-].join('');
-const MASTS = [260, 1330].map((x) => {
-  const y = yAt(FAR, x);
-  return `M${x} ${y.toFixed(1)}V${(y - 46).toFixed(1)}h1.4V${y.toFixed(1)}zM${x - 5} ${(y - 30).toFixed(1)}h11.4v1.2h-11.4z`;
-}).join('');
-const MAST_TOPS = [260, 1330].map((x) => [x + 0.7, yAt(FAR, x) - 47]);
-const BEACONS = [[791, 265, 2.4, 0], [945.8, 317, 2, 1.3], [598, 351, 1.6, 2.1], ...MAST_TOPS.map(([x, y], i) => [x, y, 1.6, 0.7 + i * 1.7])];
-const WINDOWS = [[771, 338], [808, 350], [786, 372], [594, 380], [944, 372], [1031, 386], [700, 410], [870, 412]];
-
-const MOTES = (() => {
-  const rnd = rng(0x5eed);
-  return Array.from({ length: 26 }, () => ({
-    x: rnd() * 100, y: 28 + rnd() * 66, s: 1 + rnd() * 2.2, d: 14 + rnd() * 16, dl: rnd() * 30,
-  }));
-})();
-const STARS = (() => {
-  const rnd = rng(0x57a2);
-  return Array.from({ length: 46 }, () => {
-    const a = 0.25 + rnd() * 0.55;
-    return `${(rnd() * 100).toFixed(2)}vw ${(rnd() * 44).toFixed(2)}vh 0 ${rnd() < 0.15 ? '.6px' : '0'} rgba(220, 240, 235, ${a.toFixed(2)})`;
-  }).join(',');
-})();
-
-function Scene({ theme }) {
-  return html`
-    <div class="hub-bg__sky"></div>
-    ${theme === 'night' || theme === 'frost' ? html`<i class="hub-bg__stars" style=${`box-shadow:${STARS}`}></i>` : null}
-    <div class="hub-bg__haze"></div>
-    ${theme !== 'calm' ? html`<div class="hub-bg__clouds"></div>` : null}
-    <svg class="hub-bg__land" viewBox="0 0 1600 600" preserveAspectRatio="xMidYMax slice">
-      <defs>
-        <linearGradient id="hubFog" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" class="hub-fog-0" /><stop offset=".55" class="hub-fog-1" /><stop offset="1" class="hub-fog-0" />
-        </linearGradient>
-        <linearGradient id="hubBeam" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0" class="hub-beam-0" /><stop offset="1" class="hub-beam-1" />
-        </linearGradient>
-      </defs>
-      <path class="hub-bg__ridge hub-bg__ridge--far" d=${area(FAR)} />
-      <path class="hub-bg__rim" d=${edge(FAR)} />
-      <path class="hub-bg__ridge--far" d=${MASTS} />
-      <rect x="0" y="290" width="1600" height="170" fill="url(#hubFog)" />
-      ${theme === 'night' || theme === 'frost' ? html`<path class="hub-bg__beam" d="M791 300L700 -300H776Z" fill="url(#hubBeam)" />` : null}
-      <path class="hub-bg__fort" d=${FORT} />
-      <g class="hub-bg__windows">${WINDOWS.map(([x, y], i) => html`<rect key=${i} x=${x} y=${y} width="3" height="5" style=${`--dl:${(i * 1.9) % 7}s`} />`)}</g>
-      <g class="hub-bg__beacons">${BEACONS.map(([x, y, r, dl], i) => html`<g key=${i} style=${`--dl:${dl}s`}>
-        <circle class="hub-bg__beacon-glow" cx=${x} cy=${y} r=${r * 4} /><circle cx=${x} cy=${y} r=${r} /></g>`)}</g>
-      <path class="hub-bg__ridge hub-bg__ridge--mid" d=${area(MID)} />
-      <rect x="0" y="430" width="1600" height="120" fill="url(#hubFog)" opacity=".7" />
-      <path class="hub-bg__ridge hub-bg__ridge--near" d=${area(NEAR)} />
-    </svg>
-    ${theme !== 'calm' ? html`<div class="hub-bg__motes">${MOTES.map((m, i) => html`<i key=${i} class="hub-bg__mote"
-      style=${`left:${m.x.toFixed(2)}%;top:${m.y.toFixed(2)}%;width:${m.s.toFixed(1)}px;height:${m.s.toFixed(1)}px;--d:${m.d.toFixed(1)}s;--dl:-${m.dl.toFixed(1)}s`}></i>`)}</div>` : null}`;
-}
-
 export const MAX_VIDEO_BYTES = 60 * 1024 * 1024;
 async function validateVideo(file) {
   if (!file.size || file.size>MAX_VIDEO_BYTES) throw Error(t('视频大小上限为 60MB'));
@@ -289,11 +176,11 @@ function HubVideo({bg}) {
 export function HubBackdrop({ bg }) {
   const scene = sceneOf(bg);
   const { pref } = bg;
-  // 维护者 2026-10-25 (逐屏裁决: 大厅背景取官方 0.3.3): the default 夜巡 backdrop is the official one — the glow
-  // (entry/entry_bkg_01) and the Rhodes Island hologram (entry/entry_bkg_02) over a dark field with a faint grid
-  // (public/css/screens/lobby.css `.hub-bg__glow` / `__ship` / `__grid`, the upstream rules). The fork's drawn scenes
-  // stay for the other themes, and a custom picture still wins over all of them.
-  if (scene === 'night') {
+  // 维护者 2026-10-25 / 2026-10-27 (逐屏裁决: 大厅背景取官方 0.3.3，手绘场景全部下线): the glow (entry/entry_bkg_01)
+  // and the Rhodes Island hologram (entry/entry_bkg_02) over a dark field with a faint grid
+  // (public/css/screens/lobby.css `.hub-bg__glow` / `__ship` / `__grid`, the upstream rules). A custom picture still
+  // wins over it.
+  if (scene === 'official') {
     return html`<div class="hub-bg" data-scene="official" data-motion=${pref.motion ? 'on' : 'off'} aria-hidden="true">
       <${Sprite} k="entry/entry_bkg_01" class="hub-bg__glow" />
       <${Sprite} k="entry/entry_bkg_02" class="hub-bg__ship" />
@@ -306,16 +193,16 @@ export function HubBackdrop({ bg }) {
     ${scene === 'photo'
       ? html`${bg.mediaKind==='video'?html`<${HubVideo} key=${bg.imageUrl} bg=${bg} />`:html`<div class="hub-bg__photo" style=${`background-image:url("${bg.imageUrl}");filter:${pref.blur ? `blur(${pref.blur}px)` : 'none'}`}></div>`}
         <div class="hub-bg__shade" style=${`opacity:${pref.dim / 100}`}></div>`
-      : scene === 'blank' ? html`<div class="hub-bg__sky"></div>` : html`<${Scene} theme=${scene} />`}
+      : html`<div class="hub-bg__sky"></div>`}
     ${scene !== 'photo' || pref.overlay ? html`<div class="hub-bg__grid"></div><div class="hub-bg__dots"></div>` : null}
     <div class="hub-bg__scan"></div>
     <div class="hub-bg__vignette"></div>
   </div>`;
 }
 
-/** Range rings and a slow sweep behind the emblem (the sweep only with motion on, never on 静默). */
+/** Range rings and a slow sweep behind the emblem (the sweep only with motion on). */
 export function HubRadar({ bg }) {
-  const sweep = bg.pref.motion && sceneOf(bg) !== 'calm';
+  const sweep = bg.pref.motion;
   return html`<div class="hub-radar" aria-hidden="true">
     <svg viewBox="-240 -240 480 480">
       <circle r="92" /><circle r="152" /><circle class="hub-radar__ticks" r="214" />

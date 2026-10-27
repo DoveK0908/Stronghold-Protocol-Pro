@@ -59,9 +59,10 @@ describe('which files a slot takes', () => {
     for (const f of [null, file('a.png', 'image/png', 0)]) assert.equal(classifyFile(f, 'backdrop').ok, false);
   });
   test('the saved switches are sanitised (off by default, 暗度 0–0.8)', () => {
-    assert.deepEqual(loadMediaPrefs(null), { backdrop: false, music: false, dim: 0.35, scene: 'official' });
-    assert.deepEqual(loadMediaPrefs({ backdrop: true, music: 'yes', dim: 3, scene: 'frost' }), { backdrop: true, music: false, dim: 0.8, scene: 'frost' });
-    assert.deepEqual(loadMediaPrefs({ dim: -1, scene: 'sunny' }), { backdrop: false, music: false, dim: 0, scene: 'official' }, 'an unknown scene is the official backdrop');
+    assert.deepEqual(loadMediaPrefs(null), { backdrop: false, music: false, dim: 0.35 });
+    // 维护者 2026-10-27: 四个手绘场景下线，只剩官方背景，`scene` 不再是偏好项
+    assert.deepEqual(loadMediaPrefs({ backdrop: true, music: 'yes', dim: 3, scene: 'frost' }), { backdrop: true, music: false, dim: 0.8 });
+    assert.deepEqual(loadMediaPrefs({ dim: -1, scene: 'sunny' }), { backdrop: false, music: false, dim: 0 });
     assert.deepEqual(loadMediaPrefs({ dim: 'x' }).dim, 0.35);
   });
 });

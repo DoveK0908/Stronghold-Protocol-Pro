@@ -1,11 +1,21 @@
 ## 0.3.3-pro.2 — 2026-10-25
 
-### 主界面音乐库（2026-10-27）
+### 主界面音乐库：整张目录、按分类分组（2026-10-27）
 
-- 迁移 selena 0.4.1 的 23 首主界面曲目（`factionMusicCatalog.js` 里 `home: true` 的那批）到 `public/assets/audio/bgm/lobby/`，
-  清单生成 `public/js/lobbyMusicLibrary.js`，`node tools/import-lobby-music.mjs <selena-app目录>` 可重复导入；音频不进 git。
-- 大厅左上角「主界面音乐」卡片新增「音乐库」折叠列表（可搜索、点一首即播），上/下一首与随机播放会把曲库一起循环；
-  `audio.js lobbyTrackOf` 直接解析 `lib_*` 曲目，走同一个 `/media/` 免扩展名通道。自选上传与原有官方曲目照旧。
+- 音乐库从 selena 0.4.1 的 23 首 `home: true` 扩到**整张 `factionMusicCatalog.js`：246 首、7 个组**
+  （悬赏 OST / 敌人 OST / 阵营 OST / 结算 OST / 其他 OST / 主界面 / Boss OST，共 61 个子分类），
+  音频按原文件名拷到 `public/assets/audio/bgm/`（不再单开 `lobby/` 子目录），清单由
+  `node tools/import-lobby-music.mjs <selena-app目录>` 重新生成（带 `group` / `groupName` / `categories`）。
+- 大厅左上角「主界面音乐」卡片：**删掉原来的下拉曲目列表**（玩家：「音乐库和选曲列表重复了，只留音乐库」），
+  音乐库本身成为唯一选曲入口——按组折叠、带搜索（曲名与分类都能搜）、点一首即播；「官方大厅音乐」留作复位按钮。
+  上/下一首与随机播放走同一份 `official + 曲库 + 自选上传` 列表。
+- `audio.js lobbyTrackOf` 仍直接解析 `lib_*`，URL 改回 `/assets/audio/bgm/…`（原来误写成 `/public/assets/…`，404）。
+
+### 大厅背景：只留官方一张（2026-10-27）
+
+- 按玩家要求下线四个手绘场景（夜巡 / 霜原 / 烬野 / 静默）：删 `public/js/ui/hubScene.js` 与其用例，
+  `ui/hubBackdrop.js` 只保留官方 0.3.3 的辉光 + 罗德岛全息 + 网格，`lobby.media` 偏好里不再有 `scene`；
+  背景选择面板里的场景一栏一并移除，玩家自己的图片／视频仍然可选。
 
 ### 名片/头像：动图与更大的图（2026-10-27）
 

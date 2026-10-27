@@ -1,36 +1,29 @@
-// 大厅音乐面板 (ui/lobbyMusicPanel.js; the owner's request of 2026-10-20): the lobby's own card at the top-left —
-// 主界面音乐 / RHODES RADIO — a track dropdown (the packaged tracks of bgmChoice.js BGM_TRACKS, 官方大厅音乐, and the
-// player's own file), ⏮ ▶/⏸ ⏭ with 随机播放, and a volume slider for the lobby alone (settings lobbyVolume; the
-// 背景音乐 slider of 设置 stays the master BGM volume). The picks live in settings (lobbyTrack / lobbyShuffle /
-// lobbyVolume / lobbyMusicOpen); audio.js plays the packaged ones (setLobbyPick / setLobbyPaused, its own gain), and a
-// player's own file keeps playing through ui/lobbyMusic.js, which overrides the lobby key. The card only shows in the
-// lobby: other screens keep their music.
+// 大厅音乐面板 (ui/lobbyMusicPanel.js; the owner's request of 2026-10-20, reshaped 2026-10-27): the lobby's own card at
+// the top-left — 主界面音乐 / RHODES RADIO — ⏮ ▶/⏸ ⏭ with 随机播放, a volume slider for the lobby alone (settings
+// lobbyVolume; the 背景音乐 slider of 设置 stays the master BGM volume), and the 主界面音乐库 as the only picker.
+// 维护者 2026-10-27 (玩家: 「这个音乐库和我们现在有的选曲列表不是重复了吗，只留音乐库就可以了」): the old track
+// dropdown (the packaged 曲目表 + the 23 home entries) is gone — the library now carries selena 0.4.1's whole
+// catalogue (246 tracks in 7 groups, lobbyMusicLibrary.js) and is grouped by 悬赏/阵营/Boss/敌人/结算/其他/主界面 with a
+// search box. 官方大厅音乐 stays as the reset chip. The picks live in settings (lobbyTrack / lobbyShuffle / lobbyVolume /
+// lobbyMusicOpen); audio.js plays the packaged ones (setLobbyPick / setLobbyPaused, its own gain), and a player's own file
+// keeps playing through ui/lobbyMusic.js, which overrides the lobby key. The card only shows in the lobby.
 import { html, Button } from './components.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { audio } from '../audio.js';
-import { BGM_TRACKS } from '../bgmChoice.js';
-import { LOBBY_LIBRARY } from '../lobbyMusicLibrary.js';
+import { LOBBY_LIBRARY, LOBBY_GROUPS } from '../lobbyMusicLibrary.js';
 import { t } from '../../../shared/i18n.js';
 import { useSettings, updateSettings } from './settings.js';
 import { music } from './lobbyMusic.js';
 
-/** The track names the dropdown offers; 'custom' is the player's own file (lobbyMusic.js), 'official' the lobby's own. */
-// 上海Major stops here: its file is host-provided (MAJOR_BGM_URL) and this repo ships no copy, so offering it in the
-// lobby list only ever produced a failed load (the owner: 「之前那个上海major的bgm没有文件就不要了」).
-const PACKED_IDS = Object.freeze(['official', ...BGM_TRACKS.filter((x) => x.id !== 'lobby' && x.id !== 'major').map((x) => x.id)]);
-const UPLOAD = '__upload';
-
-/** The 主界面音乐库 (lobbyMusicLibrary.js) — the 23 packaged lobby tracks of selena 0.4.1, offered beside the above. */
 const LIB_IDS = Object.freeze(LOBBY_LIBRARY.map((x) => x.id));
 
-/** The name of one column value (`lobbyTrack`) or of a library entry (`custom:<id>`). */
+/** The name of one column value (`lobbyTrack`) — 'official', a library id, or 'custom' (the player's own file). */
 export function lobbyTrackName(id, customName = '') {
-  if (id === 'official') return t('官方大厅音乐');
-  if (id?.startsWith?.('custom:')) return customName || t('自选上传');
+  if (id === 'official' || !id) return t('官方大厅音乐');
   if (id === 'custom') return customName || t('自选上传');
   const lib = LOBBY_LIBRARY.find((x) => x.id === id);
   if (lib) return lib.title;
-  return t(BGM_TRACKS.find((x) => x.id === id)?.name || id);
+  return customName || id;
 }
 
 const ICON = { prev: '◀◀', next: '▶▶', play: '▶', pause: '❚❚', fold: '▾', unfold: '▸' };
@@ -60,18 +53,19 @@ export function LobbyMusicPanel() {
   }, []);
 
   const choose = (value) => {
-    if (value === UPLOAD) { input.current?.click(); return; }
-    if (value.startsWith('custom:')) {
+    if (value === 'custom') {
       // a library entry: ui/lobbyMusic.js owns the file and writes lobbyTrack/lobbyCustomId itself
       setUploadError('');
-      music.select(value.slice(7)).catch((e) => setUploadError(e?.message || t('音乐导入失败')));
+      const target = tracks[0];
+      if (!target) { input.current?.click(); return; }
+      music.select(target.id).catch((e) => setUploadError(e?.message || t('音乐导入失败')));
       return;
     }
     updateSettings({ lobbyTrack: value });
     // the player's own file and the packaged tracks share the lobby key: tell ui/lobbyMusic.js the pick moved on
     music.pickChanged();
   };
-  const options = [...PACKED_IDS, ...LIB_IDS, ...tracks.map((x) => `custom:${x.id}`)];
+  const options = ['official', ...LIB_IDS, ...tracks.map((x) => `custom:${x.id}`)];
   const step = (dir) => {
     const at = Math.max(0, options.indexOf(column));
     let next;
@@ -79,6 +73,11 @@ export function LobbyMusicPanel() {
       const pool = options.filter((id) => id !== column);
       next = pool[Math.floor(Math.random() * pool.length)] || column;
     } else next = options[(at + dir + options.length) % options.length];
+    if (next.startsWith('custom:')) {
+      setUploadError('');
+      music.select(next.slice(7)).catch((e) => setUploadError(e?.message || t('音乐导入失败')));
+      return;
+    }
     choose(next);
   };
   const toggle = () => {
@@ -87,6 +86,11 @@ export function LobbyMusicPanel() {
     // audio.js has no listener of its own: re-render this card
     setState(music.snapshot());
   };
+
+  const q = libQuery.trim().toLocaleLowerCase();
+  const shown = LOBBY_LIBRARY.filter((x) => !q
+    || x.title.toLocaleLowerCase().includes(q)
+    || (x.categories || []).some((c) => c.toLocaleLowerCase().includes(q)));
 
   return html`<section class="lobmusic" data-open=${open ? '1' : '0'} data-track=${pick} aria-label=${t('主界面音乐')}>
     <header class="lobmusic__head">
@@ -100,13 +104,7 @@ export function LobbyMusicPanel() {
         onClick=${() => updateSettings({ lobbyMusicOpen: !open })}>${open ? ICON.fold : ICON.unfold}<//>
     </header>
     ${open ? html`<div class="lobmusic__body">
-      <div class="lobmusic__sel">
-        <select data-testid="lobby-track" value=${column} onChange=${(e) => choose(e.currentTarget.value)}>
-          ${PACKED_IDS.map((id) => html`<option key=${id} value=${id}>${lobbyTrackName(id)}</option>`)}
-          ${tracks.map((x) => html`<option key=${x.id} value=${`custom:${x.id}`}>${lobbyTrackName(`custom:${x.id}`, x.name)}</option>`)}
-          <option value=${UPLOAD}>${t('＋ 上传新的…')}</option>
-        </select>
-      </div>
+      <div class="lobmusic__now" data-testid="lobby-now">${lobbyTrackName(column, selectedCustom?.name)}</div>
       <div class="lobmusic__row">
         <button class="lobmusic__btn" data-act="prev" title=${t('上一首')} aria-label=${t('上一首')} onClick=${() => step(-1)}>${ICON.prev}</button>
         <button class="lobmusic__btn lobmusic__btn--play" data-act=${playing ? 'pause' : 'play'} data-testid="lobby-play"
@@ -124,23 +122,35 @@ export function LobbyMusicPanel() {
           aria-label=${t('大厅音乐音量')} onChange=${(e) => updateSettings({ lobbyVolume: Number(e.currentTarget.value) / 100 })} />
         <b>${volume}</b>
       </label>
-      <details class="lobmusic__library" data-testid="lobby-library">
-        <summary>${t('音乐库')} <small>${LOBBY_LIBRARY.length}</small></summary>
-        <input class="lobmusic__search" type="search" data-testid="lobby-library-search" aria-label=${t('搜索曲目')}
-          placeholder=${t('搜索曲目')} value=${libQuery} onInput=${(e) => setLibQuery(e.currentTarget.value)} />
-        <div class="lobmusic__list">
-          ${LOBBY_LIBRARY.filter((x) => !libQuery || x.title.toLocaleLowerCase().includes(libQuery.toLocaleLowerCase())).map((x) => html`<button
-            type="button" class="lobmusic__track" data-testid="lobby-library-track" aria-pressed=${pick === x.id}
-            onClick=${() => choose(x.id)}><span aria-hidden="true">${pick === x.id && !audio.lobbyPaused ? '♫' : '▷'}</span><span>${x.title}</span></button>`)}
-        </div>
-      </details>
+      <div class="lobmusic__libhead">
+        <button type="button" class="lobmusic__chip" data-testid="lobby-official" aria-pressed=${pick === 'official'}
+          onClick=${() => choose('official')}>${t('官方大厅音乐')}</button>
+        <strong>${t('音乐库')} <small>${LOBBY_LIBRARY.length}</small></strong>
+      </div>
+      <input class="lobmusic__search" type="search" data-testid="lobby-library-search" aria-label=${t('搜索曲目')}
+        placeholder=${t('搜索曲目')} value=${libQuery} onInput=${(e) => setLibQuery(e.currentTarget.value)} />
+      <div class="lobmusic__groups" data-testid="lobby-library">
+        ${LOBBY_GROUPS.map((g) => {
+          const rows = shown.filter((x) => x.group === g);
+          if (!rows.length) return null;
+          return html`<details class="lobmusic__group" key=${g} open=${!!q}>
+            <summary>${g} <small>${rows.length}</small></summary>
+            <div class="lobmusic__list">
+              ${rows.map((x) => html`<button type="button" class="lobmusic__track" data-testid="lobby-library-track"
+                data-group=${x.group} aria-pressed=${pick === x.id}
+                onClick=${() => choose(x.id)}><span aria-hidden="true">${pick === x.id && !audio.lobbyPaused ? '♫' : '▷'}</span><span>${x.title}</span><small>${x.groupName}</small></button>`)}
+            </div>
+          </details>`;
+        })}
+      </div>
       ${custom ? html`<div class="lobmusic__file">
         <small data-testid="lobby-file">${selectedCustom.name}</small>
         <${Button} size="sm" variant="secondary" onClick=${() => input.current?.click()}>${t('更换')}<//>
         <${Button} size="sm" variant="secondary" class="lobmusic__remove" data-testid="lobby-remove"
           onClick=${() => music.remove(selectedCustom.id).catch((e) => setUploadError(e?.message || t('音乐导入失败')))}>${t('删除')}<//>
-      </div>` : null}
-      ${custom && uploadError ? html`<p class="lobmusic__note is-bad" data-testid="lobby-upload-error">${uploadError}</p>` : null}
+      </div>` : html`<button type="button" class="lobmusic__upload" data-testid="lobby-upload"
+        onClick=${() => input.current?.click()}>${t('＋ 上传本地音乐')}</button>`}
+      ${uploadError ? html`<p class="lobmusic__note is-bad" data-testid="lobby-upload-error">${uploadError}</p>` : null}
       <input ref=${input} type="file" accept=".mp3,.m4a,.ogg,.wav,.aac,.flac,.webm,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/x-wav,audio/aac,audio/flac,audio/webm" hidden
         onChange=${(e) => {
           const file = e.currentTarget.files?.[0];

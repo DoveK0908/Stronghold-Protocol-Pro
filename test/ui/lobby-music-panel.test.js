@@ -7,7 +7,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AudioManager, lobbyTrackOf } from '../../public/js/audio.js';
 import { BGM_TRACKS } from '../../public/js/bgmChoice.js';
-import { LOBBY_LIBRARY } from '../../public/js/lobbyMusicLibrary.js';
+import { LOBBY_LIBRARY, LOBBY_GROUPS } from '../../public/js/lobbyMusicLibrary.js';
 import { lobbyTrackName } from '../../public/js/ui/lobbyMusicPanel.js';
 import { siteCsp } from '../../server/http/csp.js';
 
@@ -85,8 +85,9 @@ test('the site policy lets the card play a blob: file, and 上海Major is not of
   assert.match(csp, /media-src 'self' blob:/, 'blob: media stays legal under the site policy');
   assert.ok(!csp.includes('unsafe-eval'), 'the relaxation is only media-src');
   const panel = read('public/js/ui/lobbyMusicPanel.js');
-  assert.match(panel, /x\.id !== 'lobby' && x\.id !== 'major'/, '上海Major has no shipped file — not listed');
-  assert.doesNotMatch(panel, /\['official', \.\.\.BGM_TRACKS\.filter\(\(x\) => x\.id !== 'lobby'\)\.map/, 'the 上海Major entry is gone from the picker');
+  // 维护者 2026-10-27: 下拉列表整个删了，bgmChoice.js 的 BGM_TRACKS 不再出现在大厅卡片里（上海Major 自然也不在）
+  assert.doesNotMatch(panel, /BGM_TRACKS/, 'the lobby card no longer lists the packaged BGM_TRACKS');
+  assert.match(panel, /LOBBY_LIBRARY\.filter/, 'the picker is the 音乐库');
 });
 
 test('the dropdown owns the lobby: switching away from 自选上传 stops the player\'s file, and its volume is the lobby gain', () => {
@@ -118,9 +119,11 @@ test('the player\'s own music is a local library: several files, all kept in thi
   assert.match(src, /tracks: library\.map\(\(\{ id, name, size \}\) => \(\{ id, name, size \}\)\)/, 'the snapshot lists the library without the blobs');
   assert.ok(!/fetch\(|net\.request\(|XMLHttpRequest/.test(src), 'nothing about the music goes over the network');
   const panel = read('public/js/ui/lobbyMusicPanel.js');
-  assert.match(panel, /tracks\.map\(\(x\) => html`<option key=\$\{x\.id\} value=\$\{`custom:\$\{x\.id\}`\}>/, 'every library entry is an option');
-  assert.match(panel, /const UPLOAD = '__upload';/, 'and there is an upload entry');
-  assert.match(panel, /music\.select\(value\.slice\(7\)\)/, 'picking an entry selects it');
+  // 维护者 2026-10-27: 下拉列表（选曲列表）删了，音乐库本身是唯一的选曲入口
+  assert.doesNotMatch(panel, /<select /, 'no 选曲列表 dropdown any more');
+  assert.match(panel, /LOBBY_GROUPS\.map\(\(g\) => \{/, 'the library is grouped by category');
+  assert.match(panel, /data-testid="lobby-library-track"/, 'every track is a row');
+  assert.match(panel, /music\.select\(next\.slice\(7\)\)/, 'stepping onto an own file selects it');
   assert.match(panel, /data-testid="lobby-remove"/, 'the current entry can be deleted');
   const settings = read('public/js/ui/gameLogic/settings.js');
   assert.match(settings, /lobbyCustomId: ''/, 'the default settings know the entry');
@@ -153,16 +156,20 @@ test('对局音乐 lists the same local library as the lobby card', () => {
   assert.match(audio, /setBgmLocal\(kind, url, id = null\)/, 'audio.js keeps the entry id');
 });
 
-// 主界面音乐库 (维护者 2026-10-27): selena 0.4.1's 23 lobby tracks — the pick resolves to its own file, and every entry
-// ships (a listed track whose file is missing would silently fall back to the lobby music).
+// 主界面音乐库 (维护者 2026-10-27): selena 0.4.1's whole catalogue — 246 tracks in 7 groups. The pick resolves to its own
+// file, and every entry ships (a listed track whose file is missing would silently fall back to the lobby music).
 test('主界面音乐库: every track resolves through lobbyTrackOf and its file ships', () => {
-  assert.equal(LOBBY_LIBRARY.length, 23, 'selena 0.4.1 published 23 主界面 tracks');
+  assert.equal(LOBBY_LIBRARY.length, 246, 'selena 0.4.1 published 246 tracks');
+  assert.deepEqual([...LOBBY_GROUPS], ['悬赏 OST', '敌人 OST', '阵营 OST', '结算 OST', '其他 OST', '主界面', 'Boss OST']);
   const seen = new Set();
   for (const track of LOBBY_LIBRARY) {
     assert.match(track.id, /^lib_[0-9a-f]{20}(?:_[0-9a-f]+)?$/, `${track.title}: a stable file-hash id`);
     assert.ok(!seen.has(track.id), `${track.title}: the id is unique`);
     seen.add(track.id);
     assert.ok(track.title.trim(), `${track.id}: a title`);
+    assert.ok(LOBBY_GROUPS.includes(track.group), `${track.title}: a known group`);
+    assert.ok(track.groupName.trim(), `${track.title}: a sub-category`);
+    assert.ok(Array.isArray(track.categories) && track.categories.length, `${track.title}: categories for 搜索`);
     assert.equal(lobbyTrackOf(MANIFEST, track.id)?.loop, track.url, `${track.title}: the pick plays its own file`);
     assert.ok(existsSync(join(ROOT, 'public', track.url)), `${track.title}: ${track.url} ships`);
     assert.equal(lobbyTrackName(track.id), track.title, `${track.title}: the card names it`);

@@ -159,18 +159,9 @@ describe('自定义大厅背景与音乐 (real server)', { skip: !ENABLED && 'se
       assert.equal(m.musicName, '默认音乐');
       assert.equal(await c.page.evaluate(() => document.activeElement?.textContent?.trim()), '完成');
 
-      // 大厅场景: a generated scene over the official backdrop, at once; 默认背景 takes it away
+      // 维护者 2026-10-27: 四个手绘场景已下线——面板里不再有场景选择，只剩官方背景
       assert.equal(await c.page.$('[data-testid="hub-scene"]'), null);
-      await c.click('.bgset__theme[data-scene="frost"]');
-      await c.page.waitForFunction(() => document.querySelector('[data-testid="hub-scene"]')?.dataset.hubTheme === 'frost');
-      assert.equal(JSON.parse(await c.page.evaluate(() => localStorage.getItem('sp.pref.lobby.media'))).scene, 'frost');
-      await c.page.keyboard.press('Escape');
-      await c.page.waitForFunction(() => !document.querySelector('.modal__box.lmedia'));
-      await c.shot('hub-scene-frost');
-      await openDialog(c);
-      await c.click('.bgset__theme[data-scene="official"]');
-      await c.page.waitForFunction(() => !document.querySelector('[data-testid="hub-scene"]'));
-
+      assert.equal(await c.page.$('.bgset__theme'), null);
       // own picture: over the official backdrop at once; 暗度
       await upload(c, 'backdrop', files.png);
       await c.page.waitForFunction(() => document.querySelector('[data-testid="own-backdrop"] img')?.naturalWidth > 0, { timeout: 10000 });

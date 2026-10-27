@@ -1,12 +1,13 @@
-// 自定义大厅背景与音乐 (PR #643 split 8): one of four generated scenes (ui/hubScene.js: 夜巡 / 霜原 / 烬野 / 静默) or the
-// player's own picture or video behind the lobby, in place of the official backdrop (screens/lobby.js HubBackdrop), and own music in place of the lobby's track (audio.js setLobbyTrack: wherever
+// 自定义大厅背景与音乐 (PR #643 split 8; 维护者 2026-10-27: 四个手绘场景下线，只剩官方背景): the player's own picture or
+// video behind the lobby, in place of the official backdrop (screens/lobby.js HubBackdrop), and own music in place of the
+// lobby's track (audio.js setLobbyTrack: wherever
 // the lobby's music plays — title, lobby, room, briefing, draft, 协议启动, result — through the same 背景音乐 volume; it
 // also takes the place of a cosmetic plugin's audio.bgm.lobby in this browser).
 //
 // The files stay in this browser: IndexedDB 'sp-lobby-media', one record per kind ('backdrop', 'music'), never uploaded
 // and never seen by a teammate. The database is opened at start only when one of the files is switched on, else when the
-// dialog opens (a visitor who never opens it never creates it). Which of them is on, the scene and the backdrop's
-// 暗度 are a pref (lobby.media). A file is checked when it is chosen — its type and size, then that this browser can
+// dialog opens (a visitor who never opens it never creates it). Which of them is on, and the backdrop's 暗度, are a pref
+// (lobby.media). A file is checked when it is chosen — its type and size, then that this browser can
 // actually show / decode it, and its pixels or length — and refused with a message otherwise: a picture whose longest
 // edge is past 2560 px is scaled down (a still one; one that moves is refused), a video above 1080p is refused (#643's
 // guards), music longer than 6 minutes is refused (it is decoded whole into PCM). One that stops working later (storage
@@ -20,8 +21,9 @@ import { createStore, useStore, loadPref, savePref } from '../store.js';
 import { audio } from '../audio.js';
 import { toast } from './toasts.js';
 import { reducedMotion } from './device.js';
-import { HUB_SCENES, SCENE_IDS, HubScene, SceneSwatch } from './hubScene.js';
 import { isAnimatedImage } from './imageSniff.js';
+// 面板的「图片能不能动」判定也用这一份（test/ui/lobby-media.test.js 从这里拿）
+export { isAnimatedImage };
 import { t, tc } from '../../../shared/i18n.js';
 
 const MB = 1024 * 1024;
@@ -61,7 +63,6 @@ export function loadMediaPrefs(raw = loadPref(PREF, null)) {
   const dim = Number(o.dim);
   return {
     backdrop: o.backdrop === true, music: o.music === true, dim: Number.isFinite(dim) ? Math.min(0.8, Math.max(0, dim)) : 0.35,
-    scene: SCENE_IDS.includes(o.scene) ? o.scene : 'official',
   };
 }
 
@@ -363,7 +364,6 @@ export function setMediaOn(slot, on) {
 /** The own backdrop's 暗度 (0–0.8). */
 export const setBackdropDim = (dim) => savePrefs({ dim: loadMediaPrefs({ dim }).dim });
 /** The lobby's scene: 'official' (the event's backdrop) or a generated one. */
-export const setScene = (scene) => savePrefs({ scene: loadMediaPrefs({ scene }).scene });
 
 // ---- views ------------------------------------------------------------------------------------------------------------
 
@@ -419,30 +419,6 @@ export function OwnBackdrop() {
   </div>`;
 }
 
-/**
- * The chosen generated scene, over the official backdrop and under the own picture (null for 'official'); null too while
- * the own backdrop covers it, so its beam, windows and beacons do not animate unseen.
- */
-export function LobbyScene() {
-  const scene = useStore((x) => x.prefs.scene, undefined, mediaStore);
-  const covered = useStore((x) => !!x.backdrop && x.prefs.backdrop, undefined, mediaStore);
-  return covered ? null : html`<${HubScene} theme=${scene} />`;
-}
-
-/** 大厅场景: the official backdrop and the four generated scenes as swatches. */
-function SceneRow({ scene }) {
-  return html`<section class="lmedia__part" data-slot="scene">
-    <header class="lmedia__head"><b>${t('大厅场景')}</b><${MicroLabel}>SCENE<//></header>
-    <div class="bgset__themes" role="radiogroup" aria-label=${t('大厅场景')}>
-      ${HUB_SCENES.map((x) => html`<button key=${x.id} type="button" role="radio" aria-checked=${scene === x.id ? 'true' : 'false'}
-          class=${`bgset__theme${scene === x.id ? ' is-selected' : ''}`} data-scene=${x.id} onClick=${() => setScene(x.id)}>
-        <${SceneSwatch} theme=${x.id} />
-        <span class="bgset__name">${t(x.name)}</span><span class="bgset__en">${x.en}</span>
-      </button>`)}
-    </div>
-  </section>`;
-}
-
 const sizeText = (n) => `${(n / MB).toFixed(n < 10 * MB ? 1 : 0)} MB`;
 
 function MediaRow({ slot, title, micro, file, on, busy, accept, chooseText, officialText }) {
@@ -472,7 +448,6 @@ export function LobbyMediaDialog({ onClose }) {
   const dim = Math.round(s.prefs.dim * 100);
   return html`<${Modal} open=${true} class="lmedia" micro="LOBBY BACKDROP & MUSIC" title=${t('大厅背景与音乐')} width="min(8.6rem, 96vw)"
       onClose=${onClose} actions=${html`<${Button} variant="ghost" onClick=${onClose} data-autofocus="">${t('完成')}<//>`}>
-    <${SceneRow} scene=${s.prefs.scene} />
     <${MediaRow} slot="backdrop" title=${t('大厅背景')} micro="BACKDROP" file=${s.backdrop} on=${s.prefs.backdrop} busy=${s.busy}
       accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm" chooseText=${t('选择图片或视频')} officialText=${t('默认背景')} />
     ${s.backdrop && s.prefs.backdrop ? html`<label class="set-row lmedia__dim">

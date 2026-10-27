@@ -2852,9 +2852,10 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
   font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lobmusic__fold { flex: none; }
 .lobmusic__body { display: grid; gap: .08rem; padding: .1rem .12rem .12rem; }
-.lobmusic__sel select { width: 100%; height: .3rem; padding: 0 .08rem; font-size: calc(.12 * var(--t)); color: var(--text-hi);
+.lobmusic__now { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: calc(.115 * var(--t)); font-weight: 700; color: var(--mint-300); }
+.lobmusic__unused { width: 100%; height: .3rem; padding: 0 .08rem; font-size: calc(.12 * var(--t)); color: var(--text-hi);
   background: rgba(4, 9, 8, .9); border: 1px solid rgba(223, 230, 226, .22); }
-.lobmusic__sel select:focus-visible { outline: 1px solid var(--mint-400); outline-offset: 1px; }
 .lobmusic__row { display: flex; align-items: center; gap: .06rem; min-width: 0; }
 .lobmusic__btn { display: grid; place-items: center; width: .3rem; height: .26rem; flex: none; padding: 0;
   font-size: calc(.105 * var(--t)); letter-spacing: -.02em; color: var(--text-hi); background: rgba(12, 22, 20, .9); border: 1px solid rgba(223, 230, 226, .22);
@@ -2874,23 +2875,35 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .lobmusic__file { display: flex; align-items: center; gap: .08rem; min-width: 0; }
 .lobmusic__file small { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: calc(.1 * var(--t)); color: var(--text-dim); }
-/* 主界面音乐库 (维护者 2026-10-27): the 23 packaged lobby tracks of selena 0.4.1 — a folded list with search, so the
-   card stays compact while every track is one click away. */
-.lobmusic__library { min-width: 0; }
-.lobmusic__library > summary { display: flex; align-items: center; gap: .06rem; cursor: pointer; list-style: none;
+/* 主界面音乐库 (维护者 2026-10-27): selena 0.4.1 的全部 246 首，按 悬赏/阵营/Boss/敌人/结算/其他/主界面 折叠分组，
+   配搜索框——卡片仍是紧凑的一张，任何一首一两下点到。 */
+.lobmusic__libhead { display: flex; align-items: center; gap: .08rem; min-width: 0; }
+.lobmusic__libhead strong { flex: 1 1 auto; min-width: 0; font-size: calc(.105 * var(--t)); color: var(--text-dim); }
+.lobmusic__libhead small { margin-left: .04rem; font: 700 .085rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__chip { flex: none; padding: .02rem .07rem; font-size: calc(.095 * var(--t)); color: var(--text-dim); cursor: pointer;
+  background: rgba(10, 20, 18, .85); border: 1px solid var(--mint-a35); border-radius: .2rem; }
+.lobmusic__chip[aria-pressed="true"], .lobmusic__chip:hover { color: var(--mint-300); border-color: var(--mint-a55, rgba(78, 216, 175, .55)); }
+.lobmusic__groups { display: grid; gap: .04rem; min-width: 0; }
+.lobmusic__group { min-width: 0; }
+.lobmusic__group > summary { display: flex; align-items: center; gap: .05rem; cursor: pointer; list-style: none;
   font-size: calc(.105 * var(--t)); color: var(--text-dim); }
-.lobmusic__library > summary::-webkit-details-marker { display: none; }
-.lobmusic__library > summary::before { content: '▸'; font-size: .08rem; color: var(--mint-400); }
-.lobmusic__library[open] > summary::before { content: '▾'; }
-.lobmusic__library > summary small { margin-left: auto; font: 700 .085rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__group > summary::-webkit-details-marker { display: none; }
+.lobmusic__group > summary::before { content: '▸'; font-size: .08rem; color: var(--mint-400); }
+.lobmusic__group[open] > summary::before { content: '▾'; }
+.lobmusic__group > summary small { margin-left: auto; font: 700 .082rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
+.lobmusic__upload { justify-self: start; padding: .02rem .08rem; font-size: calc(.1 * var(--t)); color: var(--text-dim); cursor: pointer;
+  background: transparent; border: 1px dashed var(--mint-a35); border-radius: .03rem; }
+.lobmusic__upload:hover { color: var(--mint-300); border-color: var(--mint-400); }
 .lobmusic__search { width: 100%; height: .26rem; margin-top: .06rem; padding: 0 .08rem; font-size: calc(.105 * var(--t));
   color: var(--text-hi); background: rgba(10, 20, 18, .85); border: 1px solid var(--mint-a35); border-radius: .04rem; }
 .lobmusic__search:focus-visible { outline: 1px solid var(--mint-400); outline-offset: 1px; }
-.lobmusic__list { display: grid; gap: .02rem; max-height: 1.9rem; margin-top: .06rem; overflow: auto; overscroll-behavior: contain; }
+.lobmusic__list { display: grid; gap: .02rem; max-height: 1.6rem; margin: .04rem 0 .06rem .1rem; overflow: auto; overscroll-behavior: contain; }
 .lobmusic__track { display: flex; align-items: center; gap: .06rem; min-width: 0; padding: .03rem .06rem; text-align: left;
   font-size: calc(.105 * var(--t)); color: var(--text-dim); background: transparent; border: 0; border-radius: .03rem; cursor: pointer; }
 .lobmusic__track > span:first-child { flex: none; width: .1rem; color: var(--mint-400); }
-.lobmusic__track > span:last-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobmusic__track > span:nth-child(2) { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobmusic__track small { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: calc(.088 * var(--t)); color: var(--text-mute, var(--text-dim)); opacity: .75; }
 .lobmusic__track:hover, .lobmusic__track:focus-visible { color: var(--text-hi); background: rgba(78, 216, 175, .1); }
 .lobmusic__track[aria-pressed="true"] { color: var(--mint-300); }
 @media (max-width: 64rem) { .lobmusic__row { flex-wrap: wrap; } }

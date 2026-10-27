@@ -1,34 +1,260 @@
-// 主界面音乐库 (public/js/lobbyMusicLibrary.js): the 23 packaged lobby tracks of selena 0.4.1 (`factionMusicCatalog.js`
-// entries with `home: true`), copied here byte-for-byte as `assets/audio/bgm/lobby/faction_<hash>.ogg`. A pick is one of
-// these ids (`lib_<hash>`); audio.js lobbyTrackOf resolves it, and the 大厅音乐 card lists them (ui/lobbyMusicPanel.js).
-// Regenerate with tools/import-lobby-music.mjs after adding files; the ids are the file hashes, so they stay stable.
-// 曲名是官方曲目名（专有名词），按原样显示，故逐行标 `// i18n-ignore`——和干员名走 dn() 是同一个理由：译名会认错歌。
+// 主界面音乐库 (public/js/lobbyMusicLibrary.js): selena 0.4.1 的整张 `factionMusicCatalog.js`——246 首、7 个组
+// （悬赏 OST / 敌人 OST / 阵营 OST / 结算 OST / 其他 OST / 主界面 / Boss OST）——.ogg 从官方包原样拷进 `public/assets/audio/bgm/faction_<hash>.ogg`。
+// 一次选曲就是这里的一个 id（`lib_<hash>`）；audio.js 的 lobbyTrackOf 解析它，大厅音乐卡（ui/lobbyMusicPanel.js）按 group 分组列出。
+// 新增曲目后跑 tools/import-lobby-music.mjs 重新生成；id 是文件哈希，所以稳定。
+// 曲名与分类是官方专有名词，按原样显示，故逐行标 `// i18n-ignore`。
 
 export const LOBBY_LIBRARY = Object.freeze([
-  { id: "lib_549a631e13d6e6c52a97", title: "旅途前方", url: "/public/assets/audio/bgm/lobby/faction_549a631e13d6e6c52a97.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_9aa20a09c014cc9a0758", title: "Proof of being alive", url: "/public/assets/audio/bgm/lobby/faction_9aa20a09c014cc9a0758.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_f6f75553c0ed51470b33", title: "凡常恩典", url: "/public/assets/audio/bgm/lobby/faction_f6f75553c0ed51470b33.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_2c4a4c9ef8c9c00ab10e", title: "直到大地变成一颗酸橙", url: "/public/assets/audio/bgm/lobby/faction_2c4a4c9ef8c9c00ab10e.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_3ba06437627adf32a8f5", title: "用不上的雨刷", url: "/public/assets/audio/bgm/lobby/faction_3ba06437627adf32a8f5.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_08c14a7aadc0dcbd9ccf", title: "大柏墟", url: "/public/assets/audio/bgm/lobby/faction_08c14a7aadc0dcbd9ccf.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_c3dabea34a44d8946106", title: "生命流", url: "/public/assets/audio/bgm/lobby/faction_c3dabea34a44d8946106.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_95cf3b52884961d3e694", title: "示岁", url: "/public/assets/audio/bgm/lobby/faction_95cf3b52884961d3e694.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_e1a2689b296158f67e7d", title: "酸橙色信笺", url: "/public/assets/audio/bgm/lobby/faction_e1a2689b296158f67e7d.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_62f152d388229bef0d03", title: "Everything's Alright", url: "/public/assets/audio/bgm/lobby/faction_62f152d388229bef0d03.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_ea8a892aec46c4ec0233", title: "Protocol", url: "/public/assets/audio/bgm/lobby/faction_ea8a892aec46c4ec0233.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_3f42789dbad9d0c06e29", title: "赴大荒", url: "/public/assets/audio/bgm/lobby/faction_3f42789dbad9d0c06e29.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_ecb023a937557932ddd3", title: "启航", url: "/public/assets/audio/bgm/lobby/faction_ecb023a937557932ddd3.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_39ddecb6840d7e659330", title: "秉心", url: "/public/assets/audio/bgm/lobby/faction_39ddecb6840d7e659330.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_bf7e5d9e42285dba70ea", title: "Neo-vector", url: "/public/assets/audio/bgm/lobby/faction_bf7e5d9e42285dba70ea.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_d91b7f2fef0aa0ae6b75", title: "栖所架构", url: "/public/assets/audio/bgm/lobby/faction_d91b7f2fef0aa0ae6b75.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_818d7919799f895393cc", title: "走过漫漫时空", url: "/public/assets/audio/bgm/lobby/faction_818d7919799f895393cc.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_3dad0bd5d7c2e62139b0", title: "Дом", url: "/public/assets/audio/bgm/lobby/faction_3dad0bd5d7c2e62139b0.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_7974fdf94a25290ee9df", title: "Theoretical Simulation", url: "/public/assets/audio/bgm/lobby/faction_7974fdf94a25290ee9df.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_86375e68963374acb05b", title: "INFECTED", url: "/public/assets/audio/bgm/lobby/faction_86375e68963374acb05b.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_e24d69b3287873c59436", title: "塞壬唱片-MSR-immutable遗尘漫步ost remix（DavidClarkson remix）", url: "/public/assets/audio/bgm/lobby/faction_e24d69b3287873c59436.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_79c559b00a5e50f30425", title: "Misty Memory (Night Version)", url: "/public/assets/audio/bgm/lobby/faction_79c559b00a5e50f30425.ogg" }, // i18n-ignore 官方曲名，原样显示
-  { id: "lib_80a1030cdfe24c72e451_a1181a2014ad", title: "卫戍协议: 规程", url: "/public/assets/audio/bgm/lobby/faction_80a1030cdfe24c72e451_a1181a2014ad.ogg" }, // i18n-ignore 官方曲名，原样显示
+  { id: "lib_b717aca0b6658f85abe4", title: "碎骨", url: "/assets/audio/bgm/faction_b717aca0b6658f85abe4.ogg", group: "悬赏 OST", groupName: "1赏金敌人 · 碎骨", categories: ["悬赏 OST/1赏金敌人 · 碎骨"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_89b629e82d8c31eb342e", title: "尘沙扬", url: "/assets/audio/bgm/faction_89b629e82d8c31eb342e.ogg", group: "悬赏 OST", groupName: "2赏金敌人 · 鼠王", categories: ["悬赏 OST/2赏金敌人 · 鼠王"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c3a97b065c54364736b1", title: "Operation Spectrum", url: "/assets/audio/bgm/faction_c3a97b065c54364736b1.ogg", group: "悬赏 OST", groupName: "3赏金敌人 · 凋零骑士", categories: ["悬赏 OST/3赏金敌人 · 凋零骑士","悬赏 OST/3赏金敌人 · 腐败骑士","阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9b05ef7c726e4ee29a97", title: "铁手", url: "/assets/audio/bgm/faction_9b05ef7c726e4ee29a97.ogg", group: "悬赏 OST", groupName: "3赏金敌人 · 杰斯顿·威廉姆斯", categories: ["悬赏 OST/3赏金敌人 · 杰斯顿·威廉姆斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2582bde658a881b01031", title: "Wecgas fore tham Cynge, Searu fore tham Ethle", url: "/assets/audio/bgm/faction_2582bde658a881b01031.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · “最后的蒸汽骑士”", categories: ["悬赏 OST/4赏金敌人 · “最后的蒸汽骑士”","Boss OST/假想敌：胄"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_4fb5854f0d420b0705e5", title: "落子无悔", url: "/assets/audio/bgm/faction_4fb5854f0d420b0705e5.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 浮士德", categories: ["悬赏 OST/4赏金敌人 · 浮士德"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_24ef99fd7aa040aedb76", title: "First Crevasse on the Frozen Lake", url: "/assets/audio/bgm/faction_24ef99fd7aa040aedb76.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 哈洛德·克雷加文", categories: ["悬赏 OST/4赏金敌人 · 哈洛德·克雷加文"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7eab5bff953b9f7f7021", title: "近卫局攻坚小队", url: "/assets/audio/bgm/faction_7eab5bff953b9f7f7021.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 梅菲斯特", categories: ["悬赏 OST/4赏金敌人 · 梅菲斯特","阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_4682e9e242b6bbf4046a", title: "Requiem", url: "/assets/audio/bgm/faction_4682e9e242b6bbf4046a.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 霜星", categories: ["悬赏 OST/4赏金敌人 · 霜星","Boss OST/阿利斯泰尔，帝国余晖"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8a1fa1d7eaf02b1cbd1a", title: "Абсолю́тный нуль температу́ры (absolute zero)", url: "/assets/audio/bgm/faction_8a1fa1d7eaf02b1cbd1a.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 霜星", categories: ["悬赏 OST/4赏金敌人 · 霜星"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_bb946fcb1da2691e9370", title: "37℃", url: "/assets/audio/bgm/faction_bb946fcb1da2691e9370.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 霜星，“冬痕”", categories: ["悬赏 OST/4赏金敌人 · 霜星，“冬痕”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_25a86fe9151fa02fb361", title: "尽归霜雪", url: "/assets/audio/bgm/faction_25a86fe9151fa02fb361.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 霜星，“冬痕”", categories: ["悬赏 OST/4赏金敌人 · 霜星，“冬痕”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f05fdaa25957c907eaf3", title: "狼之主", url: "/assets/audio/bgm/faction_f05fdaa25957c907eaf3.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 扎罗，“狼之主”", categories: ["悬赏 OST/4赏金敌人 · 扎罗，“狼之主”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_739769bbc661094bd8f5", title: "Operation Dawnseeker (Instrumental)", url: "/assets/audio/bgm/faction_739769bbc661094bd8f5.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · 烛骑士薇薇安娜", categories: ["悬赏 OST/4赏金敌人 · 烛骑士薇薇安娜"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b01657bfdeb8ba85f74f", title: "Operation Blade", url: "/assets/audio/bgm/faction_b01657bfdeb8ba85f74f.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · “复仇者”", categories: ["悬赏 OST/5赏金敌人 · “复仇者”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_4ad181439d817affaebc", title: "Operation Blade (Instrumental)", url: "/assets/audio/bgm/faction_4ad181439d817affaebc.ogg", group: "敌人 OST", groupName: "寻仇者与红刀复仇者", categories: ["敌人 OST/寻仇者与红刀复仇者"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_25f5b42832e9c2db93e5", title: "盾卫之志", url: "/assets/audio/bgm/faction_25f5b42832e9c2db93e5.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · “皇帝的利刃”", categories: ["悬赏 OST/5赏金敌人 · “皇帝的利刃”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b4bacf32c758b89138ba", title: "夕照", url: "/assets/audio/bgm/faction_b4bacf32c758b89138ba.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 白垩，“尘世遗骸”", categories: ["悬赏 OST/5赏金敌人 · 白垩，“尘世遗骸”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_351420576f398043b4ee", title: "斜阳肃穆", url: "/assets/audio/bgm/faction_351420576f398043b4ee.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 白垩，“尘世遗骸”", categories: ["悬赏 OST/5赏金敌人 · 白垩，“尘世遗骸”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3056f1aca71a3530c02f", title: "Magic Theorem (Instrumental)", url: "/assets/audio/bgm/faction_3056f1aca71a3530c02f.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 多萝西", categories: ["悬赏 OST/5赏金敌人 · 多萝西"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9360c0572828909b0722", title: "提卡兹之根", url: "/assets/audio/bgm/faction_9360c0572828909b0722.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 曼弗雷德", categories: ["悬赏 OST/5赏金敌人 · 曼弗雷德"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c6da72318c4ac8f3b879", title: "诉死歌者", url: "/assets/audio/bgm/faction_c6da72318c4ac8f3b879.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 梅菲斯特，“歌者”", categories: ["悬赏 OST/5赏金敌人 · 梅菲斯特，“歌者”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d5b8abb9acc141ef5009", title: "冠军对决", url: "/assets/audio/bgm/faction_d5b8abb9acc141ef5009.ogg", group: "悬赏 OST", groupName: "5赏金敌人 · 血骑士狄开俄波利斯", categories: ["悬赏 OST/5赏金敌人 · 血骑士狄开俄波利斯","阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b2b3f48744ce4d5461d4", title: "傀儡的狂喜", url: "/assets/audio/bgm/faction_b2b3f48744ce4d5461d4.ogg", group: "悬赏 OST", groupName: "6赏金敌人 · “剧团喉舌”", categories: ["悬赏 OST/6赏金敌人 · “剧团喉舌”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_5a5f0dc3c34b1ceb869e", title: "行文之韵", url: "/assets/audio/bgm/faction_5a5f0dc3c34b1ceb869e.ogg", group: "悬赏 OST", groupName: "6赏金敌人 · “剧作家”", categories: ["悬赏 OST/6赏金敌人 · “剧作家”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_0407250cf3b7065daa20", title: "殉道之人", url: "/assets/audio/bgm/faction_0407250cf3b7065daa20.ogg", group: "悬赏 OST", groupName: "6赏金敌人 · “殉道者”，安多恩", categories: ["悬赏 OST/6赏金敌人 · “殉道者”，安多恩"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8965cc771cebdcfe7e39", title: "Der Hexenkönig", url: "/assets/audio/bgm/faction_8965cc771cebdcfe7e39.ogg", group: "悬赏 OST", groupName: "6赏金敌人 · 赫尔昏佐伦，“巫王”", categories: ["悬赏 OST/6赏金敌人 · 赫尔昏佐伦，“巫王”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_5652b9ffb4e19f0f1e11", title: "愚人曲", url: "/assets/audio/bgm/faction_5652b9ffb4e19f0f1e11.ogg", group: "悬赏 OST", groupName: "6赏金敌人 · 屠谕者，大群意志", categories: ["悬赏 OST/6赏金敌人 · 屠谕者，大群意志"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_dfb4c2d3169423bb85e0", title: "The Survivor, The Winner", url: "/assets/audio/bgm/faction_dfb4c2d3169423bb85e0.ogg", group: "悬赏 OST", groupName: "7赏金敌人 · “桥夹”克里夫", categories: ["悬赏 OST/7赏金敌人 · “桥夹”克里夫"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7a6f32f40fa019f0a133", title: "Control's Wishes", url: "/assets/audio/bgm/faction_7a6f32f40fa019f0a133.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3176136c6695f91447c9", title: "终局抵抗者", url: "/assets/audio/bgm/faction_3176136c6695f91447c9.ogg", group: "结算 OST", groupName: "结算 OST", categories: ["结算 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_71008c8e842d04b82dd6", title: "血液", url: "/assets/audio/bgm/faction_71008c8e842d04b82dd6.ogg", group: "结算 OST", groupName: "结算 OST", categories: ["结算 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_436079184de574f6f1cc", title: "The Opening", url: "/assets/audio/bgm/faction_436079184de574f6f1cc.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9d2a0ab1d29c98060476", title: "与你在黄昏街角相遇", url: "/assets/audio/bgm/faction_9d2a0ab1d29c98060476.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_a5871ab535a67734bd99", title: "......已至。", url: "/assets/audio/bgm/faction_a5871ab535a67734bd99.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_de127d405aa87477bbb9", title: "Broken Sun", url: "/assets/audio/bgm/faction_de127d405aa87477bbb9.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_0487025c46bfa9547f38", title: "Menacing Dance", url: "/assets/audio/bgm/faction_0487025c46bfa9547f38.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST","阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_dc6303e4d053bf0186ed", title: "Ambiguous Morality", url: "/assets/audio/bgm/faction_dc6303e4d053bf0186ed.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_81523a904f18a8ed1b59", title: "巧筑八方", url: "/assets/audio/bgm/faction_81523a904f18a8ed1b59.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1cceb7db590a279105df", title: "Storyteller", url: "/assets/audio/bgm/faction_1cceb7db590a279105df.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2d929f4b66024be93cff", title: "岁陵漫步", url: "/assets/audio/bgm/faction_2d929f4b66024be93cff.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST","Boss OST/朔壳／妄躯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_72d8678aefbed60cc749", title: "岁识气象", url: "/assets/audio/bgm/faction_72d8678aefbed60cc749.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9863bd661405e7529a10", title: "Antiphon of Agonies Old", url: "/assets/audio/bgm/faction_9863bd661405e7529a10.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_5a6d5d9a086bb4377073", title: "浊杯照影", url: "/assets/audio/bgm/faction_5a6d5d9a086bb4377073.ogg", group: "其他 OST", groupName: "其他 OST", categories: ["其他 OST"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b001c2143b773a51150f", title: "Fading Sky", url: "/assets/audio/bgm/faction_b001c2143b773a51150f.ogg", group: "悬赏 OST", groupName: "青金，莫妮克与罗伊", categories: ["悬赏 OST/青金，莫妮克与罗伊","阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_856122923aa61d3a191e", title: "多索雷斯假日", url: "/assets/audio/bgm/faction_856122923aa61d3a191e.ogg", group: "阵营 OST", groupName: "玻利瓦尔", categories: ["阵营 OST/玻利瓦尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2c3add9628a12ed3e762", title: "巨浪与烈阳", url: "/assets/audio/bgm/faction_2c3add9628a12ed3e762.ogg", group: "阵营 OST", groupName: "玻利瓦尔", categories: ["阵营 OST/玻利瓦尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1a960d5e7bf5f8c75362", title: "倾潮", url: "/assets/audio/bgm/faction_1a960d5e7bf5f8c75362.ogg", group: "阵营 OST", groupName: "玻利瓦尔", categories: ["阵营 OST/玻利瓦尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3c3623eba8236dad3f01", title: "Stop Breathing", url: "/assets/audio/bgm/faction_3c3623eba8236dad3f01.ogg", group: "阵营 OST", groupName: "玻利瓦尔", categories: ["阵营 OST/玻利瓦尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b998524781fa786a952f", title: "尽波澜", url: "/assets/audio/bgm/faction_b998524781fa786a952f.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3d43e4377ff8f17f3305", title: "登临意", url: "/assets/audio/bgm/faction_3d43e4377ff8f17f3305.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_75422a08f7ec936c7ac2", title: "访孤城", url: "/assets/audio/bgm/faction_75422a08f7ec936c7ac2.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_591ed2cd557a2496ce52", title: "今夕何夕", url: "/assets/audio/bgm/faction_591ed2cd557a2496ce52.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_36a9dc581d1d1b290fe2", title: "起墨", url: "/assets/audio/bgm/faction_36a9dc581d1d1b290fe2.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_5fae94c99a21d953ac98", title: "醉飞尘", url: "/assets/audio/bgm/faction_5fae94c99a21d953ac98.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_cfb92e5a9b3db7e9a352", title: "自有乾坤", url: "/assets/audio/bgm/faction_cfb92e5a9b3db7e9a352.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c4af68861204e0b697f0", title: "度关山", url: "/assets/audio/bgm/faction_c4af68861204e0b697f0.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_64b76cf74a9bbecbb23a", title: "何时卷", url: "/assets/audio/bgm/faction_64b76cf74a9bbecbb23a.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b89bb70f443510930984", title: "几更笔", url: "/assets/audio/bgm/faction_b89bb70f443510930984.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b215ecd1cba5785bd8fc", title: "挽流云", url: "/assets/audio/bgm/faction_b215ecd1cba5785bd8fc.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_35406bf0422b409cb71c", title: "天不予", url: "/assets/audio/bgm/faction_35406bf0422b409cb71c.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_5e5f9c982f85823c5de1", title: "独衔杯", url: "/assets/audio/bgm/faction_5e5f9c982f85823c5de1.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b2941575da9abe2f5b6e", title: "客醉久", url: "/assets/audio/bgm/faction_b2941575da9abe2f5b6e.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_58075310df4e7a1d38e7", title: "祥风时雨", url: "/assets/audio/bgm/faction_58075310df4e7a1d38e7.ogg", group: "阵营 OST", groupName: "大炎", categories: ["阵营 OST/大炎"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ac89c32eaf1e823686a2", title: "夏日潜行", url: "/assets/audio/bgm/faction_ac89c32eaf1e823686a2.ogg", group: "阵营 OST", groupName: "东国", categories: ["阵营 OST/东国"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_55bfae18ed76baa9ec56", title: "200 PM in Mitsukue", url: "/assets/audio/bgm/faction_55bfae18ed76baa9ec56.ogg", group: "阵营 OST", groupName: "东国", categories: ["阵营 OST/东国"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c79b4ca7551de38f26da", title: "刀刃所栖之物", url: "/assets/audio/bgm/faction_c79b4ca7551de38f26da.ogg", group: "阵营 OST", groupName: "东国", categories: ["阵营 OST/东国"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7be3aeac7b0a2ad6fbc7", title: "墟", url: "/assets/audio/bgm/faction_7be3aeac7b0a2ad6fbc7.ogg", group: "阵营 OST", groupName: "东国", categories: ["阵营 OST/东国"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_100a309ffcf874d4bbec", title: "沙滩小憩", url: "/assets/audio/bgm/faction_100a309ffcf874d4bbec.ogg", group: "阵营 OST", groupName: "杜林", categories: ["阵营 OST/杜林"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_025a5ceefa645388e0a6", title: "冲破穹顶", url: "/assets/audio/bgm/faction_025a5ceefa645388e0a6.ogg", group: "阵营 OST", groupName: "杜林", categories: ["阵营 OST/杜林"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9168fef3c4feabf25ee1", title: "滑梯冲浪", url: "/assets/audio/bgm/faction_9168fef3c4feabf25ee1.ogg", group: "阵营 OST", groupName: "杜林", categories: ["阵营 OST/杜林"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2a1000b80578af8035ae", title: "水花", url: "/assets/audio/bgm/faction_2a1000b80578af8035ae.ogg", group: "阵营 OST", groupName: "杜林", categories: ["阵营 OST/杜林"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3a3ca485ec11a3eb502c", title: "破笼", url: "/assets/audio/bgm/faction_3a3ca485ec11a3eb502c.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1b40fa24ad2ef6b33399", title: "疑云", url: "/assets/audio/bgm/faction_1b40fa24ad2ef6b33399.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b2279dce8a31a11707a8", title: "旅程", url: "/assets/audio/bgm/faction_b2279dce8a31a11707a8.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_05d722ded805f5fdf92b", title: "因变量", url: "/assets/audio/bgm/faction_05d722ded805f5fdf92b.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_383d5838d41c9bb239f9", title: "Ad astra", url: "/assets/audio/bgm/faction_383d5838d41c9bb239f9.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ebd7eb12e411b6599328", title: "特里蒙的天空", url: "/assets/audio/bgm/faction_ebd7eb12e411b6599328.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_6e4afca847dfc2a89cf7", title: "脱逃", url: "/assets/audio/bgm/faction_6e4afca847dfc2a89cf7.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_71c719996ff5b9127dbb", title: "巴伦巨舰", url: "/assets/audio/bgm/faction_71c719996ff5b9127dbb.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_383abfd51d6dbbc75e5f", title: "Case Ejection", url: "/assets/audio/bgm/faction_383abfd51d6dbbc75e5f.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f07138575385e6855f19", title: "Rhine Lab.LLC", url: "/assets/audio/bgm/faction_f07138575385e6855f19.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_e466cbe38e9d5a445e9a", title: "梦境苏醒", url: "/assets/audio/bgm/faction_e466cbe38e9d5a445e9a.ogg", group: "阵营 OST", groupName: "哥伦比亚", categories: ["阵营 OST/哥伦比亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c0eecd00818f5a32f4af", title: "沉溺浅洋", url: "/assets/audio/bgm/faction_c0eecd00818f5a32f4af.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_209526e70129ff94f9e8", title: "跌坠海渊", url: "/assets/audio/bgm/faction_209526e70129ff94f9e8.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_284b030a8f3b9e535d8f", title: "Voices", url: "/assets/audio/bgm/faction_284b030a8f3b9e535d8f.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_6187ad1b1087c6916a35", title: "暗潮", url: "/assets/audio/bgm/faction_6187ad1b1087c6916a35.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_df80033e0643684c307a", title: "深蓝之树", url: "/assets/audio/bgm/faction_df80033e0643684c307a.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8604e1d284facc52ec99", title: "族群歌谣", url: "/assets/audio/bgm/faction_8604e1d284facc52ec99.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣","阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_71212196fcfaf71d92a6", title: "Under Tides", url: "/assets/audio/bgm/faction_71212196fcfaf71d92a6.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣","悬赏 OST/8赏金敌人 · 伊莎玛拉，腐化之心"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1fe5a4e7ab4e936ec15a", title: "大群之殇", url: "/assets/audio/bgm/faction_1fe5a4e7ab4e936ec15a.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_907c9b59d9ecd45b972d", title: "旅者征服者", url: "/assets/audio/bgm/faction_907c9b59d9ecd45b972d.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_cc6130734638c67b45f9", title: "礁石不朽", url: "/assets/audio/bgm/faction_cc6130734638c67b45f9.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d173f4411f57aa5b6c1a", title: "深渊梦呓", url: "/assets/audio/bgm/faction_d173f4411f57aa5b6c1a.ogg", group: "阵营 OST", groupName: "海嗣", categories: ["阵营 OST/海嗣"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_0c4460b2517290eb0d84", title: "红松的骑士", url: "/assets/audio/bgm/faction_0c4460b2517290eb0d84.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9ef4c934872db70c6686", title: "罗德行进曲", url: "/assets/audio/bgm/faction_9ef4c934872db70c6686.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1c88596d86fad9b355b2", title: "Operation Spectrum Battle Theme", url: "/assets/audio/bgm/faction_1c88596d86fad9b355b2.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d39bfc1438e1b50f35cb", title: "骑士竞技", url: "/assets/audio/bgm/faction_d39bfc1438e1b50f35cb.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8f3acf87fb07e0c5e29d", title: "Radiant", url: "/assets/audio/bgm/faction_8f3acf87fb07e0c5e29d.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b88cb43997b9df8abb53", title: "霓虹塔下", url: "/assets/audio/bgm/faction_b88cb43997b9df8abb53.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d1e7f4a19a6d2a2bd63c", title: "Ensheath", url: "/assets/audio/bgm/faction_d1e7f4a19a6d2a2bd63c.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_97c6b4a890518d6b065b", title: "Field in the Light", url: "/assets/audio/bgm/faction_97c6b4a890518d6b065b.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3ea611a5c19123af9b3c", title: "铜钱与血", url: "/assets/audio/bgm/faction_3ea611a5c19123af9b3c.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_dde83089876865345ad5", title: "大骑士领", url: "/assets/audio/bgm/faction_dde83089876865345ad5.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9906bc4629cee57135dc", title: "骑士之日", url: "/assets/audio/bgm/faction_9906bc4629cee57135dc.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_38009efcafd73c1a96fd", title: "无畏者", url: "/assets/audio/bgm/faction_38009efcafd73c1a96fd.ogg", group: "阵营 OST", groupName: "卡西米尔", categories: ["阵营 OST/卡西米尔"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_86275a480b528ad8826d", title: "不存在的乐园", url: "/assets/audio/bgm/faction_86275a480b528ad8826d.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_dfc4160cf752e2547ba2", title: "圣城日常", url: "/assets/audio/bgm/faction_dfc4160cf752e2547ba2.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_faf6b2b8f5b30cfac66c", title: "Halo Universalization", url: "/assets/audio/bgm/faction_faf6b2b8f5b30cfac66c.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰","Boss OST/假想敌：铳"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_233c03f993256d8e21f5", title: "Eternal Flame (Instrumental)", url: "/assets/audio/bgm/faction_233c03f993256d8e21f5.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_a1bfa3d50e48394dbb5b", title: "窒息", url: "/assets/audio/bgm/faction_a1bfa3d50e48394dbb5b.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_972b6caceae29ce99c65", title: "Somniomancer [null set]", url: "/assets/audio/bgm/faction_972b6caceae29ce99c65.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7698b5f03d133c88e7a4", title: "裁决日", url: "/assets/audio/bgm/faction_7698b5f03d133c88e7a4.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d7324da99ae1485a8fd2", title: "潜在危机", url: "/assets/audio/bgm/faction_d7324da99ae1485a8fd2.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_51be97bd555dbfe357e1", title: "无罪之人", url: "/assets/audio/bgm/faction_51be97bd555dbfe357e1.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7da3eca4494769d94949", title: "Faith Enlightenment", url: "/assets/audio/bgm/faction_7da3eca4494769d94949.ogg", group: "阵营 OST", groupName: "拉特兰", categories: ["阵营 OST/拉特兰"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_010a162f8bf90eb61726", title: "Visage", url: "/assets/audio/bgm/faction_010a162f8bf90eb61726.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚","Boss OST/假想敌：管"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2f993b958dbffb8d2baa", title: "Underneath the Spires", url: "/assets/audio/bgm/faction_2f993b958dbffb8d2baa.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚","Boss OST/假想敌：管"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_de888dffcf1eabc8e070", title: "光影", url: "/assets/audio/bgm/faction_de888dffcf1eabc8e070.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_03ab0f9d6ded249115e6", title: "The Theme (Imperial)", url: "/assets/audio/bgm/faction_03ab0f9d6ded249115e6.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_bbb40d23f85616c7b98e", title: "The Theme (Variant)", url: "/assets/audio/bgm/faction_bbb40d23f85616c7b98e.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_fe0af8b93a43f4e0039d", title: "急行", url: "/assets/audio/bgm/faction_fe0af8b93a43f4e0039d.ogg", group: "阵营 OST", groupName: "莱塔尼亚", categories: ["阵营 OST/莱塔尼亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9e987e6edcb6fb8d2318", title: "绿洲", url: "/assets/audio/bgm/faction_9e987e6edcb6fb8d2318.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_03a13ade7c447a591e7e", title: "细沙", url: "/assets/audio/bgm/faction_03a13ade7c447a591e7e.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8a78c157b28565e73b81", title: "沙海流金", url: "/assets/audio/bgm/faction_8a78c157b28565e73b81.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_da40b14616c0605585b4", title: "城市觉醒", url: "/assets/audio/bgm/faction_da40b14616c0605585b4.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_845ae81be25c5d5a3a03", title: "丛林归途", url: "/assets/audio/bgm/faction_845ae81be25c5d5a3a03.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d6ea782c66c5dec9bde8", title: "烈阳与刀刃", url: "/assets/audio/bgm/faction_d6ea782c66c5dec9bde8.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_00b396100ae0f160f4a5", title: "穿越千年的誓言", url: "/assets/audio/bgm/faction_00b396100ae0f160f4a5.ogg", group: "阵营 OST", groupName: "萨尔贡", categories: ["阵营 OST/萨尔贡"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_17d12c2d66bffd8a33d4", title: "Succession", url: "/assets/audio/bgm/faction_17d12c2d66bffd8a33d4.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_091137b54f6c0cea5527", title: "Merciful Broken Sun", url: "/assets/audio/bgm/faction_091137b54f6c0cea5527.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f0d517109bb5eb801c94", title: "Fire's Embrace", url: "/assets/audio/bgm/faction_f0d517109bb5eb801c94.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_26e47724202c56d2d5f8", title: "黑夜喃语", url: "/assets/audio/bgm/faction_26e47724202c56d2d5f8.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1edbb1a69028c0d5342a", title: "舍弃", url: "/assets/audio/bgm/faction_1edbb1a69028c0d5342a.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_362cd78989b314266c57", title: "血中之泪", url: "/assets/audio/bgm/faction_362cd78989b314266c57.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_950ed52a78b1907dc2fa", title: "风暴前夕", url: "/assets/audio/bgm/faction_950ed52a78b1907dc2fa.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f05706265ca6d8e149c1", title: "离解复合", url: "/assets/audio/bgm/faction_f05706265ca6d8e149c1.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_359191ed2330a099aaf7", title: "RATIO ULTIMA", url: "/assets/audio/bgm/faction_359191ed2330a099aaf7.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f54cb6cba87c43c8e041", title: "故土", url: "/assets/audio/bgm/faction_f54cb6cba87c43c8e041.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_aeee918411281c78352f", title: "军事委员会的号令", url: "/assets/audio/bgm/faction_aeee918411281c78352f.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_50a5e68dc08c44b08437", title: "异乡", url: "/assets/audio/bgm/faction_50a5e68dc08c44b08437.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7ee63033d2e7dc88a5e7", title: "Here Come the Exiles", url: "/assets/audio/bgm/faction_7ee63033d2e7dc88a5e7.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_cab9ed19324b2ce9d2ad", title: "In Originium Covered Fields", url: "/assets/audio/bgm/faction_cab9ed19324b2ce9d2ad.ogg", group: "阵营 OST", groupName: "萨卡兹", categories: ["阵营 OST/萨卡兹"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_975c2c86e1820c682240", title: "Mortal Eye (Instrumental)", url: "/assets/audio/bgm/faction_975c2c86e1820c682240.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_499700fcb0979aea8842", title: "坚墙崩毁", url: "/assets/audio/bgm/faction_499700fcb0979aea8842.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1c922bc9ad1ee9da5197", title: "呼魂", url: "/assets/audio/bgm/faction_1c922bc9ad1ee9da5197.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1ed0dd024092dec26875", title: "银凇止境", url: "/assets/audio/bgm/faction_1ed0dd024092dec26875.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_37e4c72329a2ad3921fe", title: "主宰", url: "/assets/audio/bgm/faction_37e4c72329a2ad3921fe.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ae92456e91204d243c1e", title: "Andarsár", url: "/assets/audio/bgm/faction_ae92456e91204d243c1e.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_867ab2c62d39c923d44f", title: "猎食", url: "/assets/audio/bgm/faction_867ab2c62d39c923d44f.ogg", group: "阵营 OST", groupName: "萨米", categories: ["阵营 OST/萨米"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3d720136d75284edf2da", title: "荣光暗沉", url: "/assets/audio/bgm/faction_3d720136d75284edf2da.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池","阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_093c2fab7771d9ad6b58", title: "火与灰", url: "/assets/audio/bgm/faction_093c2fab7771d9ad6b58.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_64410b66da3e1ec5e92b", title: "湮佚诗歌", url: "/assets/audio/bgm/faction_64410b66da3e1ec5e92b.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_88670f7ccb8ef92a5b93", title: "尘埃渐冷", url: "/assets/audio/bgm/faction_88670f7ccb8ef92a5b93.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池","阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_bf43afe95a7b1f734c18", title: "黯影风暴", url: "/assets/audio/bgm/faction_bf43afe95a7b1f734c18.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_a580baa61c203bae41fb", title: "深池之影", url: "/assets/audio/bgm/faction_a580baa61c203bae41fb.ogg", group: "阵营 OST", groupName: "深池", categories: ["阵营 OST/深池"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_97f6b0ff7bb46d3962ed", title: "Till the Bell Tolls", url: "/assets/audio/bgm/faction_97f6b0ff7bb46d3962ed.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f53d7625d71a24fd8108", title: "诸王之息", url: "/assets/audio/bgm/faction_f53d7625d71a24fd8108.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_744f464ebf633e9a3b74", title: "生存之形", url: "/assets/audio/bgm/faction_744f464ebf633e9a3b74.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_6dee65cac9b4fbf5ebe0", title: "Towards Her Light", url: "/assets/audio/bgm/faction_6dee65cac9b4fbf5ebe0.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2fed7864bd6cb0491919", title: "Flame Shadow (Instrumental)", url: "/assets/audio/bgm/faction_2fed7864bd6cb0491919.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f401a61b723699751b0d", title: "保卫伦蒂尼姆", url: "/assets/audio/bgm/faction_f401a61b723699751b0d.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b62310339ead8e670176", title: "March On!", url: "/assets/audio/bgm/faction_b62310339ead8e670176.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_03029f13fea85adc470b", title: "我的生活", url: "/assets/audio/bgm/faction_03029f13fea85adc470b.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_db9e2dfea2fec50b3e37", title: "Rekindle", url: "/assets/audio/bgm/faction_db9e2dfea2fec50b3e37.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚","Boss OST/阿利斯泰尔，帝国余晖"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_49dda77dd2d7fd8bb4cd", title: "Quench", url: "/assets/audio/bgm/faction_49dda77dd2d7fd8bb4cd.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_23eb158a5e8e840cd562", title: "Stainless Heart (Instrumental)", url: "/assets/audio/bgm/faction_23eb158a5e8e840cd562.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_99478d2533259580d9d6", title: "日光碎屑", url: "/assets/audio/bgm/faction_99478d2533259580d9d6.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_21f52b48751c0b0e931e", title: "March On!  (Instrumental)", url: "/assets/audio/bgm/faction_21f52b48751c0b0e931e.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d0b9c17e8095141148df", title: "Rekindle (Instrumental)", url: "/assets/audio/bgm/faction_d0b9c17e8095141148df.ogg", group: "阵营 OST", groupName: "维多利亚", categories: ["阵营 OST/维多利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ec12f4ba5a0abe1620a5", title: "Прощание (Instrumental)", url: "/assets/audio/bgm/faction_ec12f4ba5a0abe1620a5.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3767da2931048be5a4f5", title: "迷雾重重", url: "/assets/audio/bgm/faction_3767da2931048be5a4f5.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d8f60c304b45cba25b1e", title: "乌萨斯的影月", url: "/assets/audio/bgm/faction_d8f60c304b45cba25b1e.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_396d52907a2c52f14275", title: "ложь", url: "/assets/audio/bgm/faction_396d52907a2c52f14275.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_12c792c7eab93b892aa7", title: "反常光谱", url: "/assets/audio/bgm/faction_12c792c7eab93b892aa7.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3dec3ed634f3688c2bd8", title: "无序频谱", url: "/assets/audio/bgm/faction_3dec3ed634f3688c2bd8.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_41c9ade74ae1d2e7d763", title: "Don't Miss It", url: "/assets/audio/bgm/faction_41c9ade74ae1d2e7d763.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯","Boss OST/“皇帝的利刃”，追猎者"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ae8eecc886ca7cc25fab", title: "切尔诺伯格", url: "/assets/audio/bgm/faction_ae8eecc886ca7cc25fab.ogg", group: "阵营 OST", groupName: "乌萨斯", categories: ["阵营 OST/乌萨斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f9f36dec8313b74bf33d", title: "停滞之地", url: "/assets/audio/bgm/faction_f9f36dec8313b74bf33d.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_4070b6c825dda872e84b", title: "雪境歧路", url: "/assets/audio/bgm/faction_4070b6c825dda872e84b.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_27feb1394a0d9ee43572", title: "希瓦艾什变例", url: "/assets/audio/bgm/faction_27feb1394a0d9ee43572.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_e84b40b0b3dcbe91ce32", title: "圣女蒙召", url: "/assets/audio/bgm/faction_e84b40b0b3dcbe91ce32.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_67090a188bff60f2f143", title: "雪山降临1101", url: "/assets/audio/bgm/faction_67090a188bff60f2f143.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1f745ec9040adb914bf5", title: "Day Train to Lake Silberneherze", url: "/assets/audio/bgm/faction_1f745ec9040adb914bf5.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ade20b55b2eb218957aa", title: "异象", url: "/assets/audio/bgm/faction_ade20b55b2eb218957aa.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c42d4cfc59e257138371", title: "变革已至", url: "/assets/audio/bgm/faction_c42d4cfc59e257138371.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_86aca6b0df842785bdd7", title: "山雪欲来", url: "/assets/audio/bgm/faction_86aca6b0df842785bdd7.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_18d40237ea2ab2f8dab8", title: "院墙将倾", url: "/assets/audio/bgm/faction_18d40237ea2ab2f8dab8.ogg", group: "阵营 OST", groupName: "谢拉格", categories: ["阵营 OST/谢拉格"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ec9a150406c1d355082f", title: "Il Signore del Carnevale", url: "/assets/audio/bgm/faction_ec9a150406c1d355082f.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_cecaa56b3d87055ecc71", title: "叙拉古人", url: "/assets/audio/bgm/faction_cecaa56b3d87055ecc71.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_19a05016f30853ae4369", title: "Go My Way (Instrumental)", url: "/assets/audio/bgm/faction_19a05016f30853ae4369.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_51b067b8b2e539b3c9a8", title: "Thorns In You (Instrumental)", url: "/assets/audio/bgm/faction_51b067b8b2e539b3c9a8.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_289cf830062e435ba57a", title: "Sentenced (Instrumental)", url: "/assets/audio/bgm/faction_289cf830062e435ba57a.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_cf90b0f36af97b91f5a2", title: "Don't Waste the Joke", url: "/assets/audio/bgm/faction_cf90b0f36af97b91f5a2.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_424476f95b8f8c075141", title: "文明之名", url: "/assets/audio/bgm/faction_424476f95b8f8c075141.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7f3c34d4dc2334479499", title: "我即荒野", url: "/assets/audio/bgm/faction_7f3c34d4dc2334479499.ogg", group: "阵营 OST", groupName: "叙拉古", categories: ["阵营 OST/叙拉古"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_4b9caca169066693f186", title: "海洋的哺养", url: "/assets/audio/bgm/faction_4b9caca169066693f186.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_8b0d5345e30e07cb3ec4", title: "滴水涟漪", url: "/assets/audio/bgm/faction_8b0d5345e30e07cb3ec4.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_a11cedf7e343a274f97a", title: "Mirari", url: "/assets/audio/bgm/faction_a11cedf7e343a274f97a.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1c48037eeb57f435e6e6", title: "A Toda Vela", url: "/assets/audio/bgm/faction_1c48037eeb57f435e6e6.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b2ed37eb56d8d542440b", title: "Baptised with Fire", url: "/assets/audio/bgm/faction_b2ed37eb56d8d542440b.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_990e12d60de3da974b7b", title: "El Muerto Vivo", url: "/assets/audio/bgm/faction_990e12d60de3da974b7b.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d2b259be33abe4764266", title: "The Iberia Touch", url: "/assets/audio/bgm/faction_d2b259be33abe4764266.ogg", group: "阵营 OST", groupName: "伊比利亚", categories: ["阵营 OST/伊比利亚"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_80554181aabb68c2a98d", title: "冬隐归路", url: "/assets/audio/bgm/faction_80554181aabb68c2a98d.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_95a29e8d972ddb28ebc3", title: "整合运动", url: "/assets/audio/bgm/faction_95a29e8d972ddb28ebc3.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c7eaaec22676c2527df5", title: "00001", url: "/assets/audio/bgm/faction_c7eaaec22676c2527df5.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_549a631e13d6e6c52a97", title: "旅途前方", url: "/assets/audio/bgm/faction_549a631e13d6e6c52a97.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动","主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1cae1db57aa2cac930f8", title: "永冻症", url: "/assets/audio/bgm/faction_1cae1db57aa2cac930f8.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_b0a06b625a8344608730", title: "黎明前奏", url: "/assets/audio/bgm/faction_b0a06b625a8344608730.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2ea7b7169ae87eb94224", title: "来自雪原的回响", url: "/assets/audio/bgm/faction_2ea7b7169ae87eb94224.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_661a5228d3d11042a1c5", title: "奇兵天坠", url: "/assets/audio/bgm/faction_661a5228d3d11042a1c5.ogg", group: "阵营 OST", groupName: "整合运动", categories: ["阵营 OST/整合运动"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9aa20a09c014cc9a0758", title: "Proof of being alive", url: "/assets/audio/bgm/faction_9aa20a09c014cc9a0758.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f6f75553c0ed51470b33", title: "凡常恩典", url: "/assets/audio/bgm/faction_f6f75553c0ed51470b33.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2c4a4c9ef8c9c00ab10e", title: "直到大地变成一颗酸橙", url: "/assets/audio/bgm/faction_2c4a4c9ef8c9c00ab10e.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3ba06437627adf32a8f5", title: "用不上的雨刷", url: "/assets/audio/bgm/faction_3ba06437627adf32a8f5.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_08c14a7aadc0dcbd9ccf", title: "大柏墟", url: "/assets/audio/bgm/faction_08c14a7aadc0dcbd9ccf.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c3dabea34a44d8946106", title: "生命流", url: "/assets/audio/bgm/faction_c3dabea34a44d8946106.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_95cf3b52884961d3e694", title: "示岁", url: "/assets/audio/bgm/faction_95cf3b52884961d3e694.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_e1a2689b296158f67e7d", title: "酸橙色信笺", url: "/assets/audio/bgm/faction_e1a2689b296158f67e7d.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_62f152d388229bef0d03", title: "Everything's Alright", url: "/assets/audio/bgm/faction_62f152d388229bef0d03.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ea8a892aec46c4ec0233", title: "Protocol", url: "/assets/audio/bgm/faction_ea8a892aec46c4ec0233.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3f42789dbad9d0c06e29", title: "赴大荒", url: "/assets/audio/bgm/faction_3f42789dbad9d0c06e29.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ecb023a937557932ddd3", title: "启航", url: "/assets/audio/bgm/faction_ecb023a937557932ddd3.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_39ddecb6840d7e659330", title: "秉心", url: "/assets/audio/bgm/faction_39ddecb6840d7e659330.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_bf7e5d9e42285dba70ea", title: "Neo-vector", url: "/assets/audio/bgm/faction_bf7e5d9e42285dba70ea.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_d91b7f2fef0aa0ae6b75", title: "栖所架构", url: "/assets/audio/bgm/faction_d91b7f2fef0aa0ae6b75.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_818d7919799f895393cc", title: "走过漫漫时空", url: "/assets/audio/bgm/faction_818d7919799f895393cc.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3dad0bd5d7c2e62139b0", title: "Дом", url: "/assets/audio/bgm/faction_3dad0bd5d7c2e62139b0.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_7974fdf94a25290ee9df", title: "Theoretical Simulation", url: "/assets/audio/bgm/faction_7974fdf94a25290ee9df.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_86375e68963374acb05b", title: "INFECTED", url: "/assets/audio/bgm/faction_86375e68963374acb05b.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_133ed397c27437d8c1c5", title: "塔露拉·雅特利亚斯", url: "/assets/audio/bgm/faction_133ed397c27437d8c1c5.ogg", group: "Boss OST", groupName: "“不死的黑蛇”", categories: ["Boss OST/“不死的黑蛇”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_89ae3373769725981e65", title: "Tower Fierce", url: "/assets/audio/bgm/faction_89ae3373769725981e65.ogg", group: "Boss OST", groupName: "“不死的黑蛇”", categories: ["Boss OST/“不死的黑蛇”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_2796e921d173be84ac52", title: "视死如归", url: "/assets/audio/bgm/faction_2796e921d173be84ac52.ogg", group: "Boss OST", groupName: "爱国者", categories: ["Boss OST/爱国者"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_72437af60d14a77c634f", title: "切尔诺伯格急行军", url: "/assets/audio/bgm/faction_72437af60d14a77c634f.ogg", group: "Boss OST", groupName: "爱国者", categories: ["Boss OST/爱国者"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_ee9ec14277ce3e6cfb95", title: "Непоколебимость", url: "/assets/audio/bgm/faction_ee9ec14277ce3e6cfb95.ogg", group: "Boss OST", groupName: "爱国者", categories: ["Boss OST/爱国者"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_3786d9f92b8838b7a6f8", title: "Underneath the Sanctuary", url: "/assets/audio/bgm/faction_3786d9f92b8838b7a6f8.ogg", group: "Boss OST", groupName: "假想敌：铳", categories: ["Boss OST/假想敌：铳"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_f396b6827236ff14bf40", title: "蔓延恨意", url: "/assets/audio/bgm/faction_f396b6827236ff14bf40.ogg", group: "Boss OST", groupName: "假想敌：胄", categories: ["Boss OST/假想敌：胄"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_88c076e81c9393f7c9a8", title: "猩红孤钻", url: "/assets/audio/bgm/faction_88c076e81c9393f7c9a8.ogg", group: "Boss OST", groupName: "卢西恩，“猩红血钻”", categories: ["Boss OST/卢西恩，“猩红血钻”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_00c9c3e468a841e4f540", title: "第■幕", url: "/assets/audio/bgm/faction_00c9c3e468a841e4f540.ogg", group: "Boss OST", groupName: "卢西恩，“猩红血钻”", categories: ["Boss OST/卢西恩，“猩红血钻”"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_9e4f5e2534a94a339f05", title: "自海中来", url: "/assets/audio/bgm/faction_9e4f5e2534a94a339f05.ogg", group: "Boss OST", groupName: "盐风主教昆图斯", categories: ["Boss OST/盐风主教昆图斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_1fcb223965f557aeeaf6", title: "Mare Natus", url: "/assets/audio/bgm/faction_1fcb223965f557aeeaf6.ogg", group: "Boss OST", groupName: "盐风主教昆图斯", categories: ["Boss OST/盐风主教昆图斯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_e24d69b3287873c59436", title: "塞壬唱片-MSR-immutable遗尘漫步ost remix（DavidClarkson remix）", url: "/assets/audio/bgm/faction_e24d69b3287873c59436.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_43ec415db0aba44281e2", title: "拟生态", url: "/assets/audio/bgm/faction_43ec415db0aba44281e2.ogg", group: "悬赏 OST", groupName: "4赏金敌人 · “Touch”，再生之流", categories: ["悬赏 OST/4赏金敌人 · “Touch”，再生之流"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_c28ce8ad3d9422d380f5", title: "破晦", url: "/assets/audio/bgm/faction_c28ce8ad3d9422d380f5.ogg", group: "Boss OST", groupName: "朔壳／妄躯", categories: ["Boss OST/朔壳／妄躯"] }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_79c559b00a5e50f30425", title: "Misty Memory (Night Version)", url: "/assets/audio/bgm/faction_79c559b00a5e50f30425.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
+  { id: "lib_80a1030cdfe24c72e451_a1181a2014ad", title: "卫戍协议: 规程", url: "/assets/audio/bgm/faction_80a1030cdfe24c72e451_a1181a2014ad.ogg", group: "主界面", groupName: "主界面", categories: ["主界面"], home: true }, // i18n-ignore 官方曲名/分类，原样显示
 ]);
 
-/** @param {string} id @returns {{id:string,title:string,url:string}|null} */
+/** 面板上的分组顺序（官方目录里的首次出现顺序）；组名是官方分类，原样显示。 */
+export const LOBBY_GROUPS = Object.freeze(["悬赏 OST","敌人 OST","阵营 OST","结算 OST","其他 OST","主界面","Boss OST"]); // i18n-ignore 官方分类名，原样显示
+
+/** @param {string} id @returns {{id:string,title:string,url:string,group:string,groupName:string,categories:string[]}|null} */
 export const lobbyTrack = (id) => LOBBY_LIBRARY.find((x) => x.id === id) || null;
