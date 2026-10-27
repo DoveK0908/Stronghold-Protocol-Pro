@@ -197,6 +197,9 @@ test('the 主界面音乐 card is draggable and its body no longer pushes 成就
   const panel = read('public/js/ui/lobbyMusicPanel.js');
   assert.match(panel, /onPointerDown=\$\{onDown\}/, 'the header drags the card');
   assert.match(panel, /updateSettings\(\{ lobbyMusicPos: \{ x: Math\.round\(next\.x\), y: Math\.round\(next\.y\) \} \}\)/, 'the offset is kept in settings');
+  assert.match(panel, /d\.ox \+ e\.clientX - d\.px/, 'the drag adds the pointer delta to the offset, not to a screen coordinate');
+  assert.doesNotMatch(panel, /Math\.min\(Math\.max\(0, d\.left \+ dx\)/, 'the first build stored screen coordinates (the card flew off)');
+  assert.match(panel, /updateSettings\(\{ lobbyMusicPos: null \}\)/, 'an off-screen saved offset puts the card back');
   assert.match(panel, /onDblClick=\$\{\(\) => updateSettings\(\{ lobbyMusicPos: null \}\)\}/, 'double-click puts it back');
   assert.match(panel, /style=\$\{`--dx:\$\{Math\.round\(at\.x\)\}px;--dy:\$\{Math\.round\(at\.y\)\}px`\}/, 'the offset drives the card');
   const css = read('public/css/screens/lobby.css');

@@ -131,7 +131,7 @@ export function sanitizeSettings(raw) {
     lobbyVolume: vol(r.lobbyVolume, DEFAULT_SETTINGS.lobbyVolume),
     lobbyMusicOpen: r.lobbyMusicOpen !== false,
     lobbyMusicPos: Number.isFinite(r.lobbyMusicPos?.x) && Number.isFinite(r.lobbyMusicPos?.y)
-      ? { x: clamp(Math.round(r.lobbyMusicPos.x), 0, 8000), y: clamp(Math.round(r.lobbyMusicPos.y), 0, 8000) }
+      ? { x: clamp(Math.round(r.lobbyMusicPos.x), -8000, 8000), y: clamp(Math.round(r.lobbyMusicPos.y), -8000, 8000) }
       : null,
   };
 }

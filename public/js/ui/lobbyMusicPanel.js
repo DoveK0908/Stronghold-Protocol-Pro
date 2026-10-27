@@ -100,22 +100,38 @@ export function LobbyMusicPanel() {
   const drag = useRef(null);
   const [live, setLive] = useState(null);
   const at = live || pos || { x: 0, y: 0 };
+  // a stored offset from an older build could sit off screen (the first draggable build stored screen coordinates):
+  // put the card back where it ships instead of leaving it unreachable
+  useEffect(() => {
+    if (!pos) return undefined;
+    const id = requestAnimationFrame(() => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return;
+      const out = r.left < -4 || r.top < -4 || r.right > (window.innerWidth || 0) + 4 || r.bottom > (window.innerHeight || 0) + 4;
+      if (out) updateSettings({ lobbyMusicPos: null });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pos?.x, pos?.y]);
+  // `at` is the card's offset from where it ships (CSS px), never a screen coordinate: the drag adds the pointer delta to
+  // the offset it started with, and the clamp keeps the header reachable (a screen coordinate here made the card jump by
+  // the column's own left/top — the first build flew off to the bottom right).
   const onDown = (e) => {
     if (e.button !== 0 || e.target?.closest?.('button')) return;
     const r = box.current?.getBoundingClientRect();
     if (!r) return;
-    drag.current = { px: e.clientX, py: e.clientY, x: at.x, y: at.y, left: r.left - at.x, top: r.top - at.y, w: r.width, h: r.height, moved: false };
+    drag.current = { px: e.clientX, py: e.clientY, ox: at.x, oy: at.y, left: r.left - at.x, top: r.top - at.y, w: r.width, moved: false };
     e.currentTarget.setPointerCapture?.(e.pointerId);
   };
   const onMove = (e) => {
     const d = drag.current;
     if (!d) return;
-    const dx = d.x + (e.clientX - d.px), dy = d.y + (e.clientY - d.py);
     if (Math.abs(e.clientX - d.px) + Math.abs(e.clientY - d.py) > 3) d.moved = true;
-    // keep the header reachable: never drag the card off screen
-    const maxX = Math.max(0, (window.innerWidth || 0) - d.w - 8);
-    const maxY = Math.max(0, (window.innerHeight || 0) - 44 - 8);
-    setLive({ x: Math.min(Math.max(0, d.left + dx), maxX), y: Math.min(Math.max(0, d.top + dy), maxY) });
+    const minX = -d.left, maxX = Math.max(minX, (window.innerWidth || 0) - d.w - d.left - 8);
+    const minY = -d.top, maxY = Math.max(minY, (window.innerHeight || 0) - 44 - d.top - 8);
+    setLive({
+      x: Math.round(Math.min(Math.max(minX, d.ox + e.clientX - d.px), maxX)),
+      y: Math.round(Math.min(Math.max(minY, d.oy + e.clientY - d.py), maxY)),
+    });
   };
   const onUp = () => {
     const d = drag.current;
