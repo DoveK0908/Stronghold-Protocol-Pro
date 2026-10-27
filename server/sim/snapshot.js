@@ -68,6 +68,9 @@ export function unitInfo(u, stats = null, { cachedStats = false } = {}) {
     uid: u.uid ?? undefined,
     // DESIGN §16: the equipped skill's index (the renderer / audio pick that skill's Spine clip and sound)
     skillIndex: u.side === 'ally' && Number.isInteger(d.skill?.index) ? d.skill.index : undefined,
+    // 对比实现（SP_KIT_SET=selena）：这名干员跑的是 selena 包里的 kit。客户端据此让 render/vfx/sakiko.js 接管祥子的
+    // 音符与攻击起手 —— 默认实现下它不动（'kitSet' 缺省就是本树自己的实现）。
+    kitSet: u.side === 'ally' && u.kit?.selena ? 'selena' : undefined,
     // an ally whose skill is an ammo magazine: the renderer shows it as the segmented bar under the HP bar (b.snap `ammo`) and
     // draws no sustained skill aura for it — known from the unit's first appearance, before any snapshot or skill event
     ammoSkill: u.side === 'ally' && u.skill?.kind === 'ammo' ? true : undefined,

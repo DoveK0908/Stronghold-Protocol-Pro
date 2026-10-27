@@ -50,6 +50,8 @@ import { GROUND_SPAWNS } from './effect.js';
 import { SkillFx, fitsAttack, pickGroup, formMode } from './skillfx.js';
 import { TalentFx } from './talentfx.js';
 import { FunnelFx } from './funnelfx.js';
+// 丰川祥子的音符与拨档（对比实现：selena 0.4.1 的 sakiko.js，设 SP_KIT_SET=selena 时才有事件喂它）
+import { SakikoFx } from './sakiko.js';
 import { YuWall, YU_WALL_SOURCE } from './yuwall.js';
 import { formModes } from './talents.js';
 import { shotOf } from './skills.js';
@@ -285,6 +287,7 @@ export class FxWiring {
     this.skills = new SkillFx(this);
     this.talents = new TalentFx(this);
     this.funnels = new FunnelFx(this);
+    this.sakiko = new SakikoFx(this);   // 祥子的音符 / 拨档（render/vfx/sakiko.js）
   }
 
   get index() { return this.idx; }
@@ -453,6 +456,7 @@ export class FxWiring {
     for (const k of this.skills.keys(views)) keys.add(k);
     for (const k of this.talents.keys(views)) keys.add(k);
     for (const k of this.funnels.keys(views)) keys.add(k);   // the 驭械术士's floating units (render/vfx/funnelfx.js)
+    for (const k of this.sakiko.keys(views)) keys.add(k);   // 丰川祥子's notes / tones (render/vfx/sakiko.js)
     return [...keys].map(lc).filter((k) => k && this.ofx.lib.has(k));
   }
 
@@ -929,6 +933,8 @@ export class FxWiring {
    */
   attack(src, tgt, kind, time, wound = false) {
     if (!this.ofx.active || !src || !this.idx) return false;
+    // 丰川祥子（对比实现）：本体只起手，音符由 sim 的 musicNote 事件画（render/vfx/sakiko.js）
+    if (this.sakiko.attack(src)) return true;
     kind = this._combatKind(src, tgt, kind);
     const u = this.unitOf(src);
     const sk = this.skills.attackFx(src, tgt, kind);
@@ -1562,6 +1568,7 @@ export class FxWiring {
     this.skills.release(v);
     this.talents.release(v);
     this.funnels.release(v);
+    this.sakiko.release(v);
   }
 
   /** b.ev ['skill', id, on] (SkillFx.skill): true when the official layer shows the skill (no procedural burst / aura). */
@@ -1570,6 +1577,7 @@ export class FxWiring {
     const drew = this.skills.skill(v, !!on);
     this.talents.skill(v, !!on);   // the talents a skill start casts (ON_SKILL_START)
     this.funnels.skill(v, !!on);   // the floating units of the skill's mode (render/vfx/funnelfx.js)
+    this.sakiko.skill(v, !!on);    // 祥子的 S3 范围环 / S2 拨档（render/vfx/sakiko.js）
     return drew;
   }
 
@@ -1586,6 +1594,7 @@ export class FxWiring {
     this.skills.sync(list);
     this.talents.sync(list);
     this.funnels.sync(list);
+    this.sakiko.tick(list);   // 祥子的音符过期收尾 + form 变化检测（render/vfx/sakiko.js）
   }
 
   /**
@@ -1598,7 +1607,8 @@ export class FxWiring {
     const t = this.talents.fx(kind, extra);
     // the floating units stand for the kit's 'drone' / 'drones' / 'droneLock' / 'overload' (render/vfx/funnelfx.js)
     const f = this.funnels.simFx(kind, x, y, extra);
-    return this.skills.simFx(kind, x, y, extra) || t || f;
+    const n = this.sakiko.simFx(kind, x, y, extra);   // 祥子的 musicNote（render/vfx/sakiko.js）
+    return this.skills.simFx(kind, x, y, extra) || t || f || n;
   }
 
   /** b.ev 'die': the unit's own death effect or the generic one. */
@@ -1672,6 +1682,7 @@ export class FxWiring {
     this.skills.clear();
     this.talents.clear();
     this.funnels.clear();
+    this.sakiko.clear();
     this.forms.clear();
     this.lastTargets.clear();
     this.picks.clear();

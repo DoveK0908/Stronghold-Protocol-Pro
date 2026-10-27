@@ -45,6 +45,23 @@
   `ON_ABILITY_START.char_4217_makoto.attack` / `ON_ABILITY_HIT.char_4217_makoto.attack`。他的职业是傀儡师，
   常规挑选会退到通用刃声；他真正的挥击/命中是 `p_atk_Pskptldr_n` / `p_imp_Pskptldr_n`（`test/sfx-makoto.test.js`）。
 
+### 对比模式：把 selena 0.4.1 的丰川祥子 / 结城理搬进来（维护者 2026-10-27 要求「先搬过来我对比测试」）
+
+两名干员各带两份实现，按启动开关二选一，同一个 charId 键绝不并存：
+
+- **服务端**：`kits/index.js` 读 `SP_KIT_SET`。`selena` 时把 `op-oblvns.js` / `op-makoto.js` 换成
+  `ops/op-oblvns.selena.js`（selena 的 151 行简化版）与 `ops/op-makoto.selena.js`（selena 的 MOD 版，
+  连同它的 `shared/mod-tier3.js` 一起搬，且**带 selena 的盟约加层**：替身切换拉特兰 +1 / 不屈 +2）。
+  不设或别的值仍是本树自己的 1165 / 176 行实现。
+- **客户端**：新增 `render/vfx/sakiko.js`（逐行取自 selena，只改了 form 变化的触发方式）接进
+  `wiring.js` 的 attack / skill / simFx / keys / sync / release / clear；`fx/kinds.js` + `fx/simfx.js`
+  增加 `musicNote`（sim 授权位置上的短促记号）。默认实现下这套层不动 —— 快照按 `kit.selena` 下发
+  `kitSet: 'selena'`，`SakikoFx.owns()` 只接管带这个标记的祥子（`test/render/vfx-hits.test.js` R19）。
+- **启动**：`start-pro-luck-selena.cmd`（`set SP_KIT_SET=selena` + 与 `start-pro-luck.cmd` 同一个 launcher）。
+  前端不用切，同一份静态资源在两种模式下都对。
+- 皮肤、音符 prefab、`projectile_chr_oblvns` 本树早就有（30 个 `oblvns_*` prefab 齐），只是缺 selena 的
+  `skinVariants` 索引：`SakikoFx.key()` 对 undefined 取默认 key，不报错。
+
 ### 修复（维护者 2026-10-26 报）
 
 - **干员自身的方向性特效跟着部署方向**：望三技能（`wang_skill_03_*`）、松果（`pinecn_*`）、圣约送葬人（`excu2_*`）

@@ -1303,6 +1303,14 @@ has the generic spec. Summons: `battle.tokenDef(tokenId, unit)` / `battle.spawnT
 (token skill of that slot: `variants[owner].bySkill[i]`, module attributes: `.byModule[id]`). Coverage of the selectable
 skills: `node tools/kit-coverage.mjs --missing [--tier N] [--strict]`.
 
+对比实现（`SP_KIT_SET=selena`，维护者 2026-10-27 要求「先搬过来我对比测试」）：启动时读一次环境变量，值为
+`selena` 时 `kits/index.js` 把 丰川祥子 与 结城理 的 kit 换成 selena 0.4.1 包里的
+`ops/op-oblvns.selena.js` / `ops/op-makoto.selena.js`（后者自带 selena 的盟约加层，连同 `shared/mod-tier3.js`），
+`OPERATOR_KIT_PATHS` 是本次实际加载的文件表，`SELENA_KIT_MODE` / `SELENA_KIT_CHARS` 给别处判断用。两名干员是
+同一个 charId 键，两份绝不能同时注册。标了 `kit.selena` 的 Kit 会在快照里带 `kitSet: 'selena'`，客户端
+`render/vfx/sakiko.js` 只接管带这个标记的祥子（音符、攻击起手、S2 拨档、S3 范围环）；默认实现下那一层不动。
+启动脚本 `start-pro-luck-selena.cmd`（`set SP_KIT_SET=selena`），不带这个变量就是本树自己的实现。
+
 忍冬's 追凶 records the per-enemy start time and applies its arts addition in the same `damaged` callback,
 including the first instance (PRTS talent remarks; DESIGN §30.3). It does not refresh the ten-second window on
 repeated hits. Its `vulpisHunt` / `addition` tags and re-entrancy guard prevent the rider from feeding itself.

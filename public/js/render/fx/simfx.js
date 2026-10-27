@@ -72,6 +72,13 @@ export class FxSim {
     const p = chest(at.v);
     const s = p.s;
     switch (spec.a) {
+      case 'musicNote': {
+        // 丰川祥子的音符（对比实现：selena 0.4.1）：sim 授权位置上的短促记号，不自己飞、不留常驻精灵
+        const g = cam.project(at.x, at.y, at.z + 0.55), tint = ex.kind === 'arts' ? 0xbb91ff : 0xf4d494;
+        this.particle('dot', g.x, g.y, { tint, life: 0.15 / ts, s0: g.s / 32 * 0.18, s1: g.s / 32 * 0.12, a0: 1, a1: 0 });
+        this.particle('chevron', g.x + g.s * 0.035, g.y - g.s * 0.055, { tint, life: 0.15 / ts, s0: g.s / 64 * 0.12, s1: 0, a0: 0.8, a1: 0, rot: -Math.PI / 2 });
+        break;
+      }
       case 'blast': {
         if (r >= 12) { this.flashScreen(col, 0.5); break; }
         if (kind === 'bombard') { this._touchLocks(ex.id ?? ex.src ?? null); this._landed(ex.id ?? ex.src ?? null, at.x, at.y, r); }

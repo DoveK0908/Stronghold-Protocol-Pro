@@ -14,7 +14,7 @@ import { FxWiring, CHAIN_LINE_S } from '../../public/js/render/vfx/wiring.js';
 const BLOCKED = 1;
 const row = (k, o = {}) => ({ effects: [k], directionType: 0, oneshot: 1, startEvent: 4, endEvent: 3, ...o });
 const KEYS = ['shot_trail', 'shot_hit', 'rows_trail', 'rows_hit', 'timer_hit', 'dir_cast', 'dir_hit', 'heal_trail', 'healer_hit', 'chain_trail',
-  'chain_line', 'chain_hit', 'lord_trail', 'lord_hit', 'lord_cast', 'lord_combat_cast', 'lord_combat_hit', 'sky_cast', 'sky_trail', 'sky_hit', 'note_cast', 'note_trail', 'g_hit', 'g_enemy', 'g_heal'];
+  'chain_line', 'chain_hit', 'lord_trail', 'lord_hit', 'lord_cast', 'lord_combat_cast', 'lord_combat_hit', 'sky_cast', 'sky_trail', 'sky_hit', 'note_cast', 'note_trail', 'oblvns_attack_01_start', 'g_hit', 'g_enemy', 'g_heal'];
 
 function makeIndex() {
   const prefabs = Object.fromEntries(KEYS.map((k) => [k, { file: `prefabs/${k}.json`, looping: k === 'chain_line' }]));
@@ -81,7 +81,7 @@ async function setup() {
     const enemy = /^enemy_/.test(key) || o.enemy;
     const v = { id, x, y, z: 0, visFacing: enemy ? -1 : 1, isEnemy: !!enemy, alive: true, flags: o.flags || 0, anim: 0, sp: 0, spMax: 0, energy: null,
       info: { id, spine: o.spine ?? key, defId: o.defId ?? key, side: enemy ? 'enemy' : 'ally', kind: enemy ? 'enemy' : 'op', skillIndex: 0,
-        ...(o.diy ? { diy: o.diy } : {}) } };
+        ...(o.diy ? { diy: o.diy } : {}), ...(o.kitSet ? { kitSet: o.kitSet } : {}) } };
     views.set(id, v);
     return v;
   };
@@ -234,6 +234,29 @@ describe('official hits after the effects audit (round 46)', () => {
     assert.equal(w.attack(s, e, 'none', 1), true);
     assert.ok(spawned.includes('note_cast'), "the attack's own cast row plays");
     assert.equal(count(spawned, 'note_trail'), 0, "no projectile flown for show: the kit's notes are the visual");
+  });
+
+  test('R19: 丰川祥子 runs the selena fx layer only when the snapshot says kitSet=selena', async () => {
+    // 对比实现（SP_KIT_SET=selena）：快照带 kitSet='selena' 时 render/vfx/sakiko.js 接管她的攻击起手，默认实现的
+    // 官方行不再重复画；不带 kitSet 的同一张卡仍是本树自己的实现（R17）。
+    const { w, spawned, view, frame } = await setup();
+    const t = view(2, 'enemy_800_foe', 8);
+    const a = view(1, 'char_4182_oblvns', 5, 10, { kitSet: 'selena' });
+    frame();
+    assert.equal(w.attack(a, t, 'arrow', 1), true);
+    assert.ok(spawned.includes('oblvns_attack_01_start'), 'the selena layer plays her cast');
+    assert.ok(!spawned.includes('note_cast'), 'and the default attack rows do not double it');
+
+    spawns: {
+      spawned.length = 0;
+      const b = view(3, 'char_4182_oblvns', 5, 10);   // 同一角色，没有 kitSet
+      frame();
+      assert.equal(w.attack(b, t, 'arrow', 1), true);
+      assert.ok(spawned.includes('note_cast'), 'without kitSet the default official rows play');
+      assert.ok(!spawned.includes('oblvns_attack_01_start'), 'and the selena layer stays off');
+    }
+    assert.equal(w.keysFor([a]).some((k) => k.startsWith('oblvns_')), true,
+      'a selena 祥子 asks for the prefabs its layer plays');
   });
 
   test('R18: a 自选 deployment (chess defId) is still matched by its character — no shot for show', async () => {

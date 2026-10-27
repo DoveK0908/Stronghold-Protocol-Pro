@@ -51,6 +51,9 @@ async function safeImport(path) {
 }
 
 const KIT_REGISTRY = await safeImport('./kits/index.js');
+/** 对比实现（SP_KIT_SET=selena）是否生效，以及被它顶掉的那两个 charId（kits/index.js）。 */
+const SELENA_KIT_MODE = KIT_REGISTRY.SELENA_KIT_MODE === true;
+const SELENA_KIT_CHARS = KIT_REGISTRY.SELENA_KIT_CHARS ?? new Set();
 const DOMAIN_NAMES = ['tokens', 'devices', 'enemies', 'bosses', 'bonds', 'garrisons', 'items', 'bands', 'choices'];
 const DOMAINS = await Promise.all(DOMAIN_NAMES.map((n) => safeImport(`./${n}.js`)));
 const tokens = DOMAINS[0];
@@ -226,7 +229,13 @@ export function setupUnitKit(battle, unit, mode = 'full') {
     if (typeof f === 'function') {
       try {
         const k = f(bb, raw, def);
-        if (k) return selectSkillSpec(k, bb, raw, def);
+        if (k) {
+          const out = selectSkillSpec(k, bb, raw, def);
+          // 对比实现（kits/index.js SELENA_KIT_MODE）：标在 Kit 上，快照里随 'kitSet' 下发，客户端据此只让
+          // selena 版的祥子走 render/vfx/sakiko.js 那套（默认实现不能被它抢走攻击特效）。
+          if (out && SELENA_KIT_MODE && SELENA_KIT_CHARS.has(def.charId)) out.selena = true;
+          return out;
+        }
       } catch (e) {
         const dslCode = typeof e?.code === 'string' && /^PLUGIN_DSL_[A-Z0-9_]+$/.test(e.code);
         // A record that carries DSL, or a throw whose code is a DSL problem, is a corrupt content set.
