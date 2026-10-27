@@ -108,7 +108,7 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none; feedback: the lobby's feedback board (server/feedbackBoard.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, feedback = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, feedback = null, uploads = null, csp = null, trustedRuntime = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -120,6 +120,11 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     // remote client may write — its own JSON body limit, rate limit and maintainer session decide what lands.
     if (feedback && feedback.handles(parts.rawPath)) {
       await feedback.handle(req, res, parts.rawPath, parts.query, clientAddress(req, trustProxy).ip);
+      return;
+    }
+    // 动态名片/头像的大文件上传（server/uploads.js）：一次性 ticket + 只收位图的 POST，独立体积上限
+    if (uploads && uploads.handles(parts.rawPath)) {
+      await uploads.handle(req, res, parts.rawPath, parts.query);
       return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {

@@ -1134,6 +1134,8 @@ export class Lobby {
       case 'room.card': return this.setCard(session, msg);
       case 'me.avatar': return this.setAvatar(session, msg);
       case 'me.namecard': return this.setNamecard(session, msg);
+      case 'me.namecard.ticket': return this.uploadTicket(session, 'namecard');
+      case 'me.avatar.ticket': return this.uploadTicket(session, 'avatar');
       case 'room.spectate': return this.spectate(session, msg);
       case 'room.removeSpectator': return this.removeSpectator(session, msg);
       case 'room.setPlugins': return this.setPlugins(session, msg);
@@ -2542,6 +2544,18 @@ export class Lobby {
     session.namecard = res.id;
     sendSession(session, { t: 'me.namecard', id: res.id });
     return this._applyNamecard(session);
+  }
+
+  /**
+   * me.namecard.ticket / me.avatar.ticket（动态图需求 2026-10-27）：换一张一次性上传凭证。
+   * WS 帧上限 64 KB，base64 后只剩约 48 KB——动图（GIF / 动态 WebP / APNG）放不下，客户端拿 ticket 走
+   * `POST /upload/<kind>?ticket=…` 直传字节（server/uploads.js），凭证当场作废。
+   */
+  uploadTicket(session, kind) {
+    const tickets = this.uploadTickets;
+    if (!tickets) return fail(ERR.BAD_MSG, 'uploads are not accepted');
+    const out = tickets.issue(ownerKey(session.uid || ''));
+    sendSession(session, { t: kind === 'avatar' ? 'me.avatar.ticket' : 'me.namecard.ticket', ticket: out.ticket, expiresIn: out.expiresIn });
   }
 
   /** 把自传名片底图写进 display card 的 bg（`custom:<id>`）；没有就保留原来的预设底图。 */

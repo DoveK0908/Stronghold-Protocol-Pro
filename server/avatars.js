@@ -34,6 +34,9 @@ export function sniffImage(buf) {
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg';
   if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46
     && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return 'webp';
+  // GIF（含动图）：名片/头像要能动就靠它（HTTP 上传通道 server/uploads.js）。
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38
+    && (buf[4] === 0x39 || buf[4] === 0x37) && buf[5] === 0x61) return 'gif';
   return null;
 }
 
@@ -56,7 +59,7 @@ export function createAvatarStore({ dir = defaultDir(), indexFile = defaultIndex
       const raw = JSON.parse(readFileSync(indexFile, 'utf8'));
       for (const [id, it] of Object.entries(raw?.items || {})) {
         if (!isAvatarId(id) || !it || typeof it !== 'object') continue;
-        const ext = it.ext === 'png' || it.ext === 'jpg' || it.ext === 'webp' ? it.ext : null;
+        const ext = it.ext === 'png' || it.ext === 'jpg' || it.ext === 'webp' || it.ext === 'gif' ? it.ext : null;
         if (!ext) continue;
         items.set(id, { ext, bytes: Number(it.bytes) || 0, at: Number(it.at) || 0, owner: String(it.owner || '') });
       }

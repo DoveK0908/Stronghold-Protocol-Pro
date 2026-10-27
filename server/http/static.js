@@ -355,9 +355,10 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
       sendError(req, res, 404, '页面不存在 · Not found');
       return;
     }
-    // 自传头像没有扩展名的 URL（/avatar/<id>，card.avatarImg 只有 id）：按 webp → jpg → png 找那个存在的文件
+    // 自传头像没有扩展名的 URL（/avatar/<id>，card.avatarImg 只有 id）：按 webp → jpg → png → gif 找那个存在的文件
+    // （gif 排最后：同一个 id 不会同时是两种格式，但旧图没有 gif，优先静止图命中更省事）
     if (mount.sniff && segments.length === 1 && !path.extname(segments[0])) {
-      for (const ext of ['.webp', '.jpg', '.png']) {
+      for (const ext of ['.webp', '.jpg', '.png', '.gif']) {
         const candidate = path.join(mount.dir, `${segments[0]}${ext}`);
         let st = null;
         try { st = await fsp.stat(candidate); } catch { /* try the next */ }

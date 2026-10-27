@@ -5,6 +5,8 @@ import { net } from '../net.js';
 import { cardStore, setCustomAvatar } from './playerCard.js';
 import { t } from '../../../shared/i18n.js';
 import { cropFile } from './imageCropper.js';
+import { uploadBigImage } from './customNamecard.js';
+import { isAnimatedImage } from './imageSniff.js';
 
 /** Longest side sent to the server: 256px square is bigger than every place an avatar shows (seat card sm, 名片). */
 const SIDE = 256;
@@ -35,6 +37,14 @@ async function shrink(file) {
  * @returns {Promise<{ ok: boolean, id?: string, err?: string }>}
  */
 export async function uploadAvatar(file) {
+  // 动图头像：裁不了（会丢帧），原样走 HTTP 上传通道；CSS 那层是 object-fit: cover，方形裁切由显示端负责。
+  if (file && /^image\//.test(file.type || '') && file.size <= 8 * 1024 * 1024) {
+    const head = new Uint8Array(await file.slice(0, 65536).arrayBuffer());
+    if (isAnimatedImage(head)) {
+      const gid = await uploadBigImage(file, 'avatar');
+      return gid ? { ok: true, id: gid } : { ok: false, err: t('上传失败，换一张图片再试') };
+    }
+  }
   const data = await shrink(file);
   if (!data) return { ok: false, err: t('请选择一张 4MB 以内的图片（PNG/JPEG/WEBP）') };
   const id = await new Promise((resolve) => {

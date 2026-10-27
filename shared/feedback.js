@@ -2,15 +2,17 @@
 // enforces them; public/js/ui/feedbackBoard.js draws them). Kept in shared/ so a change to a limit cannot land on one
 // side only.
 
+import { N_ } from './i18n.js';
+
 /** The four columns the board shows, in the order it shows them. */
 export const FEEDBACK_STATUSES = Object.freeze(['open', 'declined', 'planned', 'done']);
 
 /** The heading of each column, in the game's own words (the client passes these through `t()`). */
 export const FEEDBACK_STATUS_LABEL = Object.freeze({
-  open: '未读或讨论中',
-  declined: '无计划',
-  planned: '已计划',
-  done: '已完成',
+  open: N_('未读或讨论中'),
+  declined: N_('无计划'),
+  planned: N_('已计划'),
+  done: N_('已完成'),
 });
 
 /** Everything the board enforces about what may be posted. */

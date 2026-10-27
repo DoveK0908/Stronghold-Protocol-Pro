@@ -3380,6 +3380,8 @@
   "隐藏中央徽记与标题": "Hide the centre emblem and title",
   "调整头像": "Adjust avatar",
   "请选择一张 30MB 以内的图片（PNG/JPEG/WEBP）": "Pick an image up to 30MB (PNG/JPEG/WEBP)",
+  "请选择一张 30MB 以内的图片（PNG/JPEG/WEBP/GIF）": "Pick an image up to 30MB (PNG/JPEG/WEBP/GIF)",
+  "动图请控制在 8MB 以内": "Keep an animated image under 8 MB",
   "调整名片底图": "Adjust name card",
   "已取消": "Cancelled",
   "调整大厅背景": "Adjust lobby background",
@@ -3574,5 +3576,7 @@
   "大厅的其他功能不受影响。": "Everything else in the lobby still works.",
   "还没有人发反馈": "Nobody has posted feedback yet",
   "第一条反馈会显示在这里。": "The first post will show up here.",
-  "反馈板：不需要登录，发帖不记录任何身份": "Feedback board: no sign-in, and posting records nothing about who you are"
+  "反馈板：不需要登录，发帖不记录任何身份": "Feedback board: no sign-in, and posting records nothing about who you are",
+  "音乐库": "Music library",
+  "搜索曲目": "Search tracks"
 }

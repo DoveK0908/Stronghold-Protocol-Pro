@@ -4,6 +4,7 @@
 import { net } from '../net.js';
 import { loadPref, savePref } from '../store.js';
 import { cropFile } from './imageCropper.js';
+import { isAnimatedImage } from './imageSniff.js';
 import { DEFAULT_NAMECARD } from './namecards.js';
 import { t } from '../../../shared/i18n.js';
 
@@ -17,6 +18,29 @@ const MAX_RAW = 30 * 1024 * 1024;
 /** `/namecard/<id>` — the URL of an uploaded 名片底图 (id = 16 hex, server/namecards.js). */
 export function namecardImgSrc(id) {
   return typeof id === 'string' && /^[0-9a-f]{16}$/.test(id) ? `/namecard/${id}` : '';
+}
+
+/** Where a big (animated) picture goes: one throwaway ticket, then a POST of the raw bytes. */
+export async function uploadBigImage(blob, kind) {
+  const ticket = await new Promise((resolve) => {
+    const offs = [];
+    const done = (v) => { while (offs.length) { try { offs.pop()(); } catch { /* ignore */ } } clearTimeout(timer); resolve(v); };
+    const onTicket = (msg) => { if (typeof msg?.ticket === 'string') done(msg.ticket); };
+    const timer = setTimeout(() => done(''), 10000);
+    offs.push(net.on(`me.${kind}.ticket`, onTicket), net.on('error', () => done('')), net.on('helloError', () => done('')));
+    net.send(`me.${kind}.ticket`, {});
+  });
+  if (!ticket) return '';
+  try {
+    const res = await fetch(`/upload/${kind}?ticket=${encodeURIComponent(ticket)}`, {
+      method: 'POST',
+      headers: { 'content-type': blob.type || 'image/gif' },
+      body: blob,
+    });
+    if (!res.ok) return '';
+    const out = await res.json().catch(() => null);
+    return typeof out?.id === 'string' && /^[0-9a-f]{16}$/.test(out.id) ? out.id : '';
+  } catch { return ''; }
 }
 
 /** base64 of a Blob (the protocol carries the picture as base64 text). */
@@ -34,7 +58,14 @@ async function toBase64(blob) {
  */
 export async function uploadNamecard(file) {
   if (!file || !/^image\//.test(file.type || '') || file.size > MAX_RAW) {
-    return { ok: false, err: t('请选择一张 30MB 以内的图片（PNG/JPEG/WEBP）') };
+    return { ok: false, err: t('请选择一张 30MB 以内的图片（PNG/JPEG/WEBP/GIF）') };
+  }
+  // 动图：裁不了（会丢帧），也不适合塞进 WS 帧——原样走 HTTP 上传，浏览器按 4:1 铺满（object-fit: cover）。
+  const head = new Uint8Array(await file.slice(0, 65536).arrayBuffer());
+  if (isAnimatedImage(head)) {
+    if (file.size > 8 * 1024 * 1024) return { ok: false, err: t('动图请控制在 8MB 以内') };
+    const gid = await uploadBigImage(file, 'namecard');
+    return gid ? { ok: true, id: gid } : { ok: false, err: t('上传失败，换一张图片再试') };
   }
   const blob = await cropFile(file, { aspect: NAMECARD_ASPECT, outWidth: WIDTH, title: t('调整名片底图'), maxBytes: Math.floor(64 * 1024 * 0.72) });
   if (!blob) return { ok: false, err: t('已取消') };

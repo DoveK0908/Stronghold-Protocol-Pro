@@ -63,6 +63,7 @@ import { createPluginRegistry } from './plugins/registry.js';
 import { computeVanillaContent } from './plugins/identity.js';
 import { defaultDir as defaultAvatarsDir } from './avatars.js';
 import { defaultDir as defaultNamecardsDir } from './namecards.js';
+import { createUploadTickets, createAnimatedUpload } from './uploads.js';
 import { createVisualSets } from './plugins/visualSet.js';
 import { createContentSets } from './plugins/contentSets.js';
 import { createPluginPolicy } from './plugins/policy.js';
@@ -195,7 +196,7 @@ export async function startServer(opts = {}) {
     }
   }
   const scriptMode = process.env.SP_PLUGIN_SCRIPTS;
-  let registry, lobby, network, packs, serveStatic, browserBuild, assetIndex = null, views = null;
+  let registry, lobby, network, packs, serveStatic, browserBuild, assetIndex = null, views = null, uploadTickets = null, uploads = null;
   let content = null, visual = null, contents = null, hosts = null, studio = null, trustedRuntime = null, persistence = null;
   let feedbackBoard = null, feedback = null;
   let versions = null, versionHosts = null, simPool = null, eventLoop = null;
@@ -267,6 +268,10 @@ export async function startServer(opts = {}) {
           phase: [...phases].sort().join('+') || 'idle', rehearsals };
       },
     });
+    // 动态名片/头像的上传凭证（server/uploads.js）：一次性的票，HTTP POST 用它换一张大图。
+    uploadTickets = createUploadTickets();
+    if (lobby) lobby.uploadTickets = uploadTickets;
+    uploads = createAnimatedUpload({ tickets: uploadTickets, namecards: lobby?.namecards || null, avatars: lobby?.avatars || null, log });
     serveStatic = createStaticHandler({ publicDir, dataDir, sharedDir, simDir, packsDir, pluginsDir, packs, content, log, metrics: opts.phaseMetrics,
       avatarDir, namecardDir, assetIndex, views, visual, contents, versions, ...(opts.client ? { client: opts.client } : {}) });
     // the plugin studio (DESIGN §32.9): its page and API for this machine and the local network; it watches plugins/ only
@@ -303,7 +308,7 @@ export async function startServer(opts = {}) {
     getHealthMetrics: () => healthMetrics, traffic, assetIndex, views, trusted: trustedRuntime?.health,
     persistence: persistence ? () => persistence.snapshot() : null, versions, versionHosts };
   const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health, log,
-    trustProxy: network.opts.trustProxy, studio, feedback, trustedRuntime }));
+    trustProxy: network.opts.trustProxy, studio, feedback, uploads, trustedRuntime }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, wsCompression, traffic });
 
