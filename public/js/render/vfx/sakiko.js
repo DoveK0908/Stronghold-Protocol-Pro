@@ -104,23 +104,28 @@ export class SakikoFx {
     if (!note || !note.handle.alive) {
       const owned = [...this.notes].filter(([, n]) => n.owner === extra.id);
       if (owned.length >= MAX_NOTES) { owned[0][1].handle.kill(); this.notes.delete(owned[0][0]); }
-      note = { owner: extra.id, key, x, y, fromX: x, fromY: y, angle: extra.angle || 0, at: now };
-      const height = (view.z || 0) + (view.hover || 0) + 0.55;
-      note.handle = this.w.ofx.spawn(key, { pos: [x - 10, y - 9, -height], yaw: note.angle, groundZ: -(view.z || 0) }, {
-        loop: true, owner: view,
+      note = { owner: extra.id, key, x, y, angle: extra.angle || 0, at: now, base: null };
+      // 用 playOn 而不是裸 spawn：音符的朝向/贴图/材质要走与其它官方特效同一条摆放路径（render/vfx/wiring.js
+      // playOn —— 载体按干员的 dir/visFacing/skin 摆好，裸 spawn + yaw 会把 prefab 拧成一片发光条，看起来
+      // 就不像音符了，用户 2026-10-27 报「有一团发光的东西，但不像音符模型」）。
+      const carrier = {
+        x, y, z: 0, hover: 0, dir: view.dir ?? 'RIGHT', visFacing: view.visFacing ?? 1,
+        alive: true, destroyed: false, anim: null, info: view.info ?? null,
+      };
+      note.handle = this.w.playOn(key, carrier, {
+        loop: true, by: view,
         track: fx => {
           if (this.w.ofx.time - note.at > NOTE_STALE || view.destroyed || view.alive === false) { fx.stop(); return; }
-          const t = Math.min(1, Math.max(0, (this.w.ofx.time - note.at) / 0.1));
-          fx.anchor[0] = note.fromX + (note.x - note.fromX) * t - 10;
-          fx.anchor[1] = note.fromY + (note.y - note.fromY) * t - 9;
-          fx.anchor[2] = -((view.z || 0) + (view.hover || 0) + 0.55);
-          fx.yaw = note.angle;
+          // 摆放点是音符的出生点，之后每帧只按「飞了多远」平移（与 render/fx/notes.js 的官方音符同法）。
+          if (!note.base) note.base = [fx.anchor[0], fx.anchor[1], note.x, note.y];
+          fx.anchor[0] = note.base[0] + (note.x - note.base[2]);
+          fx.anchor[1] = note.base[1] + (note.y - note.base[3]);
         },
       });
       if (!note.handle) return false;
       this.notes.set(slot, note);
     }
-    Object.assign(note, { fromX: note.x, fromY: note.y, x, y, angle: extra.angle || 0, at: now });
+    Object.assign(note, { x, y, angle: extra.angle || 0, at: now });
     return true;
   }
 
