@@ -88,6 +88,8 @@ export const MATCH_FIELDS = Object.freeze({
     'BattleClass', 'battleContent', 'timerScale', 'gameSpeed', 'snapshotHz', 'localReplica', 'botRehearsal', 'botSliceMs',
     'botRehearsalDelegate', 'botRehearsalDelegateMs', 'hostId', 'bot', 'externalAI', 'ds', 'clientCombat', 'verifyMode', 'combatPool', 'trialPool',
     'headlessSliceMs', 'battlePrefix', 'experimental', 'revivalEnabled', 'disableSharedPool', 'playerCapacity',
+    // the bot strategy of the whole match and its per-seat overrides (Match ctor: options / env): rebuilt from those
+    'eliteBot', 'seatBots',
     // 整备区扩容: rebuilt from the options like `experimental` (Match ctor: options + whether the stage has the cells)
     'benchExpand',
     // the room version this match plays in (server/versions.js): rebuilt from the room's own options like `mode`
@@ -101,7 +103,7 @@ export const MATCH_FIELDS = Object.freeze({
     'pacer', 'overtimeAt', '_timers', '_phaseTimer', '_infoAdvanceTimer', 'setupVote', '_lastSetupVoteAt', '_turnTimer',
     '_pubDirty', '_pubTimer', '_lastPubAt', '_lastPubJson', '_privDirty', '_prepEndQueued', 'fields', 'runner', 'watchers',
     'localViews', 'unitePlan', '_normalAliveCount', '_uniteRelay', 'uniteResultView', '_uniteLeftKey', '_uniteBounds',
-    'teamLp', 'bossPool', '_turnToken', '_botPath', '_botTraits', '_workerBotPrepOwner', '_botEmotesMerges', 'overtimeApplied',
+    'teamLp', 'bossPool', '_turnToken', '_botPath', '_botTraits', '_botEngines', '_botPosTraits', '_workerBotPrepOwner', '_botEmotesMerges', 'overtimeApplied',
     'bossOvertimeStartReal', '_finalEnding', '_bossStartAt', 'lastResultMsg', '_uniteBudget', 'onCheckpoint', 'replayRound',
     // the reroll proposal marks and the votes (setupVote.js, kickVote.js, speedVote.js): a restore drops them
     '_setupProposals', 'kickVote', '_kickVoteSeq', '_kickFailed', '_kickVoteAt',

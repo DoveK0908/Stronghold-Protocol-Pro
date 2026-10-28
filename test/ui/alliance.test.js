@@ -118,9 +118,10 @@ test('experimental rules display room options without a revival ballot', () => {
   const switches = [];
   const visit = node => { if (Array.isArray(node)) return node.forEach(visit); if (node?.props) { if (node.props.role === 'switch') switches.push(node); visit(node.props.children); } };
   visit(view);
-  assert.equal(switches.length, 6);
+  assert.equal(switches.length, 10);
   assert.deepEqual(switches.map(node => node.props.id), ['experimental-revival', 'experimental-pool', 'experimental-multiplayer',
-    'experimental-luck-console', 'experimental-hit-softcap', 'experimental-prep-unlimited']);
+    'experimental-luck-console', 'experimental-hit-softcap', 'experimental-prep-unlimited', 'experimental-bench-expand',
+    'experimental-gold-preview', 'experimental-shop-left', 'experimental-speed-vote']);
   assert.ok(switches.every(node => node.props.disabled));
   assert.ok(switches.slice(0, 2).every(node => node.props.checked));
   assert.equal(switches[2].props.checked, false, 'expanded rooms stay default off independently of both original rules');
@@ -128,6 +129,11 @@ test('experimental rules display room options without a revival ballot', () => {
   assert.equal(switches[3].props.checked, false, 'the Luck console stays dormant unless the room asked for it');
   assert.equal(switches[4].props.checked, false, 'the boss hit soft cap stays off: the official rule is the default');
   assert.equal(switches[5].props.checked, false, 'unlimited prep (G04) is opt-in');
+  // The four later ones: two opt-in conveniences, and two on unless the room turns them off (牌库剩余张数 / 二倍速).
+  assert.equal(switches[6].props.checked, false, 'the 13-slot 整备区 is opt-in');
+  assert.equal(switches[7].props.checked, false, 'the next round\'s 资金 preview is opt-in');
+  assert.equal(switches[8].props.checked, true, 'the shop card shows its remaining copies unless turned off');
+  assert.equal(switches[9].props.checked, true, 'the 二倍速 vote is offered unless turned off');
 });
 
 test('queue UI distinguishes pending vs allocated and clamps clocks', () => {

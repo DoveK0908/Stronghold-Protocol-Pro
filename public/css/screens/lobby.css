@@ -2928,7 +2928,7 @@ button.ach-card__ava:hover, button.ach-card__ava:focus-visible { border-color: v
 .lobmusic__group > summary { display: flex; align-items: center; gap: .05rem; cursor: pointer; list-style: none;
   font-size: calc(.105 * var(--t)); color: var(--text-dim); }
 .lobmusic__group > summary::-webkit-details-marker { display: none; }
-.lobmusic__group > summary::before { content: '▸'; font-size: .08rem; color: var(--mint-400); }
+.lobmusic__group > summary::before { content: '▸'; font-size: calc(.08 * var(--t)); color: var(--mint-400); }
 .lobmusic__group[open] > summary::before { content: '▾'; }
 .lobmusic__group > summary small { margin-left: auto; font: 700 .082rem/1 ui-monospace, Consolas, monospace; color: var(--mint-300); }
 .lobmusic__group--own > summary { color: var(--mint-300); }

@@ -27,7 +27,10 @@ test('the hub keeps the join key, 公告, the feedback group and the queue', () 
   const lobby = source('../../public/js/screens/lobby.js');
   assert.match(lobby, /<\$\{HubTile\} icon="key" label=\$\{t\('密钥加入'\)\}/);
   assert.match(lobby, /<\$\{NoticeCard\} value=\$\{noticeValue\}/);
-  assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\} \/><\$\{SiteBoards\} \/><\/div><\$\{DesignCredit\} \/><\$\{HubFoot\} \/><\/div>/);
+  // The fork's feedback group opens its own panel (onOpen), so the row's first entry carries props; the order — the
+  // feedback group and the site boards on one row, then the design credit and the foot — is what this pin keeps.
+  assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\}[\s\S]*?\/><\$\{SiteBoards\} \/><\/div><\$\{DesignCredit\} \/><\$\{HubFoot\} \/><\/div>/);
+  assert.match(lobby, /<\$\{LobbyFeedback\} onOpen=\$\{/);
   assert.match(lobby, /net\.request\('queue\.join', \{ difficulty \}\)/);
   assert.match(lobby, /<\$\{QueueFlow\} queue=\$\{queue\}/);
   const css = source('../../public/css/screens/lobby.css');

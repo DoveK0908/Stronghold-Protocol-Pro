@@ -10,6 +10,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { CHROME } from './chrome.mjs';
 
+// The browser tests import CHROME from this module (they drive puppeteer.launch themselves), so re-export it here.
+export { CHROME };
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 export const OUT = path.join(ROOT, 'test/e2e/out');
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

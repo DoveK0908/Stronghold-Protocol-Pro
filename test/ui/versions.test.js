@@ -130,8 +130,9 @@ test('the client renders no research texts of the data (spec / implFormula / how
   // the same in every version's build), shown on the detail card on purpose
   const allowed = (h) => /^public\/js\/ui\/detailPanel\.js:\d+: \$\{item\.note \?/.test(h);
   // fork-only readers whose `note` is not a data record's research text: the note projectile's sprite table
-  // (render/fx/notes.js: PROJ.note / NOTE_TRAIL.note / this.tex.note) and an experimental option's own hint
-  // (ui/experimental.js: the 禁用战场 list's s.note, a label the fork defines itself).
-  const forkOwned = (h) => /^public\/js\/(render\/fx\/notes\.js|ui\/experimental\.js):\d+: /.test(h);
+  // (render/fx/notes.js: PROJ.note / NOTE_TRAIL.note / this.tex.note), 丰川祥子's note voice (render/vfx/sakiko.js:
+  // extra.note is the `musicNote` fx event's `note: n.seq` from server/sim/content/kits/ops/op-oblvns.js) and an
+  // experimental option's own hint (ui/experimental.js: the 禁用战场 list's s.note, a label the fork defines itself).
+  const forkOwned = (h) => /^public\/js\/(render\/fx\/notes\.js|render\/vfx\/sakiko\.js|ui\/experimental\.js):\d+: /.test(h);
   assert.deepEqual(hits.filter((h) => /\.(implFormula|howToPlay|note)\b/.test(h) && !allowed(h) && !forkOwned(h)), [], 'no research text is read');
 });

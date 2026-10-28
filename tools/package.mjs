@@ -579,7 +579,9 @@ export function plan(root, opts = {}) {
   const pkg = readJson(path.join(root, 'package.json')) || {};
   const lock = readJson(path.join(root, 'package-lock.json')) || {};
   const generated = [...(shipsPacks(keep) ? [GENERATED_PACK_INDEX] : []), LLM_RELEASE_MARKER];
-  const files = [...keep, ...art.files, ...generated];
+  // sorted like `tracked`: the generated files (the pack index, the release marker) sit at their path's place, not at
+  // the end of every listing and every zip (test/package.test.js compares the --list order with a sorted list)
+  const files = [...keep, ...art.files, ...generated].sort();
   const problems = [];
   for (const f of files) if (isRefused(f) || isJunk(f)) problems.push(`refused: ${f}`);
   const byCase = new Map();

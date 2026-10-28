@@ -158,7 +158,7 @@ test('对局音乐 lists the same local library as the lobby card', () => {
 
 // 主界面音乐库 (维护者 2026-10-27): selena 0.4.1's whole catalogue — 246 tracks in 7 groups. The pick resolves to its own
 // file, and every entry ships (a listed track whose file is missing would silently fall back to the lobby music).
-test('主界面音乐库: every track resolves through lobbyTrackOf and its file ships', () => {
+test('主界面音乐库: every track resolves through lobbyTrackOf', () => {
   assert.equal(LOBBY_LIBRARY.length, 246, 'selena 0.4.1 published 246 tracks');
   assert.deepEqual([...LOBBY_GROUPS], ['悬赏 OST', '敌人 OST', '阵营 OST', '结算 OST', '其他 OST', '主界面', 'Boss OST']);
   const seen = new Set();
@@ -171,9 +171,15 @@ test('主界面音乐库: every track resolves through lobbyTrackOf and its file
     assert.ok(track.groupName.trim(), `${track.title}: a sub-category`);
     assert.ok(Array.isArray(track.categories) && track.categories.length, `${track.title}: categories for 搜索`);
     assert.equal(lobbyTrackOf(MANIFEST, track.id)?.loop, track.url, `${track.title}: the pick plays its own file`);
-    assert.ok(existsSync(join(ROOT, 'public', track.url)), `${track.title}: ${track.url} ships`);
     assert.equal(lobbyTrackName(track.id), track.title, `${track.title}: the card names it`);
   }
+});
+
+// the files themselves live in ignored public/assets, which CI never downloads (.github/workflows/ci.yml), so the
+// existence check is its own test that skips on a machine without the extracted pack — the same contract as every
+// other asset-dependent suite.
+test('主界面音乐库: every listed track file ships', { skip: !existsSync(join(ROOT, 'public/assets/audio/bgm')) && 'public/assets missing (run npm run assets)' }, () => {
+  for (const track of LOBBY_LIBRARY) assert.ok(existsSync(join(ROOT, 'public', track.url)), `${track.title}: ${track.url} ships`);
 });
 
 // 玩家 2026-10-27: 「对局音乐可选项也要和音乐库同步啊。还要新加一个条目，就是自己上传的，我说了自己上传不止上传一首。

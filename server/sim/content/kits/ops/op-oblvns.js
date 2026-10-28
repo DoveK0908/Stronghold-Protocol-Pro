@@ -127,6 +127,7 @@ export default {
             if (n.target && !n.pass) angle = atan2(n.target.y - n.y, n.target.x - n.x);
             else if (n.pass) angle = n.angle;
             let turn = angle - n.angle;
+            // loop-cap: both terms are normalized angles (atan2 / the stored n.angle), so each correction runs at most once
             while (turn > PI) turn -= 2 * PI;
             while (turn < -PI) turn += 2 * PI;
             const weak = n.target && !n.aimed && !n.pass;

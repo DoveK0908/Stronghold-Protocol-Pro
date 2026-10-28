@@ -374,9 +374,11 @@ test('three times an official interval still validates, and the shared bounds sn
 test('every while in the sim and the match names its loop cap', () => {
   // The Elite AI addon's engine is vendored verbatim (server/match/{arturia,lavinia}/, projects.md C03, upstream
   // HankDUMPLINGZhong/Stronghold-Protocol-AI): third-party bot code shipped as-is and replaced wholesale on a
-  // re-vendor (v0.2.0 swapped the whole policy tree), so this repo's cap annotation is not applied to it.
-  // tools/i18n.mjs's VENDORED_DIRS and test/i18n.test.js skip the same two trees for the same reason.
-  const VENDORED = new Set(['server/match/arturia', 'server/match/lavinia']);
+  // re-vendor (v0.2.0 swapped the whole policy tree), so this repo's cap annotation is not applied to it. The Zumama
+  // addon (server/match/aiAddons/zumama/, pinned in its upstream.json) and the shared compute runtime it imports
+  // (server/match/aiCompute/) are vendored the same way.
+  // tools/i18n.mjs's VENDORED_DIRS and test/i18n.test.js skip the same trees for the same reason.
+  const VENDORED = new Set(['server/match/arturia', 'server/match/lavinia', 'server/match/aiAddons', 'server/match/aiCompute']);
   const missing = [];
   const walk = (rel) => {
     if (VENDORED.has(rel)) return;

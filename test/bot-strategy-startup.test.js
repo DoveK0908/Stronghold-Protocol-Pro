@@ -91,8 +91,9 @@ test('external selection requires operator transport configuration before listen
 test('invalid SP_BOT_STRATEGY_SEATS rejects startup before data loading or listening', async (t) => {
   const previous = process.env.SP_BOT_STRATEGY_SEATS;
   t.after(() => { if (previous == null) delete process.env.SP_BOT_STRATEGY_SEATS; else process.env.SP_BOT_STRATEGY_SEATS = previous; });
+  // Expanded rooms take 0..19 seats (server/index.js passes the 20-seat capacity), so the out-of-range case is 20.
   for (const [value, reason] of [['1:legcay', /seat 1: Unknown bot strategy: legcay; available: legacy/],
-    ['4:legacy', /seat must be 0\.\.3, got "4"/], ['1:legacy,1:ioleta', /seat 1 is listed twice/]]) {
+    ['20:legacy', /seat must be 0\.\.19, got "20"/], ['1:legacy,1:ioleta', /seat 1 is listed twice/]]) {
     process.env.SP_BOT_STRATEGY_SEATS = value;
     await assert.rejects(startServer({ port: 0, quiet: true, dataDir: 'missing-bot-strategy-test-data' }), (error) => {
       assert.match(error.message, /Invalid SP_BOT_STRATEGY_SEATS/);

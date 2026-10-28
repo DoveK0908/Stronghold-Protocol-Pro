@@ -126,7 +126,7 @@ test('the draft\'s name cards fall back to the default picture when an outfit\'s
   const js = readFileSync(path.join(ROOT, 'public/js/screens/bandDraft.js'), 'utf8');
   // FORK NOTE (2026-10-25 逐屏裁决: 选择策略取回 pro.6): the fork's order row paints the doctor's 名片立绘 as a
   // background layer from seatPortrait(); the official row built an <img> candidate list with seatArtSrc(arts, badArt)
-  assert.match(js, /const artOf = \(pl\) => \(pl\.isBot \? null : seatPortrait\(/);
+  assert.match(js, /const artOf = \(pl\) => seatPortrait\(seatOf\(pl\.playerId\) \|\| pl, portraits\);/);
   // the fork's name cards paint the fallback as a background layer (.dorder__art: background-size: cover;
   // background-position: 50% 12%), the official ones as an <img> (object-fit: cover; object-position: 50% 16%)
   assert.match(css('public/css/screens/draft.css'), /\.dorder__art \{[^}]*(object-fit: cover; object-position: 50% 16%|background-size: cover; background-position: 50% 12%);/);
