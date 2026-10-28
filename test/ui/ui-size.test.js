@@ -122,14 +122,18 @@ describe('the stylesheet side', () => {
   // screens/draft.css likewise: the fork's band draft (the 本局信息 dialog, the name cards) is fork-authored and still
   // floors in bare design pixels.
   const LISTED = new Set([
-    'public\\css\\screens\\loadout.css:*:*',
-    'public\\css\\screens\\lobby.css:*:*',
-    'public\\css\\screens\\alliance.css:*:*',
-    'public\\css\\screens\\draft.css:*:*',
-    'public\\css\\screens\\room.css:*:*',
+    'public/css/screens/loadout.css:*:*',
+    'public/css/screens/lobby.css:*:*',
+    'public/css/screens/alliance.css:*:*',
+    'public/css/screens/draft.css:*:*',
+    'public/css/screens/room.css:*:*',
   ]);
-  const listed = (file, prop, arg) => LISTED.has(`${file}:${prop}:${arg}`)
-    || LISTED.has(`${file}:${prop}:*`) || LISTED.has(`${file}:*:*`);
+  // path.relative spells a Windows path with backslashes; the keys are POSIX, so the same exemption list has to be read
+  // on both. Before this the ubuntu CI missed every entry and failed on the fork's own bare-pixel floors.
+  const listed = (file, prop, arg) => {
+    const k = file.replace(/\\/g, '/');
+    return LISTED.has(`${k}:${prop}:${arg}`) || LISTED.has(`${k}:${prop}:*`) || LISTED.has(`${k}:*:*`);
+  };
   function* cssFiles(dir) {
     for (const f of readdirSync(dir)) {
       const p = path.join(dir, f);
