@@ -32,7 +32,7 @@ class EngineRunner extends FieldRunner {
 
 export class CombatEngine {
   constructor({ specs, boss = null, wireFrames = false, coalesceFrames = false, damageBoard = false, snapshotHz = 20, gameSpeed = GAME_SPEED,
-    metaOnDemand = false, terminalOnce = false },
+    metaOnDemand = false, terminalOnce = false, resourceNumbers = false },
     { data, log = QUIET, BattleClass, now = () => performance.now(), cloneOutput = true } = {}) {
     if (!Array.isArray(specs) || specs.length > MAX_PLAYER_CAPACITY) throw new TypeError(`specs must contain at most ${MAX_PLAYER_CAPACITY} fields`);
     // A leader phase remains ONE worker / ONE SharedBossPool, with at most ten pair fields.
@@ -91,7 +91,7 @@ export class CombatEngine {
         players: (spec.players || []).map((p) => p.playerId), battle: null };
       if (this.damageBoard) { f.damageRows = emptyDamageRows(spec); f.damageAt = -Infinity; }
       try {
-        f.battle = createBattleFromSpec(spec, ds, { sharedBoss: this.pool, BattleClass, logger: log });
+        f.battle = createBattleFromSpec(spec, ds, { sharedBoss: this.pool, BattleClass, logger: log, resourceNumbers });
       } catch (e) {
         this._error(`battle ${f.fieldId} construct`, e, f.fieldId);
         f.battle = new DeadBattle(spec);

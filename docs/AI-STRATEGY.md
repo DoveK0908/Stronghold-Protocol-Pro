@@ -671,3 +671,68 @@ The independent-seed rehearsal is §35.64 (counted leaks first; leader damage br
 more layers on the main remain open. RESEARCH §10 Q1 (co-op leader HP 4× too low) does not hold for the current pools:
 they match `activity_table.json` `bossInfoDict` (§35.64).
 
+
+
+### Cycle 6 layer audit (§37.24, round54)
+
+The default legacy bot's solo ABYSS seeds 1–40 still win 0/40. Of 28 boards entering R13, the main selected by
+`_botFocusId` has 74.96 layers after preparation; the 24 surviving R13 have 93.54 after settlement and 102.25
+at R14 after preparation. These are different cutoffs and cohorts, not conflicting estimates. R13 survivors'
+main layers come 57.55% from combat, 15.95% from acquisition, 15.68% from recurring prep/refresh traits,
+9.18% from 助力, and the rest from items/cards. 投资人 activates in none of the 523 ended preps.
+
+Three **[ASSUMED]** trials were measured separately and withdrawn: a cheaper main-layer trade after ordinary
+purchases decline; pricing already-owned refresh traits into refresh value; retaining/buying a second bench
+refresh stacker. Full deployment and a leak-free preceding round did not prevent lost development or guard
+regressions. There is no new production weight, difficulty exception or resource grant. Use
+`node tools/botbench.mjs --configs solo:ABYSS --seeds 40 --jobs 4 --layers --json layers.json` to reproduce the
+source ledger; history §37.24 gives all five configurations and the source/target comparisons.
+
+### Cycle 7: 职业队 (§37.35, round54)
+
+The maintainer (2026-10-28): judge on 终极 only; unless a 职业队 strategy reliably supplies the main bond's operators, the
+draws decide whether layers can be stacked, so no leader-specific (physical / Arts) drafting. The legacy bots now take a
+职业队 strategy's core bond (`gd.bandBondIds`) as the focus from round 1, spend its rigged refreshes (杜遥夜's first two,
+佩佩's after a 2 / 4 / 6 level-up) before levelling, trade every 获得时 layer trait plus the deployed 小满 / 夕 gain count,
+and refresh for 阿罗玛 / 安洁莉娜 / 拉普兰德 layers. Forced 职业队 strategies (9 × 40 solo 终极 seeds): main layers
+20 → 75, pool completion 15.9 → 20.1 %. The Final Assault share rises with the main bond's layers (31 % below 75, 46 % at
+125–200, 59 % at 200+), so roughly 400–500 main layers clear the pool — the community's 「400层保底」. A 职业队-only band
+pick on 终极 lost (solo 19.4 %, co-op 8.5 % completion): the low-LP strategies do not survive rounds 11–13 yet. Open levers,
+per bond: 炎's gain count (the bots gain 2.4–3.5 operators a round with 小满 out), 阿戈尔's battle-start devour placement,
+谢拉格 freeze collectors, 卡西米尔's 远牙 row, and two tank-grade blockers beside a 6-member core.
+
+### Cycle 8: engine-first (§37.36, round54)
+
+A piece whose recurring or battle trait adds layers to the focus bond (its text names the bond, or adds to its own bonds)
+is worth ENGINE_BONUS more to buy and to field until the Final Assault. Normal band picks: solo 终极 1–160 pool completion
+25.1 → 30.7 % (wins 4 → 8), co-op 1–80 24.6 → 23.0 % (noise; 40-seed co-op runs swing about 5 points). Withdrawn: counting
+the most-layered-bond engines (co-op fell), bench engines kept for their per-copy layers (+0.44 pieces a round, flat), a
+two-heavy-blocker floor (more 职业队 boards reach the Final Assault, less damage there, co-op fell) and economy-item values
+(精打细算 still loses to three refreshes on a full board). Front-tile placements (凛御银灰, 阿戈尔's devour, 魔王, 空弦)
+remain open.
+
+### Cycle 9: R11–R13 diagnosis, positional traits, layer-gain rehearsal ties, engine merges (§37.37, round54)
+
+The rounds before the Final Assault leak because boards are outclassed, not misplaced: 79 % of R11–R13 leaks were never
+blocked and walked off with 70 % of their HP, 1599 of 1812 after the first blocker fell; co-op 终极's official enemy HP is
+×3.58 / ×4.30 at R7 / R8 against solo's ×1.73. Wider layout rehearsals and bench 重装 / healer swaps did not help. A Final
+Assault lab (the same seeds replayed with one change at the boss prep) put the lever on layers: all active bonds ×2 lifted
+the leader pool share 40.8 → 58.1 % (wins 3 → 13), +150 focus layers to 57.8 %, +20 LP to 45.4 %, +20 funds to 42.7 %.
+Changes: positional traits (front / behind / row / rightmost / copies / 阿戈尔's devour) arranged first in the rehearsal,
+which now breaks leak and leader-damage ties by the layers the battle gained; skill points on skill-start engines and
+equipment on 维多利亚 members; an engine's second and third copies worth more (an elite doubles its layers); Final
+Assault lineups with a strong bench piece rehearsed. Normal picks: solo 1–160 30.7 → 32.0 %, co-op 1–80 23.0 → 27.4 %;
+职业队 forced 22.3 → 26.4 %, focus layers 90 → 100. Withdrawn: 助力 valued for its +2 / +4 on every active bond (its
+members crowd the main bond out: co-op 27.4 → 20.3 %), an engine-first layout candidate (co-op fell), engine merges ×2.
+The focus bond still activates late (median R6–R8; its members come slowly at shop levels 1–2), the next lever.
+
+### Cycle 10: no level 6 (§37.38, round54)
+
+Upstream dev `78c9adb8` caps ordinary legacy bots at shop level 5 (still at R9): the R11 upgrade's 10–11 funds and
+subsequent tier-6 dilution cost more than tier 6 brings. Upstream paired 终极 measurements: solo 1–320 completion
+30.9 → 38.7 % (+7.8 ± 1.5), co-op 1–160 25.7 → 30.0 % (+4.4 ± 2.0); these are upstream results, not a Pro rerun.
+This supersedes cycle 2's L6-at-R11 target. Human autoplay with stocked next-level DIY may bypass the cap, but must
+still meet the usual spending condition; advisor plans and explicit policies keep their own ceilings. Pro's frozen
+elite drivers do not inherit this ordinary-bot target. Four-version Pro match goldens are recomputed locally, not
+copied from upstream; see the Pro follow-up in history 0.3.3.
+

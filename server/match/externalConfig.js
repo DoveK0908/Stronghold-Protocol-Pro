@@ -9,6 +9,7 @@ export function externalConfig(input, env = process.env, replay = false) {
     c.mode = env.SP_EXTERNAL_AI_MODE || c.mode;
     c.language = env.SP_EXTERNAL_AI_LANGUAGE || c.language;
     if (env.SP_EXTERNAL_AI_KNOWLEDGE) c.knowledge = env.SP_EXTERNAL_AI_KNOWLEDGE === '1';
+    if (env.SP_EXTERNAL_AI_MANUAL_WAIT) c.manualWait = env.SP_EXTERNAL_AI_MANUAL_WAIT === '1';
     c.transport = env.SP_EXTERNAL_AI_TRANSPORT;
     c.url = env.SP_EXTERNAL_AI_URL;
     if (env.SP_EXTERNAL_AI_COMMAND) {
@@ -21,13 +22,15 @@ export function externalConfig(input, env = process.env, replay = false) {
     }
   }
   c.knowledge ??= c.mode === 'plan';
+  c.manualWait ??= false;
+  if (typeof c.manualWait !== 'boolean' || (c.manualWait && c.mode !== 'direct')) throw new Error('External AI: manualWait requires direct mode');
   if (!['direct', 'plan'].includes(c.mode)) throw new Error('External AI: invalid mode');
   if (!['zh-CN', 'en', 'ja', 'ko', 'zh-TW'].includes(c.language)) throw new Error('External AI: invalid language');
   if (typeof c.knowledge !== 'boolean') throw new Error('External AI: invalid knowledge flag');
   for (const [key, max] of Object.entries({ timeoutMs: 300000, maxIntents: 256, maxBytes: 1048576, failureLimit: 20, backoffMs: 60000 })) {
     if (!Number.isInteger(c[key]) || c[key] < 1 || c[key] > max) throw new Error(`External AI: invalid ${key} (1..${max})`);
   }
-  if (c.seats !== undefined && (!Array.isArray(c.seats) || c.seats.length > 4 || c.seats.some(s => !Number.isInteger(s) || s < 0 || s > 3))) throw new Error('External AI: seats must be indices 0..3');
+  if (c.seats !== undefined && (!Array.isArray(c.seats) || c.seats.length > 20 || c.seats.some(s => !Number.isInteger(s) || s < 0 || s > 19))) throw new Error('External AI: seats must be indices 0..19');
   if (!replay) {
     if (!['http', 'stdio'].includes(c.transport)) throw new Error('External AI: configure SP_EXTERNAL_AI_TRANSPORT=http or stdio');
     if (c.transport === 'http') {

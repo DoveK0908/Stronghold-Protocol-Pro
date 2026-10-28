@@ -57,7 +57,7 @@ export function uiScaleStep(uiScale, phone) {
  *  设置「部署时收起商店」 (`prepDeployFold`, GitHub #602 / PR #646): picking a piece up on the own prep board folds the shop
  *  bar and zooms to the shop-collapsed camera for the drag / direction wheel, then gives the player's own fold back. The
  *  official default is on; this fork ships it OFF (the owner's decision of 2026-10-19: every convenience switch here is
- *  opt-in). Only an explicit true turns it on (ui/screens/game.js, gameLogic/camera.js deployFoldsShop).
+ *  opt-in). An explicit true folds fully; 'partial' keeps a 70% shop with an intermediate camera offset.
  *  officialFx: 设置「官方特效」 (0.3.0, render/vfx): 'full' (完整, this fork's default on every device — the owner's
  *  decision of 2026-10-16), 'auto' (完整 on a desktop, 精简 on a touch device — render/vfx/tier.js), 'off', 'lite'
  *  (精简); only shown when effects were extracted from the local client.
@@ -94,7 +94,7 @@ function ammoEnergyCountOf(r) {
 /**
  * Sanitize persisted settings.
  * @param {any} raw
- * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean, quality: 'high'|'medium'|'low',
+ * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean|'partial', quality: 'high'|'medium'|'low',
  *   officialFx: 'auto'|'off'|'lite'|'full', otherSkins: boolean, showTag: boolean,
  *   textSize: 'sm'|'md'|'lg'|'xl', uiScale: string, keys: Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>, bgmPrep: string, bgmCombat: string, lobbyTrack: string, lobbyCustomId: string, lobbyShuffle: boolean, lobbyVolume: number, lobbyMusicOpen: boolean, lobbyMusicPos: { x: number, y: number }|null }}
  */
@@ -113,7 +113,7 @@ export function sanitizeSettings(raw) {
     officialDamageNumbers: typeof r.officialDamageNumbers === 'boolean' ? r.officialDamageNumbers : false,
     ammoEnergyCount: ammoEnergyCountOf(r),
     bondTimers: r.bondTimers === true,
-    prepDeployFold: r.prepDeployFold === true,
+    prepDeployFold: r.prepDeployFold === 'partial' ? 'partial' : r.prepDeployFold === true,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
     fullscreenWakeLock: typeof r.fullscreenWakeLock === 'boolean' ? r.fullscreenWakeLock : DEFAULT_SETTINGS.fullscreenWakeLock,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,

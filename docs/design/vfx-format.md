@@ -1382,7 +1382,8 @@ index.json — version 1 and the version 2 fields (§33.12, §33.15; Phase 3c) �
   while the unit stands, IMMEDIATELY once), a husk's revival ('revived') its ManualTriggerRebornTalent's `_effects`;
   then `reborn.mode`'s attacks; null — the sim fx its `triggers` name (a fatal blow, ON_BEFORE_TRY_SET_HP_ZERO:
   'substitute' / 'undying'; a stand-in buff's ON_BUFF_FINISH: 'swap' / 'dollEnd'; ON_SKILL_START: the skill's start;
-  ON_OWNER_BORN: the deploy), its rows once (a loop for 3 s [ASSUMED]); `attack` — only where a kit fx marks the
+  ON_OWNER_BORN: the deploy; the one point strike, `talents.js POINT_TRIGGERS`: 新约能天使's `angel2_t_1[target]` → the
+  sim's talent 'airstrike' fx, its attack plan's first hit group at the fx's spot — PR #861, 0.3.4 §37.19), its rows once (a loop for 3 s [ASSUMED]); `attack` — only where a kit fx marks the
   talent's attack ('extraAttack': 守林人's 受选之人 — the attack's casts on the owner, its hits on that attack's target), else
   nothing (8 roster nodes). The forms' modes come from the data (`talents.js formModes`: a RebornTalent's 'form2' →
   `reborn.mode`, a husk's modes, a 傀儡师's 'doll' → the mode its fatal-blow node switches to — 风丸 → Stand, whose attack
@@ -1903,3 +1904,9 @@ are additive and old consumers ignore them.
 Sources: `config/buff_template_holder.ab` (`ines_t_2` event 0, dumped action graph); local v3 index
 `units.char_4087_ines.talents["2"].uses`; the client's own `ines_range_01` (one `wall_*` pair) vs `ines_range_02`
 (three) prefabs. No sim rules change.
+
+### Talent strike points (official #861 port, 2026-10-27)
+
+pointKinds(binding) marks TalentBomb airstrike nodes whose hit rows play at the supplied fx x/y. Only talent:true
+selects this talent path; a skill using the same fx kind does not. Missing coordinates or assets keep fallback
+effects. Self-mounted substitute/swap rows still select a single target-form binding and skip duplicate starts.

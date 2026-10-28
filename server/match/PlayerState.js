@@ -1,3 +1,4 @@
+import { eliteCard } from '../../shared/eliteAi.js';
 // server/match/PlayerState.js — authoritative per-player state + every prep intent handler (DESIGN §6.2).
 //
 // Handlers validate → mutate → recompute bonds → mark the private view dirty. They never throw on bad input; they
@@ -153,7 +154,7 @@ export class PlayerState {
     /** @type {string | null} 名字#1234 four digits (界面#09); null for bots and older clients */
     this.tag = typeof seat.tag === 'string' ? seat.tag : null;
     /** room.card { charId, avatar, avatarLook?, look?, bg }: display only, never read by the rules. */
-    this.card = seat.card && typeof seat.card === 'object' ? seat.card : null;
+    this.card = eliteCard(seat) || (seat.card && typeof seat.card === 'object' ? seat.card : null);
     this.isBot = !!seat.isBot;
     this.connected = this.isBot ? true : !!seat.connected;
     this.left = false;

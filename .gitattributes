@@ -17,6 +17,24 @@
 *.yml  text eol=lf
 # Preserve the exact bytes/hashes of upstream moderation licenses, including their original whitespace.
 deploy/stardust/auth/NAME-*-LICENSE.txt -text whitespace=-blank-at-eol
+# Frozen upstream AI sources: manifests hash original bytes, not normalized text.
+# Keep upstream whitespace rather than reformatting vendored policy files.
+server/match/arturia/policy/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/arturia/compat/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/arturia/runtime/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/lavinia/policy/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/lavinia/compat/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/lavinia/runtime/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/aiAddons/zumama/policy/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/aiAddons/zumama/compat/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/aiAddons/zumama/runtime/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/arturia/runtime.js -text whitespace=cr-at-eol,-blank-at-eof
+server/match/lavinia/runtime.js -text whitespace=cr-at-eol,-blank-at-eof
+server/match/aiAddons/zumama/runtime.js -text whitespace=cr-at-eol,-blank-at-eof
+server/match/aiCompute/** -text whitespace=cr-at-eol,-blank-at-eof
+server/match/arturia/LICENSE -text
+server/match/lavinia/LICENSE -text
+server/match/aiAddons/zumama/LICENSE -text
 # binary assets
 *.png binary
 *.jpg binary

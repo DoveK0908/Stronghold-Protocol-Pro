@@ -96,3 +96,7 @@ deploy/stardust/**/auth-secrets/
 public/dev/simcheck/data/
 # the Vite bundle of the UI layer (npm run build; vite.config.js)
 public/build/
+
+# Runtime data of the pinned optional Luck launcher.
+mods/luck/runtime/logs/
+mods/luck/runtime/mod.config.json

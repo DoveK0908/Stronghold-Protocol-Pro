@@ -166,7 +166,8 @@ export function draftTip({ timed, turnSeconds = null, autoName = null, selected 
   // a concurrent draft (everybody at once, expanded rooms): no skip, one clock for the step
   const skip = concurrent ? t('所有博士同时选择') : t('联合模拟在选择策略时可以进行一次跳过');
   if (!timed) return t('{skip}；本局不限时', { skip });
-  const clock = Number(turnSeconds) > 0 ? t(concurrent ? '限时 {n} 秒' : '每位博士有 {n} 秒', { n: Math.round(turnSeconds) }) : t('每位博士限时决策');
+  const params = { n: Math.round(turnSeconds) };
+  const clock = Number(turnSeconds) > 0 ? (concurrent ? t('限时 {n} 秒', params) : t('每位博士有 {n} 秒', params)) : t('每位博士限时决策');
   if (!autoName) return t('{skip}；{clock}', { skip, clock });
   return selected ? t('{skip}；{clock}，超时将自动选择当前选中的「{autoName}」', { skip, clock, autoName })
     : t('{skip}；{clock}，超时将自动选择「{autoName}」', { skip, clock, autoName });
@@ -261,8 +262,8 @@ export function BandDraftScreen({ held = false } = {}) {
     byChar: new Map(cardList.map((c) => [c.charId, c])), m: data.get('assets'), myId, myCard: myCard.charId, myLook: myCard.look,
   }), [cardList, myId, myCard.charId, myCard.look]);
   const seatOf = (pid) => (Array.isArray(roomSeats) ? roomSeats.find((x) => x && x.playerId === pid) : null) || null;
-  const cardOf = (pl) => (pl.playerId === myId ? myCard : seatOf(pl.playerId)?.card || null);
-  const artOf = (pl) => (pl.isBot ? null : seatPortrait(seatOf(pl.playerId) || { playerId: pl.playerId }, portraits));
+  const cardOf = (pl) => (pl.playerId === myId ? myCard : pl.card || seatOf(pl.playerId)?.card || null);
+  const artOf = (pl) => seatPortrait(seatOf(pl.playerId) || pl, portraits);
   const draft = normalizeDraft(pub?.draft, players);
   // an expanded room's draft: every seat picks at once (server MatchPhases.concurrentDraft) — no turn, no skip
   const concurrent = !solo && draft.concurrent === true;

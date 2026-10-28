@@ -162,6 +162,7 @@ describe('deploying a piece leaves the shop and the camera as they are (#602 rem
     assert.equal(await cam(), shopCam, 'back on exactly the shop camera');
     assert.equal(await page.evaluate(() => document.querySelector('.gm')?.classList.contains('is-collapsed')), false);
     assert.deepEqual(problems, []);
+    await page.evaluate(async () => (await import('/js/ui/settings.js')).updateSettings({ prepDeployFold: true }));
     await page.close();
   });
 
@@ -174,4 +175,26 @@ describe('deploying a piece leaves the shop and the camera as they are (#602 rem
     assert.deepEqual(h.problems, []);
     await h.page.close();
   });
+  test('middle mode keeps the shop through facing, and mid-drag off restores it without changing the preference', async () => {
+    const h = await openPage({ width: 844, height: 390, hasTouch: true });
+    const set = (v) => h.page.evaluate(async (value) => (await import('/js/ui/settings.js')).updateSettings({ prepDeployFold: value }), v);
+    await set('partial');
+    await h.pickup(h.chess);
+    await h.page.waitForSelector('.gm.is-deploy-partial .shopbar');
+    await h.dropOn(...h.tile);
+    await h.page.waitForSelector('.fwheel');
+    assert.ok(await h.page.$('.gm.is-deploy-partial .shopbar'));
+    await h.page.keyboard.press('Escape');
+    await h.page.waitForSelector('.gm.is-deploy-partial', { hidden: true });
+    await h.pickup(h.item);
+    await h.page.waitForSelector('.gm.is-deploy-partial');
+    await set(false);
+    await h.page.waitForSelector('.gm.is-deploy-partial', { hidden: true });
+    assert.deepEqual(await h.folded(), { cls: false, tab: false });
+    await h.cancelDrag();
+    await set(true);
+    assert.deepEqual(h.problems, []);
+    await h.page.close();
+  });
+
 });

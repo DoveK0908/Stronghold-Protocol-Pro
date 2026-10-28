@@ -1,3 +1,4 @@
+import { eliteRecruit, eliteCard } from '../shared/eliteAi.js';
 // server/lobby.js — rooms, seats, host, AI seats, ready/start, reconnect, and room → Match wiring
 // (DESIGN §2, §6.1 LOBBY, §8.1). Implements the handler interface consumed by server/net.js.
 //
@@ -267,6 +268,7 @@ import { GameData } from './match/gamedata.js';
 import { Matchmaking } from './matchmaking.js';
 import { KITTED_CHARS } from './sim/content/kits/index.js';
 import { NO_PHASES } from './phaseMetrics.js';
+import { PeerRelay } from './peerRelay.js';
 
 const VANILLA_KITTED = new Set(KITTED_CHARS);
 import { isContentHash } from '../shared/plugins/identity.js';
@@ -622,7 +624,7 @@ export class Room {
           ...(s.isBot ? { band: s.band ?? null } : {}),
           ...(s.isBot && s.botPersona ? { botPersona: s.botPersona } : {}),
           // display only: the player's room.card and the 服主 mark (absent when none)
-          ...(!s.isBot && s.card ? { card: s.card } : {}), ...(!s.isBot && s.owner ? { owner: true } : {}),
+          ...(eliteCard(s) ? { card: eliteCard(s) } : !s.isBot && s.card ? { card: s.card } : {}), ...(!s.isBot && s.owner ? { owner: true } : {}),
           // 干员皮肤 (docs/SKINS.md): every seat's own picks, so teammates draw the card / lineup with the appearance
           // its owner chose. Only changed entries, so a room without skins keeps the same frame as before.
           ...(!s.isBot && s.skins && Object.keys(s.skins).length ? { skins: s.skins } : {}),
@@ -768,6 +770,8 @@ export class Lobby {
     });
     /** stops following the limits file's maintenance switch (server/onlineLimit.js onMaintenance) */
     this.unwatchMaintenance = typeof limits?.onMaintenance === 'function' ? limits.onMaintenance((on) => this.maintenanceChanged(on)) : null;
+    this.peerRelay = new PeerRelay({ now, log });
+    this.publicDeliveries = new WeakMap();
     /** log lines said once (warnOnce) */
     this.told = new Set();
     /** a held visual set whose plugins changed on disk: its rooms' hosts are told (header "The room's plugins") */
@@ -1040,6 +1044,9 @@ export class Lobby {
    * @returns {{ ok: true } | { error: string, detail?: string } | Promise<{ ok: true } | { error: string, detail?: string }>}
    */
   onMessage(session, msg) {
+    // Transport handshakes/leases belong to the live socket, independently of a plugin match's IPC queue.
+    // In particular, an old queued enable must never opt a replacement socket into peer delivery.
+    if (msg?.t === 'p2p.enable' || msg?.t === 'p2p.signal' || msg?.t === 'p2p.ready') return this.handleMessage(session, msg);
     const room = this.queuedRoom(session);
     if (!room) return this.handleMessage(session, msg);
     // a queued room.contentReady speaks for the page that sent it: the seat and its generation now — a disconnect in
@@ -1149,6 +1156,20 @@ export class Lobby {
       // throttles it like the other resend-heavy intents). This is the same heavy resync a repeated hello runs, so it
       // draws from the same per-session budget: the match resends its full state, or the lobby its room state.
       case 'state.resync': return this.resync(session, true) ?? { ok: true };
+      case 'p2p.enable': {
+        this.peerRelay.enable(session, msg.enabled);
+        const room = this.roomOf(session);
+        if (room) this.peerRelay.sync(room, [...this.memberSessions(room)], session);
+        else sendSession(session, { t: 'p2p.config', enabled: false });
+        return OK;
+      }
+      case 'p2p.signal':
+      case 'p2p.ready': {
+        const room = this.roomOf(session);
+        if (!room) return fail(ERR.NOT_IN_ROOM);
+        this.peerRelay.sync(room, [...this.memberSessions(room)]);
+        return msg.t === 'p2p.signal' ? this.peerRelay.signal(room, session, msg) : this.peerRelay.ready(room, session, msg);
+      }
       default:
         if (typeof msg.t === 'string' && msg.t.startsWith('g.')) return this.routeGameNow(session, msg);
         return fail(ERR.BAD_MSG, `unhandled type ${String(msg.t).slice(0, 32)}`);
@@ -1160,6 +1181,7 @@ export class Lobby {
     if (this.isOnline(session)) return; // an obsolete socket must not detach its replacement
     this.presenceChanged(session, false);
     this.queue.remove(session, 'disconnected');
+    this.peerRelay.disconnect(session);
     this.clearResync(session.playerId); // the next resume resyncs immediately
     const room = this.roomOf(session);
     // a solo run may be resumed within singleReconnectTime (24 h); everything else keeps the registry's window
@@ -1260,6 +1282,7 @@ export class Lobby {
     this.graceTimers.clear();
     for (const t of this.resyncTimers.values()) clearTimeout(t);
     this.resyncTimers.clear();
+    this.peerRelay.dispose();
   }
 
   // ---------------------------------------------------------------------------------------------------
@@ -2059,7 +2082,7 @@ export class Lobby {
     if (idx < 0) return fail(ERR.ROOM_FULL);
     const capped = this.botCapRefusal(room, session);
     if (capped) return capped;
-    if (persona !== undefined && !['arturia', 'lavinia'].includes(persona)) return fail(ERR.BAD_TARGET);
+    if (persona !== undefined && !eliteRecruit(persona)) return fail(ERR.BAD_TARGET);
     if (persona && room.seats.some((s) => s?.botPersona === persona)) return fail(ERR.ALREADY);
     // the named elite policies fight with their own band, which the standard FUNNY mode disables
     if (persona && room.difficulty === 'FUNNY') return fail(ERR.BAD_TARGET);
@@ -2067,6 +2090,7 @@ export class Lobby {
     const used = new Set(room.seats.filter((s) => s && s.isBot).map((s) => s.name));
     const name = persona === 'arturia' ? 'AI·阿尔图罗' // i18n-ignore: player name
       : persona === 'lavinia' ? 'AI·拉维妮娅' // i18n-ignore: player name
+      : persona === 'zumama' ? 'AI·祖玛玛' // i18n-ignore: player name
       : BOT_NAMES.find((n) => !used.has(n)) || `AI·${idx + 1}`;
     let playerId;
     do playerId = 'ai_' + randomBytes(4).toString('hex'); while (room.seatOf(playerId));
@@ -2817,7 +2841,7 @@ export class Lobby {
       return {
         seat: s.seat, playerId: s.playerId, name: s.name, ...(s.tag ? { tag: s.tag } : {}), isBot: s.isBot, connected: s.connected,
         // display only: the player's room.card (头像 + 名片底图), so every client can draw their face instead of a band icon
-        ...(!s.isBot && s.card ? { card: s.card } : {}),
+        ...(eliteCard(s) ? { card: eliteCard(s) } : !s.isBot && s.card ? { card: s.card } : {}),
         ...(s.botPersona ? { botPersona: s.botPersona } : {}),
         // DESIGN §16: the human's checked operator loadout and (0.2.2) per-operator 潜能 / 练度 (bots fight with the defaults)
         loadout: own ? own.loadout : null,
@@ -3368,6 +3392,7 @@ export class Lobby {
    */
   disposeRoom(room, reason) {
     if (room.disposed) return;
+    this.peerRelay.clear(room);
     room.disposed = true;
     if (this.rooms.get(room.code) === room) { this.trustedRuntime?.event('roomClosed',{room:room.toState(this.now())}); this.rooms.delete(room.code); }
     // an open version vote ends with the room (its timer)
@@ -3445,6 +3470,7 @@ export class Lobby {
       if (state.inMatch && !prev?.inMatch) event('matchStarted');
       room.trustedPrevious = state;
     }
+    this.peerRelay.sync(room, [...this.memberSessions(room)]);
     // one encode, then the fork's link-aware fanout (cluster/link-server.js: sockets riding an ingress link share one
     // frame); the port sent frame by frame, which copies the state once per member
     const data = encode(room.toState(this.now()));
@@ -3452,17 +3478,70 @@ export class Lobby {
   }
 
   sendState(room, session) {
+    this.peerRelay.sync(room, [...this.memberSessions(room)], session);
     sendSession(session, room.toState(this.now()));
+  }
+
+  /** The room's delivery stream: one order shared by the WebSocket and the peer path. */
+  publicStream(room) {
+    let stream = this.publicDeliveries.get(room);
+    if (!stream) {
+      stream = { epoch: randomBytes(16).toString('hex'), seq: 0 };
+      this.publicDeliveries.set(room, stream);
+    }
+    return stream;
+  }
+
+  /**
+   * Append the room's delivery stamps to bytes a caller already produced (a lane Worker's m.public). Splicing them
+   * into the finished JSON keeps the pass-through: the public view is still serialized exactly once per broadcast.
+   * Bytes that are not a JSON object come back unchanged — that frame carries no cross-transport order to honour.
+   * @param {string} bytes @param {string} epoch @param {number} seq
+   * @returns {string}
+   */
+  stampPublicBytes(bytes, epoch, seq) {
+    const end = bytes.lastIndexOf('}');
+    if (end < 0) return bytes;
+    let view;
+    try { view = JSON.parse(bytes); } catch { return bytes; }
+    if (!view || typeof view !== 'object' || Array.isArray(view)) return bytes;
+    return `${bytes.slice(0, end)},"deliveryEpoch":${JSON.stringify(epoch)},"deliverySeq":${seq}}`;
+  }
+
+  /**
+   * A public view joins the room's delivery stream: the peer route signs and forwards these stamped bytes, so a
+   * delayed copy from either transport can never overwrite newer state. Inert while `SP_P2P` is not enabled, which
+   * leaves the wire byte-identical with the merged state-delta transport (it owns its own per-connection baseline).
+   * @param {object} room @param {object} msg @param {string | null} [encoded] bytes a caller already produced
+   * @returns {{ msg: object, bytes: string }}
+   */
+  stampPublic(room, msg, encoded = null) {
+    if (!this.peerRelay.enabled || msg?.t !== 'm.public') return { msg, bytes: encoded ?? encode(msg) };
+    const stream = this.publicStream(room);
+    const deliverySeq = ++stream.seq;
+    const bytes = this.stampPublicBytes(encoded ?? encode(msg), stream.epoch, deliverySeq);
+    return { msg: { ...msg, deliveryEpoch: stream.epoch, deliverySeq }, bytes };
   }
 
   /** Match broadcast: encode once, send to every connected member. @returns {string | null} the encoded frame */
   broadcastRoom(room, msg, encoded = null) {
     if (room.disposed) return null;
-    const data = encoded ?? encode(msg);
+    let data = encoded ?? encode(msg);
     if (data == null) { this.log.error(`[lobby] ${room.code} unserializable broadcast ${msg && msg.t}`); return null; }
+    const stamped = this.stampPublic(room, msg, data);
+    msg = stamped.msg;
+    data = stamped.bytes;
+    const members = [...this.memberSessions(room)];
+    // Peer delivery (server/peerRelay.js) takes the relay and its ready receivers out of the loop below: the relay
+    // gets the signed frame over its own socket (never compressed into a delta — it forwards these exact bytes) and
+    // each ready receiver is served by the channel, with the lobby's watchdog re-sending over WebSocket on timeout.
+    const routed = this.peerRelay.enabled && msg.t === 'm.public' ? this.peerRelay.broadcast(room, members, data) : null;
     // per connection: sendSession runs the state transport, which owns each socket's delta baseline (and the
     // droppable/backpressure rules) - one shared byte string in, one frame per member out
-    for (const session of this.memberSessions(room)) sendSession(session, msg, data);
+    for (const session of members) {
+      if (routed?.has(session)) continue;
+      sendSession(session, msg, data);
+    }
     return data;
   }
 
@@ -3483,6 +3562,8 @@ export class Lobby {
     if (!seat || seat.isBot || seat.left) return false;
     const session = this.registry.byId(playerId);
     if (!session || session.roomCode !== room.code) return false;
-    return sendSession(session, msg, encoded);
+    // A unicast m.public joins the room's delivery stream too (its stamps order it against peer frames).
+    const stamped = this.stampPublic(room, msg, encoded ?? encode(msg));
+    return sendSession(session, stamped.msg, stamped.bytes);
   }
 }

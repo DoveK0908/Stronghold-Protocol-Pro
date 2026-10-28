@@ -6,6 +6,7 @@
 // the modal's rem-sized box and — through the dev mock's 休整期 screen — the field host, the canvas and the shop bar stay
 // exactly where they were. Static counterpart: test/ui/text-scale.test.js.
 
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

@@ -94,6 +94,7 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { smokePackage } from './package-smoke.mjs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -256,14 +257,14 @@ export function selectTracked(paths) {
 }
 
 export function trackedFiles(root) {
-  const r = spawnSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync('git', ['-C', root, 'ls-files', '-z'], { maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   if (r.error || r.status !== 0) throw new Error('git ls-files failed: the package takes tracked files only, run it in a git checkout');
   return r.stdout.toString('utf8').split('\0').filter(Boolean);
 }
 
 /** Tracked files of `files` with uncommitted changes (staged or not). */
 export function dirtyFiles(root, files) {
-  const r = spawnSync('git', ['-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=no'], { maxBuffer: 64 * 1024 * 1024 });
+  const r = spawnSync('git', ['-C', root, 'status', '--porcelain=v1', '-z', '--untracked-files=no'], { maxBuffer: 64 * 1024 * 1024, windowsHide: true });
   if (r.error || r.status !== 0) throw new Error('git status failed');
   const want = new Set(files);
   const out = [];
@@ -695,7 +696,7 @@ export function zipFolder(cwd, zipPath, folder = FOLDER) {
   for (const [cmd, args] of attempts) {
     // a half-written zip from the attempt before must not pass for one this attempt made
     fs.rmSync(zipPath, { force: true });
-    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8' });
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', windowsHide: true });
     if (!r.error && r.status === 0 && isFile(zipPath)) return;
     const end = r.status === null && r.signal ? `signal ${r.signal}` : `exit ${r.status}`;
     const why = r.error ? String(r.error.code || r.error.message) : `${end}${errLine(r.stderr) ? ` (${errLine(r.stderr)})` : ''}`;
@@ -802,7 +803,7 @@ function makeStage(root, p, stage, { install, env, log }) {
   if (install) {
     log('npm ci --omit=dev …');
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const r = spawnSync(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: stage, stdio: 'inherit', shell: process.platform === 'win32' });
+    const r = spawnSync(npm, ['ci', '--omit=dev', '--no-audit', '--no-fund'], { cwd: stage, stdio: 'inherit', shell: process.platform === 'win32', windowsHide: true });
     if (r.error || r.status !== 0) throw new Error('npm ci --omit=dev failed in the stage');
     fs.rmSync(path.join(stage, 'node_modules', '.cache'), { recursive: true, force: true });
     for (const file of ['pixi.min.js', 'ses.umd.js', 'acorn.mjs']) {
@@ -1180,7 +1181,7 @@ export function parseArgs(argv) {
   return o;
 }
 
-function main(argv) {
+async function main(argv) {
   let o;
   try { o = parseArgs(argv); } catch (e) { console.error(`package: ${e.message}`); return 2; }
   if (o.help) { console.log(USAGE); return 0; }
@@ -1209,11 +1210,15 @@ function main(argv) {
   try {
     if (o.update) {
       const r = buildUpdate(o.root, p, bases, opts);
+      for (let i = 0; i < bases.length; i++) {
+        await smokePackage(r.zipPath, { base: bases[i].source, version: p.version, logPath: `${r.zipPath}.base-${i + 1}.smoke.log` });
+      }
       process.stdout.write(formatUpdate(r, p.version));
       console.log(`zip: ${r.zipPath} (${MB(r.zipBytes)}, ${r.files} files)${r.stage ? ` · stages kept: ${r.stage}, ${r.full}` : ''}`);
       return 0;
     }
     const r = build(o.root, p, opts);
+    await smokePackage(r.zipPath, { version: p.version });
     console.log(`zip: ${r.zipPath} (${MB(r.zipBytes)}, ${r.files} files)${r.stage ? ` · stage kept: ${r.stage}` : ''}`);
     return 0;
   } catch (e) {
@@ -1248,4 +1253,6 @@ function mainAssets(o) {
 }
 
 const invoked = (() => { try { return pathToFileURL(fs.realpathSync(process.argv[1] || '')).href; } catch { return null; } })();
-if (invoked === import.meta.url) process.exitCode = main(process.argv.slice(2));
+if (invoked === import.meta.url) main(process.argv.slice(2)).then((code) => { process.exitCode = code; }, (error) => {
+  console.error(`package: ${error.message}`); process.exitCode = 1;
+});

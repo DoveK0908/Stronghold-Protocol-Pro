@@ -114,7 +114,7 @@ const sliceCtl = testSlice(this);
           r = gen.next();
           if (!r || typeof r.done !== 'boolean') throw new TypeError('Bot prep hooks must return a synchronous iterator');
           if (sliceCtl) sliceCtl.note(1);
-        } while (!r.done && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
+        } while (!r.done && !ps._botCoopWorkerWaiting && !(sliceCtl ? sliceCtl.wall(now() - t0, this.botSliceMs) : (bounded && now() - t0 >= this.botSliceMs))); // loop-cap: generator and the bot time slice
       } catch (e) { failure = e; }
       finally { this._workerBotPrepOwner = owner; }
       if (!valid()) { work.cancel(); return; }
@@ -135,7 +135,7 @@ const sliceCtl = testSlice(this);
     };
     const end = (job) => {
       let gen = null;
-      try { gen = this.bot.prepEnd(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
+      try { gen = this.botFor(ps).prepEnd(this, ps, job); } catch (e) { this.reportError(`bot ${ps.playerId}`, e); }
       if (!gen) { ready(); return; }
       drive(gen, '', ready);
     };
@@ -160,7 +160,7 @@ const sliceCtl = testSlice(this);
     const begin = () => {
       if (!valid()) return;
       let gen;
-      try { gen = this.bot.prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
+      try { gen = this.botFor(ps).prepBegin(this, ps, { delegate: this.botRehearsalDelegate, pooled: !!this.simPool }); }
       catch (e) { this.reportError(`bot ${ps.playerId}`, e); end(null); return; }
       drive(gen, '', (job) => {
         if (!job) { end(null); return; }
@@ -233,7 +233,7 @@ const sliceCtl = testSlice(this);
     };
     this.later(this.scaled(DELAYS.BOT_ACTION + i * DELAYS.BOT_STAGGER), () => {
       if (!valid()) return;
-      if (this.bot.decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
+      if (this.botFor(ps).decide?.(this, ps, { kind: 'prep', valid, complete: () => ps.ready,
         fallback: () => this.later(0, begin) })) return;
       begin();
     });

@@ -39,6 +39,20 @@ test('level is a floor and legacy continues beyond it; explicit hold stops even 
   levelUp(m, ps); assert.equal(ps.shop.level, 3); assert.equal(ps.funds, 0);
 });
 
+test('advisor level 6 bypasses the legacy cap but still honours hold and reserve', t => {
+  const { m, ps, plan } = setup(t, { economy: { level: 6 } });
+  ps.shop.level = 5; ps.shop.upgradePrice = 10; ps.funds = 11;
+  levelUp(m, ps); assert.equal(ps.shop.level, 6); assert.equal(ps.funds, 1);
+  ps.shop.level = 5; ps.shop.upgradePrice = 0; ps.funds = 100;
+  plan.economy = { level: 5, holdLevel: true, why: 'Keep tier-five odds.' };
+  levelUp(m, ps); assert.equal(ps.shop.level, 5);
+  ps.bandId = m.gd.leftoverKeptBands[0];
+  assert.ok(ps.bandId, 'a banking band exists');
+  ps.shop.upgradePrice = 10; ps.funds = 11;
+  plan.economy = { level: 6, reserve: 2 };
+  levelUp(m, ps); assert.equal(ps.shop.level, 5); assert.equal(ps.funds, 11);
+});
+
 test('expiring funds ignore refresh/reserve preferences and buy a wanted offer before refreshing', t => {
   const { m, ps, plan, ids } = setup(t); const id = ids[0];
   plan.buy = [id]; ps.funds = 4;

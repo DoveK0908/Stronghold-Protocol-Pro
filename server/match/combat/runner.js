@@ -121,7 +121,7 @@ export class WorkerFieldRunner {
       this.inflight = true;
       this.session = this.m.combatPool.create({ specs: this.fields.map((f) => f.spec), boss: this.boss,
         wireFrames: true, coalesceFrames: true, damageBoard: true, snapshotHz: this.m.snapshotHz, gameSpeed: this.m.gameSpeed,
-        metaOnDemand: true, terminalOnce: true }, {
+        metaOnDemand: true, terminalOnce: true, resourceNumbers: true }, {
         onFailure: (e) => this._fail(e),
       });
       this.session.ready.then((out) => this._receive(out, true), (e) => this._fail(e));

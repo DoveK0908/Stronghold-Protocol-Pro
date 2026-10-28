@@ -1604,7 +1604,7 @@ export class FxWiring {
    */
   simFx(kind, x, y, extra) {
     if (!this.idx) return false;
-    const t = this.talents.fx(kind, extra);
+    const t = this.talents.fx(kind, extra, x, y);
     // the floating units stand for the kit's 'drone' / 'drones' / 'droneLock' / 'overload' (render/vfx/funnelfx.js)
     const f = this.funnels.simFx(kind, x, y, extra);
     const n = this.sakiko.simFx(kind, x, y, extra);   // 祥子的 musicNote（render/vfx/sakiko.js）

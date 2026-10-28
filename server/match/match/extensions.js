@@ -1,5 +1,6 @@
 // Server-authoritative Worker transport, damage ledger and room-owned experimental rescue.
 import { PHASE, ERR } from '../../../shared/constants.js';
+import { cancelForecastScopes } from '../aiCompute/scopes.js';
 import { msg } from '../../../shared/i18n.js';
 import { createDamageBoard } from '../damageBoard.js';
 import { emptyDamageRows } from '../../sim/damageBoard.js';
@@ -181,6 +182,7 @@ export class MatchExtensions {
   }
 
   _cancelBotPrep(ps) {
+    cancelForecastScopes(this, ps);
     ps._botPrepToken = (ps._botPrepToken || 0) + 1;
     ps._botPrepWork?.cancel();
   }

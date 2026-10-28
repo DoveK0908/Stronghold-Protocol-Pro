@@ -139,15 +139,62 @@ function legacySeat(t) {
   return { m, ps };
 }
 
-test('bots aim for level 5 at round 9 and level 6 at round 11', t => {
+test('bots aim for level 5 at round 9 and stay there (§37.38: no level 6)', t => {
   const { m, ps } = legacySeat(t);
   const ids = DATA.chess ? Object.values(DATA.chess).filter(c => c.visible && !c.isGolden && c.tier <= 2).map(c => c.chessId) : [];
   for (const id of ids.slice(0, ps.deployCap)) give(m, ps, id, 'hand');
-  for (const [round, from, to] of [[9, 4, 5], [11, 5, 6], [8, 4, 4]]) {
+  for (const [round, from, to] of [[9, 4, 5], [11, 5, 5], [13, 5, 5], [8, 4, 4]]) {
     m.round = round; ps.shop.level = from; ps.shop.upgradePrice = 5; ps.funds = 6;
     levelUp(m, ps);
     assert.equal(ps.shop.level, to, `R${round}: level ${from} → ${to}`);
   }
+  for (const price of [0, 5]) for (const spare of [false, true]) {
+    m.round = 12; ps.shop.level = 5; ps.shop.upgradePrice = price; ps.funds = 100;
+    levelUp(m, ps, { spare });
+    assert.equal(ps.shop.level, 5, `even free/rich/spare upgrades stop at L5 (${price}, ${spare})`);
+    assert.equal(ps.funds, 100);
+  }
+});
+
+test('human autoplay may unlock stocked tier-6 DIY only when its ordinary spending condition allows it', t => {
+  const { m, ps } = legacySeat(t);
+  ps.isBot = false; ps.autoplay = true; ps.bandId = 'band_amiya'; m.round = 12;
+  const ids = m.gd.visibleChess.filter(id => m.pool.has(id) && !m.gd.isGolden(id));
+  for (const id of ids.slice(0, ps.deployCap)) give(m, ps, id, 'hand');
+  assert.ok(ps.allChess().length >= Math.min(ps.deployCap, 6));
+  const reset = (shopLevel, left, funds = 11, price = 10) => {
+    ps.shop.level = 5; ps.shop.upgradePrice = price; ps.funds = funds;
+    ps.diyStock = { entries: new Map([['boundary', { shopLevel, left }]]) };
+  };
+  reset(6, 1);
+  levelUp(m, ps);
+  assert.equal(ps.shop.level, 5, 'stock alone bypasses the cap, not the capped target curve');
+  levelUp(m, ps, { spare: true });
+  assert.equal(ps.shop.level, 6, 'spare pass can afford its stocked tier-6 step');
+  assert.equal(ps.funds, 1);
+  for (const [tier, left] of [[6, 0], [5, 1]]) {
+    reset(tier, left, 100);
+    levelUp(m, ps, { spare: true });
+    assert.equal(ps.shop.level, 5, 'exhausted or wrong-tier DIY does not bypass the cap');
+  }
+  reset(6, 1, 100); ps.diyStock = null;
+  levelUp(m, ps, { spare: true }); assert.equal(ps.shop.level, 5);
+  for (const [funds, price] of [[0, 0], [24, 10]]) {
+    reset(6, 1, funds, price);
+    levelUp(m, ps); assert.equal(ps.shop.level, 6, 'free or surplus funds can unlock stocked DIY');
+  }
+});
+
+test('explicit policy keeps its own level ceiling and refusal/offer guards', t => {
+  const { m, ps } = legacySeat(t);
+  const policy = { canLevel: () => true, core: () => false };
+  ps.shop.slots = []; ps.shop.level = 5; ps.shop.upgradePrice = 5; ps.funds = 6;
+  levelUp(m, ps, { policy }); assert.equal(ps.shop.level, 6);
+  ps.shop.level = 5; ps.shop.upgradePrice = 5; ps.funds = 6;
+  policy.canLevel = () => false;
+  levelUp(m, ps, { policy }); assert.equal(ps.shop.level, 5);
+  policy.canLevel = () => true; ps.offers.push({});
+  levelUp(m, ps, { policy }); assert.equal(ps.shop.level, 5);
 });
 
 test('the layer trade buys a 获得时 layer unit of two active bonds and sells it again when the lineup does not take it', t => {

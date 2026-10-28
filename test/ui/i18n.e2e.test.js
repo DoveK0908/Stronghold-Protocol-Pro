@@ -13,6 +13,7 @@
 // With more than four languages the menu is a list (ui/lang.js SEGMENTED_MAX): the helpers read and pick either form.
 // No console / page / request errors. docs/I18N.md.
 
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

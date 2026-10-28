@@ -2,7 +2,7 @@
 
 Stronghold Protocol's own code is licensed under **GPL-3.0-or-later** (see [LICENSE](LICENSE) and [NOTICE.md](NOTICE.md)).
 The components below are **not** part of that grant: each stays under its own licence, reproduced at the end of this
-file. The only third-party source committed here is `tools/local-extract/aklz4.py` and the transpiled Pixi no-eval adapter `public/js/render/app/pixiNoEval.js`; the client libraries are
+file where available. Third-party sources include `tools/local-extract/aklz4.py`, the transpiled Pixi no-eval adapter `public/js/render/app/pixiNoEval.js`, and the AI integrations and local Luck snapshot described below; the client libraries are
 installed by npm and copied into `public/vendor/` by `tools/vendor.mjs` (postinstall), and the release bundle carries
 them (with `node_modules/`, which keeps each package's own licence file).
 
@@ -31,6 +31,24 @@ The Spine Runtimes License requires, among other things, that redistributions in
 integration is covered by the Spine Editor License Agreement — read it before redistributing. To allow the combination
 at all, this project grants an additional permission under GPL-3.0 section 7 for linking with the Spine Runtimes (see
 [NOTICE.md](NOTICE.md)).
+
+## AI integrations and local Luck snapshot
+
+The elite AI sources originate from [HankDUMPLINGZhong/Stronghold-Protocol-AI](https://github.com/HankDUMPLINGZhong/Stronghold-Protocol-AI).
+The Arturia, Lavinia and Zumama integrations retain their upstream `LICENSE` and `upstream.json` files under
+`server/match/arturia/`, `server/match/lavinia/` and `server/match/aiAddons/zumama/`; consult those files for the GPL terms,
+source revisions and file hashes.
+
+**Redistribution hold — Stronghold-Luck:** the local snapshot in `mods/luck/runtime/` comes from
+[RenJiyi163/Stronghold-Luck](https://github.com/RenJiyi163/Stronghold-Luck), v0.1.7,
+commit `c4dcba173689e356b5e7c5f1abf53495cc2797ab`. At inspection on 2026-10-28, that pinned tree had no LICENSE
+file or identified licence grant in its README, package manifest or runtime sources. Public source access does not
+establish redistribution permission, and this project's GPL does not supply a licence for Luck. Local version-control
+retention is not publication clearance: **do not push this snapshot or distribute a bundle containing it** until an
+applicable upstream licence or written author permission is obtained and recorded. Alternatively, remove the vendored
+snapshot from the publishable history and deliver an independently user-installed integration, after verifying its
+licensing and technical boundaries. Merely adding attribution or deleting files in a later commit does not clear the
+existing history for publication.
 
 ## Fonts
 

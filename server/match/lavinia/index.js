@@ -1,34 +1,9 @@
-// Named Siracusa policy only. The host owns all rules, data and legal actions.
-import * as policy from './policy/server/match/botDevelopment.js';
-
-export const LAVINIA = 'lavinia';
-export const BAND = 'band_chiave';
-export const CORE = 'siracusaShip';
-export const isLavinia = (m, ps) => ps?.isBot === true
-  && m.opts?.seats?.some(s => s.playerId === ps.playerId && s.isBot && s.botPersona === LAVINIA) === true;
-const views = new WeakMap();
-export function policyView(m) {
-  if (!views.has(m)) {
-    const opts = Object.freeze({ ...m.opts, botStrategy: 'growth', botCoreStrategies: true, botRehearsal: 3,
-      botFrontlineRepair: false, botFormationRoles: true, botHumanLessons: true,
-      botSiracusaEngines: Object.freeze(['promotion', 'hybrid', 'boss']), botLateranoLessons: false,
-      botLateranoExperiment: false, botLateranoCoopExperiment: false,
-      botSiracusaSoloExperiment: false, botSiracusaCoopExperiment: 'coop-two-r7-core-pair',
-      botSiracusaArcaneWeight: 0.65,
-      botSiracusaAdjustments: Object.freeze([]), botSiracusaInvestorDeadline: 9 });
-    views.set(m, new Proxy(m, {
-      get(target, key) {
-        if (key === 'opts') return opts;
-        if (key === 'botRehearsal') return 3;
-        if (key === 'botCoreStrategies') return true;
-        const value = Reflect.get(target, key, target);
-        return typeof value === 'function' ? value.bind(target) : value;
-      },
-      set(target, key, value) { return Reflect.set(target, key, value, target); },
-    }));
-  }
-  return views.get(m);
-}
-export const pickCard = (m, ps, cards, available) => policy.botPickCard(policyView(m), ps, cards, available);
-export const prepBegin = (m, ps) => policy.botPrepBeginSteps(policyView(m), ps);
-export const prepEnd = (m, ps, job) => policy.botPrepEndSteps(policyView(m), ps, job);
+// Frozen upstream drivers; Pro supplies the player's own shared-pool scope.
+import * as runtime from './runtime.js';
+import { eliteScope } from '../eliteScope.js';
+export { LAVINIA, BAND, CORE } from './runtime.js';
+export { isLavinia } from './runtime.js';
+export const policyView = (m, ps) => runtime.policyView(eliteScope(m, ps));
+export const pickCard = (m, ps, cards, available) => runtime.pickCard(eliteScope(m, ps), ps, cards, available);
+export const prepBegin = (m, ps) => runtime.prepBegin(eliteScope(m, ps), ps);
+export const prepEnd = (m, ps, job) => runtime.prepEnd(eliteScope(m, ps), ps, job);

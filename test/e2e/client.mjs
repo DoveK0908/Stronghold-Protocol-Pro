@@ -2,6 +2,7 @@
 // per player that drives the real UI with real mouse clicks, keys and canvas drags (no net.request shortcuts).
 // Used by test/e2e/coop.e2e.mjs. Not a test file itself (it only exports helpers).
 
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
 import net from 'node:net';

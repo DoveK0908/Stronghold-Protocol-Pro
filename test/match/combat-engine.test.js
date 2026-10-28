@@ -195,6 +195,18 @@ test('overtime formula is exactly GameData.bossOvertimeDue, including nonintegra
   e.dispose();
 });
 
+test('resource receipts are opt-in for Worker battles and do not enter the BattleSpec', () => {
+  for (const enabled of [false, true]) {
+    const input = probe([{}]);
+    const before = JSON.stringify(input.specs);
+    const engine = new CombatEngine({ ...input, resourceNumbers: enabled }, { data: DATA, BattleClass: ProbeBattle, log: QUIET });
+    try {
+      assert.equal(engine.fields[0].battle.opts.resourceNumbers === true, enabled);
+      assert.equal(JSON.stringify(input.specs), before);
+    } finally { engine.dispose(); }
+  }
+});
+
 test('one data source per thread; mismatch and unbounded advancement are rejected', () => {
   const e = new CombatEngine(probe([{}]), { data: DATA, BattleClass: ProbeBattle, log: QUIET });
   assert.equal(gameData(), DATA);

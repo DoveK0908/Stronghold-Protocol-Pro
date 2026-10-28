@@ -4,6 +4,7 @@
 // (PlayerState.card, maintainer 2026-10-20: the same face in-match as in the room, so teammates see each other's card);
 // it never reaches the cluster's match DTO (server/cluster/lobby.js stampMember) and no rule reads it.
 import test from 'node:test';
+import { ELITE_RECRUITS } from '../shared/eliteAi.js';
 import assert from 'node:assert/strict';
 import { Lobby, CARD_CHANGES, CARD_WINDOW_MS } from '../server/lobby.js';
 import { ClusterLobby } from '../server/cluster/lobby.js';
@@ -40,6 +41,21 @@ function fixture(t, { LobbyClass = Lobby, extra = {}, getData = () => DATA } = {
   const card = (s, msg) => lobby.onMessage(s, { t: 'room.card', ...msg });
   return { clock, registry, lobby, player, states, card };
 }
+
+test('three elite seats publish their corresponding E2 cards without changing the host card', t => {
+  const { lobby, player, states } = fixture(t);
+  const host = player();
+  assert.deepEqual(lobby.create(host, { mode: 'coop', difficulty: 'HARD' }), { ok: true });
+  for (const rec of ELITE_RECRUITS) assert.deepEqual(lobby.addBot(host, { persona: rec.id }), { ok: true });
+  const seats = states(host).at(-1).seats.filter(Boolean);
+  for (const rec of ELITE_RECRUITS) {
+    const seat = seats.find(s => s.botPersona === rec.id);
+    assert.equal(seat.card.avatar, rec.char);
+    assert.equal(seat.card.charId, rec.char);
+    assert.equal(seat.card.look, '');
+  }
+  assert.equal(seats[0].card, undefined);
+});
 
 test('room.card wire shape: optional charId / avatar / bg ids ("" clears) and an integer trophy count', () => {
   const ok = (msg) => assert.equal(validateC2S({ t: 'room.card', ...msg }), null, JSON.stringify(msg));

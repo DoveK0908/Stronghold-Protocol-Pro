@@ -1,6 +1,7 @@
 // Real server and normal UI operations only: create/join, ready, skip and confirm.
 // No mocked draft, injected game state, direct network requests or fixed seed.
 // SP_E2E=1 node --test test/ui/band-draft-skip.e2e.test.js
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';

@@ -348,10 +348,13 @@ function MatchScreen() {
   }, [alive, !!(priv || meP)]);
   const home = homeFieldId(pub, myId);
   const watchingOther = !!watching && watching !== home && watching !== ownFieldId(myId);
-  // watching a teammate's prep board: the 本局信息 drawer shows THEIR 策略 in place of one's own (user playtest #2 item 2)
-  const scoutPid = watchingOther && field?.prep && typeof field.fieldId === 'string' && field.fieldId.startsWith('n:') ? field.fieldId.slice(2) : null;
+  // Both the sidebar and 本局信息 follow the watched player in prep and combat; shared fields have no single owner.
+  const fieldMembers = pub?.fields?.find(f => f.fieldId === field?.fieldId)?.players;
+  const scoutPid = watchingOther && field ? (field.fieldId?.startsWith('n:') ? field.fieldId.slice(2)
+    : fieldMembers?.length === 1 ? fieldMembers[0] : null) : null;
   const scoutBandId = scoutPid ? ownerBandId(pub, scoutPid) : null;
   const scoutBandOwner = scoutPid ? (players.find((p) => p.playerId === scoutPid)?.name || null) : null;
+  const viewedEffects = watchingOther && field ? (field.effects ?? null) : priv?.effects;
   const personalChoice = !spectator && alive ? normalizePersonalChoice(pub, priv, myId) : null;
   const hasPersonalChoice = !!personalChoice;
   const roomRules = useStore((s) => s.room?.content?.rules ?? null);
@@ -556,12 +559,13 @@ function MatchScreen() {
   // 2026-10-19 — every convenience switch here is off until turned on).
   const deployFold = deployFoldsShop({
     ownPrep: !!view && viewModeRef.current === 'prep' && showPrep, editable, pen, drag: !!drag, facing: !!facing,
-    enabled: playerSettings.prepDeployFold === true,
+    enabled: playerSettings.prepDeployFold === true || playerSettings.prepDeployFold === 'partial',
   });
   const deployZoomedRef = useRef(false);
   const shopFolded = showShop && (pen ? penRef.current.collapsed : (collapsed || deployFold));
-  // what the shop bar itself shows: the player's 收起 state, temporarily folded while deploying
-  const barCollapsed = collapsed || deployFold;
+  // the shop bar / board layout's displayed fold: the player's 收起 state, temporarily folded while deploying.
+  const deployPartial = deployFold && playerSettings.prepDeployFold === 'partial' && !collapsed;
+  const barCollapsed = collapsed || (deployFold && !deployPartial);
 
   // own board (prep, or a battle field the player fights on) → the stage with the player's overrides; a teammate's
   // board → the plain stage (their overrides are not known here)
@@ -873,13 +877,13 @@ function MatchScreen() {
   useEffect(() => {
     const step = deployZoomStep(deployZoomedRef.current, deployFold);
     const next = prepDeployCamera({
-      pub, myId, deployFold, releaseDeploy: step.release, folded: shopFolded,
+      pub, myId, deployFold, partial: deployPartial, releaseDeploy: step.release, folded: shopFolded,
       ownPrep: !!view && viewModeRef.current === 'prep' && showPrep,
       pen, busy: !!drag || !!facing, current: camRef.current,
     });
     deployZoomedRef.current = deployZoomRemember(step, { next, pen });
     if (next) setCam(next.kind, { ...next.opts, ms: FOLD_CAMERA_MS });
-  }, [view, deployFold, shopFolded, showPrep, pen, !!drag, !!facing, prepCamKey]);
+  }, [view, deployFold, deployPartial, shopFolded, showPrep, pen, !!drag, !!facing, prepCamKey]);
 
   // 联防 / 最终攻势: the ‹ › pill moves the camera between the field's halves and 全景 (research 09 §3.1)
   useEffect(() => {
@@ -1595,10 +1599,11 @@ function MatchScreen() {
   const retreatSel = useCallback(() => retreatPiece(live.current.sel?.uid), [retreatPiece]);
   const sellSel = useCallback(() => sellOwnPiece(live.current.sel?.uid), [sellOwnPiece]);
 
-  // unit clicks from the engine may only carry an id: resolve through m.field / spawn infos
+  // Resolve fresh field metadata even if a click carried its own info, so an open scout detail tracks item progress.
   const detailTarget = useMemo(() => {
-    if (detail?.kind !== 'unit' || detail.unit) return detail;
-    const u = (Array.isArray(field?.units) ? field.units : []).find((x) => x && x.id === detail.unitId);
+    if (detail?.kind !== 'unit') return detail;
+    const id = detail.unitId ?? detail.unit?.id;
+    const u = (Array.isArray(field?.units) ? field.units : []).find((x) => x && x.id === id);
     return u ? { ...detail, unit: u } : detail;
   }, [detail, field]);
   const resolved = useMemo(() => resolveDetail(detailTarget, placeCtx.pieces, { priv, backups: gd.backups }), [detailTarget, placeCtx, gd.ready, data.locale()]);
@@ -1908,7 +1913,7 @@ function MatchScreen() {
   // bonds this mode never activates (标准: 10 of 23, 奥术 among them) — shown 本局禁用 on cards, chips and the popup
   const offBonds = modeOffBonds(getMode(pub?.modeId));
 
-  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', uniteBudgetInfo(pub) && 'gm--unite-budget', drag && 'is-dragging', barCollapsed && 'is-collapsed', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
+  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', uniteBudgetInfo(pub) && 'gm--unite-budget', drag && 'is-dragging', barCollapsed && 'is-collapsed', deployPartial && 'is-deploy-partial', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
       data-camera=${pen ? 'pen' : camKind}>
     <div class="gm__field" ref=${hostRef} onContextMenu=${(e) => e.preventDefault()}></div>
     ${viewKind === 'loading' ? html`<div class="gm__loading"><${Spinner} label="LOADING FIELD" /></div>` : null}
@@ -1951,7 +1956,7 @@ function MatchScreen() {
         self=${Number.isFinite(priv?.lp) ? { lp: priv.lp, pending: liveLpNow.pending, unite: liveLpNow.unite, left: liveLpNow.left } : null}
         observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null} />
 
-      <div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>
+      <div class="gm__effects"><${EffectsList} effects=${viewedEffects} /></div>
 
       ${watchingOther && !combat ? html`<div class="gm__watching" role="status">
         <${GIcon} name="eye" /><span>${tParts('正在查看 {name} 的阵地（只读）', { name: html`<b>${watchedName}</b>` })}</span>
@@ -2002,7 +2007,7 @@ function MatchScreen() {
       </div>
 
       ${drawer ? html`<${EnemyDrawer} tab=${drawer} onTab=${setDrawer} pub=${pub} priv=${priv} onClose=${() => setDrawer(null)}
-        bandId=${scoutBandId} bandOwner=${scoutBandOwner}
+        bandId=${scoutBandId} bandOwner=${scoutBandOwner} effects=${viewedEffects}
         onEnemy=${(k, n) => setDetail({ kind: 'enemy', id: k, count: n })} onChess=${(id) => setDetail({ kind: 'chess', id, foreign: true })} />` : null}
 
       ${bondPop ? html`<${BondPopup} bondId=${bondPop.bondId} entry=${bondPop.entry} priv=${bondPop.priv} banned=${pub?.bannedChess || []} owner=${bondPop.name} forecast=${bondPop.ownerId === myId ? ownForecast : null} ownerId=${bondPop.ownerId}

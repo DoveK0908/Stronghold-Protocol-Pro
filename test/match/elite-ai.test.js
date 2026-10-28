@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
 import { makeMatch } from './harness.js';
+import { eliteScope } from '../../server/match/eliteScope.js';
+import { policyView as zumamaView } from '../../server/match/aiAddons/zumama/index.js';
 
 const seatsOf = (personae) => {
   const seats = [{ seat: 0, playerId: 'p_0', name: 'P0', isBot: false, connected: true }];
@@ -19,6 +21,7 @@ function draft({ personae, aiPicksLast = false, difficulty = 'HARD', pick }) {
   for (const ps of m.players.values()) if (!ps.isBot && !ps.left) m.handle(ps.playerId, { t: 'g.infoReady' });
   h.run(() => m.phase !== PHASE.INFO_CHECK);
   assert.equal(m.phase, PHASE.BAND_DRAFT);
+  const draftOrder = [...m.draft.order];
   const order = [];
   for (let i = 0; i < 64 && m.phase === PHASE.BAND_DRAFT; i++) {
     const pid = m.draftTurn();
@@ -33,7 +36,7 @@ function draft({ personae, aiPicksLast = false, difficulty = 'HARD', pick }) {
   }
   const picks = { ...m.draft.picks };
   m.dispose();
-  return { picks, order };
+  return { picks, order, draftOrder };
 }
 
 test('arturia takes the Laterano band and drafts before the human even with AI 队友最后选择', () => {
@@ -82,17 +85,48 @@ test('without a persona an AI seat behaves exactly as before (no reserved band)'
 });
 
 test('the elite prepares with its own policy on this host (units bought, invariants hold)', () => {
-  for (const persona of ['arturia', 'lavinia']) {
+  for (const persona of ['arturia', 'lavinia', 'zumama']) {
     const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 1, seed: 11, fake: true, seats: seatsOf([persona]) }).start();
     h.autoHumans();
     h.drive(() => h.m.phase === 'PREP' || h.ended);
     const ps = h.ps('ai_0');
-    const band = persona === 'arturia' ? 'band_paganini' : 'band_chiave';
+    const band = { arturia: 'band_paganini', lavinia: 'band_chiave', zumama: 'band_pepe' }[persona];
     assert.equal(ps.bandId, band);
     h.run(() => ps.deployCount > 0 || h.ended, { maxSteps: 2e6 });
     assert.ok(ps.deployCount > 0, `${persona} deployed during the first prep`);
     assert.deepEqual(h.logs.error, []);
     h.invariants();
     h.m.dispose();
+  }
+});
+
+test('three elites choose their reserved bands in Arturia/Lavinia/Zumama order', () => {
+  const { picks, draftOrder } = draft({ personae: ['zumama', 'lavinia', 'arturia'], aiPicksLast: true });
+  assert.deepEqual(draftOrder.slice(0, 3), ['ai_2', 'ai_1', 'ai_0']);
+  assert.equal(picks.ai_0, 'band_pepe');
+  assert.equal(picks.ai_1, 'band_chiave');
+  assert.equal(picks.ai_2, 'band_paganini');
+});
+
+test('20-seat policy scopes and band reservations do not cross four-seat pool boundaries', () => {
+  for (const count of [6, 8, 20]) {
+    const seats = Array.from({ length: count }, (_, i) => ({ seat: i, playerId: `p${i}`, name: `P${i}`, isBot: i === 5,
+      connected: true, ...(i === 5 ? { botPersona: 'zumama' } : {}) }));
+    const h = makeMatch({ seats, difficulty: 'HARD', fake: true,
+      experimental: { playerCapacity: 20, disableSharedPool: false, revivalEnabled: false } }).start();
+    try {
+      const m = h.m, ps = m.players.get('p5'), scoped = eliteScope(m, ps);
+      assert.equal(scoped.pool, ps.pool);
+      assert.notEqual(scoped.pool, m.players.get('p0').pool);
+      const ownCount = Math.min(4, count - 4);
+      assert.equal(scoped.order.length, ownCount);
+      assert.equal(scoped.alivePlayers().length, ownCount);
+      assert.equal(scoped.opts.seats.length, ownCount);
+      assert.equal(zumamaView(m, ps).opts.botSargonFactor, count === 6 ? 'coop-swift-budget-pair-two' : 'coop-swift-budget-pair-four');
+      assert.equal(m.bandTaken('band_pepe', 'p0'), false);
+      assert.equal(m.bandTaken('band_pepe', 'p4'), true);
+      assert.equal(ps.card.avatar, 'char_416_zumama');
+      assert.equal(m.publicView().players.find(p => p.playerId === 'p5').card.charId, 'char_416_zumama');
+    } finally { h.m.dispose(); }
   }
 });

@@ -1,3 +1,4 @@
+import { isZumama, BAND as ZUMAMA_BAND } from '../aiAddons/zumama/index.js';
 import { isArturia, BAND as ARTURIA_BAND } from '../arturia/index.js';
 import { isLavinia, BAND as LAVINIA_BAND } from '../lavinia/index.js';
 // server/match/match/phases.js — Match methods: the round flow up to the prep — INFO_CHECK, the strategy draft
@@ -52,8 +53,8 @@ export class MatchPhases {
     if (!this.isSolo) this.rngDraft.shuffle(order);
     order = this.humansFirst(order);
     // a named elite teammate commits first even with aiPicksLast; everyone else keeps their order
-    const elite = (pid) => isArturia(this, this.players.get(pid)) || isLavinia(this, this.players.get(pid));
-    order = [...order.filter(elite), ...order.filter((pid) => !elite(pid))];
+    const rank = pid => { const ps = this.players.get(pid); return isArturia(this, ps) ? 0 : isLavinia(this, ps) ? 1 : isZumama(this, ps) ? 2 : 3; };
+    order = order.map((pid, index) => ({ pid, index })).sort((a, b) => rank(a.pid) - rank(b.pid) || a.index - b.index).map(p => p.pid);
     const concurrent = this.concurrentDraft();
     const skips = this.isSolo || concurrent ? 0 : this.gd.bandDraft.skipsPerPlayer;
     const untimed = this.soloUntimed;
@@ -203,12 +204,12 @@ export class MatchPhases {
         const own = this.designatedBand(ps);
         if (own) { this._applyBand(ps, own, { dedupe: true }); return; }
         // a strategy a teammate already took is not selectable (队友已选): the bot re-draws, else the first free one
-        let id = this.bot.pickBand(this, ps);
-        for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = this.bot.pickBand(this, ps);
+        let id = this.botFor(ps).pickBand(this, ps);
+        for (let k = 0; k < 8 && this.bandTaken(id, ps.playerId); k++) id = this.botFor(ps).pickBand(this, ps);
         if (this.bandTaken(id, ps.playerId)) id = this.gd.bandIds().find((b) => !this.bandTaken(b, ps.playerId)) || id;
         this._applyBand(ps, id, { dedupe: true });
       };
-      if (this.bot.decide?.(this, ps, { kind: 'band',
+      if (this.botFor(ps).decide?.(this, ps, { kind: 'band',
         valid: () => this.phase === PHASE.BAND_DRAFT && token === this._turnToken,
         complete: () => token !== this._turnToken || !!this.draft?.picks[ps.playerId], fallback })) return;
       fallback();
@@ -225,9 +226,12 @@ export class MatchPhases {
    */
   bandTaken(bandId, playerId) {
     // a named elite's band is reserved for that persona on every path (explicit, timeout, default)
-    const others = this.order.filter((ps) => ps.playerId !== playerId);
+    const player = this.players.get(playerId);
+    const others = this.order.filter((ps) => ps.playerId !== playerId
+      && (!this.capacityExperiment || (player && this.poolFor(ps) === this.poolFor(player))));
     if (bandId === ARTURIA_BAND && others.some((ps) => isArturia(this, ps))) return true;
     if (bandId === LAVINIA_BAND && others.some((ps) => isLavinia(this, ps))) return true;
+    if (bandId === ZUMAMA_BAND && others.some((ps) => isZumama(this, ps))) return true;
     if (this.capacityExperiment) return false;
     const picks = this.draft?.picks || {};
     for (const [pid, id] of Object.entries(picks)) if (pid !== playerId && id === bandId) return true;
@@ -271,6 +275,7 @@ export class MatchPhases {
     const elite = this.players.get(playerId);
     if (isArturia(this, elite)) return ARTURIA_BAND;
     if (isLavinia(this, elite)) return LAVINIA_BAND;
+    if (isZumama(this, elite)) return ZUMAMA_BAND;
     const def = this.gd.bandDraft.timeoutBandId;
     if (!this.bandTaken(def, playerId) && (!this.disableDuckLord || this.gd.bandAllowed(def))) return def;
     return this.gd.bandIds().find((b) => !this.bandTaken(b, playerId)) || (this.disableDuckLord ? this.gd.defaultBandId : def);

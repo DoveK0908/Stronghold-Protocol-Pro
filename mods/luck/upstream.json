@@ -1,0 +1,18 @@
+{
+  "repository": "https://github.com/RenJiyi163/Stronghold-Luck",
+  "ref": "c4dcba173689e356b5e7c5f1abf53495cc2797ab",
+  "tag": "v0.1.7",
+  "files": [
+    "README.md",
+    "package.json",
+    "public/auto-rules.js",
+    "public/overlay.css",
+    "public/overlay.js",
+    "public/slot-rules.js",
+    "public/unit-rules.js",
+    "src/find-game.mjs",
+    "src/launcher.mjs",
+    "src/pick-game.mjs",
+    "src/server-patch.mjs"
+  ]
+}

@@ -1,5 +1,10 @@
 # mods/luck —— Stronghold-Luck 控制台（StrongholdPro 的第二件外挂）
 
+> 2026-10-28：当前目标已改为本目录的 `runtime/`，固定上游 **v0.1.7 / c4dcba17**，不再改写 `source/luck`。
+> `node mods/luck/launch.mjs --no-open --port 3000` 显式指定本主树；工作区 `start-pro-luck.cmd` 已指向该入口。
+> `target.json` 指向 `runtime`；L2–L7 应用后随本仓库保存，再次检查/应用应保持幂等。
+> 旧文中的 `source/luck` 表示历史目标；Selena 启动器及只读参考克隆保持原样。来源见 `upstream.json`。
+
 这个目录是一份 **overlay**：它不改游戏本体的一个字节，只把「Stronghold-Luck 控制台」上我们需要的两件事，
 以**锚点式补丁**的形式叠加上去，随时可以一条命令撤干净。
 

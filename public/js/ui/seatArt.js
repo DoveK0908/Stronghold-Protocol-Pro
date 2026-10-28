@@ -1,3 +1,4 @@
+import { eliteCard } from '../../../shared/eliteAi.js';
 // 名片干员 (PR #643 split 6): the portrait on a doctor's seat card in the waiting room (screens/room.js) and on the
 // strategy draft's name cards (screens/bandDraft.js) — the operator the player picked (room.card; everybody sees it as
 // room.state seats[].card), else one of the 5★/6★ operators chosen by the player id, the same on every client — worn in
@@ -141,6 +142,8 @@ export function cardOperator(m, byChar, charId) {
  * @returns {{ charId: string, look: string }}
  */
 export function seatPick(seat, { byChar, m, myId, myCard, myLook = '' } = {}) {
+  const elite = eliteCard(seat);
+  if (elite) { const rec = cardOperator(m, byChar, elite.charId); return { charId: elite.charId, look: '', rec }; }
   const mine = !!seat && seat.playerId === myId && !!myCard;
   const own = mine ? (typeof myCard === 'string' ? myCard : myCard?.charId) : '';
   const fromCard = typeof seat?.card === 'string' ? seat.card : seat?.card?.charId;
@@ -154,7 +157,7 @@ export function seatPick(seat, { byChar, m, myId, myCard, myLook = '' } = {}) {
  * 没皮肤 / 精一 / 机器人返回 null，调用方退回 seatPortrait（透明立绘）。
  */
 export function seatIllust(seat, ctx) {
-  if (!seat || seat.playerId == null || seat.isBot) return null;
+  if (!seat || seat.playerId == null || (seat.isBot && !eliteCard(seat))) return null;
   const { charId, look } = seatPick(seat, ctx);
   if (!charId) return null;
   // '' = 精英二：客户端里那张带背景的立绘（chars[].illust）；'e1' = 同一套取景的透明全身立绘（chars[].illustE1）
@@ -181,7 +184,7 @@ export function seatLook(seat, charId, { myId, myCard, myLook = '' } = {}) {
 }
 
 export function seatPortrait(seat, ctx) {
-  if (!seat || seat.playerId == null) return null;
+  if (!seat || seat.playerId == null || (seat.isBot && !eliteCard(seat))) return null;
   // seats[].card is { charId, bg, trophies } (ui/playerCard.js); a bare string is the design's original form
   const { charId, look, rec } = seatPick(seat, ctx);
   // '' = 精英二（`portraitE2`，和立绘同一取景），'e1' = 半身 `portrait`，皮肤 = 该皮肤自己的 portrait
@@ -213,7 +216,10 @@ export function cardContext(list) {
  * @returns {{ chess: any, picked: boolean } | null}
  */
 export function seatOperator(seat, { byChar, pool }, { myId, myCard } = {}) {
-  if (!seat || seat.playerId == null || seat.isBot) return null;
+  if (!seat || seat.playerId == null) return null;
+  const elite = eliteCard(seat);
+  if (elite) return { chess: byChar?.get(elite.charId) || { charId: elite.charId }, picked: true };
+  if (seat.isBot) return null;
   // a card is a record ({ charId, avatar, bg, look, … }, ui/playerCard.js) since the 名片 remake, and a bare charId in
   // older prefs and in one's own `myCard` from useMyCard: read the charId out of either, or the pick resolves to nothing
   // and the seat falls back to the hash-chosen default operator — the wrong operator's name under the right portrait.

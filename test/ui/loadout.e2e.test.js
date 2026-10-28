@@ -9,6 +9,7 @@
 // or the lettered tiles without it → test/e2e/out/module-icons.png.
 // Every page must finish with zero console errors / page errors / failed requests. Screenshots: test/e2e/out/loadout-*.png
 
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -59,6 +60,7 @@ describe('干员调配 overlay (real server, headless Chrome)', { skip: !ENABLED
       // the list view these tests drive (the card view of 2026-10-14 is the overlay's own default)
       if (localStorage.getItem('sp.pref.loadout.view') == null) localStorage.setItem('sp.pref.loadout.view', '"list"');
     });
+    await seedReleaseRead(page);
     await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(() => globalThis.__SP__?.store.get().connection.status === 'online' && !!document.querySelector('.lobby-screen'), { timeout: 30000 });
     // the lobby opens its 公告板 by itself while a notice is unread: closed, so the clicks below reach the lobby

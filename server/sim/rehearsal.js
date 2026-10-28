@@ -34,6 +34,7 @@ export class RehearsalScore {
     this.index = 0;
     this.leaks = Infinity;
     this.boss = -Infinity;
+    this.gain = -Infinity;
     this.score = -Infinity;
   }
 
@@ -47,8 +48,8 @@ export class RehearsalScore {
 
   /**
    * Score the finished candidate `candidateIndex`. Fewer counted leaks win. On a leak tie, more leader damage wins
-   * (a Final Assault rehearsal; a normal field records 0). On a tie of both, −1000 per leak + kills − 0.01 × position
-   * keeps the earlier candidate, and that number is what `score` stores. A battle without a result of its own (a
+   * (a Final Assault rehearsal; a normal field records 0). On a tie of both, more gained layers wins; then
+   * −1000 per leak + kills − 0.01 × position keeps the earlier candidate, and that number is what `score` stores. A battle without a result of its own (a
    * stand-in for a constructor failure) is no candidate at all.
    * One counted leak still outranks any leader-damage difference: a leak spends LP, and the pools are far smaller
    * than the weight of one leak in the old score. [ASSUMED] #315.
@@ -61,13 +62,17 @@ export class RehearsalScore {
     const leaks = (pp.leaked || []).filter((l) => l && l.counted !== false).length;
     const boss = Math.max(0, Number(pp.bossDamage) || 0);
     const score = -leaks * 1000 + (pp.killed || 0) - candidateIndex * 0.01;
+    // §37.37: the layers the battle gained (its 特质 and bonds, `layerGains`) break a leak and leader-damage tie
+    const gain = Object.values(pp.layerGains || {}).reduce((s, n) => s + (Number(n) || 0), 0);
     const better = leaks < this.leaks
       || (leaks === this.leaks && boss > this.boss)
-      || (leaks === this.leaks && boss === this.boss && score > this.score);
+      || (leaks === this.leaks && boss === this.boss && gain > this.gain)
+      || (leaks === this.leaks && boss === this.boss && gain === this.gain && score > this.score);
     if (!better) return false;
     this.score = score;
     this.leaks = leaks;
     this.boss = boss;
+    this.gain = gain;
     this.index = candidateIndex;
     return true;
   }

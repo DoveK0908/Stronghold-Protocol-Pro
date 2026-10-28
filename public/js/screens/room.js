@@ -1,3 +1,4 @@
+import { ELITE_RECRUITS, eliteCard } from '../../../shared/eliteAi.js';
 // Room screen (同盟等待室) — 2026-10-14: the room design by 雨千代chiyo (the event's room), adopted by the owner with this
 // fork's own features kept. Tall seat cards side by side — a portrait per doctor (名片干员: the player's own pick, else an
 // operator chosen from the player id, ui/seatArt.js), 创建者, 已就绪 / 准备中 / 失去信号, the name plate (名片底图, the trophy
@@ -288,10 +289,6 @@ function BotBandPicker({ seat, room, gd, busy, onClose, onPick }) {
 // Named elite AI (community addon port): the host adds 阿尔图罗 (拉特兰) or 拉维妮娅 (叙拉古) to the party. The seat
 // carries rooms state seats[].botPersona; the server names it, reserves its opening strategy and plays it with the
 // addon's own policy (server/match/arturia, server/match/lavinia).
-const ELITE_RECRUITS = Object.freeze([
-  { id: 'arturia', char: 'char_245_cello' },
-  { id: 'lavinia', char: 'char_4065_judge' },
-]);
 const eliteChar = (persona) => ELITE_RECRUITS.find((r) => r.id === persona)?.char ?? null;
 const eliteAvatar = (persona) => avatarUrl(data.get('assets'), eliteChar(persona), { e2: true });
 function EliteRecruit({ room, busy, onAdd }) {
@@ -304,7 +301,7 @@ function EliteRecruit({ room, busy, onAdd }) {
       disabled=${disabled} onClick=${() => setOpen(!open)}><${Icon} name="robot" />${t('添加精英干员')}</button>
     ${open ? html`<div class="elite-recruit__menu" role="menu" aria-label=${t('添加精英干员')}>
       ${ELITE_RECRUITS.map((rec) => html`<button key=${rec.id} type="button" role="menuitem" disabled=${taken.has(rec.id)}
-        onClick=${() => { setOpen(false); onAdd(rec.id); }}>${t(rec.id === 'arturia' ? '阿尔图罗' : '拉维妮娅')}</button>`)}
+        onClick=${() => { setOpen(false); onAdd(rec.id); }}>${t(rec.name)}</button>`)}
     </div>` : null}
   </div>`;
 }
@@ -417,12 +414,12 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, po
   const ready = seat.ready || seat.isBot || isHostSeat;
   const src = seat.isBot ? eliteAvatar(seat.botPersona) : seatPortrait(seat, portraits);
   // 装备皮肤时席位大图改用那张连背景的 illustration（名字牌下仍是普通名片）
-  const scene = seat.isBot ? null : seatIllust(seat, portraits);
+  const scene = seatIllust(seat, portraits);
   // 精一那张是透明全身立绘（_e1.webp）：只借「同一取景」，底纹与薄荷渐变仍用席位卡的默认样式
   const scenePainted = !!scene && !/_e1\.webp$/.test(scene);
   // the art chain: the fork's scene illustration, then the official outfit picture, then the operator's own, then the frame
-  const art = seat.isBot ? null : seatArtSrc([scene, portrait, portraitDefault, src], badArt);
-  const card = isMe ? myCard : seat.card && typeof seat.card === 'object' ? seat.card : null;
+  const art = seatArtSrc([scene, portrait, portraitDefault, src], badArt);
+  const card = eliteCard(seat) || (isMe ? myCard : seat.card && typeof seat.card === 'object' ? seat.card : null);
   const owner = isOwnerSeat(seat);
   const canPick = isMe && !seat.isBot && !!onPickCard;
   // an AI teammate's name without its 「AI·」 prefix on a phone (room.css; botNameParts)
@@ -467,7 +464,7 @@ function SeatCard({ seat, index, room, facts, myId, myCard, busy, gd, queued, po
       ${isMe && onPickAvatar
         ? html`<button type="button" class="rseat__ava" onClick=${onPickAvatar} title=${t('更换头像')} aria-label=${t('更换头像')}>
             <${AvatarFrame} size="sm" name=${seat.name} src=${customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook)} fallback=${customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} /><span class="rseat__ava-pen" aria-hidden="true"><${Icon} name="edit" /></span></button>`
-        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? null : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} fallback=${!seat.isBot && customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} bot=${seat.isBot} />`}
+        : html`<${AvatarFrame} size="sm" name=${seat.name} src=${seat.isBot ? eliteAvatar(seat.botPersona) : (customAvatarSrc(card) || cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook))} fallback=${!seat.isBot && customAvatarSrc(card) ? cardAvatarUrl(card?.avatar, portraits.m, card?.avatarLook) : null} seat=${index} bot=${seat.isBot} />`}
       <span class="rseat__who">
         ${seat.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<b class=${`rseat__name seat__name${owner ? ' sp-owner-name' : ''}`}>${botPrefix ? html`<span class="seat__name-pre">${botPrefix[0]}</span>${botPrefix[1]}` : seat.isBot ? seat.name || t('博士') : label(seat.name, seat.tag)}</b>
         ${isMe ? html`<span class="seat__you" aria-hidden="true">${t('你')}</span>` : null}

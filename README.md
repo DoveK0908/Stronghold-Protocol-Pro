@@ -160,6 +160,8 @@ npm start          # 启动服务器：http://localhost:3000
 | `SP_OWNER_FILE` | 空 | 服主文件（JSON：`{"names": ["保留昵称"], "keySha256": "<服主密钥的 SHA-256>"}`）：带对的密钥进入的玩家显示服主标记，保留昵称只有服主能用；运行中修改后几秒内生效；不设、文件不存在或格式不对时关闭 |
 | `SP_VERIFY` | `off` | 服务器复算客户端上报的战斗结果：`off` / `sample`（约 1/8 抽查）/ `all`（全部复算，更耗 CPU） |
 | `SP_BOT_REHEARSAL` | 不设（服务器试算） | 仅 `host` 让房主浏览器帮 AI 队友试算布阵（同源 Worker，只回候选序号）；不设或 `server` 仍由服务器试算。房主无法完成时服务器用同一批候选接手。玩法插件房间始终由服务器试算。真人「AI 托管」和正式战斗不受影响 |
+| `SP_P2P` | 不设（关闭） | 显式设为 `1`（或 `true`）时，同盟房间通过 WebRTC 转发公共对局状态，看门狗仍从 WebSocket 补发最新快照；不设或其他值保持服务器直接分发。开启后连接失败会自动回退 WebSocket，见 [部署指南](docs/DEPLOY.md#26-p2p-公共状态转发) |
+| `SP_P2P_ICE_SERVERS` | `[]` | 可选的 STUN / TURN 配置（JSON 数组），仅在 `SP_P2P` 开启时生效，见 [部署指南](docs/DEPLOY.md#26-p2p-公共状态转发) |
 | `TRUST_PROXY` | `auto` | 是否信任 `X-Forwarded-For` 等转发头：`auto` 只信任来自本机 / 内网的代理；`1` 总是；`0` 从不 |
 | `DEBUG` | 空 | 设为任意值输出详细日志 |
 | `SP_NO_BROWSER` | 空 | 设为 `1` 时启动脚本不自动打开浏览器 |

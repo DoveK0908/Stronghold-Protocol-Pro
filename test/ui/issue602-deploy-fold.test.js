@@ -29,14 +29,15 @@ describe('设置「部署时收起商店」 is opt-in here', () => {
     assert.equal(sanitizeSettings({}).prepDeployFold, false);
     assert.equal(sanitizeSettings({ prepDeployFold: false }).prepDeployFold, false);
     assert.equal(sanitizeSettings({ prepDeployFold: true }).prepDeployFold, true);
+    assert.equal(sanitizeSettings({ prepDeployFold: 'partial' }).prepDeployFold, 'partial');
     assert.equal(sanitizeSettings({ prepDeployFold: 'yes' }).prepDeployFold, false, 'junk stays off');
   });
 
   test('the dialog offers the switch, under 盟约效果剩余时间', () => {
     const dialog = read('public/js/ui/settings.js');
-    assert.match(dialog, /label=\$\{t\('部署时收起商店'\)\} micro="DEPLOY FOLD" value=\$\{s\.prepDeployFold\}/);
+    assert.match(dialog, /t\('部署时收起商店'\)[\s\S]{0,80}DEPLOY FOLD/);
     // the fork's hint spells out both the fold and what turning it off leaves alone (the owner's 2026-10-16 wording)
-    assert.match(dialog, /拖起干员、装备或召唤物，以及放下后选择朝向时/);
+    assert.match(dialog, /适度缩小保留七成大小的商店/);
   });
 });
 
@@ -109,7 +110,7 @@ describe('game.js wiring', () => {
   test('the deploy fold is derived from the interaction state and the switch', () => {
     assert.match(game, /const deployFold = deployFoldsShop\(\{/);
     assert.match(game, /enabled: playerSettings\.prepDeployFold === true/);
-    assert.match(game, /const barCollapsed = collapsed \|\| deployFold;/);
+    assert.match(game, /const barCollapsed = collapsed \|\| \(deployFold && !deployPartial\);/);
     assert.match(game, /const shopFolded = showShop && \(pen \? penRef\.current\.collapsed : \(collapsed \|\| deployFold\)\);/);
   });
 

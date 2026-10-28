@@ -23,3 +23,35 @@ export function getBotStrategy(selection = 'legacy', registry = BOT_STRATEGIES) 
   }
   return registry[selection];
 }
+
+/**
+ * Per-seat overrides of the match's strategy (#816 P1). `SP_BOT_STRATEGY_SEATS` text is `seat:id[,seat:id…]`
+ * (registered IDs; capacity defaults to 4, expanded rooms support 0–19); a programmatic selection is `{ [seat]: id | definition }`.
+ * Unset or empty: no overrides. Each entry resolves through getBotStrategy (unknown IDs fail, a release maps external).
+ * @param {string | Record<string, string | import('./botStrategyContract.js').BotStrategyDefinition>} [selection]
+ * @returns {Readonly<Record<string, import('./botStrategyContract.js').BotStrategy>>}
+ */
+export function getBotStrategySeats(selection, registry = BOT_STRATEGIES, capacity = 4) {
+  const out = {};
+  if (selection == null || selection === '') return Object.freeze(out);
+  let entries;
+  if (typeof selection === 'string') {
+    entries = selection.split(',').map((part) => {
+      const at = part.indexOf(':');
+      if (at < 0) throw new Error(`Bot strategy seats: expected seat:id, got "${part.trim()}"`);
+      return [part.slice(0, at).trim(), part.slice(at + 1).trim()];
+    });
+  } else if (typeof selection === 'object' && !Array.isArray(selection)) entries = Object.entries(selection);
+  else throw new Error('Bot strategy seats: a seat:id list or a { seat: id } object is required');
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > 20) throw new Error('Bot strategy seats: invalid capacity');
+  if (entries.length > capacity) throw new Error(`Bot strategy seats: at most ${capacity} seats`);
+  for (const [seat, choice] of entries) {
+    if (!/^(?:0|[1-9]\d*)$/.test(seat) || Number(seat) >= capacity) throw new Error(`Bot strategy seats: seat must be 0..${capacity - 1}, got "${seat}"`);
+    if (Object.hasOwn(out, seat)) throw new Error(`Bot strategy seats: seat ${seat} is listed twice`);
+    // getBotStrategy reads '' / undefined as legacy; an entry must name its strategy.
+    if (choice == null || choice === '') throw new Error(`Bot strategy seats: seat ${seat} needs a strategy id`);
+    try { out[seat] = getBotStrategy(choice, registry); }
+    catch (cause) { throw new Error(`Bot strategy seats: seat ${seat}: ${cause.message}`, { cause }); }
+  }
+  return Object.freeze(out);
+}
