@@ -10,6 +10,7 @@ import { compileRoute } from '../ai.js';
 import { unitInfo } from '../snapshot.js';
 import { normalizeRoute, normalizeEnemy } from '../simdata.js';
 import { fin } from './util.js';
+import { sanitizeEnemyCarry, restoreEnemyCarry } from '../enemyCarry.js';
 
 const FALLBACK_ENEMY = Object.freeze({
   type: 'enemy', id: 'enemy_unknown', key: 'enemy_unknown', name: '未知敌人', rank: 'NORMAL', maxHp: 2000, atk: 200, def: 100, res: 0,
@@ -31,6 +32,7 @@ export class BattleSpawns {
         mods: s.mods ?? null, sourcePlayerId: s.sourcePlayerId ?? null, bounty: s.bounty ?? null, tag: s.tag ?? null,
         ownerPlayerId: s.ownerPlayerId ?? null, pos: s.pos ?? null, seq: ++this._spawnSeq, countInTotal: s.countInTotal,
       };
+      if (this.stateCarry && s.stateCarry) p.stateCarry = sanitizeEnemyCarry(s.stateCarry);
       p.counted = p.countInTotal ?? (!(def && def.notCountInTotal) && p.tag !== 'boss' && p.tag !== 'part');
       // inTotal: the enemies THIS STAGE scheduled that count — the HUD capsule's own set (DESIGN §14 "顶栏胶囊"). A
       // runtime spawn (a split child, a summon, a part, a form change) is never in it, so the capsule's denominator stays
@@ -176,9 +178,13 @@ export class BattleSpawns {
     e.hp = e.bossPool ? e.hp : e.s.maxHp;
     this.units.push(e);
     this.enemies.push(e);
-    this._ev(['spawn', unitInfo(e)]);
+    if (!this.stateCarry) this._ev(['spawn', unitInfo(e)]);
     if (this._hooks.deploy) this.emit('deploy', { unit: e, initial: false });
     if (this._hooks.enemySpawn) this.emit('enemySpawn', { enemy: e });
+    if (this.stateCarry) {
+      if (opts.stateCarry) restoreEnemyCarry(this, e, opts.stateCarry);
+      this._ev(['spawn', unitInfo(e)]);
+    }
     return e;
   }
 

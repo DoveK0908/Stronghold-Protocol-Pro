@@ -444,6 +444,7 @@ export const SPECIAL_KITS = Object.freeze({
   enemy_10044_wintun: (ab) => {                                      // 咸鳞汁推荐者 · fast with the barrel; first attack (SILENCE): big hit + buff zone for enemies
     const s = ab.sk.BlockedBoom ? ab.sk.BlockedBoom.bb : {};
     return [{
+      carryPhase: { key: 'barrel', fields: ['done'], buffs: ['ab:barrel'] },
       sil: true,                                                     // silenced: the barrel is kept (and its speed) until an unsilenced attack
       spawn(b, e) { b.addBuff(e, { key: 'ab:barrel', persist: true, mods: { moveMul: T(ab, '1.move_speed') ?? 1 } }); },
       // the barrel blow is its BlockedBoom: the skill slot for the client (castSlot, display only)

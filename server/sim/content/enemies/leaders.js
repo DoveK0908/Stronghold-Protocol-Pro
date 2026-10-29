@@ -2,6 +2,7 @@
 // multi-form ones (reborn second forms, 转译基底·α, 乌顶巨角卢鲁) — and their part of KITS (split from content/enemies.js).
 
 import { TICK, COLS } from '../../constants.js';
+import { phaseState } from '../../enemyCarry.js';
 import { aggroCmp, areaSelectable } from '../../targeting.js';
 import { periodicDamage } from '../../attack.js';
 import {
@@ -72,6 +73,7 @@ const ELK_FAIL_SCALE = 2;
 function kitDekght(ab) {
   const rage = { atkPct: T(ab, 'triggerrage.atk') ?? 0, aspd: T(ab, 'triggerrage.attack_speed') ?? 0, moveMul: 1 + (T(ab, 'triggerrage.move_speed') ?? 0) };
   const partnerRage = {
+    carryPhase: { key: 'partnerRage', fields: ['raged'], buffs: ['ab:rage'] },
     otherDeath(c, b, e, a) {
       const u = c.unit;
       if (a.raged || !u || u === e || !/enemy_1513_dekght/.test(u.defId || '')) return;
@@ -377,7 +379,10 @@ function kitUglyThing(ab) {
   const bomb = ab.sk['bomb[reborning]'] ? ab.sk['bomb[reborning]'].bb : {};
   const run = { spd: T(ab, 'bird_run.move_speed') ?? 0, def: T(ab, 'bird_run.def'), res: T(ab, 'bird_run.magic_resistance'), dmg: T(ab, 'bird_run.damage') ?? 0 };
   const P = { pilot: false };
-  return [
+  return [phaseState('pilot', P, ['pilot'], ['ab:pilot'], (b, e) => {
+    const held = e.findBuff('ab:pilot');
+    if (held) { held.interval = 1; held.onTick = ({ battle, unit }) => { if (run.dmg > 0) battle.dealDamage(null, unit, { amount: run.dmg, type: 'true', canDodge: false, tags: ['enemyAbility', 'pilotBurn'] }); }; }
+  }),
     // 远程攻击造成溅射伤害，近战攻击造成更高伤害 — PRTS 天赋: unblocked, a ranged attack on 1 non-flying unit within 2.5 hitting it
     // and its 8 surrounding tiles for 100 % ATK ("可溅射飞行单位"); blocked, a melee hit at mcmstr_rage_attack.atk_scale
     { spawn(b, e) { e.base.rangeRadius = Math.max(e.base.rangeRadius || 0, MCM_RANGE); e.profile.canTarget = (u) => !u.isFlying; } },
@@ -417,7 +422,7 @@ function kitWarden(ab) {
   const iron = ab.sk.ironsandstorm, pierce = ab.sk.armorpiercing;
   const P = { killer: false, n: 0, power: false };
   const pen = () => (pierce && pierce.bb.def_penetrate) || 0;
-  return [{
+  return [phaseState('warden', P, ['killer'], ['ab:warden', 'ab:killer']), {
     spawn(b, e, a, ab2) {
       ab2.atkType = 'arts';                                    // 攻击造成远程法术伤害
       e.profile.melee = false;
@@ -493,7 +498,7 @@ function kitXi(ab) {
   // selector of its own: it waits for a swing at the attack's target (`own` false; PRTS 「触发索敌和普通攻击相同」, §35.54)
   const s1 = skill(sb, burst(sb), { cond: () => !P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurst', false) });
   const s2 = skill(sb2, sb2 ? burst(sb2) : null, { cond: () => P.form2, turn: attackSkillOf('enemy_1517_xi', 'ShieldBurstReborn', false) });
-  return [re, s1, s2, doubleHit(() => P.form2),                   // 普通攻击进行两次
+  return [phaseState('xi', P, ['form2'], ['ab:xiReborn']), re, s1, s2, doubleHit(() => P.form2),                   // 普通攻击进行两次
     skill(cross, (b, e) => {
       const l = byDist(b, e);
       if (!l.length) return;
@@ -528,7 +533,7 @@ function kitMace(ab) {
   // cast with a target in the circle — the trigger selection (targetsNear: PRTS 选择器 "所有触发选择器通常不无视迷彩"): no
   // airborne (起飞) operator for a ground enemy (§21.22), no unblocking 隐匿 or 迷彩 one
   const inR = (b, e, s) => targetsNear(b, e, (s && s.bb.range_radius) || 0).length > 0;
-  return [resist(), {
+  return [phaseState('mace', P, ['form2', 'next'], ['ab:stealth']), resist(), {
     hitOut(c, b, e) { const p = penOn(c, e); if (c.dmg.isAttack && p > 0) c.dmg.defIgnorePct = Math.min(1, (c.dmg.defIgnorePct || 0) + p); },
     taken(c, b, e) {                                             // 【瞬息杀机】 every hp_ratio of max HP lost (second form)
       if (!P.form2 || !(cs.ratio > 0)) return;
@@ -575,7 +580,9 @@ function kitWolfLord(ab) {
   const cure = (b) => { for (const u of b.allies()) { const d = u.findBuff('ab:fearCage'); if (d) b.removeBuff(u, d); } };
   // 【远古威慑】 (a buff aura, auraAllies): no 隐匿 operator, the blocker included, an airborne 起飞 one still — as 深池伙友卫队's
   const awe = (b, e) => { for (const u of auraAllies(b, e, e.x, e.y, WOLF_AWE_RADIUS)) auraBuff(b, u, 'ab:ancientAwe', 0.2, { aspd: WOLF_AWE_ASPD }, null, true); };
-  return [{
+  return [phaseState('wolf', P, ['form2'], ['ab:wolfGuard', 'ab:wolfRage'], (b, e) => {
+    if (P.form2 || e.form === 'reborn') e.mem.ab.immune?.delete('stun');
+  }), {
     spawn(b, e, a, ab2) {
       ab2.immune = new Set([...(ab2.immune || []), 'stun']);   // 第一形态: 不可被晕眩
       b.addBuff(e, { key: 'ab:wolfGuard', persist: true, visible: true, mods: { dmgTakenMul: 1 - (T(ab, 'Passive.damage_resistance') ?? 0) } });
@@ -692,7 +699,11 @@ function kitTranslator(ab, e) {
     b.addBuff(e2, { key: 'ab:change', duration: TRANSLATOR_CHANGE, persist: true, flags: { noMove: true }, onExpire: ({ battle }) => finish(battle, e2) });
     setForm(b, e2, `translator_${form}`, 'phase', { dur: TRANSLATOR_CHANGE });
   };
-  return [{
+  return [phaseState('translator', P, ['phys', 'arts', 'form', 'done', 'anger'], ['ab:origin', 'ab:change', 'ab:form', 'ab:anger'], (b, e2) => {
+    if (P.done) ab.immune = null;
+    const held = e2.findBuff('ab:change');
+    if (held) held.onExpire = ({ battle }) => finish(battle, e2);
+  }), {
     spawn(b, e2) {
       b.addBuff(e2, { key: 'ab:origin', persist: true, flags: { noDisplace: true } });
       ab.immune = new Set(TRANSLATOR_IMMUNE);
@@ -821,11 +832,14 @@ export const LEADER_KITS = Object.freeze({
   })],
   // 拥霜羽兽 · PRTS 天赋 "不会攻击飞行单位"; unbalanced once ⇒ 失去蛋的模式 "不进行普通攻击，不可阻挡，移动速度最终提升至200%" (until
   // 0.1.3 it kept its ranged attack without the egg and stood for each attack clip — ai.js attackStand —, and shot the 炎佑 dragon)
-  enemy_10141_xdpeng_2: (ab) => [noAirTargets(), unbalanced((b, e, a) => {
-    if (a.done) return;
-    a.done = true;
-    castSlot(b, e, ab.sk.switch);   // losing the egg is its `switch` skill (display only)
-    e.profile.noAttack = true;
-    b.addBuff(e, { key: 'ab:noEgg', persist: true, visible: true, flags: { unblockable: true }, mods: { moveMul: 1 + (T(ab, 'speed.move_speed') ?? 0) } });
-  })],
+  enemy_10141_xdpeng_2: (ab) => {
+    const state = { done: false };
+    return [phaseState('noEgg', state, ['done'], ['ab:noEgg']), noAirTargets(), unbalanced((b, e) => {
+      if (state.done) return;
+      state.done = true;
+      castSlot(b, e, ab.sk.switch);   // losing the egg is its `switch` skill (display only)
+      e.profile.noAttack = true;
+      b.addBuff(e, { key: 'ab:noEgg', persist: true, visible: true, flags: { unblockable: true }, mods: { moveMul: 1 + (T(ab, 'speed.move_speed') ?? 0) } });
+    })];
+  },
 });

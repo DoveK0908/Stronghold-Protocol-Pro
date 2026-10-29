@@ -710,6 +710,116 @@ test('凛御银灰 S2 auto-cast: SKILL_RANGE — an enemy inside the skill range
   clean(h);
 });
 
+for (const [label, candidates, picked] of [
+  ['preferred right profession before nearer non-preferred', [[13, 'WARRIOR'], [14, 'TANK'], [16, 'CASTER'], [18, 'SNIPER']], 2],
+  ['nearest right when no preferred profession', [[13, 'WARRIOR'], [14, 'TANK'], [16, 'MEDIC']], 1],
+  ['highest left cost when no right reserve', [[8, 'WARRIOR'], [13, 'TANK'], [10, 'SNIPER']], 1],
+]) {
+  test(`凛御银灰 S2 reserve discount: ${label}`, () => {
+    const defs = Object.fromEntries(candidates.map(([cost, profession], i) => [`t_reserve_${i}`, chessRec({ id: `t_reserve_${i}`, profession, stats: { cost, atk: 0 } })]));
+    const h = makeBattle({
+      defs: { chess: defs },
+      units: [{ chessId: 'chess_char_5_14_a', row: 9, col: 3 },
+        ...candidates.map((_, i) => ({ chessId: `t_reserve_${i}`, row: 12, col: 3 + i }))],
+      autoFinish: false,
+    });
+    h.step();
+    const u = h.unit('chess_char_5_14_a');
+    assert.equal(u.mem.eyeCost, 14);
+    for (let i = 0; i < candidates.length; i++) h.b.kill(h.unit(`t_reserve_${i}`));
+    u.skill.gainSp(1000);
+    assert.ok(u.skill.activate('test'));
+    for (let i = 0; i < candidates.length; i++) {
+      const a = h.unit(`t_reserve_${i}`), cost = candidates[i][0];
+      assert.equal(a.base.cost, i === picked ? Math.max(0, cost - bbOf(u).cost) : cost);
+      assert.equal(a.mem.svashCasts ?? 0, cost < u.mem.eyeCost ? 1 : 0, 'only reserves left of the eye receive a slash');
+    }
+    clean(h);
+  });
+}
+
+for (const automatic of [false, true]) {
+  test(`凛御银灰 S2 reserve redeploy (${automatic ? 'automatic' : 'paid'}): discounted DP, cost restored, two recipient-ATK slashes and VFX without own skill activation`, () => {
+    const h = makeBattle({
+      defs: {
+        enemies: { enemy_dummy: dummy() },
+        chess: {
+          t_reserve: chessRec({ id: 't_reserve', stats: { cost: 13, atk: 321, blockCnt: 0 }, skill: { spCost: 1000 } }),
+          t_alive: chessRec({ id: 't_alive', stats: { cost: 9, atk: 0 } }),
+          t_removed: chessRec({ id: 't_removed', stats: { cost: 12, atk: 0 } }),
+        },
+      },
+      units: [{ chessId: 'chess_char_5_14_a', row: 9, col: 3 }, { chessId: 't_reserve', row: 12, col: 3 },
+        { chessId: 't_alive', row: 10, col: 3 }, { chessId: 't_removed', row: 11, col: 3 }],
+      flags: { dpInit: 0, dpPerSec: 0 }, hooks: ['damaged', 'deploy', 'skillStart'], captureNoisy: true, autoFinish: false,
+    });
+    h.step();
+    const u = h.unit('chess_char_5_14_a'), a = h.unit('t_reserve');
+    const bb = bbOf(u), baseCost = a.base.cost;
+    h.b.kill(a);
+    h.b.retreat(h.unit('t_removed'), { permanent: true });
+    for (let i = 1; i <= 3; i++) {
+      u.skill.gainSp(1000);
+      assert.ok(u.skill.activate('test'));
+      assert.equal(a.base.cost, Math.max(0, baseCost - i * bb.cost), 'discount accumulates and clamps at zero');
+      assert.equal(a.mem.svashCasts, Math.min(i, bb.max_stack_cnt), 'redeploy slashes cap at two');
+    }
+    for (const id of ['t_alive', 't_removed']) {
+      const other = h.unit(id);
+      assert.equal(other.base.cost, other.def.stats.cost, 'living and permanently removed operators are not reserves');
+      assert.equal(other.mem.svashCasts ?? 0, 0);
+    }
+    // Redeploy once to consume the capped stack, then earn one fresh discount for a nonzero paid redeploy.
+    const stackedTarget = h.spawn('enemy_dummy', { pos: [12, 5] });
+    const stackedHp = stackedTarget.hp;
+    assert.ok(h.b.redeploy(a));
+    const stackedHits = tagged(h, 'svash2', stackedTarget).filter((c) => c.source === a);
+    assert.equal(stackedHits.length, 2, 'three earned casts produce exactly two slashes');
+    for (const hit of stackedHits) approx(hit.amount, a.s.atk * bb.atk_scale);
+    approx(stackedHp - stackedTarget.hp, 2 * a.s.atk * bb.atk_scale);
+    assert.equal(fxOf(h, 'aoe').filter((ev) => ev[4].id === a.id && ev[4].skill === 'svash2').length, 2);
+    h.b.kill(stackedTarget);
+    assert.equal(a.mem.svashCasts, 0);
+    assert.equal(a.base.cost, baseCost);
+    h.b.kill(a);
+    u.skill.gainSp(1000);
+    assert.ok(u.skill.activate('test'));
+    const discounted = Math.max(0, baseCost - bb.cost) * a.s.costMul;
+    assert.ok(discounted > 0 && discounted < baseCost);
+    const ps = h.b.getPlayer(a.ownerId);
+    ps.dp = discounted;
+    const e = h.spawn('enemy_dummy', { pos: [12, 5] });
+    // A deployment-time modifier must be included: the slash uses the recipient's current ATK, not SilverAsh's.
+    h.b.addBuff(a, { key: 'test:redeployAtk', persist: true, mods: { atkFlat: 123 } });
+    const hp0 = e.hp, activations = a.skill.activations;
+    const fx0 = fxOf(h, 'aoe').filter((ev) => ev[4].id === a.id).length;
+    if (automatic) {
+      assert.ok(h.runUntil(() => a.alive, 30), 'timer and available discounted DP automatically redeploy the reserve');
+    } else {
+      assert.ok(h.b.redeploy(a, { free: false }));
+    }
+    approx(ps.dp, 0, 1e-6, 'paid only the discounted cost before deploy restored it');
+    assert.equal(a.base.cost, baseCost);
+    assert.equal(a.mem.svashCasts, 0);
+    const hits = tagged(h, 'svash2', e).filter((c) => c.source === a);
+    assert.equal(hits.length, 1);
+    approx(hits[0].amount, a.s.atk * bb.atk_scale);
+    approx(hp0 - e.hp, a.s.atk * bb.atk_scale);
+    assert.ok(hits[0].dmg.isSkill && hits[0].dmg.tags.includes('skill'));
+    assert.ok(e.findBuff('cold') && e.findBuff('reveal'));
+    const fx = fxOf(h, 'aoe').filter((ev) => ev[4].id === a.id).slice(fx0);
+    assert.equal(fx.length, 1);
+    assert.deepEqual(fx[0], ['fx', 'aoe', a.x + a.fwd[1] * 1.5, a.y + a.fwd[0] * 1.5, { id: a.id, r: 2, skill: 'svash2' }]);
+    assert.equal(a.skill.activations, activations);
+    assert.equal(h.hooksOf('skillStart').filter((c) => c.unit === a).length, 0);
+    assert.equal(h.eventsOf('skill').filter((ev) => ev[1] === a.id).length, 0, 'borrowed slash is not the recipient activating its own skill');
+    h.b.kill(a);
+    assert.ok(h.b.redeploy(a));
+    assert.equal(tagged(h, 'svash2', e).filter((c) => c.source === a).length, 1, 'consumed slash does not repeat on the next deployment');
+    clean(h);
+  });
+}
+
 // ------------------------------------------------------------------------------------------------------------------
 test('引星棘刺 S2: alchemy unit (+3 s with an op in range) — 120 % ATK arts/s, healing ×0.5 on ground enemies, allies recover (生命回复速度); T1 ATK +10 %; T2 ASPD ±10 on long roads', () => {
   const h = makeBattle({

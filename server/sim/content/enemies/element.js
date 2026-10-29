@@ -64,6 +64,7 @@ const SYUFO_CRAWL_STUN = 0.5;
  */
 function kitSyufo(ab) {
   return [float(), ep('erosion', T(ab, 'EpDamage.attack@ep_damage_ratio') ?? 0), {
+    carryPhase: { key: 'crawl', fields: ['crawl'], buffs: ['ab:float'] },
     spawn(b, e) { e.profile.canTarget = (u) => !u.isFlying; },
     status(c, b, e, a) {
       if (a.crawl || !(c.status === 'stun' || c.status === 'freeze' || c.status === 'sleep' || c.status === 'groundbind')) return;
@@ -83,7 +84,10 @@ function kitDeathEye(ab, e) {
     const t = byPriority(e2, targetsNear(b, e2, r))[0];
     if (!t) return;
     const dur = s.bb.hit_duration ?? 0;
-    b.addBuff(e2, { key: 'ab:channel', duration: dur, flags: { disarm: true } });
+    // 持续施法 stands still: without `noMove` an unblocked caster kept walking its route while the beam fired (the
+    // owner's 2026-10-29 report, as 节日爵士乐手). The buff's own duration ends it — and the interrupt paths
+    // remove it — so mobility returns with the channel.
+    b.addBuff(e2, { key: 'ab:channel', duration: dur, flags: { disarm: true, noMove: true } });
     b.fx('beam', { x: e2.x, y: e2.y, from: e2.id, to: t.id, kind: 'deathEye', dur });
     let n = 0;
     const h = b.every(1, () => {

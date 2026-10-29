@@ -178,9 +178,30 @@ test(`${nm('enemy_10034_cnvsax')}: revealed (反隐) and not blocked it makes no
   const e = put(h, 'enemy_10034_cnvsax', [9, 8], { move: true, route: { motion: 'WALK', start: [9, 8], end: [9, 1], checkpoints: [] } });
   h.b.addBuff(e, { key: 'test:reveal', persist: true, flags: { reveal: true } });
   const x0 = e.x;
-  h.run(4);
+  h.run(2.5);                                                   // before the 3 s initial cooldown: no channel yet
   assert.equal(e.stats.attacks, 0, 'no ranged attack (until 0.1.3 it shot the wall and stood still)');
-  approx(x0 - e.x, 4 * e.s.moveSpeed * 0.5, 0.02, 'walked the whole 4 s');
+  approx(x0 - e.x, 2.5 * e.s.moveSpeed * 0.5, 0.02, 'walked the whole 2.5 s');
+});
+
+test(`${nm('enemy_10034_cnvsax')}: 狂欢式演奏 stands it still while the channel runs, then it walks on`, () => {
+  const h = arena({ units: [{ chessId: 't_wall', row: 10, col: 6 }] });
+  h.step();
+  h.b.addBuff(h.unit('t_wall'), { key: 'test:noBlock', persist: true, flags: { noBlock: true } });
+  const e = put(h, 'enemy_10034_cnvsax', [9, 8], { move: true, route: { motion: 'WALK', start: [9, 8], end: [9, 1], checkpoints: [] } });
+  h.b.addBuff(e, { key: 'test:reveal', persist: true, flags: { reveal: true } });
+  h.run(4.5);                                                   // the 3 s initial cooldown, then the channel
+  assert.ok(e.mem.jazzChannel && !e.mem.jazzChannel.cancelled, '狂欢式演奏 is channelling');
+  const xStop = e.x;
+  h.run(2);
+  approx(e.x, xStop, 1e-9, '持续施法: the channel holds its ground (it walked on until 2026-10-29)');
+  h.run(9);                                                     // past the buff's 10.6 s duration (it re-casts: the 10 s
+                                                                // cooldown runs out mid-channel)
+  h.b.applyStatus(e, 'silence', { duration: 3 });               // "施法期间受到沉默影响后，立即结束技能"
+  h.run(1);
+  assert.ok(!e.mem.jazzChannel, 'silenced: the channel ends');
+  const x1 = e.x;
+  h.run(1);
+  assert.ok(e.x < x1 - 1e-6, 'mobility returns once the channel ends');
 });
 
 test(`${nm('enemy_9008_acbunn')}: attacks several targets at once while stealthed`, () => {
@@ -2012,6 +2033,25 @@ test(`${nm('enemy_1275_dwlock_2')}: a stun during 死亡之眼 interrupts the ch
   h.run(s.bb.hit_duration + 1);
   assert.equal(w.elem.apoptosis, 0);
   assert.ok(!e.findBuff('ab:channel'));
+});
+
+test(`${nm('enemy_1275_dwlock_2')}: 死亡之眼 stands it still while the channel runs, then it walks on`, () => {
+  const h = arena({ units: [{ chessId: 't_wall', row: 10, col: 6 }] });
+  h.step();
+  h.b.addBuff(h.unit('t_wall'), { key: 'test:noBlock', persist: true, flags: { noBlock: true } });
+  const e = put(h, 'enemy_1275_dwlock_2', [9, 8], { move: true, route: { motion: 'WALK', start: [9, 8], end: [9, 1], checkpoints: [] } });
+  e.profile.noAttack = true;                                    // only the channel may stop it
+  const s = skb('enemy_1275_dwlock_2', 'DeathEye');
+  h.run(s.initCooldown + 1.5);
+  assert.ok(e.findBuff('ab:channel'), '死亡之眼 is channelling');
+  const xStop = e.x;
+  h.run(2);
+  approx(e.x, xStop, 1e-9, '持续施法: the channel holds its ground (it walked on until 2026-10-29)');
+  h.run(s.bb.hit_duration);                                     // the buff's own duration ends the channel
+  assert.ok(!e.findBuff('ab:channel'), 'the channel is over');
+  const x1 = e.x;
+  h.run(1);
+  assert.ok(e.x < x1 - 1e-6, 'mobility returns once the channel ends');
 });
 
 test(`${nm('enemy_10044_wintun')}: its first attack (SILENCE-flagged) is plain while silenced — the barrel is kept for later`, () => {

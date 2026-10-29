@@ -6,6 +6,8 @@
 // "本质上为一次特殊的撤退-再部署行为", "因移动撤退时不会积累再部署惩罚", "可以通过移动行为多次触发部署时触发的效果",
 // "部署时将清空技力". Now both are Battle.moveRedeploy: a new deployment with a `deploy` { move: true } event, no exit.
 // Owner's deviation kept (DESIGN §22.3): his buffs — the 阿戈尔 devour gains — stay through both moves.
+// Nothing to move back from (the anchor landed on his own tile while he blocks, or no deployable tile was found): no
+// 【返回】 at all — no new deployment and no deploy effect (the owner withdrew the 2026-10-22 decision on 2026-10-29).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -139,7 +141,7 @@ test('乌尔比安 S3: the 阿戈尔 devour gains stay through the 【移动】 
   clean(h);
 });
 
-test('乌尔比安 S3 while he blocks (GitHub #33): no 【移动】, but the end is an in-place 【返回】 (owner 2026-10-22)', REAL, () => {
+test('乌尔比安 S3 while he blocks (GitHub #33, §22.3 unchanged): no 【移动】, no new deployment, nothing to return from', REAL, () => {
   const h = makeBattle({
     defs: { enemies: { e_dummy: dummy } },
     units: [{ chessId: ULP, row: 9, col: 3 }], enemies: [{ key: 'e_dummy', pos: [9, 3] }], hooks: ['deploy'], autoFinish: false, timeLimit: 120,
@@ -153,11 +155,8 @@ test('乌尔比安 S3 while he blocks (GitHub #33): no 【移动】, but the end
   assert.ok(h.runUntil(() => u.skill.active, 2));
   assert.deepEqual([u.tileR, u.tileC], [9, 3]);
   assert.ok(h.runUntil(() => !u.skill.active, 30));
-  assert.deepEqual([u.tileR, u.tileC], [9, 3], 'never moved');
-  assert.ok(u.deploySeq > seq0, 'the in-place 【返回】 is a new deployment');
-  const back = deploysOf(h, u);
-  assert.equal(back.length, 2, 'the battle-start deploy + the in-place return');
-  assert.equal(back[1].move, true);
+  assert.equal(u.deploySeq, seq0, 'the same deployment');
+  assert.equal(deploysOf(h, u).length, 1, 'only the battle-start deploy');
   assert.ok(!h.b.allyUnits.some((x) => x.kind === 'token'), 'no 从不混淆的方向');
   clean(h);
 });
@@ -303,38 +302,5 @@ test('Battle.moveRedeploy: refused like relocate (nothing changes); 气流 follo
   assert.ok(b.moveRedeploy(u, 11, 5));
   h.run(0.2);
   assert.ok(u.findBuff('terrain:airflow') && u.s.atk > 1000, 'the new tile\'s airflow starts');
-  clean(h);
-});
-
-test('乌尔比安 S3 with no deployable anchor tile: the end is still a 【返回】 — in-place redeploy, SP emptied, ration fires', REAL, () => {
-  // a teammate stands where the anchor would land and a 阻隔工事 blocks the tile beyond: neither is a tile his player may
-  // deploy on, so the skill never moves him. Owner's decision of 2026-10-22 「技能结束都算重新部署」: the return still
-  // empties the SP and the on-deploy effects (迅捷作战粮) reach him — the ally is 深巡 (阿戈尔), so the ration counts one
-  // bond partner. (The 自身所在地块 case — he blocks, stop = 0 — is the same in-place 【返回】: GitHub #33 test above.)
-  const h = makeBattle({
-    defs: { enemies: { e_dummy: dummy } },
-    flat: { crates: [[12, 6]] },
-    units: [{ chessId: ULP, row: 12, col: 3, items: [RATION] }, { chessId: 'chess_char_1_04_a', row: 12, col: 5 }],
-    enemies: [{ key: 'e_dummy', pos: [12, 8] }],
-    hooks: ['deploy', 'skillEnd'],
-    autoFinish: false, timeLimit: 120,
-  });
-  const u = h.unit(ULP);
-  h.step();
-  assert.equal(deploysOf(h, u).length, 1, 'the battle-start deployment');
-  const seq0 = u.deploySeq;
-  u.skill.gainSp(1000);
-  assert.ok(h.runUntil(() => u.skill.active, 3), 'S3 casts');
-  assert.deepEqual([u.tileR, u.tileC], [12, 3], 'no anchor tile: he never moved');
-  u.skill.sp = 7; // leftover SP: the return must empty it before the ration's gift
-  assert.ok(h.runUntil(() => !u.skill.active, 40), 'S3 ends');
-  const deploys = deploysOf(h, u);
-  assert.equal(deploys.length, 2, 'start + the in-place 【返回】');
-  assert.equal(deploys[1].move, true);
-  assert.equal(deploys[1].initial, false);
-  assert.ok(u.deploySeq > seq0, 'a new deployment (deploySeq bumped)');
-  close(u.skill.sp, itemBb(RATION).sp_each_person * 2, 0.15, 'the ration gift (one bond partner) after the emptied SP');
-  assert.deepEqual([u.tileR, u.tileC], [12, 3], 'still his tile');
-  assert.equal(h.hooksOf('death').filter((c) => c.unit === u).length, 0, 'no exit');
   clean(h);
 });

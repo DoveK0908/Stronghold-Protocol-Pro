@@ -44,6 +44,8 @@ import { isPotential, isCultivate } from '../../shared/potential.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
 import { DEFAULT_VERSION, versionById, versionOfData } from '../../shared/versions.js';
+import { BossQuota } from '../../shared/bossQuota.js';
+import { sanitizeEnemyCarry } from './enemyCarry.js';
 
 export const SPEC_VERSION = 1;
 
@@ -88,19 +90,41 @@ export function buildBattleSpec(o = {}) {
     waveId: o.waveId ?? null,
     bossId: o.bossId ?? null,
     content: o.content ?? 'full',
-    boss: bossLike && o.boss ? { poolHp: Number(o.boss.poolHp) || 0, poolMax: Number(o.boss.poolMax) || 1 } : null,
+    boss: bossLike && o.boss ? { poolHp: Number(o.boss.poolHp) || 0, poolMax: Number(o.boss.poolMax) || 1,
+      ...(o.boss.quota ? { quota: o.boss.quota } : {}) } : null,
     // the content set the battle runs on and the art it was drawn with (header): not read by the sim
     ...(isContentHash(o.cs) ? { cs: o.cs } : {}),
     ...(isContentHash(o.vs) ? { vs: o.vs } : {}),
     // experimental room option (项目 5): 限伤 caps at BOSS_HIT_LIMIT − 1 instead of cancelling the hit
     ...(o.bossHitSoftCap === true ? { bossHitSoftCap: true } : {}),
+    // Only the normal→Unite chain carries HP/phase and remaining redeployment; never a boss or a later round.
+    ...(o.stateCarry === true && ['normal', 'unite'].includes(o.kind ?? 'normal') ? { stateCarry: true } : {}),
     ...(o.version && o.version !== DEFAULT_VERSION ? { version: o.version } : {}),
     // morphPairing plus only. An official spec grows no key (identity and extra-field tests).
     ...(o.morphPairing === 'plus' ? { morphPairing: 'plus' } : {}),
   };
   const out = JSON.parse(JSON.stringify(spec, specReplacer));
   for (const p of out.players) for (const u of (p && Array.isArray(p.units) ? p.units : [])) if (u && typeof u === 'object') sanitizeUnitLoadout(u);
+  cleanStateCarryInputs(out);
   return out;
+}
+
+// Copy only the bounded versioned phase DTO, never functions/arbitrary memories. The gate is checked again when a
+// spec is consumed (replays, workers and display replicas need not have passed through buildBattleSpec in this process).
+function cleanStateCarryInputs(s) {
+  const enabled = s.stateCarry === true && ['normal', 'unite'].includes(s.kind ?? 'normal');
+  if (!enabled) delete s.stateCarry;
+  for (const p of Array.isArray(s.spawns) ? s.spawns : []) {
+    if (!p || typeof p !== 'object') continue;
+    const carry = enabled ? sanitizeEnemyCarry(p.stateCarry) : null;
+    if (carry) p.stateCarry = carry;
+    else delete p.stateCarry;
+  }
+  for (const p of Array.isArray(s.players) ? s.players : []) for (const u of Array.isArray(p?.units) ? p.units : []) {
+    const c = u?.carryState;
+    if (!c || typeof c !== 'object') continue;
+    if (!enabled || c.down !== true || !Number.isFinite(c.redeployRemaining) || c.redeployRemaining < 0) delete c.redeployRemaining;
+  }
 }
 
 const LOADOUT_ID = /^[A-Za-z0-9_\-]{1,64}$/;
@@ -155,12 +179,13 @@ export { withUnitLoadouts };
 export function createBattleFromSpec(spec, dataSource, opts = {}) {
   if (!spec || typeof spec !== 'object') throw new TypeError('createBattleFromSpec: spec required');
   const s = jsonClone(spec);
+  cleanStateCarryInputs(s);
   if (s.version != null && (!versionById(s.version) || versionOfData(toDataSource(dataSource).raw) !== s.version)) {
     throw new RangeError(`Battle version ${s.version} does not match loaded data`);
   }
   const bossLike = s.kind === 'boss' || s.kind === 'hidden';
   let sharedBoss = opts.sharedBoss ?? null;
-  if (!sharedBoss && bossLike && s.boss) sharedBoss = new LocalBossPool(s.boss.poolMax, s.boss.poolHp);
+  if (!sharedBoss && bossLike && s.boss) sharedBoss = new LocalBossPool(s.boss.poolMax, s.boss.poolHp, s.boss.quota);
   const BattleClass = typeof opts.BattleClass === 'function' ? opts.BattleClass : Battle;
   const battleOpts = {
     seed: s.seed,
@@ -183,6 +208,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
   };
   if (s.bossId != null) battleOpts.bossId = s.bossId;
   if (s.bossHitSoftCap === true) battleOpts.bossHitSoftCap = true;
+  if (s.stateCarry === true) battleOpts.stateCarry = true;
   if (s.morphPairing === 'plus') battleOpts.morphPairing = 'plus';
   if (opts.logger) battleOpts.logger = opts.logger;
   if (opts.recordEvents === false) battleOpts.recordEvents = false;
@@ -206,7 +232,7 @@ export function createBattleFromSpec(spec, dataSource, opts = {}) {
  * changes nothing — so the leader stood at "0 HP" and the field never ended.
  */
 export class LocalBossPool {
-  constructor(maxHp, hp = maxHp) {
+  constructor(maxHp, hp = maxHp, quota = null) {
     this.maxHp = Math.max(1, Number(maxHp) || 1);
     const h = Number(hp);
     this.serverHp = Number.isFinite(h) ? Math.max(0, Math.min(this.maxHp, h)) : this.maxHp;
@@ -214,11 +240,12 @@ export class LocalBossPool {
     this.acked = 0;
     /** @type {Record<string, number>} */
     this.byPlayer = {};
+    if (quota) this.quota = new BossQuota(this.maxHp, quota);
   }
 
   get hp() {
     const h = this.serverHp - Math.max(0, this.cum - this.acked);
-    return h < BOSS_POOL_MIN_HP ? 0 : h;
+    return this.quota ? Math.max(0, h) : h < BOSS_POOL_MIN_HP ? 0 : h;
   }
 
   /** Only used by the sim's fallback path when damage() throws. */
@@ -227,11 +254,13 @@ export class LocalBossPool {
     if (Number.isFinite(n)) this.serverHp = Math.max(0, n) + Math.max(0, this.cum - this.acked);
   }
 
-  damage(playerId, amount) {
+  damage(playerId, amount, time) {
     const a = Number(amount);
     const left = this.hp;
     if (!Number.isFinite(a) || a <= 0 || left <= 0) return 0;
-    const dealt = left - a < BOSS_POOL_MIN_HP ? left : a;
+    const dealt = this.quota ? this.quota.damage(playerId, a, time, left)
+      : left - a < BOSS_POOL_MIN_HP ? left : a;
+    if (dealt <= 0) return 0;
     this.cum += dealt;
     if (playerId != null) this.byPlayer[playerId] = (this.byPlayer[playerId] || 0) + dealt;
     return dealt;
@@ -261,7 +290,7 @@ export class LocalBossPool {
  *   damage(playerId, amount) / hp / maxHp / byPlayer  SharedBossPool's (server/match/finalAssault.js) without onHit
  */
 export class ReplayBossPool {
-  constructor(maxHp, hp = maxHp) {
+  constructor(maxHp, hp = maxHp, quota = null) {
     this.maxHp = Math.max(1, Number(maxHp) || 1);
     const h = Number(hp);
     this.hp = Number.isFinite(h) ? Math.max(0, Math.min(this.maxHp, h)) : this.maxHp;
@@ -273,6 +302,7 @@ export class ReplayBossPool {
     this.to = 0;
     /** @type {{ tick: number, reason: string } | null} */
     this.end = null;
+    if (quota) this.quota = new BossQuota(this.maxHp, quota);
   }
 
   feed(i, to, hp, end) {
@@ -303,10 +333,12 @@ export class ReplayBossPool {
 
   endAfter(tick) { return this.end && this.end.tick === tick ? this.end : null; }
 
-  damage(playerId, amount) {
+  damage(playerId, amount, time) {
     const a = Number(amount);
     if (!Number.isFinite(a) || a <= 0 || this.hp <= 0) return 0;
-    const dealt = this.hp - a < BOSS_POOL_MIN_HP ? this.hp : a;
+    const dealt = this.quota ? this.quota.damage(playerId, a, time, this.hp)
+      : this.hp - a < BOSS_POOL_MIN_HP ? this.hp : a;
+    if (dealt <= 0) return 0;
     this.hp -= dealt;
     if (playerId != null) this.byPlayer.set(playerId, (this.byPlayer.get(playerId) || 0) + dealt);
     return dealt;

@@ -32,6 +32,7 @@ function kitBlades(ab) {
   const cnt = T(ab, 'DeadSpawn.cnt') ?? 0, add = T(ab, 'DeadSpawn.cnt_add') ?? 0, atk = T(ab, 'Atkup.atk', 'AtkUp.atk') ?? 0;
   const key = ab.tS['DeadSpawn.enemy_key'];
   return [{
+    carryPhase: { key: 'blades', fields: ['used'], buffs: ['ab:blade'] },
     spawn(b, e, a) {
       a.used = 0;
       if (cnt > 0 && atk) b.addBuff(e, { key: 'ab:blade', mods: { atkPct: atk }, persist: true, visible: true });

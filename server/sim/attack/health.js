@@ -84,11 +84,14 @@ export function applyHpDecrease(battle, ctx, amount, mark) {
     const before = pool.hp;
     const pid = credit && credit.side === 'ally' ? credit.ownerId : null;
     if (hpAmount > 0) {
-      try { pool.damage(pid, hpAmount); } catch (e) { battle._internalError('bossPool.damage', e); pool.hp = Math.max(0, pool.hp - hpAmount); }
+      try { pool.damage(pid, hpAmount, battle.time); } catch (e) {
+        battle._internalError('bossPool.damage', e);
+        if (!pool.quota) pool.hp = Math.max(0, pool.hp - hpAmount);
+      }
     }
     dealt = Math.max(0, before - pool.hp);
     if (!Number.isFinite(dealt)) dealt = 0; // a misbehaving pool (NaN hp) must not poison damage stats
-    if (pid != null) { const pp = battle._pp(pid); if (pp) pp.bossDamage += dealt; }
+    if (pid != null) { const pp = battle._pp(pid); if (pp) pp.bossDamage += pool.quota ? amount : dealt; }
     battle._syncBossHp(target);
   } else {
     const before = target.hp;
@@ -105,9 +108,10 @@ export function applyHpDecrease(battle, ctx, amount, mark) {
   }
   // damage dealt (unit stats, the results screen's 造成伤害) never counts a unit's own side — its own drain or 流失 (源石溶剂,
   // 史尔特尔 S3 …), friendly damage; `taken` and the kill credit do
+  const statisticalDamage = target.bossPool?.quota ? amount : dealt;
   if (credit && credit.side !== target.side) {
-    credit.stats.dmg += dealt;
-    if (credit.side === 'ally' && credit.ownerId != null) { const pp = battle._pp(credit.ownerId); if (pp) pp.damageDealt += dealt; }
+    credit.stats.dmg += statisticalDamage;
+    if (credit.side === 'ally' && credit.ownerId != null) { const pp = battle._pp(credit.ownerId); if (pp) pp.damageDealt += statisticalDamage; }
   }
   target.stats.taken += dealt;
   target.lastHitAt = battle.time;

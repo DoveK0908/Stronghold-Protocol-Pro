@@ -6,6 +6,7 @@
 import { COLS } from '../constants.js';
 import { unitInfo } from '../snapshot.js';
 import { fin } from './util.js';
+import { captureEnemyCarry } from '../enemyCarry.js';
 
 export class BattleDeploy {
   /**
@@ -267,6 +268,10 @@ export class BattleDeploy {
       // born while a 联防 field ran (spawns.js): the leaker never sent it in, so it costs nobody LP and raises no ×N —
       // unite.js uniteSurvivors / spec.js uniteLeft filter it; every other reading keeps counting it as usual
       if (e.uniteRuntime) entry.uniteRuntime = true;
+      if (this.stateCarry) {
+        const state = captureEnemyCarry(this, e);
+        if (state) entry.stateCarry = state;
+      }
       pp.leaked.push(entry);
       if (e.counted || e.isBoss) pp.perfect = false;
     }

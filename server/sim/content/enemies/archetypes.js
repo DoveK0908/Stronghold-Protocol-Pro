@@ -173,6 +173,7 @@ const allyAura = (r, key, mods, sil = true, iv = 0.5, flags = null) => ({
 
 /** Self ATK buff once HP first drops below ratio. */
 const lowHpBuff = (ratio, mods, key = 'ab:lowhp') => ({
+  carryPhase: { key: 'lowHp', fields: ['on'], buffs: [key] },
   taken(c, b, e, a) {
     if (a.on || !(e.hpRatio < ratio)) return;
     a.on = true;
@@ -209,6 +210,7 @@ const deathBoom = ({ scale, type = 'phys', r = BOOM_RADIUS, status = null, sil =
  * (PRTS 假想敌：镜膜, 天赋: "受沉默影响后失效，无法恢复"); its fan stays in the stopped B_* form afterwards.
  */
 const refraction = (res, hpPct = 0) => ({
+  carryPhase: { key: 'refraction', fields: ['hpLost', 'on'], buffs: ['ab:refraction'] },
   silAware: true,                                                    // SILENCE-flagged: silence switches it off in tick()
   tick(b, e, a) {
     const on = !e.s.flags.silence;
@@ -292,6 +294,9 @@ function prisoner(ab, { freeAll = false } = {}) {
     }
   };
   return {
+    carryPhase: { key: 'prisoner', fields: ['n', 'free'], buffs: ['ab:confined', 'ab:liberty'],
+      extra: ['freedAll'], capture: (b) => ({ freedAll: stOf(b).freedAll }),
+      restore(b, e, a, s) { if (s.freedAll) stOf(b).freedAll = true; } },
     liberate,
     spawn(b, e, a) {
       a.n = 0; a.free = false;
@@ -366,6 +371,18 @@ function reborn({ dur = 0, hpRatio = 1, invincible = 0, invincibleUntargetable =
     setForm(b, e, 'form2', 'revive', { kind: 'reborn' });
   };
   return {
+    carryPhase: { key: 'reborn', fields: ['state', 'noAtk'], buffs: [key, `${key}:inv`], extra: ['elapsed'],
+      capture: (b, e, a) => ({ elapsed: a.state === 'reborn' ? Math.max(0, b.time - a.t0) : 0 }),
+      validate: (s) => s.state == null || s.state === 'reborn' || s.state === 'form2',
+      restore(b, e, a, s) {
+        if (a.state !== 'reborn') return;
+        a.t0 = b.time - (s.elapsed || 0);
+        const held = e.findBuff(key);
+        if (held) {
+          held.onExpire = ({ battle }) => finish(battle, e, a);
+          held.onTick = during ? ({ battle }) => during(battle, e, a, battle.time - a.t0) : null;
+        }
+      } },
     killed(c, b, e, a) {
       if (a.state) return false;
       a.state = 'reborn';
@@ -486,12 +503,26 @@ function husk({ hits, delay, stealthy = true, unblock = false, onHusk = null, ke
     setForm(b, e, 'revived', 'revive');
   };
   return {
+    carryPhase: { key: 'husk', fields: ['state', 'max', 'noAtk', 'huskBegun'], buffs: [key, `${key}:reborn`, 'ab:hitCount'], extra: ['rebornRemaining', 'reviveRemaining'],
+      capture: (b, e, a) => ({ rebornRemaining: Math.max(0, (a.rebornUntil || 0) - b.time), reviveRemaining: Math.max(0, (a.reviveAt || 0) - b.time) }),
+      validate: (s) => s.state == null || s.state === 'husk',
+      restore(b, e, a, s) {
+        if (a.state !== 'husk') return;
+        a.rebornUntil = b.time + (s.rebornRemaining || 0);
+        a.reviveAt = b.time + (s.reviveRemaining || 0);
+        if (!a.huskBegun) b.after(s.rebornRemaining || 0, () => {
+          if (e.alive && a.state === 'husk') { a.huskBegun = true; rebirthCooldowns(e); if (onHusk) onHusk(b, e); }
+        }, { owner: e });
+        b.after(s.reviveRemaining || 0, () => revive(b, e, a), { owner: e });
+      } },
     killed(c, b, e, a) {
       // an HP loss (流失 bypasses 无敌) during the 1 s 重生 cannot cut it short
       if (a.state === 'husk' && b.time < a.rebornUntil) { e.hp = e.s.maxHp; return true; }
       if (a.state === 'husk' || !(hits > 0) || !(delay > 0)) return false;   // the husk's knock-out is the real death
       a.state = 'husk';
       a.rebornUntil = b.time + HUSK_REBIRTH;
+      a.reviveAt = b.time + HUSK_REBIRTH + delay;
+      a.huskBegun = false;
       e.unbalanceUntil = -Infinity;   // a 重生 is a forced state change: it ends a 失衡 (PRTS 失衡位移机制 「例如复活」)
       a.noAtk = e.profile.noAttack;
       a.max = a.max ?? e.base.maxHp;
@@ -511,7 +542,7 @@ function husk({ hits, delay, stealthy = true, unblock = false, onHusk = null, ke
       b._unblock(e);
       if (e.route) e.route.pts = null;
       setForm(b, e, 'husk', 'ember', { hits, dur: HUSK_REBIRTH + delay });
-      b.after(HUSK_REBIRTH, () => { if (e.alive && a.state === 'husk') { rebirthCooldowns(e); if (onHusk) onHusk(b, e); } }, { owner: e });
+      b.after(HUSK_REBIRTH, () => { if (e.alive && a.state === 'husk') { a.huskBegun = true; rebirthCooldowns(e); if (onHusk) onHusk(b, e); } }, { owner: e });
       b.after(HUSK_REBIRTH + delay, () => revive(b, e, a), { owner: e });
       return true;
     },
@@ -530,7 +561,23 @@ function husk({ hits, delay, stealthy = true, unblock = false, onHusk = null, ke
  */
 function statue(ab) {
   const dur = T(ab, 'stone.duration') ?? 0;
+  const fly = (battle, e, a) => {
+    if (!e.alive) return;
+    e.motion = 'FLY';
+    Object.assign(e.profile, { noAttack: a.noAtk, melee: false, dmgType: 'arts', canTarget: (u) => !u.isFlying });
+    battle.addBuff(e, { key: 'ab:flight', persist: true, flags: { noDisplace: true } });
+    if (e.route) e.route.pts = null;
+    setForm(battle, e, 'fly', 'revive', { kind: 'fly' });
+  };
   return {
+    carryPhase: { key: 'statue', fields: ['done', 'noAtk'], buffs: ['ab:stone', 'ab:flight'],
+      restore(b, e, a) {
+        if (!a.done) return;
+        ab.immune = new Set([...(ab.immune || []), 'levitate']);
+        const held = e.findBuff('ab:stone');
+        if (held) held.onExpire = ({ battle }) => fly(battle, e, a);
+        else if (e.motion === 'FLY') e.profile.canTarget = (u) => !u.isFlying;
+      } },
     spawn(b, e) { e.profile.melee = true; },
     killed(c, b, e, a, ab2) {
       if (a.done || !(dur > 0)) return false;
@@ -545,14 +592,7 @@ function statue(ab) {
       b.addBuff(e, {
         key: 'ab:stone', duration: dur, visible: true, flags: { noMove: true, selfBound: true, unblockable: true, noDisplace: true },
         mods: { defFlat: T(ab, 'stone.def') ?? 0, resFlat: T(ab, 'stone.magic_resistance') ?? 0 },
-        onExpire: ({ battle }) => {
-          if (!e.alive) return;
-          e.motion = 'FLY';
-          Object.assign(e.profile, { noAttack: a.noAtk, melee: false, dmgType: 'arts', canTarget: (u) => !u.isFlying });
-          battle.addBuff(e, { key: 'ab:flight', persist: true, flags: { noDisplace: true } });
-          if (e.route) e.route.pts = null;
-          setForm(battle, e, 'fly', 'revive', { kind: 'fly' });
-        },
+        onExpire: ({ battle }) => fly(battle, e, a),
       });
       return true;
     },

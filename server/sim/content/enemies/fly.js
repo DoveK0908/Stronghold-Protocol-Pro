@@ -2,6 +2,7 @@
 // (split from content/enemies.js).
 
 import { TICK, PROJECTILE_SPEEDS, ALLY_COLLIDER_RADIUS } from '../../constants.js';
+import { phaseState } from '../../enemyCarry.js';
 import {
   num, T, hurt, targetsNear, allTargets, areaAllies, areaAlliesInTiles, fieldAllies, byPriority, spawnChildren,
   setForm, expose, unbalancedNow, attackSkillOf,
@@ -181,6 +182,7 @@ function kitBombd(ab) {
   };
   // the cast before its release: { a: the skill ability, rel: the scheduled release }
   let pending = null;
+  const phase = { spent: false };
   // a stun / freeze / sleep before the release: the bomb stays on; the skill re-arms with its cooldown
   const interrupt = (b, e) => {
     const { a, rel } = pending;
@@ -190,6 +192,12 @@ function kitBombd(ab) {
     a.left = Math.max(TICK, num(s.cd, 1));
   };
   return [
+    phaseState('bomb', phase, ['spent'], ['ab:bombRun'], (b, e) => {
+      if (!phase.spent) return;
+      const ability = e.mem.ab.list.find((a) => a.sk === s);
+      if (ability) { ability.cd = Infinity; ability.left = Infinity; }
+      if (!e.findBuff('ab:bombRun') && ms > 0) b.addBuff(e, { key: 'ab:bombRun', mods: { moveMul: ms }, persist: true });
+    }),
     { spawn(b, e) { e.profile.noAttack = true; },
       tick(b, e) { if (pending && e.s.flags.stun) interrupt(b, e); } },
     skill(s, (b, e, a) => {
@@ -208,6 +216,7 @@ function kitBombd(ab) {
         if (!e.alive) return;
         const atk = e.s.atk;
         b._ev(['atk', e.id, t.id, 'droneBomb']);
+        phase.spent = true;
         setForm(b, e, 'bombed');                           // UnitInfo.form: a view built later draws it bomb-less
         b.addProjectile({ from: e, target: t, speed: PROJECTILE_SPEEDS.droneBomb, visual: 'droneBomb', source: e, hitDead: true,
           onHit: (c) => { land(b, e, atk, c.target, c.x, c.y); landed = true; done(); } });

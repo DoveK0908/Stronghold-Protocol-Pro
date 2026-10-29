@@ -93,7 +93,9 @@ function kitJazz(ab, e) {
       const t = byPriority(e2, targetsNear(b, e2, r))[0];
       if (!t || !(dur > 0) || !(iv > 0)) return;
       const n = Math.max(1, Math.floor(dur / iv + 1e-9));
-      const buff = b.addBuff(e2, { key: 'ab:channel', duration: dur, flags: { disarm: true } });
+      // 持续施法 stands still: without `noMove` a revealed, unblocked one (no attack wind-up to stop it) kept walking its
+      // route while the channel fired (owner's 2026-10-29 report) — the buff's removal in `end` gives mobility back.
+      const buff = b.addBuff(e2, { key: 'ab:channel', duration: dur, flags: { disarm: true, noMove: true } });
       let k = 0;
       const end = () => { h.cancel(); e2.mem.jazzChannel = null; if (buff) b.removeBuff(e2, buff); };
       const h = b.every(iv, () => {

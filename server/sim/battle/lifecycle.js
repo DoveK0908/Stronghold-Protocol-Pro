@@ -66,7 +66,10 @@ export class BattleLifecycle {
     // handler) cover the operators forced out above too: their timer is re-read with them, as a later knock-out's is
     for (const u of this.allyUnits) {
       if (u.kind !== 'op' || u.alive || u.removed || u.removeReason !== FORCED_EXIT) continue;
-      u.respawnAt = u.deathAt + Math.max(0, u.base.respawnTime * u.persist.redeployMul * u.s.redeployMul);
+      const remaining = u.carry?.redeployRemaining;
+      u.respawnAt = this.stateCarry && Number.isFinite(remaining) && remaining >= 0
+        ? this.time + remaining
+        : u.deathAt + Math.max(0, u.base.respawnTime * u.persist.redeployMul * u.s.redeployMul);
     }
   }
 
@@ -252,6 +255,8 @@ export class BattleLifecycle {
         sp: u.skill && !u.skill.noSkill ? Math.round(u.skill.spTotal * 100) / 100 : 0,
         skillActive: !!(u.skill && u.skill.active && u.skill.kind !== 'passive'),
         alive: !!u.alive,
+        ...(this.stateCarry && u.kind === 'op' && !u.alive && !u.removed && Number.isFinite(u.respawnAt)
+          ? { redeployRemaining: Math.max(0, u.respawnAt - this.time) } : {}),
       }));
       pp.unitStats = ps.units.map((u) => ({
         id: u.id, uid: u.uid, defId: u.defId, name: u.name, kind: u.kind,
