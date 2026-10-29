@@ -53,6 +53,8 @@ export const SHOPLEVEL_TYPE = 'g.modShopLevel';
 /** the sandbox's per-operator overrides (see "the unit rules" below): 携带技能 / 技力 / 属性 */
 export const UNIT_TYPE = 'g.modUnit';
 export const TESTFUNDS_TYPE = 'g.modTestFunds';
+export const TESTLP_TYPE = 'g.modTestLp';
+const isTestLp = (v) => Number.isSafeInteger(v) && v >= 1 && v <= 99999;
 export const TESTROUND_TYPE = 'g.modTestRound';
 export const TESTCAP_TYPE = 'g.modTestRoundCap';
 export const TESTENEMY_TYPE = 'g.modTestEnemy';
@@ -85,6 +87,7 @@ export const FEATURE_KEYS = Object.freeze([
   'shopFilter',    // 阵营锁 (g.modShopFilter)
   'shopLevel',     // 调度中心：直接设置等级 (g.modShopLevel)
   'testFunds',    // 测试 · 设置资金
+  'testLp',       // 测试 · 设置本座当前生命值（不复活）
   'testRound',    // 测试 · 设置当前回合
   'testRoundCap', // 测试 · 设置回合上限
   'testEnemy',    // 测试 · 设置敌人
@@ -356,6 +359,10 @@ export async function installServerPatch(gameRoot, log = console, opts = {}) {
     C2S[TESTFUNDS_TYPE] = { funds: (v) => Number.isInteger(v) && v >= 0 && v <= 99999 };
     log.info(`registered intent ${TESTFUNDS_TYPE}`);
   }
+  if (!Object.hasOwn(C2S, TESTLP_TYPE)) {
+    C2S[TESTLP_TYPE] = { lp: isTestLp };
+    log.info(`registered intent ${TESTLP_TYPE}`);
+  }
   if (!Object.hasOwn(C2S, TESTROUND_TYPE)) {
     C2S[TESTROUND_TYPE] = { round: (v) => Number.isInteger(v) && v >= 1 && v <= 99 };
     log.info(`registered intent ${TESTROUND_TYPE}`);
@@ -452,6 +459,7 @@ export async function installServerPatch(gameRoot, log = console, opts = {}) {
       else if (msg && msg.t === DIY_TYPE) res = handleModDiy(this, playerId, msg, state, ERR);
       else if (msg && msg.t === ENABLE_TYPE) res = handleEnable(this, playerId, msg, state, ERR);
       else if (msg && msg.t === TESTFUNDS_TYPE) res = handleTestFunds(this, playerId, msg, state, ERR);
+      else if (msg && msg.t === TESTLP_TYPE) res = handleTestLp(this, playerId, msg, state, ERR, PHASE);
       else if (msg && msg.t === TESTROUND_TYPE) res = handleTestRound(this, playerId, msg, state, ERR);
       else if (msg && msg.t === TESTCAP_TYPE) res = handleTestCap(this, playerId, msg, state, ERR);
       else if (msg && msg.t === TESTENEMY_TYPE) res = handleTestEnemy(this, playerId, msg, state, ERR);
@@ -690,12 +698,18 @@ function handleSpeed(match, playerId, msg, state, ERR) {
   state.speed = msg.n;
   try {
     applyGameSpeed(match, msg.n);
+    // A deliberate Luck request supersedes every Pro promise, even at the same effective speed.
+    match.speedBoost = false;
+    match.speedBoostPending = false;
+    match.speedBoostOffPending = false;
+    if (match.speedVote) match.cancelSpeedVote?.('alreadyOn');
   } catch (e) {
     match.reportError?.('modSpeed', e);
     return fail('INTERNAL');
   }
   try {
-    seat.ps.dirty?.(); // ship the new modSpeed in the next private view (and retrigger the panel)
+    match.markPublic?.();
+    for (const ps of [...(match.players?.values() || []), ...(match.spectators?.values() || [])]) ps.dirty?.();
     match.flush();
   } catch (e) {
     match.reportError?.('flush', e);
@@ -994,27 +1008,38 @@ function handleAuto(match, playerId, msg, state, ERR, log) {
 function applyGameSpeed(match, n) {
   const old = Number(match.gameSpeed);
   if (!isSpeed(n) || n === old) return;
-  const now = typeof match._clockNow === 'function' ? match._clockNow() : match.sched.now();
-  const live = [];
-  for (const f of Array.isArray(match.fields) ? match.fields : []) {
-    if (!f || f.done || !Number.isFinite(f.startAt)) continue;
-    let gt = 0;
-    try { gt = match._fieldElapsed(f); } catch { gt = 0; }
-    live.push({ f, gt });
+  const wallNow = match.sched.now();
+  const now = typeof match._clockNow === 'function' ? match._clockNow() : wallNow;
+  const origin = (at) => now - ((now - at) * old) / n;
+  const deadline = (at) => now + ((at - now) * old) / n;
+  // Settle the unsampled interval at the OLD rate, without pumping/re-entering the match.
+  // acc is already game-time debt: it must not be multiplied or discarded.
+  for (const pacer of new Set([match.runner, match.pacer])) {
+    if (!pacer || pacer.done || pacer.stopped || !Number.isFinite(pacer.last)) continue;
+    if (!match.paused && (!pacer.remote || (pacer.ready && !pacer.held))) {
+      pacer.acc += Math.max(0, wallNow - pacer.last) / 1000 * old;
+    }
+    pacer.last = wallNow;
+  }
+  const live = (Array.isArray(match.fields) ? match.fields : []).filter((f) => f && !f.done && Number.isFinite(f.startAt));
+  for (const f of live) f.startAt = origin(f.startAt);
+  if (['COMBAT', 'UNITE', 'FINAL_ASSAULT', 'HIDDEN_CORE'].includes(match.phase)) {
+    if (match.deadline) match.deadline = deadline(match.deadline);
+    if (match.overtimeAt) match.overtimeAt = deadline(match.overtimeAt);
+    if (Number.isFinite(match._bossStartAt)) match._bossStartAt = origin(match._bossStartAt);
   }
   match.gameSpeed = n;
-  for (const { f, gt } of live) f.startAt = now - (gt / n) * 1000;
-  for (const { f } of live) {
+  for (const f of live) {
     if (f.mode === 'client' && f.kind !== 'boss' && f.kind !== 'hidden') {
       if (match.paused) {
         if (f.deadlineTimer) { match.cancel(f.deadlineTimer); f.deadlineTimer = null; }
-        f.rearmDeadline = true; // _resume re-arms it (matching Match.setPause's own bookkeeping)
-      } else {
-        try { match._armDeadline(f); } catch (e) { match.reportError?.('armDeadline', e); }
-      }
+        f.rearmDeadline = true;
+      } else match._armDeadline(f);
     } else if (f.mode === 'server' && f.result != null) {
-      // a finished server-run field waiting out its release: move the release to the new clock too
-      try { match._armRelease(f); } catch (e) { match.reportError?.('armRelease', e); }
+      if (match.paused) {
+        if (f.doneTimer) { match.cancel(f.doneTimer); f.doneTimer = null; }
+        f.rearmRelease = true;
+      } else match._armRelease(f);
     }
   }
 }
@@ -1044,7 +1069,7 @@ function installPresentationScale({ Match, DELAYS, state, log }) {
   const origScaled = Match.prototype.scaled;
   Match.prototype.scaled = function scaled(ms) {
     const base = origScaled.call(this, ms);
-    const n = Number(state.speed);
+    const n = Number(this.gameSpeed);
     if (!(n > GAME_SPEED) || !steps.has(Math.round(ms))) return base;
     let solo = false;
     try { solo = !!this.soloUntimed; } catch { solo = false; }
@@ -1367,6 +1392,8 @@ function sandboxView(ps, state) {
     test: {
       matchId: state.test.matchId,
       funds: state.test.funds,
+      // Current authoritative LP of this seat, never another seat's last command or a second ledger.
+      lp: ps.lp,
       round: state.test.round,
       roundCap: state.test.roundCap,
       enemy: { list: state.test.enemy.list, wave: state.test.enemy.wave },
@@ -1468,6 +1495,33 @@ function handleTestFunds(match, playerId, msg, state, ERR) {
   } catch (e) {
     match.reportError?.('modTestFunds', e);
     return fail(ERR.BAD_TARGET, '设置资金失败');
+  }
+}
+
+/** Set this seat's current player LP, not operator HP or the shared boss/team pool. */
+function handleTestLp(match, playerId, msg, state, ERR, PHASE) {
+  const got = testSeat(match, playerId, state, 'testLp', ERR);
+  if (got.fail) return got.fail;
+  const ps = got.ps;
+  if (!isTestLp(msg.lp)) return fail(ERR.BAD_TARGET, '生命值要是 1..99999 的整数');
+  // Zero/dead/pending-rescue states belong to settlement/rescue. Never cancel a death here.
+  if (ps.alive !== true || ps.pendingDeath || !Number.isFinite(ps.lp) || ps.lp <= 0) {
+    return fail(ERR.BAD_TARGET, '只能设置存活玩家的生命值，不能复活或取消待救援状态');
+  }
+  // Boss LP is an authoritative shared pool; _syncTeamLp would overwrite a personal write.
+  if (match.teamLp != null || match.phase === PHASE.LOBBY || match.phase === PHASE.RESULT
+    || match.phase === PHASE.FINAL_ASSAULT || match.phase === PHASE.HIDDEN_CORE) {
+    return fail(ERR.WRONG_PHASE, '当前阶段不能设置个人生命值');
+  }
+  try {
+    ps.lp = msg.lp;
+    ps.dirty?.();
+    match.markPublic?.();
+    match.flush?.();
+    return { ok: true, lp: ps.lp };
+  } catch (e) {
+    match.reportError?.('modTestLp', e);
+    return fail(ERR.BAD_TARGET, '设置生命值失败');
   }
 }
 

@@ -30,7 +30,7 @@
     {
       "id": "L3-control",
       "find": "  el('label', { class: 'spmod-sbchk' }, sbPlace, '地块'),",
-      "replace": "  el('label', { class: 'spmod-sbchk' }, sbPlace, '地块'),\n  el('label', { class: 'spmod-sbchk', title: '直接把本座的调度中心（商店）等级设成这个数：升级仍走游戏自己的 levelUp，上限 6 级' },\n    el('input', {\n      type: 'number', min: 1, max: 6, step: 1, value: String(local.sb.level || 1),\n      style: 'width:3.2em', class: 'spmod-sbnum',\n      onChange: (e) => { const v = Number(e.currentTarget.value); if (Number.isInteger(v)) { local.sb.level = v; saveSandboxPrefs(); } },\n    })),\n  el('button', {\n    class: 'spmod-sbbtn', type: 'button',\n    title: '把本座的调度中心等级设成左边那个数（1..6）',\n    onClick: () => sendShopLevel(local.sb.level),\n  }, '设置调度'),"
+      "replace": "  el('label', { class: 'spmod-sbchk' }, sbPlace, '地块'),\n  el('label', { class: 'spmod-sbchk', title: '直接把本座的调度中心（商店）等级设成这个数：升级仍走游戏自己的 levelUp，上限 6 级' },\n    el('span', { class: 'spmod-sblabel', style: 'margin-right:0.32em' }, '调度中心等级'),\n    el('input', {\n      type: 'number', min: 1, max: 6, step: 1, value: String(local.sb.level || 1),\n      style: 'width:3.2em', class: 'spmod-sbnum',\n      onChange: (e) => { const v = Number(e.currentTarget.value); if (Number.isInteger(v)) { local.sb.level = v; saveSandboxPrefs(); } },\n    })),\n  el('button', {\n    class: 'spmod-sbbtn', type: 'button',\n    title: '把本座的调度中心等级设成左边那个数（1..6）',\n    onClick: () => sendShopLevel(local.sb.level),\n  }, '设置调度'),"
     },
     {
       "id": "L3-feature-row",

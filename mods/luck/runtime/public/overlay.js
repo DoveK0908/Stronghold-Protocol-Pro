@@ -35,6 +35,7 @@ const BANDS = 'g.modBands';
 const PLACE = 'g.modPlace';
 const UNIT = 'g.modUnit';
 const TESTFUNDS = 'g.modTestFunds';
+const TESTLP = 'g.modTestLp';
 const TESTROUND = 'g.modTestRound';
 const TESTCAP = 'g.modTestRoundCap';
 const TESTENEMY = 'g.modTestEnemy';
@@ -130,7 +131,7 @@ void fetch(new URL("data/waves.json", document.baseURI))
   .catch(() => { /* 拿不到就只列 enemies.json，不影响别的 */ });
 
 // 测试页的默认值与「这一局」的标识。换局就复位（见 drawTestPage）—— 一局的测试就是一局的。
-const testDefaults = () => ({ funds: 100, round: 1, roundCap: 10, shopLevel: 1, enemies: [], wave: null, all: false,
+const testDefaults = () => ({ lp: '', funds: 100, round: 1, roundCap: 10, shopLevel: 1, enemies: [], wave: null, all: false,
   map: null, mapAll: false, bondId: '', bondLayers: 1, bondAll: false, comboRound: null, comboPick: '', comboAll: false,
   timerCombat: null, timerPrep: null });
 let testMatchScope = '\u0000';
@@ -496,7 +497,7 @@ const TEST_KEY = 'spmod.test';
 function saveTestPrefs() {
   try {
     const mid = store.get()?.match?.public?.matchId ?? null;
-    localStorage.setItem(TEST_KEY, JSON.stringify({ matchId: mid, funds: local.test.funds, round: local.test.round, roundCap: local.test.roundCap, shopLevel: local.test.shopLevel, enemies: local.test.enemies, wave: local.test.wave, all: local.test.all, map: local.test.map, mapAll: local.test.mapAll, bondId: local.test.bondId, bondLayers: local.test.bondLayers, bondAll: local.test.bondAll, comboRound: local.test.comboRound, comboPick: local.test.comboPick, comboAll: local.test.comboAll }));
+    localStorage.setItem(TEST_KEY, JSON.stringify({ matchId: mid, lp: local.test.lp, funds: local.test.funds, round: local.test.round, roundCap: local.test.roundCap, shopLevel: local.test.shopLevel, enemies: local.test.enemies, wave: local.test.wave, all: local.test.all, map: local.test.map, mapAll: local.test.mapAll, bondId: local.test.bondId, bondLayers: local.test.bondLayers, bondAll: local.test.bondAll, comboRound: local.test.comboRound, comboPick: local.test.comboPick, comboAll: local.test.comboAll }));
   } catch { /* 存不下就算了，下次回默认值 */ }
 }
 
@@ -512,6 +513,7 @@ function loadTestPrefs() {
     const mid = store.get()?.match?.public?.matchId ?? null;
     if (!s.matchId || !mid || s.matchId !== mid) return;
     testMatchScope = mid;
+    if (Number.isInteger(s.lp) && s.lp >= 1 && s.lp <= 99999) local.test.lp = s.lp;
     if (Number.isInteger(s.funds) && s.funds >= 0 && s.funds <= 99999) local.test.funds = s.funds;
     if (Number.isInteger(s.round) && s.round >= 1 && s.round <= 99) local.test.round = s.round;
     if (Number.isInteger(s.roundCap) && s.roundCap >= 1 && s.roundCap <= 99) local.test.roundCap = s.roundCap;
@@ -1202,13 +1204,13 @@ function drawSandboxPage(v) {
 
 const SPEED_KEY = 'spmod.speed';
 const SPEED_CHOICES = [1, 2, 4, 8];
-const TICK = 1 / 30; // the sim's fixed tick (public/js/battle/runner.js)
+// Runner owns its fixed tick and paused clock; the overlay only adopts authoritative speed.
 try {
   const n = Number(localStorage.getItem(SPEED_KEY));
   if (isSpeed(n)) local.speed = n;
 } catch { /* ignore */ }
 
-const speedBar = el('div', { class: 'spmod-speed', hidden: true, title: '作战倍速（不影响结果）' });
+const speedBar = el('div', { class: 'spmod-speed', hidden: true, title: '作战速度：2为正常，4为正常的二倍；与房间二倍速不叠乘（不影响结果）' });
 const speedBtns = new Map();
 speedBar.append(el('span', { class: 'spmod-speed-label' }, '倍速'));
 for (const n of SPEED_CHOICES) {
@@ -1230,7 +1232,7 @@ let curSpeed = 2;
 /** How fast the fixed 过场 steps are running (1 = the game's own pacing; < 1 = shortened to match the battle speed). */
 let curPace = 1;
 let serverModded = false;
-let pushedSpeed = null;
+// No remembered speed is pushed implicitly: Pro changes are authoritative too.
 let speedFlashTimer = null;
 
 /** Drag a bar anywhere; the spot is kept per browser. A press on one of its controls never starts a drag. */
@@ -1295,22 +1297,11 @@ makeDraggable(speedBar, 'spmod.speedPos');
 
 /** Point the local battles already running in this tab at `n`, without moving their clock. */
 function applySpeed(n) {
-  const runner = globalThis.__SP_RUNNER__;
-  try {
-    if (runner && runner._entries && typeof runner.state === 'function') {
-      const st = runner.state();
-      if (!(st && st.paused)) { // frozen: retuning now would mis-schedule against the pause instant
-        const now = globalThis.performance ? performance.now() : Date.now();
-        for (const e of runner._entries.values()) {
-          if (!e || e.done || !(e.speed > 0) || e.speed === n) continue;
-          const ticks = Number(e.battle && e.battle.tickCount) || 0;
-          e.speed = n;
-          e.t0 = now - ((ticks * TICK) / n) * 1000; // targetTick(e, now) stays == ticks
-        }
-      }
-    }
-  } catch (err) { console.warn('[luck] retune runner speed failed', err); }
-  try { globalThis.__SP_VIEW__?.raw?.setLocalFeed?.({ on: true, speed: n }); } catch (err) { console.warn('[luck] retune render speed failed', err); }
+  try { globalThis.__SP_RUNNER__?.retuneSpeed?.(n); } catch (err) { console.warn('[luck] retune runner speed failed', err); }
+  // Quota/streamed fields must retain the network jitter buffer. Only the screen's local meta owns localFeed.
+  if (store.get()?.match?.field?.local === true) {
+    try { globalThis.__SP_VIEW__?.raw?.setLocalFeed?.({ on: true, speed: n }); } catch (err) { console.warn('[luck] retune render speed failed', err); }
+  }
 }
 
 function speedFlash(ok) {
@@ -1320,22 +1311,18 @@ function speedFlash(ok) {
   speedFlashTimer = setTimeout(() => speedBar.classList.remove('is-err', 'is-ok'), 1200);
 }
 
-/** Push `n` to the server (which paces every field off it) and adopt it here. */
-function sendSpeed(n, { silent = false } = {}) {
-  pushedSpeed = n;
-  applySpeed(n);
+/** Requests do not change clocks or button selection before the authoritative private echo. */
+function sendSpeed(n) {
   net.request(SPEED, { n }).then(
-    () => { if (!silent) speedFlash(true); },
-    (e) => { pushedSpeed = null; if (!silent) speedFlash(false); console.warn('[luck] speed refused', errText(e)); },
+    () => { speedFlash(true); },
+    (e) => { speedFlash(false); console.warn('[luck] speed refused', errText(e)); },
   );
 }
 
 function setSpeed(n) {
   if (!isSpeed(n)) return;
   local.speed = n;
-  curSpeed = n;
   try { localStorage.setItem(SPEED_KEY, String(n)); } catch { /* ignore */ }
-  markSpeed();
   sendSpeed(n);
 }
 
@@ -1343,18 +1330,16 @@ function markSpeed() {
   for (const [n, btn] of speedBtns) btn.classList.toggle('is-on', n === curSpeed);
 }
 
-/** Show / hide the bar and mark the live speed; also the one-time push of a remembered choice. */
+/** Show / hide the bar and mark only the authoritative live speed. */
 function renderSpeed() {
   const st = store.get()?.match;
   const priv = st?.private;
   const pub = st?.public;
   if (priv?.shop?.modPickable || Number.isFinite(Number(priv?.modSpeed))) serverModded = true;
   const server = Number(priv?.modSpeed);
-  if (Number.isFinite(server)) curSpeed = server;
-  // a speed remembered from an earlier session, against a server that is not at it yet (fresh process): push once
-  if (serverModded && local.speed != null) {
-    if (Number.isFinite(server) && server === local.speed) pushedSpeed = null;
-    else if (pushedSpeed == null) sendSpeed(local.speed, { silent: true });
+  if (Number.isFinite(server) && server > 0) {
+    curSpeed = server;
+    applySpeed(server); // every tab/reconnect follows the match, never local remembered preferences
   }
   // the fixed presentation steps (结算 / 回合开始 / 战斗结束) do NOT follow the battle speed on their own — the server
   // shortens them in a solo match (modPace.delayScale, see installPresentationScale)
@@ -2759,6 +2744,7 @@ const ENABLE = 'g.modEnable';
 const ENABLE_KEY = 'spmod.enable';
 /** [key, label, hint] — the keys are exactly the server's. */
 const FEATURES = [
+  ['testLp', '设置生命值', '直接设置本座存活玩家的当前生命值（1..99999），不复活、不修改首领战共享生命。'],
   ['shop', '自选商店 / 直购 / 额度', '把要的干员填进槽位、直接买到手上，以及每回合能用几次。'],
   ['sandboxBands', '沙盒 · 策略叠加', '一局里同时挂多个策略。'],
   ['sandboxPlace', '沙盒 · 地块解锁', '解除布置限制、近战可上高台，以及布阵上限。'],
@@ -2850,6 +2836,7 @@ if (!Object.hasOwn(C2S, SHOPLEVEL)) C2S[SHOPLEVEL] = { level: (v) => Number.isIn
 if (!Object.hasOwn(C2S, ENABLE)) {
   C2S[ENABLE] = { features: (v) => !!v && typeof v === 'object' && !Array.isArray(v) && Object.values(v).every((x) => typeof x === 'boolean') };
 }
+if (!Object.hasOwn(C2S, TESTLP)) C2S[TESTLP] = { lp: v => Number.isSafeInteger(v) && v >= 1 && v <= 99999 };
 if (!Object.hasOwn(C2S, TESTFUNDS)) C2S[TESTFUNDS] = { funds: (v) => Number.isInteger(v) && v >= 0 && v <= 99999 };
 if (!Object.hasOwn(C2S, TESTROUND)) C2S[TESTROUND] = { round: (v) => Number.isInteger(v) && v >= 1 && v <= 99 };
 if (!Object.hasOwn(C2S, TESTCAP)) C2S[TESTCAP] = { round: (v) => Number.isInteger(v) && v >= 1 && v <= 99 };
@@ -2953,7 +2940,11 @@ function testNumber({ key, value, min, max, width = 4.2, label, hint, send, rese
   });
   const btns = [el('button', {
     class: 'spmod-sbbtn', type: 'button', title: hint,
-    onClick: () => send(Math.max(min, Math.min(max, Number(box.value) || min))),
+    onClick: () => {
+      if (key === 'lp' && (!String(box.value).trim() || !Number.isSafeInteger(Number(box.value))
+        || Number(box.value) < min || Number(box.value) > max)) return;
+      send(Math.max(min, Math.min(max, Number(box.value) || min)));
+    },
   }, '设置')];
   if (reset) btns.push(el('button', {
     class: 'spmod-sbbtn', type: 'button', title: '清掉这一项的改动，回到数据表/游戏的默认值（框里也会跳回默认值）',
@@ -2968,6 +2959,13 @@ function testNumber({ key, value, min, max, width = 4.2, label, hint, send, rese
     },
   }, '重置'));
   return testRow(label, hint, el('span', { class: 'spmod-sbrow' }, box, ...btns), null);
+}
+
+function sendTestLp(n) {
+  if (!enableOn('testLp')) { console.info('[luck] testLp is off in the master switch'); return; }
+  if (!Number.isSafeInteger(n) || n < 1 || n > 99999) return;
+  net.request(TESTLP, { lp: n })
+    .catch(e => console.warn('[luck] life refused', errText(e)));
 }
 
 function sendTestFunds(n) {
@@ -3030,6 +3028,7 @@ function drawTestPage(v) {
     el('div', { class: 'spmod-sbtitle' }, '对局数据'),
     el('div', { class: 'spmod-sbhint' },
       '当前：资金 ' + (v && v.priv ? v.priv.funds : '?')
+      + ' · 生命 ' + (t && t.lp != null ? t.lp : '?')
       + ' · 调度中心 Lv.' + (v && v.shop ? v.shop.level : '?')
       + ' · 第 ' + (v && v.pub && v.pub.round != null ? v.pub.round : '?')
       + ' / 上限 ' + (v && v.pub && v.pub.lastRound != null ? v.pub.lastRound : '?')
@@ -3049,6 +3048,12 @@ function drawTestPage(v) {
       label: '资金',
       hint: '把本座的资金设成这个数（0..99999）。直接改 ps.funds，没有别的派生物。',
       send: sendTestFunds,
+    }),
+    testNumber({
+      key: 'lp', value: local.test.lp, min: 1, max: 99999, width: 5.4,
+      label: '当前生命值', placeholder: t && t.lp != null ? String(t.lp) : '',
+      hint: '设置本座玩家的当前生命值（1..99999），不是干员血量；不能复活、取消待救援或修改首领战共享生命。',
+      send: sendTestLp,
     }),
     testNumber({
       key: 'shopLevel', value: local.test.shopLevel, min: 1, max: 6, width: 3.2,
@@ -3462,7 +3467,7 @@ function signature(v) {
     .map(([slotId, p]) => `${slotId}:${p?.charId || ''}:${p?.skillIndex ?? ''}`).sort().join(',');
   const cfgEcho = Object.keys(v.priv?.modDiy?.slots || {}).sort().join(',');
   const expEcho = (v.priv?.modDiy?.extra || []).map((e) => `${e.k}:${e.pick?.charId || ''}:${e.pick?.skillIndex ?? ''}`).join(',');
-  return [v.shop.level, v.priv.funds, v.pick.chess.length, v.pick.item.length, slots,
+  return [v.priv.modSandbox?.test?.lp, v.shop.level, v.priv.funds, v.pick.chess.length, v.pick.item.length, slots,
     local.tab, local.query, local.prof, local.open, local.mode, q.used, q.limit,
     local.filter.on ? 1 : 0, local.filter.bonds.join(','), local.filter.mode, sf?.count ?? '', diyEcho, cfgEcho, expEcho,
     // 测试页的回显（服务端记着的资金 / 回合 / 上限 / 敌人 / 地图）也进签名 —— 它变了就得重画。

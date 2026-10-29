@@ -2,7 +2,7 @@
 
 > 2026-10-28：当前目标已改为本目录的 `runtime/`，固定上游 **v0.1.7 / c4dcba17**，不再改写 `source/luck`。
 > `node mods/luck/launch.mjs --no-open --port 3000` 显式指定本主树；工作区 `start-pro-luck.cmd` 已指向该入口。
-> `target.json` 指向 `runtime`；L2–L7 应用后随本仓库保存，再次检查/应用应保持幂等。
+> `target.json` 指向 `runtime`；L2–L11 应用后随本仓库保存，再次检查/应用应保持幂等。
 > 旧文中的 `source/luck` 表示历史目标；Selena 启动器及只读参考克隆保持原样。来源见 `upstream.json`。
 
 这个目录是一份 **overlay**：它不改游戏本体的一个字节，只把「Stronghold-Luck 控制台」上我们需要的两件事，
@@ -28,7 +28,17 @@
 | **L5** | `L5-test-page.patch.json` | `public/overlay.js` | **测试页的面板**：页签与页本体、搜索框的焦点与输入法、布局注入、沙盒条入口，以及下面的 **L5-gate / L5-gate2**。 |
 | **L6** | `L6-skins.patch.json` | `public/overlay.js` | 面板里的干员卡片跟随玩家所选皮肤（`v.priv.skins[charId]` → `chessPortraitUrl(assets, c, { skin })`），不再永远画默认立绘。 |
 
-（L4/L5 由 `_build/gen-luck-test.mjs` 生成 —— 那是它们唯一的真源，别手改这两个 JSON。）
+| **L7** | `L7-gate.patch.json` | `src/server-patch.mjs` | 未开启插件时不污染普通对局与战绩。 |
+| **L8** | `L8-player-lp-server.patch.json` | `src/server-patch.mjs` | `g.modTestLp { lp }`：修改本座存活玩家当前生命值，严格整数 1..99999；拒绝待救援、已淘汰与共享生命池阶段，不复活。私有回显 `modSandbox.test.lp` 直接读权威座位。 |
+| **L9** | `L9-player-lp-ui.patch.json` | `public/overlay.js` | 测试页「对局数据」中与资金并列；独立 `testLp` 总开关、按局输入记忆与权威回显刷新。 |
+| **L10** | `L10-speed-authority-server.patch.json` | `src/server-patch.mjs` | Luck 绝对速度覆盖 Pro 待生效状态，广播所有席位；保留游戏时钟、暂停和 pacing debt。 |
+| **L11** | `L11-speed-authority-ui.patch.json` | `public/overlay.js` | 不重推旧速度、不乐观改速；按服务端回显调用 runner 的 retune API，流式场不切换为 localFeed。 |
+
+倍速口径（2026-10-29）：Luck 按钮保留原始速度值，**2 是正常，4 是正常的二倍**。Pro 二倍速下一战固定选 4，关闭固定回 2，不与 Luck 相乘或相除；玩家显式选择 Luck（即便同值）会取消 Pro 状态、待生效修改与投票。其他页面／重连跟随服务端权威回显，浏览器记忆不再主动覆盖它。
+
+L4/L5 最初由 `_build/gen-luck-test.mjs` 生成；当前 JSON 已维护 L8/L9 的累计锚点，不能再用历史生成器直接覆盖。
+新增补丁若改到旧补丁的替换文本，须同步其累计替换文本，否则重复 apply 会误判成未应用；以 `node mods/luck/apply.mjs --check` 全部 `already` 为准。
+2026-10-29 的本轮仅做无浏览器定向验证；不宣称实机或视觉验收通过。
 
 ### 开局前的实验性开关「Luck 测试插件」（L4-gate / L5-gate）
 

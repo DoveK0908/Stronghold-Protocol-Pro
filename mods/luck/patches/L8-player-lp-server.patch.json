@@ -1,0 +1,37 @@
+{
+  "name": "L8-player-lp-server.patch.json",
+  "file": "src/server-patch.mjs",
+  "about": "Backend only: own living player's current LP, strict positive bounds; no rescue or shared-pool mutation. Snapshot reads authoritative seat LP.",
+  "hunks": [
+    {
+      "id": "L8-type",
+      "find": "export const TESTFUNDS_TYPE = 'g.modTestFunds';",
+      "replace": "export const TESTFUNDS_TYPE = 'g.modTestFunds';\nexport const TESTLP_TYPE = 'g.modTestLp';\nconst isTestLp = (v) => Number.isSafeInteger(v) && v >= 1 && v <= 99999;"
+    },
+    {
+      "id": "L8-feature",
+      "find": "  'testFunds',    // 测试 · 设置资金",
+      "replace": "  'testFunds',    // 测试 · 设置资金\n  'testLp',       // 测试 · 设置本座当前生命值（不复活）"
+    },
+    {
+      "id": "L8-c2s",
+      "find": "  if (!Object.hasOwn(C2S, TESTROUND_TYPE)) {",
+      "replace": "  if (!Object.hasOwn(C2S, TESTLP_TYPE)) {\n    C2S[TESTLP_TYPE] = { lp: isTestLp };\n    log.info(`registered intent ${TESTLP_TYPE}`);\n  }\n  if (!Object.hasOwn(C2S, TESTROUND_TYPE)) {"
+    },
+    {
+      "id": "L8-dispatch",
+      "find": "      else if (msg && msg.t === TESTFUNDS_TYPE) res = handleTestFunds(this, playerId, msg, state, ERR);",
+      "replace": "      else if (msg && msg.t === TESTFUNDS_TYPE) res = handleTestFunds(this, playerId, msg, state, ERR);\n      else if (msg && msg.t === TESTLP_TYPE) res = handleTestLp(this, playerId, msg, state, ERR, PHASE);"
+    },
+    {
+      "id": "L8-view",
+      "find": "      funds: state.test.funds,\n      round: state.test.round,",
+      "replace": "      funds: state.test.funds,\n      // Current authoritative LP of this seat, never another seat's last command or a second ledger.\n      lp: ps.lp,\n      round: state.test.round,"
+    },
+    {
+      "id": "L8-handler",
+      "find": "/** `g.modTestRound { round }` —— 跳到第 `round` 回合（走游戏自己的 startRound）。 */",
+      "replace": "/** Set this seat's current player LP, not operator HP or the shared boss/team pool. */\nfunction handleTestLp(match, playerId, msg, state, ERR, PHASE) {\n  const got = testSeat(match, playerId, state, 'testLp', ERR);\n  if (got.fail) return got.fail;\n  const ps = got.ps;\n  if (!isTestLp(msg.lp)) return fail(ERR.BAD_TARGET, '生命值要是 1..99999 的整数');\n  // Zero/dead/pending-rescue states belong to settlement/rescue. Never cancel a death here.\n  if (ps.alive !== true || ps.pendingDeath || !Number.isFinite(ps.lp) || ps.lp <= 0) {\n    return fail(ERR.BAD_TARGET, '只能设置存活玩家的生命值，不能复活或取消待救援状态');\n  }\n  // Boss LP is an authoritative shared pool; _syncTeamLp would overwrite a personal write.\n  if (match.teamLp != null || match.phase === PHASE.LOBBY || match.phase === PHASE.RESULT\n    || match.phase === PHASE.FINAL_ASSAULT || match.phase === PHASE.HIDDEN_CORE) {\n    return fail(ERR.WRONG_PHASE, '当前阶段不能设置个人生命值');\n  }\n  try {\n    ps.lp = msg.lp;\n    ps.dirty?.();\n    match.markPublic?.();\n    match.flush?.();\n    return { ok: true, lp: ps.lp };\n  } catch (e) {\n    match.reportError?.('modTestLp', e);\n    return fail(ERR.BAD_TARGET, '设置生命值失败');\n  }\n}\n\n/** `g.modTestRound { round }` —— 跳到第 `round` 回合（走游戏自己的 startRound）。 */"
+    }
+  ]
+}
