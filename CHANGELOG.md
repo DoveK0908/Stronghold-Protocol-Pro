@@ -1,5 +1,13 @@
 ## 0.3.3-pro.2 — 2026-10-25
 
+### 常用策略：选择策略界面恢复官方的「已通过模拟 N 次」角标（2026-10-29）
+
+- 维护者按官方 2/2 选择策略截图要求：这个浏览器里通关过的常用策略要像官方那样展示。墙上每一名**通过 3 次**（官方 `bands.victorCount`，40 名策略都是 3；不算退出、测试局与入门协议）的策略，立绘右上角出现官方橙色特殊标识（`statistics/strategyBadge`，整块挪到卡片角上，官方量得的 `top/right: -10.8%`、`82.35% × 84.8%`）；右侧详情面板在策略图标下方写一行「已通过模拟 N 次」，N 是本机对该策略的**实际通过次数**（1 次就写 1，角标仍要 3 次）。
+- 判定共用「统计数据」「成就统计」里那条规则（`ui/stats.js strategyBadgeIds`），没有第二套口径：把清点逻辑抽成 `bandClearCounts`，角标阈值与详情行那行次数都从它来（入门协议、中途退出、测试局、AI 接管都不计入），两边不可能对不上；`screens/bandDraft.js` 新增 `draftRecords(records, bands)`，在界面挂载后用一个空闲回调读一次本机记录（`peekStatsRecords`），不阻塞进入策略页。
+- 这套显示是 0.3.2-pro.6 / 官方 PR #828 的既有设计，2026-10-25 的逐屏裁决（`3297f715`，选择策略整屏取回 pro.6 版式）把它一起带走了；本次按维护者要求只把角标与详情行恢复到现在的 pro.6 版式上，其余版式不动。`test/ui/band-draft-badges.test.js` 两条一直 skip 的用例随之改为对现有版式的断言并通过。
+- 顺带：策略卡右上角的「谁选了这个策略」头像列在有角标时下移 `.34rem`（`.dband.has-badge .dband__who`），两者不互相遮挡。
+- 验证：定向测试 `test/ui/band-draft-badges.test.js` 3 通过 1 跳过（跳过的是皮肤那张卡的旧用例）；`node tools/golden.mjs` 六个场景集全 match。
+
 ### 跟进官方 dev 人机三批（2026-10-29）
 
 - 跟进官方 dev `78c9adb8` → `e65b0132` 三提交：我方 `server/match/bot.js` 以 `78c9adb8` 为基线与上游 `e65b0132` 三方合并（`git merge-file` 零冲突），保留三条精英分派、`sameCardPool` 自有牌池作用域、`Layout.prepare()` 与本家 `BOT_MAX_LEVEL=5`，同时接入上游新符号；`test/match/{bosshp,bot-smarter,realtime}.test.js` 同样三方合并，新增上游未改动的 `test/match/coop-play.test.js`、`test/match/shop-items.test.js`。

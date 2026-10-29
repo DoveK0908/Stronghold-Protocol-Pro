@@ -21,6 +21,12 @@
 // bond-plan picker while g.bondPlan is open, and every order row shows the doctor's planned bond (BondPlanTag); expanded
 // rooms draft concurrently (m.public.draft.concurrent, 工程#01) — every seat picks at once, so the order has no current
 // picker, the queue strip says how many are still choosing, and there is no skip.
+// 常用策略 (owner 2026-10-29): the strategies this browser has cleared often enough carry the official orange corner badge
+// (statistics/strategyBadge) and the detail pane says 已通过模拟 N 次 under the art — the wall is where the player sees
+// them at the moment of choosing. Badge = the official bands victorCount (3 for all 40), the stats page's own rule
+// (ui/stats.js strategyBadgeIds); the count in the detail pane is every clear of that strategy. In place of the event's
+// account data these read this browser's records (draftRecords, read once after the screen is up).
+// [ASSUMED] the official screen shows the badge from account history; there are no accounts here.
 
 import { useEffect, useMemo, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, MicroLabel, useTicker, secondsLeft } from '../ui/components.js';
@@ -45,6 +51,7 @@ import { cardOperators, seatPortrait } from '../ui/seatArt.js';
 import { usePlayerLabel } from '../ui/myInfo.js';
 import { useMyCard } from '../ui/playerCard.js';
 import { useRise } from '../ui/transitions.js';
+import { bandClearCounts, peekStatsRecords, strategyBadgeIds } from '../ui/stats.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -202,6 +209,25 @@ export function draftInfoStatus({ myPick = null, pickName = null, myTurn, turnNa
   return { text: turnName ? t('{turnName} 决策中', { turnName }) : t('等待轮到你'), secs: s, tone: s != null ? tone : 'dim' };
 }
 
+/** Nothing known yet (before the records are read, or none). */
+const NO_RECORDS = Object.freeze({ won: Object.freeze({}), badges: new Set() });
+
+/**
+ * 常用策略: what the wall shows from this browser's records (ui/stats.js) — `won` bandId → runs won with it (the detail
+ * pane's 已通过模拟 N 次), `badges` the strategies with the official corner badge: strategyBadgeIds, the stats page's
+ * rule — the band's own victorCount (3 for all 40 in activity_table / data/bands.json) of clears, quits, test and
+ * 入门协议 runs left out.
+ * @param {any[]} records peekStatsRecords()
+ * @param {Record<string, any>|any[]} bands data.get('bands')
+ * @returns {{ won: Record<string, number>, badges: Set<string> }}
+ */
+export function draftRecords(records, bands) {
+  try {
+    const clears = bandClearCounts(records);
+    return { won: Object.fromEntries(clears), badges: new Set(strategyBadgeIds(records, bands)) };
+  } catch { return NO_RECORDS; }
+}
+
 /** BAND_DRAFT screen. */
 /**
  * One 决策顺序 row. The official row is a plain name; this one puts the doctor's 名片 behind it (底图 from
@@ -338,6 +364,15 @@ export function BandDraftScreen({ held = false } = {}) {
 
   const band = sel ? gd.band(sel) : null;
   const selTaken = !!band && taken.has(band.bandId);
+  // 常用策略: this browser's records (up to the stats store's size) — read once, after the screen and its entry are up,
+  // not while it mounts (the store can be large; the wall is usable without it)
+  const [local, setLocal] = useState(NO_RECORDS);
+  useEffect(() => {
+    const later = globalThis.requestIdleCallback ? (fn) => globalThis.requestIdleCallback(fn, { timeout: 1200 }) : (fn) => setTimeout(fn, 300);
+    const cancel = globalThis.cancelIdleCallback && globalThis.requestIdleCallback ? (id) => globalThis.cancelIdleCallback(id) : (id) => clearTimeout(id);
+    const id = later(() => setLocal(draftRecords(peekStatsRecords(), data.get('bands'))));
+    return () => cancel(id);
+  }, []);
   const confirm = async () => {
     if (!band || busy || !myTurn || selTaken) return;
     setBusy('pick');
@@ -391,11 +426,14 @@ export function BandDraftScreen({ held = false } = {}) {
           const who = pickers.get(b.bandId) || [];
           const isTaken = taken.has(b.bandId);
           const offNames = bandOffBonds(b, offBonds).map((id) => gd.bond(id)?.name || id); // 本局禁用 (still selectable)
+          const badged = local.badges.has(b.bandId); // 常用策略 (the count is the detail pane's 已通过模拟 N 次)
           return html`<button key=${b.bandId} type="button" role="option" aria-selected=${sel === b.bandId ? 'true' : 'false'} data-band=${b.bandId}
               aria-disabled=${isTaken ? 'true' : 'false'} title=${isTaken ? t('队友已选') : offNames.length ? bandOffLine(offNames) : undefined}
-              class=${cx('dband', sel === b.bandId && 'is-sel', myPick === b.bandId && 'is-mine', isTaken && 'is-taken', offNames.length && 'is-off')} onClick=${() => { setSel(b.bandId); audio.sfx('tab', { volume: 0.5 }); }}>
+              class=${cx('dband', sel === b.bandId && 'is-sel', myPick === b.bandId && 'is-mine', isTaken && 'is-taken', offNames.length && 'is-off', badged && 'has-badge')} onClick=${() => { setSel(b.bandId); audio.sfx('tab', { volume: 0.5 }); }}>
             <${BandIcon} bandId=${b.bandId} size="lg" />
             <span class="dband__name">${b.name}</span>
+            ${badged ? html`<span class="dband__badge" data-testid="band-badge" aria-hidden="true">
+              <${Sprite} k="statistics/strategyBadge" class="dband__badge-art" fallback=${html`<span class="dband__medal"><${Icon} name="rook" /></span>`} /></span>` : null}
             <span class="dband__lp num"><i></i>${b.totalHp}</span>
             <${BandOffTag} names=${offNames} />
             ${who.length ? html`<span class="dband__who">${who.slice(0, 4).map((p) => html`<${PlayerAvatar} key=${p.playerId} player=${p} size="sm" />`)}</span>` : null}
@@ -409,6 +447,7 @@ export function BandDraftScreen({ held = false } = {}) {
           <div class="draft-detail__art">
             <${BandIcon} bandId=${band.bandId} size="xl" />
           </div>
+          ${local.won[band.bandId] ? html`<span class="draft-detail__medal" data-testid="band-clears">${t('已通过模拟{n}次', { n: local.won[band.bandId] })}</span>` : null}
           <div class="draft-detail__hp"><span>${t('初始生命值')}</span><${LpTower} value=${band.totalHp} size="lg" /></div>
           <h2 class="draft-detail__name">${band.name}</h2>
           <${BandOffNote} names=${bandOffBonds(band, offBonds).map((id) => gd.bond(id)?.name || id)} />

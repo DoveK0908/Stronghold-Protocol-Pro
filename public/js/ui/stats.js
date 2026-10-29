@@ -968,8 +968,14 @@ export function commonBondIds(records) {
   return [...clears].filter(([, count]) => count >= 3).map(([id]) => id).sort();
 }
 
-/** Strategy corner badges use official band victorCount thresholds; training awards no progress. */
-export function strategyBadgeIds(records, bands) {
+/**
+ * The 常用策略 count: bandId → runs won with that strategy, under the same rule as the corner badges (training awards no
+ * progress, a quit, a test match or an AI-takeover round never counts). Both the badge threshold and the 已通过模拟 N 次
+ * line in the strategy draft read this, so they can never disagree.
+ * @param {any[]} records
+ * @returns {Map<string, number>}
+ */
+export function bandClearCounts(records) {
   const clears = new Map();
   for (const rec of Array.isArray(records) ? records : []) {
     if (!rec || rec.end === 'quit' || rec.test === true || rec.difficulty === 'TRAINING' || rec.modeId === 'mode_training_1') continue;
@@ -977,6 +983,12 @@ export function strategyBadgeIds(records, bands) {
     if (!self?.bandId || Number.isInteger(self.aiTakeoverRound) || !selfWon(rec, self)) continue;
     clears.set(self.bandId, (clears.get(self.bandId) || 0) + 1);
   }
+  return clears;
+}
+
+/** Strategy corner badges use official band victorCount thresholds; training awards no progress. */
+export function strategyBadgeIds(records, bands) {
+  const clears = bandClearCounts(records);
   return Object.values(bands || {}).filter((band) => Number.isInteger(band.victorCount) && band.victorCount > 0
     && (clears.get(band.bandId) || 0) >= band.victorCount)
     .sort((a, b) => (a.sortId || 0) - (b.sortId || 0) || a.bandId.localeCompare(b.bandId))
