@@ -171,10 +171,13 @@ const sliceCtl = testSlice(this);
           if (job.streamed && !job.inline) {
             // Dedicated workers own their bounded internal slices. Main wakes only for low-frequency progress
             // and completion, never once per 32 ticks. All these callbacks are new asynchronous boundaries.
-            const deadline = this.experimental?.prepUnlimited === true ? 0 : this.deadline;
-            const remaining = deadline ? deadline - this.sched.now() : 30_000;
+            // 无限休整期 ignores the countdown (an expiry cannot ready anyone, prep.js prepDeadline); read both the
+            // option and the deadline live — an owner action between boundaries may have moved either.
+            const liveDeadline = () => (this.experimental?.prepUnlimited === true ? 0 : this.deadline);
+            const remaining = liveDeadline() ? liveDeadline() - this.sched.now() : 30_000;
             if (remaining <= 0) { work.cancel(); return; }
             const check = () => {
+              const deadline = liveDeadline();
               if (!valid() || (deadline && this.sched.now() >= deadline)) { work.cancel(); return false; }
               if (!fresh()) { stale(); return false; }
               return true;
