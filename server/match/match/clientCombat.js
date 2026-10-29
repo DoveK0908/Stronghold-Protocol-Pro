@@ -86,6 +86,8 @@ export class MatchClientCombat {
     // [ASSUMED] Layer traits require an authoritative run, even with SP_VERIFY=off.
     // Use the existing sliced server path (also for shared boss pools) before assigning any client.
     if (requiresTraitLayerAuthority(f.spec, this.gd)) return null;
+    // Per-player quotas and crossing ticks require one shared, authoritative simulation.
+    if (this.experimental.bossQuota && (f.kind === 'boss' || f.kind === 'hidden')) return null;
     let best = null;
     for (const pid of f.players) {
       if (pid === exclude || (f.demoted && f.demoted.has(pid))) continue;

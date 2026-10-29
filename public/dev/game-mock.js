@@ -20,6 +20,7 @@ import { awayStore } from '/js/ui/matchChrome.js';
 import { GAME_FILES } from '/js/ui/gameComponents.js';
 import { PHASE, GEO } from '/shared/constants.js';
 import { equippedLineup } from './settle-fixture.js';
+import { eliteCard } from '/shared/eliteAi.js';
 
 const params = new URLSearchParams(location.search);
 const SHOT = params.get('shot') === '1';
@@ -44,6 +45,10 @@ const PLAYERS = [
 
 /** Teammates' room.card (room.state seats[].card): a 头像 for Doctor·B, a namecard and trophies for 灰烬 (who keeps no 头像). */
 const MOCK_CARDS = { p3: { avatar: 'char_306_leizi', trophies: 260 }, p4: { bg: 'loading:core', trophies: 1200 } };
+// ?variant=eliteai — the AI seat is an 精英AI, so the room carries its operator card (shared/eliteAi.js eliteCard): the settle
+// 同盟 card draws that operator's 立绘, while its 名片 is still the default one (a bot never wears an operator 名片).
+const ELITE_AI = 'arturia';
+if (VARIANTS.has('eliteai')) Object.assign(MOCK_CARDS, { ai_2: eliteCard({ isBot: true, botPersona: ELITE_AI }) });
 
 let uidSeq = 100;
 const nextUid = () => ++uidSeq;
@@ -904,6 +909,7 @@ async function boot() {
     room: {
       code: 'MOCK', hostId: VARIANTS.has('notHost') ? 'ai_2' : ME, mode: 'coop', difficulty: 'HARD', inMatch: true,
       seats: PLAYERS.map((p) => ({ seat: p.seat, playerId: p.playerId, name: p.name, isBot: p.isBot, ready: true, connected: true,
+        ...(p.isBot && VARIANTS.has('eliteai') ? { botPersona: ELITE_AI } : {}),
         ...(MOCK_CARDS[p.playerId] ? { card: MOCK_CARDS[p.playerId] } : {}) })),
       ...(VARIANTS.has('spectators') ? { spectators: [{ playerId: 'sp_1', name: '观战者甲', connected: true }, { playerId: 'sp_2', name: '观战者乙', connected: false }] } : {}),
     },

@@ -1,10 +1,9 @@
 // Pure match-status helpers of the in-match HUD (no DOM, no Preact — unit-tested in test/ui/leftovers.test.js):
 //
-//   * Boss-round clock (最终攻势 / 隐秘核心, research 00-INDEX §5, 01 §10): m.public.deadline is the level's
-//     maxPlayTime countdown (120 real s, config modes[…].rounds[r].levelMaxPlayTime) — "计时结束后战斗仍然会继续" —
-//     and m.public.overtimeAt is when the overtime drain starts (bossTurnHpReduceTime, 150 real s): from then on the
-//     merged team LP loses config.bossOvertimeDrainPerSec (1) per whole real second (server gamedata.js
-//     bossOvertimeDue: the first point at overtimeAt + 1 s). `overtimeState` says what the red DOT warning shows.
+//   * Boss-round clock (最终攻势 / 隐秘核心): m.public.bossClock samples authoritative elapsed game seconds,
+//     normalized by combatTimeScale (baseline 2). Countdown, completion times and overtime use this same clock;
+//     speed votes accelerate it and pauses stop it. Overtime LP remains server-authoritative (overtimeApplied).
+//     Legacy views without bossClock retain the deadline/overtimeAt epoch fallback.
 //   * Solo pause (official 独立模拟 battles): C2S g.pause {on}; the server says so in m.public.paused (optionally
 //     m.public.pausedAt, ms epoch). Only solo battles offer it (`pauseAvailable`); while paused every HUD clock is
 //     frozen at the pause moment (`frozenNow`).
@@ -34,7 +33,21 @@ export function bossLevelSeconds(pub, config) {
   return Number.isFinite(v) && v > 0 ? v : BOSS_LEVEL_SECONDS;
 }
 
-/** Team LP lost per real second of overtime (config.bossOvertimeDrainPerSec, default 1). */
+/** Normalized boss game seconds, extrapolated only from an authoritative server sample. */
+export function bossElapsed(pub, now) {
+  const clock = pub?.bossClock;
+  if (!BOSS_PHASES.has(pub?.phase) || !clock || !Number.isFinite(clock.elapsed) || !Number.isFinite(clock.at)
+    || !Number.isFinite(clock.speed) || !Number.isFinite(now)) return null;
+  return Math.max(0, clock.elapsed + (pub.paused ? 0 : Math.max(0, now - clock.at) / 1000 * Math.max(0, clock.speed)));
+}
+
+/** Boss countdown in the same normalized game seconds as completion times and overtime. */
+export function bossRemaining(pub, now, config) {
+  const elapsed = bossElapsed(pub, now);
+  return elapsed == null ? null : Math.max(0, Math.ceil(bossLevelSeconds(pub, config) - elapsed));
+}
+
+/** Team LP lost per normalized game second of overtime (config.bossOvertimeDrainPerSec, default 1). */
 export function overtimeDrainPerSec(config) {
   const v = config?.bossOvertimeDrainPerSec;
   return Number.isFinite(v) && v >= 0 ? v : 1;
@@ -48,10 +61,24 @@ export function overtimeDrainPerSec(config) {
  *   { state: 'drain', secs, lost, perSec } draining for `secs` whole seconds: `lost` LP so far, `perSec` LP/s
  * @param {any} pub m.public
  * @param {number} now
- * @param {{ perSec?: number, warnBefore?: number }} [o]
+ * @param {{ perSec?: number, warnBefore?: number, levelSeconds?: number }} [o]
  */
-export function overtimeState(pub, now, { perSec = 1, warnBefore = OVERTIME_WARN_BEFORE } = {}) {
+export function overtimeState(pub, now, { perSec = 1, warnBefore = OVERTIME_WARN_BEFORE, levelSeconds = BOSS_LEVEL_SECONDS } = {}) {
   if (!isObj(pub) || !BOSS_PHASES.has(pub.phase) || !Number.isFinite(now)) return null;
+  const elapsed = bossElapsed(pub, now);
+  if (elapsed != null && Number.isFinite(pub.bossClock.overtimeAfter)) {
+    const remaining = pub.bossClock.overtimeAfter - elapsed;
+    if (remaining > 0) {
+      const secs = Math.ceil(remaining);
+      if (elapsed < levelSeconds && secs > warnBefore) return null;
+      return { state: 'pending', secs };
+    }
+    const secs = Math.floor(-remaining + 1e-9);
+    const rate = Number.isFinite(perSec) && perSec >= 0 ? perSec : 1;
+    // The server owns losses; do not invent LP deductions between authoritative samples.
+    const lost = Number.isFinite(pub.bossClock.overtimeApplied) ? Math.max(0, pub.bossClock.overtimeApplied) : secs * rate;
+    return { state: 'drain', secs, lost, perSec: rate };
+  }
   const at = Number(pub.overtimeAt);
   if (!(Number.isFinite(at) && at > 0)) return null;
   if (now < at) {

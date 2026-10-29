@@ -451,8 +451,14 @@ export class Match {
     /** how the bot rehearsals that were offered to `simPool` ended — separate from rehearsalStats (its keys are asserted) */
     this.rehearsalPoolStats = { pooled: 0, accepted: 0, fallbacks: 0 };
     this.ds = dataSourceFor(this.data);
-    /** client-side combat (DESIGN §14) — see the header */
-    this.clientCombat = opts.clientCombat != null ? !!opts.clientCombat : envClientCombat();
+    /** Locked room-owned rules; direct engine fixtures retain the legacy option names. */
+    this.experimental = experimentalOptions(opts.experimental ?? {
+      revivalEnabled: opts.revivalEnabled === true, disableSharedPool: opts.disableSharedPool === true,
+    });
+    // Phase snapshots are server-produced, not unverified client result extensions. Server streaming and its
+    // deterministic worker/replica specs retain the carry payload without trusting a browser to invent a phase.
+    this.clientCombat = this.experimental.stateCarry !== true
+      && (opts.clientCombat != null ? !!opts.clientCombat : envClientCombat());
     this.verifyMode = parseVerify(opts.verify ?? env('SP_VERIFY'));
     // Workers are opt-in at server startup; virtual/custom simulators and client-authoritative combat stay inline.
     this.combatPool = opts.combatPool && !this.clientCombat && !this.sched.virtual && this.BattleClass === Battle
@@ -484,10 +490,6 @@ export class Match {
     this._damageAt = -Infinity;
     this._damageSampleAt = -Infinity;
     this._damageSent = new Map();
-    /** Locked room-owned rules; direct engine fixtures retain the legacy option names. */
-    this.experimental = experimentalOptions(opts.experimental ?? {
-      revivalEnabled: opts.revivalEnabled === true, disableSharedPool: opts.disableSharedPool === true,
-    });
     this.revivalEnabled = !this.isSolo && this.experimental.revivalEnabled;
     this.disableSharedPool = this.experimental.disableSharedPool;
     this.playerCapacity = roomCapacity(this.isSolo ? 'solo' : this.mode, this.experimental);

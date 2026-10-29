@@ -9,6 +9,10 @@ import { BondGlyph } from './gameComponents.js';
 import { PHASE } from '../../../shared/constants.js';
 import { data } from '../data.js';
 import { t } from '../../../shared/i18n.js';
+import { useMemo } from '../../vendor/hooks.module.js';
+import { useStore } from '../store.js';
+import { shownVersion } from '../versions.js';
+import { commonBondIds, loadStats, recordsOfVersion } from './stats.js';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -65,12 +69,22 @@ export function BondPlanTag({ bondId, gd, compact = false, class: cls }) {
  *   off: Set<string>, busy: boolean, onPick: (bondId: string|null) => void }} props
  */
 export function BondPlanPicker({ open, onClose, bonds, value, holders, off, busy, onPick }) {
+  const version = useStore(shownVersion);
+  const common = useMemo(() => new Set(open ? commonBondIds(recordsOfVersion(loadStats().records, version)) : []), [open, version]);
+  const favorites = bonds.filter(b => common.has(b.bondId));
+  const others = bonds.filter(b => !common.has(b.bondId));
+  const groups = favorites.length
+    ? [{ title: t('常用盟约'), bonds: favorites }, { title: t('其他盟约'), bonds: others }]
+    : [{ title: null, bonds }];
   return html`<${Modal} open=${open} onClose=${onClose} title=${t('预选盟约')} micro="BOND PLAN" class="bplan-dlg"
     actions=${html`
       <${Button} variant="ghost" icon="close" disabled=${busy || !value} onClick=${() => onPick(null)}>${t('不预选')}<//>
       <${Button} variant="secondary" data-autofocus onClick=${onClose}>${t('关闭')}<//>`}>
     <p class="bplan-dlg__tip t-dim">${t('选择你打算发展的盟约，所有博士都能看到。只作沟通，不影响对局。')}</p>
-    <div class="bplan-dlg__grid" role="listbox" aria-label=${t('预选盟约')}>${bonds.map((b) => {
+    <p class="bplan-dlg__tip t-dim">${t('任意难度累计通关 3 次的盟约自动加入常用盟约，按本机保留的当前版本战绩统计。')}</p>
+    ${groups.filter(group => group.bonds.length).map(group => html`<section>
+    ${group.title ? html`<h3>${group.title}</h3>` : null}
+    <div class="bplan-dlg__grid" role="listbox" aria-label=${group.title || t('预选盟约')}>${group.bonds.map((b) => {
       const who = holders.get(b.bondId) || [];
       const isOff = off.has(b.bondId);
       return html`<button key=${b.bondId} type="button" role="option" aria-selected=${value === b.bondId ? 'true' : 'false'}
@@ -83,5 +97,6 @@ export function BondPlanPicker({ open, onClose, bonds, value, holders, off, busy
         ${value === b.bondId ? html`<span class="bplan-card__mine"><${Icon} name="check" /></span>` : null}
       </button>`;
     })}</div>
+    </section>`)}
   <//>`;
 }

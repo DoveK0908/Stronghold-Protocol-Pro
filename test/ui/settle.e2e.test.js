@@ -41,24 +41,22 @@ describe('settlement layout (#745, headless Chrome)', { skip: !enabled }, () => 
     assert.ok(clear, `${selector}: the title box does not overlap neighboring content`);
   }
 
-  async function checkButtons(page, noart) {
+  async function checkButtons(page) {
     const buttons = await page.$$eval('.settle__next, .sbtn', (els) => els.map((el) => {
       el.blur(); // sample idle styling atomically, after any delayed page-entry focus
-      const bg = el.querySelector('.settle__btnbg'), style = getComputedStyle(el);
-      return { tag: bg?.tagName, loaded: bg instanceof HTMLImageElement && bg.complete && bg.naturalWidth > 0,
-        fallback: bg?.className.includes('--'), background: style.backgroundColor, image: style.backgroundImage,
-        // A keyboard focus ring is intentional. Blur in the test to check the idle decoration.
-        shadow: style.boxShadow, fallbackImage: bg && getComputedStyle(bg).backgroundImage,
-        fallbackColor: bg && getComputedStyle(bg).backgroundColor };
+      const style = getComputedStyle(el), b = el.getBoundingClientRect();
+      // A keyboard focus ring is intentional. Blur in the test to check the idle face.
+      return { hasArt: !!el.querySelector('.settle__btnbg'), image: style.backgroundImage, background: style.backgroundColor,
+        inside: [...el.querySelectorAll('*')].every((c) => {
+          const r = c.getBoundingClientRect();
+          return !r.width || (r.left >= b.left - 1 && r.right <= b.right + 1 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1);
+        }) };
     }));
     assert.ok(buttons.length);
     for (const b of buttons) {
-      assert.equal(b.background, 'rgba(0, 0, 0, 0)');
-      assert.equal(b.image, 'none');
-      assert.equal(b.shadow, 'none');
-      assert.equal(b.tag, noart ? 'SPAN' : 'IMG');
-      if (noart) assert.ok(b.fallback && (b.fallbackImage !== 'none' || b.fallbackColor !== 'rgba(0, 0, 0, 0)'));
-      else assert.ok(b.loaded);
+      assert.equal(b.hasArt, false, 'the face is drawn by CSS, not by a stretched extracted sprite');
+      assert.ok(b.image !== 'none' || b.background !== 'rgba(0, 0, 0, 0)', 'the button still paints a face');
+      assert.ok(b.inside, 'the label and its icon stay inside the face');
     }
   }
 
@@ -121,7 +119,7 @@ describe('settlement layout (#745, headless Chrome)', { skip: !enabled }, () => 
           if (noart) assert.ok(s.fallback);
           else { assert.ok(s.loaded); assert.equal(s.objectFit, 'contain'); }
         }
-        await checkButtons(page, noart);
+        await checkButtons(page);
         const name = `${lang}-${width}x${height}-${noart ? 'noart' : 'art'}.png`;
         if (process.env.SP_SETTLE_SHOTS) await page.screenshot({ path: path.join(process.env.SP_SETTLE_SHOTS, name) });
         await page.click('.settle__next');
@@ -134,7 +132,7 @@ describe('settlement layout (#745, headless Chrome)', { skip: !enabled }, () => 
         }
         await page.evaluate(() => { document.documentElement.dataset.text = 'md'; document.activeElement?.blur(); });
         await checkTitle(page, '.steam__title');
-        await checkButtons(page, noart);
+        await checkButtons(page);
         if (process.env.SP_SETTLE_SHOTS) await page.screenshot({ path: path.join(process.env.SP_SETTLE_SHOTS, 'team', name) });
         await page.click('.steam__detail');
         await page.waitForSelector('[data-testid="settle-detail"]');

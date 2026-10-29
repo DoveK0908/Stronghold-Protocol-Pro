@@ -91,6 +91,12 @@
 .result__bossopname { min-width: 1.1rem; }
 .result__bossop > b { margin-left: auto; }
 .result__bossdps, .result__bossheal { color: var(--text-md); font-size: .82em; }
+.result__quota-table { width: 100%; border-collapse: collapse; font-size: calc(.16 * var(--t)); }
+.result__quota-table caption { text-align: left; padding: .06rem 0; color: var(--text-hi); }
+.result__quota-table th, .result__quota-table td { text-align: left; padding: .06rem .1rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.result__quota-table th { color: var(--text-lo); font-weight: 500; }
+.result__quota-table td:first-child { width: 15%; color: var(--mint-400); }
+.result__quota-table td:last-child { width: 40%; }
 .result__foot { flex: 0 0 auto; margin-top: auto; padding-top: .2rem; display: flex; }
 .result__foot .btn { min-width: 3.4rem; }
 
@@ -213,16 +219,6 @@
 
 .sself__medals { position: absolute; left: 2.74rem; top: 4.16rem; display: flex; gap: .7rem; }
 .sself__medals::after { content: ''; position: absolute; left: -.22rem; right: -.5rem; bottom: -.3rem; height: 2px; background: linear-gradient(90deg, rgba(220, 230, 226, .3), rgba(220, 230, 226, .08)); }
-.smedal { position: relative; width: 1rem; height: 1rem; display: grid; place-items: center; animation: smedal-in 380ms cubic-bezier(.3, 1.6, .5, 1) calc(820ms + var(--i) * 200ms) both; }
-.smedal img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 0 .08rem rgba(255, 140, 40, .55)); }
-.smedal--hidden img { filter: drop-shadow(0 0 .08rem rgba(255, 60, 60, .6)); }
-.smedal.is-miss img { filter: grayscale(1) brightness(.6); }
-.smedal__glyph { width: .6rem; height: .6rem; color: #f0a330; }
-.smedal__check { position: absolute; right: -.14rem; top: -.12rem; width: .3rem; height: .3rem; display: grid; place-items: center; border: 2px solid #f39a2c; background: rgba(40, 18, 4, .7); color: #ffb23f; }
-.smedal__check .icon { width: .24rem; height: .24rem; }
-.smedal.is-miss .smedal__check { border-color: #8a908e; color: #c4cac8; }
-@keyframes smedal-in { from { opacity: 0; transform: scale(1.6); } }
-
 .splate { position: absolute; left: .74rem; top: 6.84rem; height: 1.64rem; display: flex; animation: sself-slide 420ms var(--ease-out) 520ms both; }
 .splate .pavatar.splate__ava { --pa: 1.64rem; border: 2px solid rgba(240, 244, 243, .85); background: #20403a; }
 .splate .pavatar__glyph { font-size: .6rem; }
@@ -323,7 +319,6 @@
 .settle__next { position: absolute; left: 14.77rem; top: 9.42rem; width: 4.43rem; height: 1rem; display: flex; align-items: center; justify-content: center; gap: .24rem;
   padding: 0; border: 0; cursor: pointer; color: #062a20; background: linear-gradient(90deg, #44e6b8, #33d8ab); font-size: .4rem; font-weight: 700; letter-spacing: .06em;
   clip-path: polygon(.12rem 0, 100% 0, 100% 100%, 0 100%, 0 .12rem); box-shadow: inset 0 -.05rem 0 rgba(0, 0, 0, .12); animation: snext-in 460ms var(--ease-out) 1400ms both; }
-.settle__next::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: .8rem; background: repeating-linear-gradient(135deg, rgba(0, 0, 0, .14) 0 .05rem, transparent .05rem .14rem); }
 .settle__next:hover, .settle__next:focus-visible { filter: brightness(1.12); outline: none; }
 .settle__next:focus-visible { box-shadow: 0 0 0 3px #fff inset; }
 .settle__nexticon { width: .52rem; height: .52rem; display: grid; place-items: center; border-radius: .1rem; background: #0b2d25; color: #44e6b8; }
@@ -416,7 +411,6 @@
 .sbtn--ghost .icon { width: .3rem; height: .3rem; padding: .03rem; border-radius: .05rem; background: #e2e8e6; color: #2a2f2e; }
 .sbtn--primary { left: 15.12rem; width: 4.08rem; background: linear-gradient(90deg, #44e6b8, #33d8ab); color: #062a20; font-size: .38rem; font-weight: 700; letter-spacing: .04em;
   clip-path: polygon(.12rem 0, 100% 0, 100% 100%, 0 100%, 0 .12rem); }
-.sbtn--primary::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: .7rem; background: repeating-linear-gradient(135deg, rgba(0, 0, 0, .14) 0 .05rem, transparent .05rem .14rem); }
 .sbtn__mark svg { width: .5rem; height: .38rem; }
 .sbtn:hover, .sbtn:focus-visible { filter: brightness(1.14); outline: none; }
 .sbtn:focus-visible { box-shadow: inset 0 0 0 3px #fff; }

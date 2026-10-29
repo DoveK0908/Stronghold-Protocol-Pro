@@ -106,6 +106,7 @@ export class MatchUnite {
       // leaked enemies re-enter with the stats they had: the round template's stat overrides apply again
       enemyOverrides: this.wave && this.wave.overrides ? this.wave.overrides : {},
       waveId: wave.templateId,
+      ...(this.experimental?.stateCarry === true ? { stateCarry: true } : {}),
     };
   }
 

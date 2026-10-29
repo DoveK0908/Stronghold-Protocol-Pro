@@ -213,6 +213,7 @@ function normalizeBossDamage(raw) {
         key: str(op.key, 64),
         uid: Number.isSafeInteger(op.uid) ? op.uid : null,
         defId: str(op.defId),
+        ...(str(op.charId) ? { charId: str(op.charId) } : {}),
         damage: amt(op.damage),
         healing: amt(op.healing),
       })).filter((op) => op.key);
@@ -234,6 +235,21 @@ function normalizeBossDamage(raw) {
   const boss = scope(raw.boss, 'boss');
   const hidden = scope(raw.hidden, 'hidden');
   return boss || hidden ? { boss, hidden } : null;
+}
+
+/** Optional bounded per-round quota rankings; absent in older/default-rule records. */
+function normalizeBossQuota(raw) {
+  if (!Array.isArray(raw)) return null;
+  const rounds = raw.filter((r) => isObj(r) && ['boss', 'hidden'].includes(r.kind)
+    && Number.isFinite(r.quota) && r.quota > 0 && Array.isArray(r.players)).slice(0, 2).map((r) => ({
+    kind: r.kind, round: num(r.round), quota: amt(r.quota),
+    players: r.players.filter(isObj).slice(0, MAX_PLAYERS).map((p) => ({
+      playerId: str(p.playerId), name: str(p.name, MAX_NAME),
+      time: Number.isFinite(p.time) && p.time >= 0 ? p.time : null,
+      rank: Number.isInteger(p.rank) && p.rank > 0 && p.rank <= MAX_PLAYERS ? p.rank : null,
+    })).filter((p) => p.playerId),
+  }));
+  return rounds.length ? rounds : null;
 }
 
 /**
@@ -269,6 +285,10 @@ function normalizePlayerRow(raw, quit = false) {
     seat: int(p.seat, 0),
     name: str(p.name, MAX_NAME) || '',
     isBot: bool(p.isBot),
+    ...(isObj(p.card) ? { card: {
+      charId: str(p.card.charId), avatar: str(p.card.avatar), avatarLook: str(p.card.avatarLook, 96),
+      avatarImg: typeof p.card.avatarImg === 'string' && /^[0-9a-f]{16}$/.test(p.card.avatarImg) ? p.card.avatarImg : null,
+    } } : {}),
     ...(Number.isInteger(p.aiTakeoverRound) && p.aiTakeoverRound >= 1 ? { aiTakeoverRound: p.aiTakeoverRound } : {}),
     left: bool(p.left),
     alive: bool(p.alive, true),
@@ -330,6 +350,7 @@ export function normalizeRecord(raw) {
     // 项目 4: 收藏 (a local bookmark, survives compaction) and the boss rounds' damage ledger
     fav: bool(r.fav),
     bossDamage: normalizeBossDamage(r.bossDamage),
+    ...(normalizeBossQuota(r.bossQuota) ? { bossQuota: normalizeBossQuota(r.bossQuota) } : {}),
     // the official version it played (see the header): a registry id other than 第二期下半, else left out
     ...(versionOf(r.version) ? { version: versionOf(r.version) } : {}),
     players,
@@ -447,7 +468,7 @@ export function peekStatsRecords() {
 // ---- compaction + the storage budget ---------------------------------------------------------------------------
 
 const COMPACT_FRAME = ['id', 'v', 't', 'end', 'victory', 'roundsPassed', 'lastRound', 'hiddenReached', 'hiddenCleared', 'reason', 'modeId',
-  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'fav', 'version', 'test', 'testActions'];
+  'difficulty', 'roomMode', 'durationMs', 'selfId', 'vs', 'content', 'fav', 'version', 'test', 'testActions', 'bossQuota'];
 
 /**
  * The compact form of a record: the frame and the player's OWN row without lineup, bonds and name — everything the
@@ -589,6 +610,7 @@ export function buildRecord(res, ctx = {}) {
     players: r.players,
     // 项目 4: the boss rounds' per-player / per-operator damage, straight from the settlement payload
     bossDamage: r.bossDamage,
+    ...(r.bossQuota ? { bossQuota: r.bossQuota } : {}),
   });
 }
 
@@ -696,7 +718,7 @@ export function buildQuitRecord(state, ctx = {}) {
     // the room's version, else the frames' (m.public `version`; absent = 第二期下半, as versions.js matchFrameVersion)
     version: state.room ? state.room.version ?? null : str(pub.version) ?? null,
     players: [{
-      playerId: myId, seat: row.seat, name: row.name, isBot: false, left: true, alive, victory: false, roundsPassed,
+      playerId: myId, seat: row.seat, name: row.name, card: row.card, isBot: false, left: true, alive, victory: false, roundsPassed,
       ...(Number.isInteger(row.aiTakeoverRound) ? { aiTakeoverRound: row.aiTakeoverRound } : {}),
       eliminatedRound: alive ? null : live.aliveRound, lp: row.lp, bandId: row.bandId,
     }],
@@ -731,6 +753,7 @@ export function recordToResult(rec) {
     players: r.players,
     // 项目 4: the replayed settlement shows the same boss-round damage the live one did
     bossDamage: r.bossDamage ?? null,
+    ...(r.bossQuota ? { bossQuota: r.bossQuota } : {}),
   };
   if (Number.isFinite(r.lastRound)) res.lastRound = r.lastRound;
   if (r.test === true) res.test = true;
@@ -924,6 +947,25 @@ function usedBondIdsOf(player) {
   const ids = Array.isArray(player?.usedBondIds) ? player.usedBondIds
     : (Array.isArray(player?.bonds) ? player.bonds : []).filter((b) => b?.active === true).map((b) => b.bondId);
   return [...new Set(ids.filter((id) => typeof id === 'string' && id.length).map((id) => id.slice(0, 64)))].slice(0, MAX_BONDS);
+}
+
+/** 常用盟约: three distinct self clears, at any difficulty, using active settlement bonds (owner 2026-10-28).
+ * Reads existing/compacted/imported history too; callers scope records to the version whose bonds they display.
+ * Like other achievements, test, gameplay-plugin and AI-takeover matches award no progress.
+ * @param {any[]} records
+ * @returns {string[]}
+ */
+export function commonBondIds(records) {
+  const clears = new Map();
+  const seen = new Set();
+  for (const rec of Array.isArray(records) ? records : []) {
+    if (!rec || rec.end !== 'settled' || !countsTowardStats(rec) || isModdedRecord(rec)) continue;
+    const self = selfRowOf(rec);
+    if (!self || self.playerId !== rec.selfId || !selfWon(rec, self) || seen.has(rec.id)) continue;
+    seen.add(rec.id);
+    for (const id of usedBondIdsOf(self)) clears.set(id, (clears.get(id) || 0) + 1);
+  }
+  return [...clears].filter(([, count]) => count >= 3).map(([id]) => id).sort();
 }
 
 /** Strategy corner badges use official band victorCount thresholds; training awards no progress. */

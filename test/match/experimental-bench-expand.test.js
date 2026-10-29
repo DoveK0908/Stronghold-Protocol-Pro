@@ -95,6 +95,129 @@ test('a room without the option keeps the official ten-slot bench and the unpatc
   assert.deepEqual(collectViolations(m), [], 'the bench invariant accepts an expanded hand');
 });
 
+const FILLER = 'chess_item_2_03_e_b'; // Golden equipment never merges with adjacent fillers.
+const NORMAL = 'chess_char_1_06_a';
+
+function emptyPrep(t, experimental = expanded()) {
+  const h = makeMatch({ mode: 'solo', experimental, seed: 91, fake: true }).start().toPrep(1);
+  const m = h.m;
+  t.after(() => m.dispose());
+  const ps = h.ps('p_0');
+  for (const p of ps.allChess()) ps.returnCopies(p);
+  ps.board.clear(); ps.hand.fill(null); ps.temp.fill(null); ps.bandId = null; ps.recompute();
+  ps.funds = 100;
+  return { m, ps };
+}
+
+function fillOriginal(ps) {
+  for (let i = 0; i < GEO.HAND_SIZE; i++) ps.hand[i] = ps.newPiece('item', FILLER);
+}
+
+test('g.buy chess and equipment prefer original slot 9 while both bench ranges are free', t => {
+  for (const kind of ['chess', 'item']) {
+    const { m, ps } = emptyPrep(t);
+    const id = kind === 'chess' ? NORMAL : FILLER;
+    ps.shop.slots[0] = { kind, id, basePrice: 1, sold: false };
+    assert.deepEqual(m.handle(ps.playerId, { t: 'g.buy', slot: 0 }), { ok: true });
+    assert.equal(ps.hand[9]?.id, id, kind);
+    assert.equal(ps.hand[9]?.kind, kind);
+    assert.ok(ps.hand.slice(10).every(p => p == null), 'extra slots stay empty');
+    assert.equal(ps.shop.slots[0].sold, true);
+  }
+});
+
+test('granted chess and equipment fill 9..0, then 12..10, then temp', t => {
+  const order = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 12, 11, 10];
+  for (const kind of ['chess', 'item']) {
+    const { m, ps } = emptyPrep(t);
+    const gain = () => kind === 'chess'
+      ? ps.acquireChess(m.gd.goldenIdOf(NORMAL), { fromPool: false, silent: true })
+      : ps.acquireItem(FILLER, { silent: true });
+    for (const idx of order) {
+      const piece = gain();
+      assert.ok(piece);
+      assert.equal(ps.hand[idx], piece, `${kind}: next slot ${idx}`);
+      assert.ok(ps.tempEmpty);
+    }
+    const overflow = gain();
+    assert.ok(overflow);
+    assert.equal(ps.temp[4], overflow, `${kind}: overflow only after all thirteen slots`);
+  }
+});
+
+test('grants prioritize an original hole without relocating existing extra pieces', t => {
+  for (const kind of ['chess', 'item']) {
+    const { ps } = emptyPrep(t);
+    fillOriginal(ps);
+    const existing = ps.newPiece('item', FILLER);
+    ps.hand[10] = existing;
+    ps.hand[3] = null;
+    const piece = kind === 'chess'
+      ? ps.acquireChess(NORMAL, { silent: true })
+      : ps.acquireItem(FILLER, { silent: true });
+    assert.ok(piece);
+    assert.equal(ps.hand[3], piece, kind);
+    assert.equal(ps.hand[10], existing, 'existing extra card stays where the player placed it');
+    assert.equal(ps.hand[11], null);
+    assert.equal(ps.hand[12], null);
+  }
+});
+
+test('temp refill fills all original slots before 12..10 and clears moved deadlines', t => {
+  const { ps } = emptyPrep(t);
+  fillOriginal(ps);
+  for (let i = 10; i < ps.hand.length; i++) ps.hand[i] = ps.newPiece('item', FILLER);
+  const queued = Array.from({ length: 14 }, () => ps.acquireItem(FILLER, { silent: true }));
+  assert.ok(queued.every(Boolean));
+  const due = ps.tempDue(queued[13]);
+  ps.hand.fill(null);
+  ps.recompute();
+  const order = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 12, 11, 10];
+  order.forEach((idx, i) => {
+    assert.equal(ps.hand[idx], queued[i], `queued piece ${i} takes slot ${idx}`);
+    assert.equal(ps._tempDue.has(queued[i].uid), false);
+  });
+  assert.deepEqual(ps.temp.filter(Boolean), [queued[13]], 'remaining overflow is not lost');
+  assert.equal(ps.tempDue(queued[13]), due);
+});
+
+test('explicit stow preferences and manual moves can still choose extra slots', t => {
+  const { m, ps } = emptyPrep(t);
+  const preferred = ps.newPiece('item', FILLER);
+  assert.equal(ps.stow(preferred, { preferIdx: 10 }), 'hand');
+  assert.equal(ps.hand[10], preferred);
+  assert.equal(ps.hand[9], null, 'an explicit extra-slot preference overrides automatic placement');
+  const original = ps.newPiece('item', FILLER);
+  assert.equal(ps.stow(original, { preferIdx: 2 }), 'hand');
+  assert.equal(ps.hand[2], original);
+  assert.deepEqual(m.handle(ps.playerId, { t: 'g.move', uid: original.uid, to: { area: 'hand', idx: 12 } }), { ok: true });
+  assert.equal(ps.hand[12], original);
+  assert.equal(ps.hand[2], null);
+  assert.equal(ps.hand[10], preferred);
+});
+
+test('non-expanded acquisitions and temp refill keep the ten-slot right-to-left order', t => {
+  const { m, ps } = emptyPrep(t, official());
+  const bought = ps.acquireChess(NORMAL, { silent: true });
+  assert.equal(ps.hand[9], bought);
+  for (let idx = 8; idx >= 0; idx--) {
+    const item = ps.acquireItem(FILLER, { silent: true });
+    assert.ok(item);
+    assert.equal(ps.hand[idx], item);
+  }
+  const overflow = ps.acquireItem(FILLER, { silent: true });
+  assert.ok(overflow);
+  assert.equal(ps.temp[4], overflow);
+  assert.equal(ps.hand.length, 10);
+  ps.hand[6] = null;
+  ps.recompute();
+  assert.equal(ps.hand[6], overflow);
+  assert.ok(ps.tempEmpty);
+  const moved = ps.hand[9];
+  assert.deepEqual(m.handle(ps.playerId, { t: 'g.move', uid: moved.uid, to: { area: 'hand', idx: 10 } }), { error: 'BAD_TARGET' });
+  assert.equal(ps.hand[9], moved);
+});
+
 test('the option is opt-in on the wire: it only rides when true, and the key/equality see it', async () => {
   const { experimentalOptions, experimentalKey, sameExperimental, isExperimental, EXPERIMENTAL_OPTIONAL } = await import('../../shared/experimental.js');
   const base = { revivalEnabled: false, disableSharedPool: false };

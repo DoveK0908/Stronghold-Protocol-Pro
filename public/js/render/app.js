@@ -1578,8 +1578,12 @@ export async function createFieldView(host, options = {}) {
       const st = data.stage(meta.stageId);
       if (st) setStage(st);
     }
-    tiles.setBattleRect(rect);
-    board3d?.setBattleRect(rect);
+    // a scouted prep board is not a running battle: no device unit of it will ever spawn (prepFieldMeta carries the
+    // pieces only), so the stage's static crates and turrets must stay drawn — handing it the battle rect hid them
+    // inside the field and the teammate's board came up empty (reported 2026-10-28: "别人棋盘上的箱子也看不见").
+    const deviceRect = battleMeta.prep ? null : rect;
+    tiles.setBattleRect(deviceRect);
+    board3d?.setBattleRect(deviceRect);
     for (const u of Array.isArray(meta.units) ? meta.units : []) {
       const info = applyInfo(u);
       if (info && battleMeta.prep) info._look = scoutLook(u);

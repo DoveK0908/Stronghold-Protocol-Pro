@@ -38,14 +38,17 @@ import { serverNow } from '../store.js';
 import { isCombatPhase, isBossPhase, prepCapsuleLabel, bossFrac, bossPctText, fmtNum, shopBlockReason, uniteBudgetInfo } from './gameLogic.js';
 import { uniteRelayRound } from '../battle/observe.js';
 import { ServerStatusModal } from './serverStatus.js';
-import { overtimeState, overtimeDrainPerSec, remainAt } from './matchStatus.js';
+import { overtimeState, overtimeDrainPerSec, remainAt, bossRemaining, bossLevelSeconds } from './matchStatus.js';
 import { hotkeyLabelOf } from './settings.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 import { UnofficialMark, ruleLine } from './pluginTag.js';
 import { TestMark } from './testConsole.js';
 // 维护者 2026-10-25: 二倍速投票 sits in the top-right, left of 准备就绪 (it used to live in the team panel's notice strip).
 // 维护者 2026-10-26: it is a room rule now (experimental speedVote, on by default) — a room that turns it off draws no button.
-import { SpeedAction } from './speedVote.js';
+// 维护者 2026-10-28: the **open vote** moved here too (SpeedVoteNotice, formerly the team panel's notice strip): while a
+// vote ran, that strip sat on top of the 同盟成员 portraits and pushed all four rows down, one screen away from the
+// button that opened it. Every 二倍速 element now lives in this corner, next to the 2× badge.
+import { SpeedAction, SpeedVoteNotice } from './speedVote.js';
 import { optionalValue } from '../../../shared/experimental.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -505,17 +508,18 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
   // a spectator seat (no m.private, community report #26) never readies
   const showReady = phase === PHASE.PREP && !spectator && priv?.alive !== false;
   // boss rounds: the overtime warning follows the clock (4 Hz while live; frozen while paused)
-  const otLive = boss && Number(pub?.overtimeAt) > 0;
+  const otLive = boss && (!!pub?.bossClock || Number(pub?.overtimeAt) > 0);
   useTicker(otLive && frozenAt == null ? 250 : 0);
   const now = Number.isFinite(frozenAt) ? frozenAt : serverNow();
-  const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config) }) : null;
+  const ot = otLive ? overtimeState(pub, now, { perSec: overtimeDrainPerSec(config), levelSeconds: bossLevelSeconds(pub, config) }) : null;
   const draining = ot?.state === 'drain';
   const lowLp = (Number.isFinite(lp) && lp - pending <= 5) || draining;
   const cap = Number(config?.lpCapPerRound) > 0 ? Number(config.lpCapPerRound) : 10;
   // 界面#10: battles are simulated at a fixed 2 game-seconds per real second (server/match/fields.js GAME_SPEED);
   // show it while a fight is on screen so 「有时候像在加速」 has a visible, honest answer
   const battleSpeed = phase === PHASE.COMBAT || phase === PHASE.UNITE ? 2 : null;
-  const frozenSecs = Number.isFinite(frozenAt) ? remainAt(pub?.deadline, frozenAt) : null;
+  const bossSecs = bossRemaining(pub, now, config);
+  const frozenSecs = Number.isFinite(frozenAt) ? (bossSecs ?? remainAt(pub?.deadline, frozenAt)) : null;
   const btn = checkButtons({ pen, penAvail, infoOpen: !!drawer });
   // the latency pill also opens the server-load panel (public issue #?; UI/serverStatus.js)
   const [loadOpen, setLoadOpen] = useState(false);
@@ -584,6 +588,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
       <div class="gtop__clock">
         ${frozenSecs != null
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
+          : bossSecs != null ? html`<${Countdown} seconds=${bossSecs} total=${total ?? undefined} size="md" />`
           : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}
         ${pause && (pause.show || pause.paused) ? html`<${PauseButton} paused=${!!pause.paused} busy=${pause.busy} onToggle=${pause.onToggle} />` : null}
       </div>
@@ -594,6 +599,7 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
         ${showReady ? html`<${ReadyToggle} priv=${priv} onToggle=${onReady} busy=${readyBusy} readyCount=${readyCount} total=${playerCount} />` : null}
       </div>
       <${UniteBudgetNote} pub=${pub} />
+      <${SpeedVoteNotice} pub=${pub} />
     </div>
   </header>`;
 }

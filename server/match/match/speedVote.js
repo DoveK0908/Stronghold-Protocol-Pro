@@ -9,10 +9,10 @@
 // need recomputed from the voters left. It times out after SPEED_VOTE_MS. A failed (rejected / timed-out) vote blocks
 // another for the rest of the round; a 300 ms burst guard per proposing player.
 //
-// What it buys: `speedBoostPending`, which doubles `gameSpeed` for the *next* battle, never the one in flight — every
+// What it buys: `speedBoostPending`, which selects GAME_SPEED * 2 for the *next* battle, never the one in flight — every
 // deadline, field clock and 联军 budget of a phase is computed from `gameSpeed` when the phase begins, so switching it
 // under a running battle would make game time jump (clientCombat derives elapsed game time as wall × speed). MatchCombat's startCombat reads
-// the flag and doubles `m.gameSpeed` once, then clears it.
+// the flag and adopts the absolute speed once, then clears it. Luck never multiplies with this selection.
 //
 // Turning it back off (owner's rule of 2026-10-24): any connected human may call it off with g.speedOff — no vote, one
 // click — and it lands the same way, on the *next* battle (`speedBoostOffPending`), never mid-battle. A cancelled
@@ -36,17 +36,17 @@ export const speedNeed = (n) => Math.max(1, n);
 
 export class MatchSpeedVote {
   /**
-   * The scheduled change, taken by MatchCombat.startCombat when the next battle begins: turning it on doubles `gameSpeed`
-   * once, turning it off halves it back. Never called mid-battle — see the header. Both directions are exact: the factor
-   * is a power of two, so `x * 2 / 2` returns to the very same float.
+   * The next battle adopts an absolute final speed: on = twice GAME_SPEED, off = GAME_SPEED.
+   * Never multiply/halve a Luck override. An explicit Luck request supersedes these flags.
    */
   applySpeedBoost() {
-    const base = Number.isFinite(this.gameSpeed) && this.gameSpeed > 0 ? this.gameSpeed : GAME_SPEED;
     if (this.speedBoostOffPending) {
       this.speedBoostOffPending = false;
       if (!this.speedBoost) return false;
       this.speedBoost = false;
-      this.gameSpeed = Math.max(1, base / SPEED_BOOST);
+      this.gameSpeed = GAME_SPEED;
+      for (const ps of this.players?.values() || []) ps.dirty?.();
+      this.markPublic?.();
       this.log.info?.(`[match ${this.roomCode}] battles back to ${this.gameSpeed} (R${this.round})`);
       return true;
     }
@@ -54,7 +54,9 @@ export class MatchSpeedVote {
     this.speedBoostPending = false;
     if (this.speedBoost) return false;
     this.speedBoost = true;
-    this.gameSpeed = Math.min(200, base * SPEED_BOOST);
+    this.gameSpeed = GAME_SPEED * SPEED_BOOST;
+    for (const ps of this.players?.values() || []) ps.dirty?.();
+    this.markPublic?.();
     this.log.info?.(`[match ${this.roomCode}] battles now run at ${this.gameSpeed} (R${this.round})`);
     return true;
   }

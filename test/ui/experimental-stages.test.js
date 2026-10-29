@@ -42,7 +42,7 @@ test('the room screen hands the difficulty\'s stages to the dialog', () => {
 
 test('the new strings are translated in English', () => {
   assert.equal(en['禁用战场'], 'Banned battlefields');
-  assert.ok(en['勾选的战场不会出现在本局；至少要保留一张。']);
+  assert.equal(en['勾选的战场本局不会出现，至少保留一张。'], 'Checked stages never appear this match; at least one stays.');
   assert.equal(en['禁用战场 {n} 张'], '{n} battlefields banned');
 });
 

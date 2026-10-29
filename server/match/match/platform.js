@@ -192,11 +192,15 @@ export class MatchPlatform {
         ps._lastPriv = null;
         this._sendPrivate(ps, true);
       }
-      if (this.clientCombat) this._resendBattle(ps);
+      if (this.clientCombat && this.fields.some((f) => f.cc)) this._resendBattle(ps);
       else if (!this.fields.length && this._follows(ps)) this._followScout(ps, { keep: true });
       else {
         let fid = this.watchers.get(playerId);
-        if (!fid && ps.spectator && this.fields.length) { fid = (this._watchTargetField(ps, this.fields) || this.fields[0]).fieldId; this.watchers.set(playerId, fid); }
+        if (!fid && this.fields.length) {
+          const own = this.fields.find((f) => f.players.includes(playerId));
+          const fallback = own || (this._follows(ps) ? this._watchTargetField(ps, this.fields) || this.fields[0] : null);
+          if (fallback) { fid = fallback.fieldId; this.watchers.set(playerId, fid); }
+        }
         // the own field a browser runs locally: b.start again (kept, or rebuilt after a reload; localReplica.js)
         const f = fid ? this.fields.find((x) => x.fieldId === fid) : null;
         if (fid && !(f && this._offerLocal(ps, f, { resend: true }))) this._sendField(playerId, fid);

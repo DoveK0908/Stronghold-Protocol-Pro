@@ -40,6 +40,7 @@ import { BOSS_ROW_OFFSET, COLS, BOSS_POOL_MIN_HP } from '../sim/constants.js';
 import { mirrorDir, normDir } from '../sim/dir.js';
 import { bossPoolShareOf } from './gamedata.js';
 import { MAX_PLAYER_CAPACITY } from '../../shared/playerCapacity.js';
+import { BossQuota } from '../../shared/bossQuota.js';
 
 /**
  * BOSS_HIT ticker thresholds (activity_table autoChessData.broadcastList comment_boss_hit_1..3, paramList 0.2 / 0.5 /
@@ -87,7 +88,7 @@ export function pairPlayers(alive, rng, previous = null) {
 }
 
 /** Shared boss HP for a boss id with `aliveCount` alive players (GameData.bossPoolShare / bossPoolShareOf; omitted ⇒ a full team). */
-export function bossPoolHp(gd, bossId, aliveCount, { experimental = false } = {}) {
+export function bossPoolHp(gd, bossId, aliveCount, { experimental = false, hpPercent = 100 } = {}) {
   const boss = gd.boss(bossId);
   const diff = gd.difficulty;
   let base = boss && boss.bloodPoint && Number.isFinite(boss.bloodPoint[diff]) ? boss.bloodPoint[diff] : null;
@@ -100,7 +101,10 @@ export function bossPoolHp(gd, bossId, aliveCount, { experimental = false } = {}
   // Only the opt-in >4-seat fight goes past the configured four: the full team's share grows by alive / 4 (one
   // bloodPoint per player under the per-player rule); normal config and solo scaling are untouched.
   const share = enlarged ? shareOf(4) * aliveCount / 4 : shareOf(aliveCount);
-  return Math.max(1, Math.round(base * share * tune));
+  // 首领血量 (experimental `bossHpPercent`, 100 = official): the room scales the leader pool itself — the share rule and the
+  // per-difficulty table stay, so 50% of a four-player HARD fight is half of what the official room would have.
+  const pct = Number.isFinite(hpPercent) && hpPercent > 0 ? hpPercent / 100 : 1;
+  return Math.max(1, Math.round(base * share * tune * pct));
 }
 
 /**
@@ -108,18 +112,21 @@ export function bossPoolHp(gd, bossId, aliveCount, { experimental = false } = {}
  * Match._creditBoss (client reports, per player); the hit that would leave less than BOSS_POOL_MIN_HP takes the rest.
  */
 export class SharedBossPool {
-  constructor(hp, { onHit = null } = {}) {
+  constructor(hp, { onHit = null, quota = null } = {}) {
     this.maxHp = Math.max(1, hp);
     this.hp = this.maxHp;
     /** playerId → damage dealt to this pool (this boss round only; the BOSS_HIT tickers' share) */
     this.byPlayer = new Map();
     this.onHit = onHit;
+    if (quota) this.quota = new BossQuota(this.maxHp, quota);
   }
 
-  damage(playerId, amount) {
+  damage(playerId, amount, time) {
     const a = Number(amount);
     if (!Number.isFinite(a) || a <= 0 || this.hp <= 0) return 0;
-    const dealt = this.hp - a < BOSS_POOL_MIN_HP ? this.hp : a;
+    const dealt = this.quota ? this.quota.damage(playerId, a, time, this.hp)
+      : this.hp - a < BOSS_POOL_MIN_HP ? this.hp : a;
+    if (dealt <= 0) return 0;
     this.hp -= dealt; // exactly 0 when the rest is taken (x − x): no float dust
     if (playerId != null) this.byPlayer.set(playerId, (this.byPlayer.get(playerId) || 0) + dealt);
     if (this.onHit) {
@@ -163,15 +170,16 @@ export class CreditPool {
   get hp() { return this.pool.hp; }
   set hp(v) { /* the sim's fallback path writes hp only when damage() threw; the real pool is never written here */ void v; }
   get maxHp() { return this.pool.maxHp; }
+  get quota() { return this.pool.quota; }
 
-  damage(playerId, amount) {
+  damage(playerId, amount, time) {
     const a = Number(amount);
     if (!Number.isFinite(a) || a <= 0) return 0;
     const before = this.cum;
     this.cum += a;
     const credit = Math.max(0, this.cum - Math.max(before, this.acked));
     if (credit <= 0) return 0;
-    const dealt = this.pool.damage(playerId, credit);
+    const dealt = this.pool.damage(playerId, credit, time);
     if (dealt > 0 && this.onCredit) { try { this.onCredit(playerId, dealt); } catch { /* reported by the caller */ } }
     return dealt;
   }

@@ -49,17 +49,19 @@ export class MatchExtensions {
       this.damageBoard.previousRound = previous;
     }
     this.damageBoard.startCombat(this.round, phase, this.order);
+    // Opt-in quota bosses run on the server even when ordinary rounds use browser authority.
+    this._damageServerOwned = !this.clientCombat || ((phase === 'boss' || phase === 'hidden') && !!this.bossPool?.quota);
     this._damageSampleAt = -Infinity;
     this._damageSent.clear();
     this._damageDirty = true;
-    if (!this.clientCombat) for (const f of this.fields) {
+    if (this._damageServerOwned) for (const f of this.fields) {
       this._onDamageRows(f, emptyDamageRows(f.spec || f.battle?.opts || { players: f.players.map((playerId) => ({ playerId })) }));
     }
     this._sampleDamage(true);
   }
 
   _onDamageRows(f, rows, { final = null } = {}) {
-    if (this.clientCombat || this.disposed || this.ended || !this.fields.includes(f)
+    if ((this.clientCombat && !this._damageServerOwned) || this.disposed || this.ended || !this.fields.includes(f)
       || f.kind !== this.damageBoard.phase || this.round !== this.damageBoard.round) return false;
     if (this.damageBoard.replaceField({ matchId: this.battlePrefix, round: this.round, phase: f.kind,
       kind: f.kind, fieldId: f.fieldId, gt: f.remote ? f.battle._damageGt ?? f.battle.time : f.battle.time || 0,
@@ -92,8 +94,12 @@ export class MatchExtensions {
         const healing = Number(u.heal) || 0;
         if (damage <= 0 && healing <= 0) continue;
         sum += damage;
+        const input = Number.isSafeInteger(u.uid) ? f.spec?.players?.find((p) => p.playerId === pid)?.units?.find((unit) => unit.uid === u.uid) : null;
+        const defId = input?.chessId ?? (typeof u.defId === 'string' ? u.defId : null);
+        const pick = input?.diy ?? this.players.get(pid)?.diyPickOf?.(defId);
+        const charId = pick?.charId ?? this.gd.chess(defId)?.charId;
         operators.push({ key: JSON.stringify([pid, u.uid ?? `unit:${u.defId ?? '?'}`]), uid: Number.isSafeInteger(u.uid) ? u.uid : null,
-          defId: typeof u.defId === 'string' ? u.defId : null, damage, healing });
+          defId, ...(charId ? { charId } : {}), damage, healing });
       }
       const total = Math.max(0, Number(p.damageDealt) || 0);
       const healing = Math.max(0, Number(p.healingDone) || 0);
@@ -109,7 +115,7 @@ export class MatchExtensions {
   }
 
   _sampleDamage(force = false, final = false) {
-    if (this.clientCombat || this.damageBoard.status !== 'live') return;
+    if ((this.clientCombat && !this._damageServerOwned) || this.damageBoard.status !== 'live') return;
     const now = this.sched.now();
     if (!force && (this.paused || now - this._damageSampleAt < DAMAGE_PUBLIC_MS)) return;
     this._damageSampleAt = now;
@@ -124,7 +130,7 @@ export class MatchExtensions {
   _damagePacket() {
     const packet = this.damageBoard.packet();
     // Browser-authoritative results are not a trusted operator meter. Preserve their existing combat authority.
-    return packet && this.clientCombat ? { ...packet, owners: [], available: false } : packet;
+    return packet && this.clientCombat && !this._damageServerOwned ? { ...packet, owners: [], available: false } : packet;
   }
 
   _damageView(ps, packet) {

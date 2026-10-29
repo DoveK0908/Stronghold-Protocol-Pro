@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  uiUrl, chessAvatarUrl, chessPortraitUrl, skillIconUrl, profIconUrl, subProfIconUrl, bondIconUrl, bandIconUrl, itemIconUrl,
+  uiUrl, chessAvatarUrl, chessPortraitUrl, chessIllustUrl, skillIconUrl, profIconUrl, subProfIconUrl, bondIconUrl, bandIconUrl, itemIconUrl,
   enemyIconUrl, tokenAvatarUrl, factionIconUrl, titleIconUrl, effectIconUrl,
 } from '../../public/js/ui/assetUrls.js';
 
@@ -26,6 +26,28 @@ const ALL = manifestUrls(m);
 const inManifest = (u) => u == null || ALL.has(u);
 
 describe('assetUrls', () => {
+  test('the 立绘 is the picture the 准备界面 draws: the painted illust, the 精一 full body, or the skin', () => {
+    const kalts = m.chars.char_003_kalts;
+    assert.equal(chessIllustUrl(m, { charId: 'char_003_kalts' }), kalts.illust);
+    assert.equal(chessIllustUrl(m, { charId: 'char_003_kalts' }, { look: 'e1' }), kalts.illustE1);
+    // an outfit with its own illustration wins over the operator's
+    const manifest = { chars: { plugin_1: { illust: '/assets/char/illust/plugin_1.webp',
+      skins: { skin_a: { illust: '/assets/char/illust/plugin_1_skin.webp' } } } } };
+    assert.equal(chessIllustUrl(manifest, { charId: 'plugin_1' }, { skin: 'skin_a' }), '/assets/char/illust/plugin_1_skin.webp');
+    assert.equal(chessIllustUrl(manifest, { charId: 'plugin_1' }), '/assets/char/illust/plugin_1.webp');
+    assert.equal(chessIllustUrl(manifest, { charId: 'nobody' }), null);
+    assert.equal(chessIllustUrl(null, { charId: 'char_003_kalts' }), null);
+    // whatever a card can draw is a manifest URL: no 404s when the pack is there
+    let withArt = 0;
+    for (const c of Object.values(chess)) {
+      if (!c.charId || c.isDiy) continue;
+      const u = chessIllustUrl(m, c);
+      assert.ok(inManifest(u), `illust ${c.chessId}`);
+      if (u) withArt++;
+    }
+    assert.ok(withArt >= 200, `illustrated chess: ${withArt}`);
+  });
+
   test('every visible chess (normal + golden) has avatar, portrait and skill icon', () => {
     let n = 0;
     for (const c of Object.values(chess)) {

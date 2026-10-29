@@ -577,17 +577,31 @@ function MatchScreen() {
   const ownView = showPrep || (shownField ? (shownMembers ? shownMembers.includes(myId) : shownField.fieldId === ownFieldId(myId)) : !watchingOther);
   // every field is fought on the round's battlefield — 联防 too, its terrain, crates and water included (0.2.1, the
   // owner's decision of 2026-10-07; 0.2.0 drew the escaped levels' empty road there and restored the board on leaving)
+  // a scouted teammate's prep board carries device / tile overrides of its own: their terrain 机变 cards switch crates and
+  // turrets on or off (`auto_chess_change_map`, 77 of the stages' 278 devices start hidden) and reclassify tiles, so the
+  // plain stage drew their board with those crates missing (reported 2026-10-28: "别人棋盘上的箱子也看不见"). The scout
+  // field already carries their 机变 entries (`prepFieldMeta` `effects`, server/match/match/views.js), which is exactly
+  // what stageOverrides derives the overrides from. Keyed by a string: a fresh effects array arrives with every push and
+  // a fresh stage object would rebuild the tiles (the flash fixed on 2026-10-26).
+  const scoutOverrides = !ownView && watchingOther && field?.prep === true
+    ? stageOverrides({ effects: Array.isArray(field.effects) ? field.effects : [] }, gd.effect)
+    : null;
+  const scoutOverridesKey = scoutOverrides ? JSON.stringify(scoutOverrides) : '';
+  const scoutStage = useMemo(
+    () => (scoutOverridesKey ? effectiveStage(baseStage, JSON.parse(scoutOverridesKey)) : baseStage),
+    [baseStage, scoutOverridesKey],
+  );
   useEffect(() => {
     if (!view) return;
-    const st = ownView ? ownStage : baseStage;
+    const st = ownView ? ownStage : scoutStage;
     if (st) view.setStage(st);
-  }, [view, ownView, ownStage, baseStage]);
-  // the stage behind the board ON SCREEN — the own one (机变 overrides applied) or, while watching a teammate, the plain
-  // one — and how a tapped BOARD tile maps to it (GitHub issue #184: tileClick → gameLogic.terrainInfo). Everywhere but a
+  }, [view, ownView, ownStage, scoutStage]);
+  // the stage behind the board ON SCREEN — the own one (机变 overrides applied) or, while watching a teammate, theirs
+  // (derived from the 机变 entries the scout field carries) — and how a tapped BOARD tile maps to it (GitHub issue #184: tileClick → gameLogic.terrainInfo). Everywhere but a
   // boss-prep board the two spaces are the same: a 最终攻势 / 隐秘核心 battle renders the stage's own rows (GEO.BOSS_RECT),
   // 联防 / normal rects are stage rows; the boss PREP draws the player's half (stage rows 2–5) as board rows 9–12
   // (render/prepfield.js toDisp), which is exactly gameLogic.fieldTile.
-  live.current.terrainStage = ownView ? ownStage : baseStage;
+  live.current.terrainStage = ownView ? ownStage : scoutStage;
   live.current.terrainTile = showPrep && (deployField === 'bossL' || deployField === 'bossR')
     ? (row, col) => fieldTile(deployField, row, col)
     : (row, col) => [row, col];
@@ -1913,7 +1927,7 @@ function MatchScreen() {
   // bonds this mode never activates (标准: 10 of 23, 奥术 among them) — shown 本局禁用 on cards, chips and the popup
   const offBonds = modeOffBonds(getMode(pub?.modeId));
 
-  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', uniteBudgetInfo(pub) && 'gm--unite-budget', drag && 'is-dragging', barCollapsed && 'is-collapsed', deployPartial && 'is-deploy-partial', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy')}
+  return html`<div class=${cx('screen', 'gm', `gm--${mode}`, pub?.playerCapacity > 4 && 'gm--expanded', uniteBudgetInfo(pub) && 'gm--unite-budget', drag && 'is-dragging', barCollapsed && 'is-collapsed', deployPartial && 'is-deploy-partial', (sp || hasPersonalChoice || offerBlocksPrep(pub?.offers)) && 'has-sp', sp && 'has-spdraft', pen && 'is-pen', readyWhy && 'has-readywhy', pub?.speedVote && 'has-speedvote')}
       data-camera=${pen ? 'pen' : camKind}>
     <div class="gm__field" ref=${hostRef} onContextMenu=${(e) => e.preventDefault()}></div>
     ${viewKind === 'loading' ? html`<div class="gm__loading"><${Spinner} label="LOADING FIELD" /></div>` : null}

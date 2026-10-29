@@ -1960,3 +1960,21 @@
 .gtop__go { display: flex; align-items: center; justify-content: flex-end; gap: .1rem; }
 .gtop__go .team-speed { margin-top: 0; max-width: none; flex-wrap: nowrap; }
 .gtop__go .team-speed .btn { min-height: .32rem; }
+
+/* 二倍速投票的票箱 (维护者 2026-10-28): 从「同盟成员」面板的 notice 条挪到右上角这一列。放在那里时它压在四个人像上面，
+   投票期间把整列队友往下推；而且离发起投票的按钮隔了一个屏幕。外观沿用 .team-rescue（mint 左边框、深底），只把
+   横向排列改成右对齐的窄列，免得在角落里横着铺开。 */
+.gtop__right .team-speed-vote { max-width: min(3.6rem, 42vw); flex-direction: column; align-items: flex-end; gap: .06rem; text-align: right; }
+.gtop__right .team-speed-vote > small { text-align: right; }
+.gtop__right .team-speed-vote .team-kick__actions { justify-content: flex-end; }
+/* The buff column (.gm__effects, right: .3rem, top: 2.4rem) occupies the right margin under the clock, i.e. exactly
+   where the vote box lands. It already steps down for a refused 准备就绪 (.has-readywhy above); a 30-second vote steps
+   it down the same way instead of hiding the buffs behind the ballot. */
+.gm.has-speedvote .gm__effects { top: 5.6rem; }
+
+/* Only completed quota rows gain a name-line badge; ordinary roster sizing stays unchanged. */
+.team__quota-name { display: flex; align-items: baseline; gap: .06rem; min-width: 0; }
+.team__quota-name .team__name { min-width: 0; }
+.team__quota-time { flex: none; color: var(--mint-400); font-size: max(.11rem, calc(10px * var(--ui))); white-space: nowrap; }
+.team--list .team__quota-name { flex: 1 1 100%; }
+.team--list .team__quota-name .team__name { flex: 1 1 3em; }

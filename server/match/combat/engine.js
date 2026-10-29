@@ -82,6 +82,7 @@ export class CombatEngine {
         bossOvertimeDrainReal: Math.max(0, finite(boss.bossOvertimeDrainReal, DEFAULTS.bossOvertimeDrainPerSec)),
       };
       this.pool = new SharedBossPool(maxHp, {
+        quota: boss.quota,
         onHit: (playerId, amount) => this.effects.push({ type: 'bossDamage', playerId, amount }),
       });
       this.pool.hp = Math.max(0, Math.min(maxHp, finite(boss.hp, maxHp)));
@@ -337,6 +338,7 @@ export class CombatEngine {
       ...(this.damageBoard ? { damageFrames } : {}),
       boss: this.boss ? {
         maxHp: this.pool.maxHp, hp: this.pool.hp, byPlayer: [...this.pool.byPlayer],
+        ...(this.pool.quota ? { quota: this.pool.quota.snapshot() } : {}),
         teamLp: this.boss.teamLp, overtimeApplied: this.boss.overtimeApplied,
       } : null,
     };

@@ -37,6 +37,7 @@
 
 import { createRng, deriveSeed } from '../sim/rng.js';
 import { PLUGIN_ACTION_UNITS } from '../../shared/plugins/limits.js';
+import { sanitizeEnemyCarry } from '../sim/enemyCarry.js';
 
 const ACLOON = 'enemy_9012_acloon';
 const DEFAULT_PLACEHOLDERS = Object.freeze({
@@ -672,6 +673,8 @@ export function buildUniteWave(gd, leaked, helperCount, timeLimit) { // eslint-d
           mods: l.mods ? { ...l.mods } : { slot: classOf(gd, l.enemyKey) }, sourcePlayerId: l.sourcePlayerId,
           preview: previewInfo(gd, l.enemyKey, routes[routeIndex]),
         };
+        const stateCarry = sanitizeEnemyCarry(l.stateCarry);
+        if (stateCarry) spec.stateCarry = stateCarry;
         if (idx >= 0) spec.actionIndex = idx;
         if (l.bounty && l.bounty.coins > 0) spec.bounty = { coins: l.bounty.coins, ownerPlayerId: l.bounty.ownerPlayerId ?? l.sourcePlayerId };
         if (l.tag === 'bounty') spec.tag = 'bounty';

@@ -45,12 +45,21 @@ export class MatchBoss {
     this.lastResults = new Map();
     if (!hidden) this._openTeamLp();
     const bossId = hidden ? this.hiddenBossId : this.bossId;
+    // Freeze participants and the actual overtime boundary before any field/spec is constructed.
+    const levelTime = this.gd.bossLevelTime(this.round);
+    const team = this.order.filter((p) => !p.left);
+    this.bossOvertimeStartReal = team.length > 1 && team.some((p) => p.isBot)
+      ? this.gd.bossOvertimeAfterReal : (levelTime || this.gd.bossOvertimeAfterReal);
+    const quota = this.experimental.bossQuota ? {
+      players: alive.map((p) => p.playerId), unlockAt: (this.bossOvertimeStartReal + 1) * this.gd.combatTimeScale,
+    } : null;
     // BOSS_HIT tickers ("对敌方领袖造成的伤害超过20% / 50% / 80%"): the player's damage to THIS leader over its pool —
     // the pool's own per-player tally, one pool per boss round. stats.bossDamage (the result's 领袖伤害) adds up both
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
     if (!hidden) this.finalAliveCount = alive.length;
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment }), {
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, hpPercent: this.experimental.bossHpPercent }), {
+      quota,
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;
@@ -110,7 +119,8 @@ export class MatchBoss {
         waveId: wave.templateId,
         bossId,
       };
-      if (this.clientCombat) return { fieldId, kind: hidden ? 'hidden' : 'boss', players: g.map((p) => p.playerId), opts: bopts, battle: null, live: true };
+      // Quota fights use the shared server clock, even in otherwise client-authoritative matches.
+      if (this.clientCombat && !quota) return { fieldId, kind: hidden ? 'hidden' : 'boss', players: g.map((p) => p.playerId), opts: bopts, battle: null, live: true };
       if (this.combatPool) return this._remoteField(bopts, g.map((p) => p.playerId));
       const battle = this.newBattle(bopts);
       try {
@@ -125,20 +135,16 @@ export class MatchBoss {
     // HUD: the boss level's countdown (maxPlayTime, 120 real s — the battle goes on past it) and the moment the
     // overtime drain starts (120 real s, or 150 with an AI teammate), both on the field clock
     const onClock = (realS) => this.sched.now() + Math.round(((realS * this.gd.combatTimeScale) / this.gameSpeed) * 1000);
-    const levelTime = this.gd.bossLevelTime(this.round);
-    // Maintainer 2026-10-10: only teams with an AI teammate keep the extra grace after the visible countdown.
-    // Freeze this choice for the fight; a disconnect / host transfer cannot change its LP clock midway.
-    const team = this.order.filter((p) => !p.left);
-    this.bossOvertimeStartReal = team.length > 1 && team.some((p) => p.isBot)
-      ? this.gd.bossOvertimeAfterReal : (levelTime || this.gd.bossOvertimeAfterReal);
+    // The grace choice above is fixed for this fight, independent of later disconnects.
     this.deadline = this.sched.instant || !levelTime ? 0 : onClock(levelTime);
     this.overtimeAt = this.sched.instant ? 0 : onClock(this.bossOvertimeStartReal);
-    if (this.clientCombat) { this._flushDamage(true); this._startFinalClient(hidden); return; }
+    if (this.clientCombat && !quota) { this._flushDamage(true); this._startFinalClient(hidden); return; }
     const Runner = this.combatPool ? WorkerFieldRunner : FieldRunner;
     this.runner = new Runner(this, this.fields, {
       onTick: (runner) => this._bossTick(runner),
       onDone: (runner) => this._finalDone(runner, hidden),
       boss: { maxHp: pool.maxHp, hp: pool.hp, teamLp: this.teamLp, overtimeApplied: 0,
+        ...(quota ? { quota } : {}),
         combatTimeScale: this.gd.combatTimeScale, bossOvertimeAfterReal: this.bossOvertimeStartReal,
         bossOvertimeDrainReal: this.gd.bossOvertimeDrainReal },
     });
@@ -534,10 +540,35 @@ export class MatchBoss {
 
   _finalDone(runner, hidden) { this._finishFinal(hidden, (f) => runner.resultOf(f)); }
 
+  /** Informational, independent per-round ranks; equal simulation ticks share a competition rank. */
+  _recordBossQuota(hidden) {
+    const quota = this.bossPool?.quota;
+    if (!quota) return;
+    const players = quota.players.map((playerId) => {
+      const time = quota.completed.get(playerId);
+      return { playerId, name: this.players.get(playerId)?.name || playerId,
+        time: time == null ? null : Math.round(time * 30) / 30 / this.gd.combatTimeScale, rank: null };
+    });
+    players.sort((a, b) => (a.time ?? Infinity) - (b.time ?? Infinity));
+    let previous = null;
+    let rank = null;
+    players.forEach((p, i) => {
+      if (p.time == null) return;
+      if (p.time !== previous) rank = i + 1;
+      p.rank = rank;
+      previous = p.time;
+    });
+    const rounds = this.bossQuotaRounds || (this.bossQuotaRounds = []);
+    const record = { kind: hidden ? 'hidden' : 'boss', round: this.round, quota: quota.share, players };
+    const old = rounds.findIndex((r) => r.kind === record.kind);
+    if (old < 0) rounds.push(record); else rounds[old] = record;
+  }
+
   /** Every boss field is over: stats, bounties, then the Hidden Core or RESULT. */
   _finishFinal(hidden, resultOf) {
     if (this.phase !== (hidden ? PHASE.HIDDEN_CORE : PHASE.FINAL_ASSAULT)) return;
     this._freezeDamage();
+    this._recordBossQuota(hidden);
     this._stopClientCombat();
     // the end condition the server registered first decides (client-side combat: _endFinal — pool 0 → victory, team LP 0
     // → defeat); a boss field's final result may never turn a defeat into a victory (user playtest #6 item 5)
@@ -551,6 +582,8 @@ export class MatchBoss {
         const ps = this.players.get(pid);
         if (pp) this.lastResults.set(pid, pp);
         if (pp && ps) {
+          // onHit counted physical removal live; quota settlement keeps the full damage statistic.
+          if (this.bossPool.quota) ps.stats.bossDamage += Math.max(0, (Number(pp.bossDamage) || 0) - (this.bossPool.byPlayer.get(pid) || 0));
           ps.stats.dmgDealt += Number(pp.damageDealt) || 0;
           ps.stats.kills += Number(pp.killed) || 0;
           ps.creditedKills += creditedKillsOf(pp);

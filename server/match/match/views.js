@@ -195,6 +195,21 @@ export class MatchViews {
     // 最终攻势 / 隐秘核心: when the overtime drain starts (ms epoch; `deadline` is the level's 120 s countdown)
     if ((this.phase === PHASE.FINAL_ASSAULT || this.phase === PHASE.HIDDEN_CORE) && this.overtimeAt) v.overtimeAt = this.overtimeAt;
     if (this.bossPool) v.bossHp = { hp: Math.max(0, Math.round(this.bossPool.hp)), max: Math.round(this.bossPool.maxHp) };
+    if (this.phase === PHASE.FINAL_ASSAULT || this.phase === PHASE.HIDDEN_CORE) {
+      const scale = this.gd.combatTimeScale;
+      // Server/Worker ticks are authoritative; client-authoritative fights use the match's integrated game clock.
+      const gt = this.runner ? this.runner.time : this._bossStartAt != null
+        ? Math.max(0, (this._clockNow() - this._bossStartAt) / 1000 * this.gameSpeed)
+        : Math.max(0, ...this.fields.map((f) => f.cc ? this._fieldElapsed(f) : Number(f.battle?.time) || 0));
+      v.bossClock = { elapsed: gt / scale, at: this.sched.now(), speed: this.gameSpeed / scale,
+        overtimeAfter: this.bossOvertimeStartReal, overtimeApplied: this.overtimeApplied || 0 };
+      if (this.experimental.bossQuota && this.bossPool?.quota) {
+        v.bossQuota = { players: this.bossPool.quota.players.map((playerId) => {
+          const time = this.bossPool.quota.completed.get(playerId);
+          return { playerId, time: time == null ? null : Math.round(time * 30) / 30 / scale };
+        }) };
+      }
+    }
     if (this.phase === PHASE.BAND_DRAFT && this.draft) {
       const d = this.draft;
       // turnSeconds: the length of a turn (the countdown gauge's total; 0 when untimed) — deadline = turnDeadline

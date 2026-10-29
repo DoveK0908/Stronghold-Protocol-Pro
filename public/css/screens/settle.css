@@ -10,17 +10,13 @@
 /* the sprites sit in boxes of their own (theme.css caps an img at its parent, which is 0 wide round the target point) */
 .settle img { max-width: none; }
 .settle__stage { position: absolute; left: 50%; top: 50%; width: 19.2rem; height: 10.8rem; transform: translate(-50%, -50%) scale(var(--k, 1)); }
-.settle__barbg { position: absolute; left: -10rem; right: -10rem; top: 9rem; bottom: -6rem; background: linear-gradient(180deg, #0d1010, #070909 40%); border-top: 1px solid rgba(200, 214, 210, .1); }
-.settle__barbg .sprite { position: absolute; left: 0; top: 0; width: 100%; height: 1.8rem; object-fit: fill; }
+.settle__barbg { position: absolute; left: -10rem; right: -10rem; top: 9rem; bottom: -6rem;
+  background: linear-gradient(180deg, #111616, #0a0d0d 22%, #070909 55%); box-shadow: 0 -1px 0 rgba(200, 214, 210, .1), inset 0 .1rem .3rem rgba(190, 210, 205, .035); }
 .settle__detail { position: absolute; inset: 0; z-index: 5; background: #070909; }
-.settle__btnbg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
 /* [ASSUMED] Preserve #698's boxes; uniformly shrink long translations and enlarged text within them (§35.1). */
 .settle__title { position: relative; overflow: hidden; }
 .settle__title > span { position: absolute; left: 0; top: 50%; display: block; width: max-content; white-space: nowrap;
   transform-origin: left center; transform: translateY(-50%) scale(var(--title-scale, 1)); }
-.settle__btnbg--ghost { background: #2a2f2e; box-shadow: inset 0 0 0 2px rgba(220, 230, 226, .2); }
-.settle__btnbg--primary { background: linear-gradient(90deg, #44e6b8, #33d8ab);
-  clip-path: polygon(.12rem 0, 100% 0, 100% 100%, 0 100%, 0 .12rem); }
 @keyframes settle-fade { from { opacity: 0; } }
 
 /* logo (top left) */
@@ -158,25 +154,24 @@ i.smedal__check.is-miss { border-color: #8a908e; color: #c4cac8; }
 .smedal.is-miss .smedal__icon, .smedal.is-miss .smedal__bg { filter: grayscale(1) brightness(.6); }
 @keyframes smedal-in { from { opacity: 0; transform: scale(1.6); } }
 
-/* my plate */
-.splate { position: absolute; left: .74rem; top: 6.84rem; height: 1.64rem; display: flex; animation: sself-slide 420ms var(--ease-out) 520ms both; }
-.splate .pavatar.splate__ava { --pa: 1.64rem; border: 2px solid rgba(240, 244, 243, .85); background: #20403a; }
-.splate .pavatar__glyph { font-size: calc(.6 * var(--t)); }
-.splate__info { position: relative; width: 2.66rem; display: grid; grid-template-columns: .66rem 1fr; grid-template-rows: .5rem 1fr; column-gap: .14rem;
+/* my plate — the lobby's/room's name plate proportions (维护者 2026-10-28): a 4:1 namecard strip,
+   a lobby-sized avatar (.72rem, not the 1.64rem that took over the report) and the two rows of the name / trophy note */
+.splate { position: absolute; left: .74rem; top: 6.92rem; height: 1rem; box-sizing: border-box; display: flex; align-items: center; gap: .12rem; padding-left: .12rem;
+  border: 1px solid rgba(78, 216, 175, .28); border-radius: .04rem; overflow: hidden; background: #0b1110;
+  animation: sself-slide 420ms var(--ease-out) 520ms both; }
+.splate > .nc-layer { z-index: 0; }
+.splate .pavatar.splate__ava { position: relative; z-index: 1; --pa: .72rem; border: 2px solid rgba(240, 244, 243, .85); background: #20403a; }
+.splate .pavatar__glyph { font-size: calc(.32 * var(--t)); }
+.splate__info { position: relative; z-index: 1; width: 3.04rem; height: 100%; display: grid; grid-template-columns: 1fr; grid-template-rows: .4rem 1fr;
   background: linear-gradient(90deg, rgba(36, 150, 122, .5), rgba(18, 70, 60, .3) 70%, transparent); }
-.splate__name { position: relative; isolation: isolate; grid-column: 1 / -1; display: flex; align-items: center; min-width: 0; padding: 0 .16rem; white-space: nowrap;
-  font-size: calc(.25 * var(--t)); font-weight: 600; color: #f2f6f5; background: rgba(4, 22, 18, .45); }
+.splate__name { position: relative; isolation: isolate; grid-row: 1; display: flex; align-items: center; min-width: 0; padding: 0 .14rem; white-space: nowrap;
+  font-size: calc(.22 * var(--t)); font-weight: 600; color: #f2f6f5; background: rgba(4, 22, 18, .45); }
 .splate__name > span { overflow: hidden; text-overflow: ellipsis; }
 .splate__namebg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: fill; }
-.splate__rank { grid-row: 2; margin: .1rem 0 .08rem .12rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .04rem;
-  background: rgba(6, 30, 24, .7); border: 1px solid rgba(160, 230, 210, .3); color: #dfe8e5; }
-.splate__cup { width: .3rem; height: .36rem; }
-.splate__rank > .icon { width: .32rem; height: .32rem; color: #e8efec; }
-.splate__rank b { font-family: var(--font-display); font-size: calc(.18 * var(--t)); line-height: 1; }
-.splate__gain { grid-row: 2; display: flex; flex-direction: column; justify-content: center; }
-.splate__gain small { display: inline-flex; align-items: center; gap: .04rem; font-size: calc(.2 * var(--t)); color: #cfd8d5; white-space: nowrap; }
-.splate__gain small .icon { width: .18rem; height: .18rem; }
-.splate__gain b { font-family: var(--font-display); font-size: calc(.42 * var(--t)); line-height: 1.05; color: #f4f7f6; }
+.splate__gain { grid-row: 2; display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: .08rem; min-width: 0; padding: 0 .14rem; }
+.splate__gain small { display: inline-flex; align-items: center; gap: .04rem; font-size: calc(.18 * var(--t)); color: #cfd8d5; white-space: nowrap; }
+.splate__gain small .icon { width: .16rem; height: .16rem; }
+.splate__gain b { font-family: var(--font-display); font-size: calc(.24 * var(--t)); line-height: 1; color: #f4f7f6; }
 
 /* final lineup: ten slots in two rows */
 .sops__row { position: absolute; display: flex; gap: .38rem; }
@@ -272,12 +267,13 @@ img.sbonds__none { width: .64rem; height: .12rem; }
 .slv__gain--daily small { margin-left: .06rem; font-size: calc(.18 * var(--t)); color: #8a9592; }
 .slv__gain--off { color: #ff8a5c; }
 
-.settle__next { position: absolute; left: 14.77rem; top: 9.42rem; width: 4rem; height: 1rem; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: .28rem;
-  padding: 0; border: 0; cursor: pointer; color: #062a20; background: transparent; font-size: .4rem; font-weight: 700; letter-spacing: .06em;
+/* right-anchored + min-width: a long translation widens the face leftwards instead of spilling out of it */
+.settle__next { position: absolute; right: 0; left: auto; top: 9.42rem; width: auto; min-width: 4.43rem; height: 1rem; isolation: isolate; display: flex; align-items: center; justify-content: center; gap: .26rem;
+  padding: 0 .34rem; border: 0; cursor: pointer; color: #062a20; font-size: calc(.4 * var(--t)); font-weight: 700; letter-spacing: .06em;
+  /* the flat official face (selena 0.4.1): a mint gradient with the top-left corner cut; no extracted button sprite */
+  background: linear-gradient(90deg, #48e8ba, #2fd2a4); clip-path: polygon(.12rem 0, 100% 0, 100% 100%, 0 100%, 0 .12rem);
+  filter: drop-shadow(0 .04rem .14rem rgba(40, 220, 175, .28));
   animation: snext-in 460ms var(--ease-out) 1400ms both; }
-/* btn_next_bg.png is 297×86; the face (white frame + green) is rows 1–68, columns 1–268, with the machine at the
-   right and the shadow below. Fit only the official image to that face; the art-less fallback keeps the CSS button. */
-.settle__next img.settle__btnbg { inset: auto; left: -.3745%; top: -1.4706%; width: 111.236%; height: 126.4706%; }
 /* The official label is heavier than the installed CJK 700 face (800/900 resolve to the same on Windows); a thin
    text-colour stroke adds the difference. */
 .settle__nextlabel { -webkit-text-stroke: .03em currentColor; }
@@ -312,6 +308,9 @@ span.settle__nexticon .icon { width: .34rem; height: .34rem; }
 .tcard__art::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2.4rem; background: linear-gradient(180deg, transparent, rgba(6, 10, 9, .86) 70%); pointer-events: none; }
 .tcard__img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 0; }
 .tcard__img.is-avatar { object-position: 50% 30%; filter: saturate(.9); }
+/* the 立绘 (the room's seat art, ui/assetUrls.js chessIllustUrl): a painted square, cover-cropped by its width the way
+   room.css .rseat__art img does it */
+.tcard__img.is-illust { object-position: 50% 12%; }
 .tcard__glyph { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: 1.4rem; font-size: calc(1.6 * var(--t)); font-weight: 900; color: rgba(140, 220, 200, .25); }
 .tcard__title { position: absolute; left: 0; right: 0; top: 3.88rem; z-index: 1; display: flex; align-items: center; justify-content: center; gap: .08rem; }
 .tcard__ticon { width: .5rem; height: .5rem; object-fit: contain; color: #4af2c4; filter: drop-shadow(0 0 .06rem rgba(40, 230, 180, .7)); }
@@ -324,10 +323,12 @@ span.settle__nexticon .icon { width: .34rem; height: .34rem; }
 .tcard.is-fail .tcard__rounds b { color: #ff574a; }
 .tcard.is-left .tcard__img, .tcard.is-left .tcard__glyph { filter: grayscale(1) brightness(.45); }
 .tcard__cut { position: absolute; left: 50%; top: 3.3rem; z-index: 1; transform: translateX(-50%); padding: .02rem .14rem; font-size: calc(.2 * var(--t)); font-weight: 700; color: #fff; background: rgba(200, 40, 34, .85); white-space: nowrap; }
-.tcard__plate { position: relative; isolation: isolate; height: 1.02rem; margin-top: .1rem; display: flex; align-items: center; gap: .1rem; padding: .06rem; box-sizing: border-box;
-  background: linear-gradient(90deg, #1b2120, #232b2a 60%, #2b3433); box-shadow: 0 0 0 1px rgba(180, 196, 192, .12); }
+/* the seat plate under the art: the room's 4:1 name plate (room.css .rseat__plate) — the namecard fills the strip,
+   the avatar keeps a lobby size instead of two thirds of the plate */
+.tcard__plate { position: relative; isolation: isolate; height: .87rem; margin-top: .1rem; display: flex; align-items: center; gap: .1rem; padding: .06rem .1rem; box-sizing: border-box;
+  background: linear-gradient(90deg, #232626, #161818); box-shadow: 0 0 0 1px rgba(255, 255, 255, .1); }
 .tcard__platebg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: fill; }
-.tcard__plate .pavatar.tcard__ava { --pa: .9rem; border: 1px solid rgba(220, 230, 226, .5); }
+.tcard__plate .pavatar.tcard__ava { --pa: .58rem; border: 1px solid rgba(220, 230, 226, .5); }
 .tcard__who { min-width: 0; display: flex; flex-direction: column; gap: .05rem; }
 .tcard__name { display: flex; align-items: baseline; gap: .04rem; min-width: 0; white-space: nowrap; font-size: calc(.24 * var(--t)); font-weight: 600; color: #f2f6f5; }
 .tcard__name > span:first-child { overflow: hidden; text-overflow: ellipsis; }
@@ -352,7 +353,6 @@ span.settle__nexticon .icon { width: .34rem; height: .34rem; }
 .steam__slot { position: absolute; right: .3rem; top: .2rem; z-index: 3; width: 3.2rem; max-height: 8.6rem; overflow: auto; }
 
 .steam__barbg { top: 9.15rem; }
-.steam__barbg .sprite { height: 1.65rem; }
 .steam__outcome { position: absolute; left: .42rem; top: 9.24rem; display: flex; flex-direction: column; align-items: flex-start; gap: .04rem; }
 .steam__tags { display: flex; align-items: center; gap: .1rem; }
 /* the 测试 mark of a 「测试」 match (0.3.1), beside the mode pill on both pages */
@@ -369,14 +369,16 @@ span.settle__nexticon .icon { width: .34rem; height: .34rem; }
 .steam__rowbg { position: absolute; inset: 0; z-index: -1; width: 100%; height: 100%; object-fit: fill; }
 .steam__ico { width: .28rem; height: .28rem; object-fit: contain; }
 .sbtn { position: absolute; isolation: isolate; top: 9.55rem; height: 1.03rem; display: flex; align-items: center; justify-content: center; gap: .16rem; padding: 0 .2rem; border: 0; cursor: pointer; white-space: nowrap; }
-.sbtn--ghost { left: 12.18rem; width: 2.57rem; background: transparent; color: #e2e8e6; font-size: calc(.3 * var(--t)); }
+.sbtn--ghost { right: 4.45rem; left: auto; width: auto; min-width: 2.57rem; background: #2a2f2e; box-shadow: inset 0 0 0 1px rgba(220, 230, 226, .26);
+  color: #e2e8e6; font-size: calc(.3 * var(--t)); }
 .sbtn--ghost .icon { width: .3rem; height: .3rem; padding: .03rem; border-radius: .05rem; background: #e2e8e6; color: #2a2f2e; }
-.sbtn--primary { left: 15.12rem; width: 4.08rem; background: transparent; color: #062a20; font-size: calc(.38 * var(--t)); font-weight: 700; letter-spacing: .04em; }
-.sbtn__mark { width: .44rem; height: .38rem; }
-/* 结算返回按钮：用图标而不是提取出来的黑字形贴图，黑底薄荷箭头（与官方观感一致） */
-.settle__back .sbtn__mark { display: grid; place-items: center; background: #0d1110; border-radius: .06rem; color: var(--mint-400); }
-.settle__back .sbtn__mark svg, .settle__back .sbtn__mark .icon { width: .3rem; height: .3rem; transform: scaleX(-1); }
-.sbtn--primary .icon { width: .34rem; height: .34rem; }
+.sbtn--primary { right: 0; left: auto; width: auto; min-width: 4.08rem; color: #062a20; font-size: calc(.38 * var(--t)); font-weight: 700; letter-spacing: .04em;
+  background: linear-gradient(90deg, #48e8ba, #2fd2a4); clip-path: polygon(.12rem 0, 100% 0, 100% 100%, 0 100%, 0 .12rem);
+  filter: drop-shadow(0 .04rem .14rem rgba(40, 220, 175, .24)); }
+.sbtn__mark { width: .3rem; height: .3rem; flex: none; }
+/* 结算返回按钮：薄荷底 + 深色图标（与 selena 0.4.1 的扁平按钮一致，不再贴提取出来的黑字形图） */
+.settle__back .sbtn__mark { transform: scaleX(-1); }
+.sbtn--primary .icon { width: .36rem; height: .36rem; }
 .sbtn:hover, .sbtn:focus-visible { filter: brightness(1.14); outline: none; }
 .sbtn:focus-visible { box-shadow: inset 0 0 0 3px #fff; }
 .steam__outcome, .steam__rounds, .steam__when, .sbtn { animation: steam-bar 420ms var(--ease-out) 520ms both; }

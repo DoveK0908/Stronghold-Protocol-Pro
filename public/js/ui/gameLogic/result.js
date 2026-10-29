@@ -2,6 +2,25 @@
 
 import { int, isObj, sortedPlayers } from './shared.js';
 import { t } from '../../../../shared/i18n.js';
+import { diyRecordFor } from './diy.js';
+
+/** The damage row's operator, never another seat's DIY pick or this browser's current preset. */
+export function damageOperatorRecord(op, lineup, data) {
+  const chess = data?.chess || {};
+  const slot = chess[op?.defId];
+  const charId = op?.charId || op?.picture?.charId;
+  if (charId) {
+    const body = Object.values(chess).find((c) => c?.charId === charId && !c.isDiy) || data?.backups?.units?.[charId];
+    if (body) return { ...body, isGolden: !!slot?.isGolden };
+  }
+  // Old records lost charId; their own final lineup still retains the pick for this slot (including its elite form).
+  if (slot?.isDiy) {
+    const unit = (lineup || []).find((u) => u?.diy && (u.id === op.defId || chess[u.id]?.baseId === (slot.baseId || slot.chessId)));
+    const body = unit && diyRecordFor(slot, unit.diy, data);
+    if (body) return body;
+  }
+  return slot || Object.values(chess).find((c) => c?.charId === op?.defId) || null;
+}
 
 
 // ---- result -----------------------------------------------------------------------------------------------------------
@@ -27,6 +46,7 @@ export function normalizeResult(res, pub) {
       seat: int(p.seat, int(pp.seat, 0)),
       name: p.name || pp.name || t('博士'),
       isBot: !!(p.isBot ?? pp.isBot),
+      card: isObj(p.card) ? p.card : isObj(pp.card) ? pp.card : null,
       ...(Number.isInteger(p.aiTakeoverRound ?? pp.aiTakeoverRound) ? { aiTakeoverRound: p.aiTakeoverRound ?? pp.aiTakeoverRound } : {}),
       alive,
       lp: teamLp != null ? (alive === false ? 0 : Math.max(0, teamLp)) : ownLp,

@@ -171,6 +171,44 @@ async function setup(o = {}) {
 
 const live = (handles, key) => handles.filter((h) => h.key === key && h.alive);
 
+test('Silverash reserve slash replays on the recipient, before their own skill cover, without changing identity', async () => {
+  const { w, index, spawned, handles, view, frame } = await setup();
+  for (const key of ['svash2_skill_02_start_01', 'svash2_skill_02_range_01']) index.prefabs[key] = { file: `${key}.json` };
+  const recipient = view(42, 'char_100_foo', 8, { skill: 0, v: { dir: 'UP', flags: SKILL } });
+  frame();
+  const before = structuredClone(recipient.info);
+  const count = spawned.length;
+  assert.equal(w.simFx('aoe', 8, 10, { id: 42, skill: 'svash2', r: 2 }), true);
+  assert.deepEqual(spawned.slice(count), ['svash2_skill_02_start_01', 'svash2_skill_02_range_01']);
+  assert.deepEqual(recipient.info, before);
+  assert.equal(handles.at(-1).opts.loop, false);
+  assert.equal(w.skills.units.get(42).skillId, 'skchr_foo_1');
+  // Missing official assets cannot let this operator's unrelated active skill swallow the event.
+  delete index.prefabs.svash2_skill_02_start_01;
+  delete index.prefabs.svash2_skill_02_range_01;
+  assert.equal(w.simFx('aoe', 8, 10, { id: 42, skill: 'svash2' }), false);
+  assert.equal(w.simFx('aoe', 8, 10, { id: 999, skill: 'svash2' }), false);
+});
+
+test('Silverash own S2 start is not replayed twice and official-off keeps fallback', async () => {
+  const { w, index, spawned, view, frame } = await setup();
+  const u = view(1, 'char_100_foo', 5);
+  frame();
+  const U = w.skills.units.get(1);
+  U.skillId = 'skchr_svash2_2';
+  U.startFrame = w.skills.frame;
+  U.drawsStart = true;
+  index.prefabs.svash2_skill_02_start_01 = {};
+  index.prefabs.svash2_skill_02_range_01 = {};
+  const count = spawned.length;
+  assert.equal(w.simFx('aoe', u.x, u.y, { id: 1, skill: 'svash2' }), true);
+  assert.equal(spawned.length, count);
+  const off = await setup({ active: false });
+  off.view(1, 'char_100_foo', 5); off.frame();
+  assert.equal(off.w.simFx('aoe', 5, 10, { id: 1, skill: 'svash2' }), false);
+  assert.deepEqual(off.spawned, []);
+});
+
 describe('skill events', () => {
   test('on: start and range play, the loop starts (held); off: the loops stop, end plays; the official layer shows it', async () => {
     const { w, spawned, handles, view, frame } = await setup();

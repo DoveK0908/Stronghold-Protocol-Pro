@@ -38,6 +38,7 @@
 
 import { buildUniteWave } from './waves.js';
 import { layerGainRoom } from '../../shared/constants.js';
+import { sanitizeEnemyCarry } from '../sim/enemyCarry.js';
 
 /**
  * @param {import('./Match.js').Match} m
@@ -77,7 +78,9 @@ export function planUnite(m, results) {
         ? { coins: Math.trunc(card.coin), ownerPlayerId: ps.playerId } : null;
       const extra = !bountyId && l.mods ? Math.trunc(Number(l.mods.bountyCoins) || 0) : 0;
       if (!bounty && extra > 0) bounty = { coins: extra, ownerPlayerId: ps.playerId };
-      leaked.push({ enemyKey: l.enemyKey, mods: l.mods ? { ...l.mods } : null, lpr: l.lpr ?? 1, sourcePlayerId: ps.playerId, tag: l.tag ?? null, bounty });
+      const stateCarry = m.experimental?.stateCarry === true ? sanitizeEnemyCarry(l.stateCarry) : null;
+      leaked.push({ enemyKey: l.enemyKey, mods: l.mods ? { ...l.mods } : null, lpr: l.lpr ?? 1, sourcePlayerId: ps.playerId, tag: l.tag ?? null, bounty,
+        ...(stateCarry ? { stateCarry } : {}) });
     }
   }
   const plan = { helpers, leakers, leaked, notReentered };
@@ -137,7 +140,11 @@ export function planUniteRelay(m, plan, result, fieldSpawns = null) {
     const coins = card && card.payout !== 'perfect' && card.enemyKey === l.enemyKey ? Math.trunc(Number(card.coin) || 0)
       : !bountyId ? Math.trunc(Number(mods?.bountyCoins) || 0) : 0;
     const bounty = source?.bounty || (coins > 0 ? { coins, ownerPlayerId: l.sourcePlayerId } : null);
-    leaked.push({ ...l, mods: mods ? { ...mods } : null, bounty, sourcePlayerId: l.sourcePlayerId });
+    const entry = { ...l, mods: mods ? { ...mods } : null, bounty, sourcePlayerId: l.sourcePlayerId };
+    const stateCarry = m.experimental?.stateCarry === true ? sanitizeEnemyCarry(unspawned ? source?.stateCarry : l.stateCarry) : null;
+    if (stateCarry) entry.stateCarry = stateCarry;
+    else delete entry.stateCarry;
+    leaked.push(entry);
   };
   for (const pp of Object.values(result.perPlayer || {})) for (const l of pp?.leaked || []) add(l);
   for (const l of result.unspawned || []) add(l, true);
@@ -210,7 +217,13 @@ export function uniteBattleOpts(m, plan, timeLimit) {
       // a summon: its SP only ("召唤物仅修改技力"); one off the field at the end enters fresh [ASSUMED]
       if (summonUids.has(u.uid)) { if (u.alive) carry.set(u.uid, { sp }); continue; }
       // knocked out at the end of its own combat: 强制退场 right after the deployment (see header)
-      if (!u.alive) { carry.set(u.uid, { down: true }); continue; }
+      if (!u.alive) {
+        const remaining = u.redeployRemaining;
+        carry.set(u.uid, { down: true,
+          ...(m.experimental?.stateCarry === true && Number.isFinite(remaining) && remaining >= 0
+            ? { redeployRemaining: remaining } : {}) });
+        continue;
+      }
       // HP ratio and SP only: a skill still running at the end is not carried (unitsEnd `skillActive` stays unused —
       // community report #34, GitHub #82)
       carry.set(u.uid, { hpPct: Number.isFinite(u.hpPct) ? Math.max(0, Math.min(1, u.hpPct)) : 1, sp });

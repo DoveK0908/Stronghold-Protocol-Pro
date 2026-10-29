@@ -7,7 +7,14 @@
 // the player state).
 
 import { tileKey, boardOrder, freeSlot } from '../board.js';
-import { TEMP_SIZE } from './common.js';
+import { HAND_SIZE, TEMP_SIZE } from './common.js';
+
+/** Original bench first, then expanded slots; each row keeps its right→left fill order. */
+function freeHandSlot(hand) {
+  for (let i = Math.min(hand.length, HAND_SIZE) - 1; i >= 0; i--) if (hand[i] == null) return i;
+  for (let i = hand.length - 1; i >= HAND_SIZE; i--) if (hand[i] == null) return i;
+  return -1;
+}
 
 export class PlayerPieces {
   newPiece(kind, id, extra = {}) {
@@ -69,7 +76,8 @@ export class PlayerPieces {
   }
 
   /**
-   * Put a piece into the hand (right→left) or, when `allowTemp`, the expandable temp queue (due at the deadline of the first prep
+   * Put a piece into the hand (original slots before expanded slots, right→left within each row) or, when `allowTemp`,
+   * the expandable temp queue (due at the deadline of the first prep
    * in which the player can act on it, _tempDueNow). Returns 'hand' | 'temp' | null. A piece put into temp while a hand
    * slot is free (`toTemp`) moves into the hand at the next recompute (_fillHandFromTemp).
    */
@@ -79,7 +87,7 @@ export class PlayerPieces {
         this.hand[preferIdx] = piece;
         return 'hand';
       }
-      const i = freeSlot(this.hand);
+      const i = freeHandSlot(this.hand);
       if (i >= 0) { this.hand[i] = piece; return 'hand'; }
       if (!allowTemp) return null;
     }
@@ -98,7 +106,7 @@ export class PlayerPieces {
   /**
    * PRTS help's hand-area rule: free regular slots automatically receive overflow.
    * Refill order [ASSUMED]: visible slots right-to-left, followed by the hidden queue in arrival order;
-   * each piece takes the hand's next free slot right-to-left. Recompute runs this after sales, deployments,
+   * each piece fills the original bench before the expanded slots, right-to-left within each row. Recompute runs this after sales, deployments,
    * merges, item use and summon removal. Moving into the hand clears the piece's temp deadline;
    * moving within the visible window keeps it. Returns the number moved into the regular hand.
    * @returns {number}
@@ -110,7 +118,7 @@ export class PlayerPieces {
     for (const j of indices) {
       const p = this.temp[j];
       if (!p) continue;
-      const i = freeSlot(this.hand);
+      const i = freeHandSlot(this.hand);
       if (i < 0) break;
       this._detach({ piece: p, area: 'temp', idx: j });
       this.hand[i] = p;

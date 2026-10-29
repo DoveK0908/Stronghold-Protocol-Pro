@@ -20,6 +20,7 @@ import { html, Button, Icon, MicroLabel, DifficultyTag } from '../ui/components.
 import { useGameData, Img, UnitThumb, BandIcon, PlayerAvatar, BondGlyph, LpTower, Sprite } from '../ui/gameComponents.js';
 import { normalizeResult, fmtNum, diyRecordFor, cardStandIn, standInForText } from '../ui/gameLogic.js';
 import { data } from '../data.js';
+import { damageOperatorRecord } from '../ui/gameLogic/result.js';
 import { damageNumber, damageRate } from '../ui/damageFigures.js';
 import { appearanceRecord } from '../ui/skinAssets.js';
 import { enemyIconUrl, titleIconUrl, uiUrl } from '../ui/assetUrls.js';
@@ -30,21 +31,6 @@ import { TestMark } from '../ui/testConsole.js';
 import { t, tParts, N_ } from '../../../shared/i18n.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
-
-// 项目 4 (2026-10-16): the damage ledger's rows carry the operator's *charId* (`char_290_vigna`), not a chess id
-// (`chess_char_290_vigna_a`), so `gd.chess(id)` misses them and the row fell back to the raw id with a 「?」 thumb.
-// Resolve the char's chess record once — any tier variant answers for the name and the avatar.
-let chessByChar = null;
-const chessRecordOf = (gd, defId) => {
-  if (!defId) return null;
-  const hit = gd?.chess?.(defId);
-  if (hit) return hit;
-  if (!chessByChar) {
-    chessByChar = new Map();
-    for (const c of Object.values(data.get('chess') || {})) if (c?.charId && !chessByChar.has(c.charId)) chessByChar.set(c.charId, c);
-  }
-  return chessByChar.get(defId) || null;
-};
 
 // The first seven present are shown (+ remaining LP = a 4×2 grid); the title (评语) stats come first.
 // `gold` is the funds a player SPENT (server/match/player/economy.js spend(); the 挥金如土 title stat).
@@ -93,7 +79,7 @@ function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null })
   const bonds = resultBonds(p.bonds, (id) => gd.bond(id));
   return html`<article class=${cx('rcard', p.playerId === myId && 'is-self', p.alive === false && 'is-dead')}>
     <header class="rcard__head">
-      <${PlayerAvatar} player=${p} self=${p.playerId === myId} />
+      <${PlayerAvatar} player=${p} self=${p.playerId === myId} snapshot=${true} />
       <div class="rcard__who">
         <b class="rcard__name">${p.name}${p.isBot ? html`<span class="rcard__ai">AI</span>` : null}${p.playerId === myId ? html`<span class="rcard__you">${t('你')}</span>` : null}</b>
         ${Number.isInteger(p.aiTakeoverRound) ? html`<small>${t('第 {round} 回合接替 AI；含此前席位数据，不计入个人统计或奖励。', { round: p.aiTakeoverRound })}</small>` : null}
@@ -127,9 +113,9 @@ function PlayerCard({ p, myId, titles, best, solo = false, skinOwnerId = null })
  * server/match/damageBoard.js 的 bossRounds(): 最终攻势与隐秘核心各自留存一份)。每场打过的关一个块、每个座位一组、
  * 每个干员一行 —— 只列真出过手（伤害或治疗 > 0）的干员，与伤害榜口径一致。
  * 客户端权威的对局（SP_COMBAT=client）服务端拿不到干员数据 (`owners: []`) ⇒ 这里自然什么都不画。
- * @param {{ ledger: any, gd: any, names: Map<string, string> }} props
+ * @param {{ ledger: any, gd: any, names: Map<string, string>, players: any[] }} props
  */
-function BossDamageLedger({ ledger, gd, names }) {
+function BossDamageLedger({ ledger, gd, names, players }) {
   const blocks = [['boss', t('最终攻势')], ['hidden', t('隐秘核心')]]
     .map(([key, label]) => ({ key, label, scope: ledger?.[key] }))
     .filter((b) => b.scope && Array.isArray(b.scope.owners) && b.scope.owners.length);
@@ -150,7 +136,8 @@ function BossDamageLedger({ ledger, gd, names }) {
           ${rows.length ? rows.map((op) => {
       // 自选 (DIY) rows carry the slot's chess id, whose record is the slot's stand-in: resolve the operator actually
       // fielded by its charId first (the row's own charId from damageBoard, else the picture body).
-      const chess = chessRecordOf(gd, op.charId || op.picture?.charId) || chessRecordOf(gd, op.defId);
+      const chess = damageOperatorRecord(op, players.find((p) => p.playerId === o.playerId)?.lineup,
+        { chess: data.get('chess'), backups: gd.backups });
       const dps = damageRate(op.damage, seconds);
       return html`<div key=${op.key} class="result__bossop">
               ${op.defId || op.charId ? html`<${UnitThumb} kind="chess" id=${op.charId || op.picture?.charId || op.defId} rec=${chess} size="sm" />` : null}
@@ -163,6 +150,29 @@ function BossDamageLedger({ ledger, gd, names }) {
         </div>
       </div>`;
   })}
+    </div>`)}
+  </section>`;
+}
+
+// Keep the server's rank / seat order and tied ranks; never infer completion from damage or the match outcome.
+export function BossQuotaLedger({ rounds }) {
+  const blocks = (Array.isArray(rounds) ? rounds : []).filter(b => b && (b.kind === 'boss' || b.kind === 'hidden')
+    && Array.isArray(b.players) && b.players.length);
+  if (!blocks.length) return null;
+  return html`<section class="result__boss result__quota" data-testid="result-boss-quota">
+    <h2 class="brief-h"><span>${t('防治倒转区')}</span><${MicroLabel}>BOSS QUOTA</${MicroLabel}></h2>
+    <p class="t-lo">${t('仅记录配额完成时间与排名，不影响胜负和奖励；时间为游戏秒数，两轮独立排名，同时完成并列。')}</p>
+    ${blocks.map(b => html`<div key=${`${b.kind}-${b.round}`} class="result__bossround" data-quota-kind=${b.kind}>
+      <table class="result__quota-table">
+        <caption>${t('第 {round} 回合 · {1}', { round: b.round, 1: b.kind === 'hidden' ? t('隐秘核心') : t('最终攻势') })}
+          <span class="t-lo"> · ${t('每人配额 {quota}', { quota: damageNumber(b.quota) })}</span></caption>
+        <thead><tr><th scope="col">${t('排名')}</th><th scope="col">${t('博士')}</th><th scope="col">${t('配额完成时间（游戏秒）')}</th></tr></thead>
+        <tbody>${b.players.map(p => html`<tr key=${p.playerId} data-player-id=${p.playerId}>
+          <td class="num">${Number.isInteger(p.rank) && p.rank > 0 ? p.rank : '—'}</td>
+          <td>${p.name || t('队友')}</td>
+          <td class="num">${Number.isFinite(p.time) && p.time >= 0 ? t('{seconds} 秒', { seconds: p.time.toFixed(2) }) : t('未完成')}</td>
+        </tr>`)}</tbody>
+      </table>
     </div>`)}
   </section>`;
 }
@@ -228,7 +238,8 @@ export function ResultView({ res, pub = null, myId = null, backLabel, onBack, qu
         <h2 class="brief-h"><span>${t('同盟成员')}</span><${MicroLabel}>ALLIANCE REPORT</${MicroLabel}></h2>
         ${r.players.length ? r.players.map((p) => html`<${PlayerCard} key=${p.playerId} p=${p} skinOwnerId=${pub ? p.playerId : null} myId=${myId} titles=${titles} best=${best} solo=${r.players.length < 2} />`)
           : html`<p class="t-dim">${t('暂无结算数据')}</p>`}
-        <${BossDamageLedger} ledger=${res?.bossDamage} gd=${gd} names=${new Map(r.players.map((p) => [p.playerId, p.name]))} />
+        <${BossQuotaLedger} rounds=${res?.bossQuota} />
+        <${BossDamageLedger} ledger=${res?.bossDamage} gd=${gd} players=${r.players} names=${new Map(r.players.map((p) => [p.playerId, p.name]))} />
       </section>
       ${slot ? html`<div class="ui-slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>` : null}
     </main>

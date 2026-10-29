@@ -1454,6 +1454,19 @@ export function createBattleRunner(deps) {
     },
     /** Re-show the current battle (the game screen remounted). */
     reshow() { if (cur) show(cur); },
+    /** Adopt an authoritative absolute speed without losing elapsed time, pause origin or catch-up debt. */
+    retuneSpeed(speed) {
+      if (!Number.isFinite(speed) || speed <= 0) return;
+      const t = clock();
+      let changed = false;
+      for (const e of new Set([...entries.values(), ...pending.values()])) {
+        if (e.done || !(e.speed > 0) || e.speed === speed) continue;
+        if (e.t0 != null) e.t0 = t - ((t - e.t0) * e.speed) / speed;
+        e.speed = speed;
+        changed = true;
+      }
+      if (changed) publishState();
+    },
     /** Test / debug hooks. */
     _entries: entries,
     _frame: frame,

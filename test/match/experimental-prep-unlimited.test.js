@@ -1,5 +1,5 @@
-// 无限休整期 (玩法#04, experimental.prepUnlimited): a co-op prep has no countdown and combat starts only once every
-// living player is ready. Ordinary rooms keep the timed prep (asserted here too, so the option cannot leak).
+// 无限休整期 counts down normally but waits at zero until every living player is ready.
+// Ordinary rooms retain forced timeout readiness; single-human defaults are unchanged.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeMatch } from './harness.js';
@@ -12,10 +12,14 @@ for (const humans of [2, 3]) {
     const h = makeMatch({ humans, experimental: untimed(), seed: 91, fake: true }).start();
     const m = h.m; t.after(() => m.dispose());
     h.runToPhase('PREP', 1);
-    assert.equal(m.deadline, 0, 'no published deadline');
-    assert.equal(m.publicView().deadline, 0, 'and the client sees none');
-    // the clock would long have run out
-    h.flushAll(); h.flushAll(); h.flushAll();
+    const deadline = m.deadline;
+    assert.equal(deadline - m.sched.now(), m.gd.prepTime(1) * 1000);
+    assert.equal(m.publicView().deadline, deadline, 'the client sees the normal countdown');
+    h.sched.advance(deadline - h.sched.now() + 60_000);
+    assert.equal(m.deadline, deadline, 'expired countdown remains at zero on the HUD');
+    assert.ok(m.alivePlayers().every(ps => !ps.ready), 'expiry must not force readiness');
+    m.prepDeadline(); // explicit expiry paths must not bypass the option either
+    h.flushAll();
     assert.equal(m.phase, 'PREP');
     assert.equal(m.round, 1);
     // every player but the last one ready: still waiting
@@ -36,6 +40,49 @@ test('a room without the option still times its prep', t => {
   h.runToPhase('PREP', 1);
   assert.ok(m.deadline > 0, 'the official countdown is there');
   assert.equal(m.deadline - m.sched.now(), m.gd.prepTime(1) * 1000, 'the round prepTime');
+});
+
+for (const mode of ['solo', 'coop']) {
+  for (const unlimited of [false, true]) {
+    test(`${mode} single human: countdown changes only with the option enabled=${unlimited}`, t => {
+      const h = makeMatch({ mode, humans: 1, experimental: unlimited ? untimed() : timed(), fake: true }).start();
+      const m = h.m; t.after(() => m.dispose());
+      h.toPrep(1); // single-human briefing/draft deliberately have no timeout
+      if (unlimited && m.gd.prepTime(1) > 0) {
+        assert.equal(m.deadline - m.sched.now(), m.gd.prepTime(1) * 1000);
+        h.sched.advance(m.deadline - m.sched.now() + 60_000);
+      } else assert.equal(m.deadline, 0, 'solo data has no prep duration; do not invent one');
+      assert.equal(m.phase, 'PREP');
+      assert.equal(m.alivePlayers()[0].ready, false);
+      assert.equal(m.alivePlayers()[0].setReady(true).ok, true);
+      h.flushAll();
+      assert.notEqual(m.phase, 'PREP');
+    });
+  }
+}
+
+test('unlimited expiry cannot auto-pick, dispose overflow or force Ready', t => {
+  const h = makeMatch({ humans: 2, experimental: untimed(), fake: true }).start();
+  const m = h.m; t.after(() => m.dispose());
+  h.runToPhase('PREP', 1);
+  m.autoPickPersonalChoice = () => assert.fail('expiry auto-picked a choice');
+  for (const ps of m.alivePlayers()) {
+    ps.resolveTemp = () => assert.fail('expiry disposed overflow');
+    ps.setReady = () => assert.fail('expiry forced Ready');
+  }
+  h.sched.advance(m.deadline - m.sched.now() + 60_000);
+  assert.equal(m.phase, 'PREP');
+  assert.ok(m.alivePlayers().every(ps => !ps.ready));
+});
+
+test('ordinary multiplayer expiry still forces Ready and ends preparation', t => {
+  const h = makeMatch({ humans: 2, experimental: timed(), fake: true }).start();
+  const m = h.m; t.after(() => m.dispose());
+  h.runToPhase('PREP', 1);
+  const deadline = m.deadline;
+  h.sched.advance(deadline - m.sched.now());
+  h.flushAll();
+  assert.notEqual(m.phase, 'PREP');
 });
 
 test('the option is opt-in on the wire: it only rides when true, and the key/equality see it', async () => {

@@ -26,7 +26,7 @@ import { audio } from '../audio.js';
 import { sentText } from '../ui/lang.js';
 import { reducedMotion } from '../ui/device.js';
 import { TrophyBadge } from '../ui/trophies.js';
-import { NameCardLayer } from '../ui/namecards.js';
+import { NameCardLayer, DEFAULT_NAMECARD } from '../ui/namecards.js';
 import { useMyCard } from '../ui/playerCard.js';
 import { appearanceRecord } from '../ui/skinAssets.js';
 import { recordId, selfRowOf, loadStats, isModdedRecord, recordsOfSeason } from '../ui/stats.js';
@@ -68,12 +68,6 @@ function SettleTitle({ as: Tag = 'h1', class: cls, children }) {
     return () => ro.disconnect();
   }, [children]);
   return html`<${Tag} ref=${ref} class=${cx('settle__title', cls)}><span>${children}</span></${Tag}>`;
-}
-
-/** Official settle sprites (research 07-assets.json); CSS is used only for an absent/failed image. */
-export function SettleButtonArt({ ghost = false }) {
-  return html`<${Sprite} k=${ghost ? 'settle/btn_bg_02' : 'settle/btn_next_bg'} class="settle__btnbg"
-    fallback=${html`<span aria-hidden="true" class=${cx('settle__btnbg', ghost ? 'settle__btnbg--ghost' : 'settle__btnbg--primary')}></span>`} />`;
 }
 
 // ---- the level settlement ---------------------------------------------------------------------------------------------
@@ -476,8 +470,7 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext, version = null
         <${PlayerAvatar} player=${self} self=${true} class="splate__ava" />
         ${card?.bg ? html`<${NameCardLayer} card=${card.bg} />` : null}
         <div class="splate__info">
-          <b class="splate__name"><${Sprite} k=${plateArt(self, true)} class="splate__namebg" /><span>${self.name}</span></b>
-          <span class="splate__rank" title=${t('累计奖杯')}><${TrophyBadge} count=${prog.trophies} /><small><${Icon} name="crown" />${prog.trophies}</small></span>
+          <b class="splate__name" title=${t('累计奖杯')}><${Sprite} k=${plateArt(self, true)} class="splate__namebg" /><${TrophyBadge} count=${prog.trophies} class="tbadge--inline" /><span>${self.name}</span></b>
           <span class="splate__gain"><small><${Icon} name="crown" />${t('获得奖杯')}</small><b class="num">${self.trophies}</b></span>
         </div>
       </div>
@@ -486,11 +479,10 @@ function SelfPage({ r, res, raw, self, gd, prog, content, onNext, version = null
         <div class="sops__row sops__row--2">${slots.slice(5).map((u, i) => html`<${OpCard} key=${i} u=${u} gd=${gd} ownerId=${self.playerId} i=${i + 5} />`)}</div>
       </div>
       <${BondBar} bonds=${self.bonds} gd=${gd} />
-      <div class="settle__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
+      <div class="settle__barbg" aria-hidden="true"></div>
       ${Array.isArray(milestones) && milestones.length ? html`<${LevelStrip} prog=${prog} milestones=${milestones} />` : null}
       <button type="button" ref=${nextRef} class="settle__next" onClick=${next}>
-        <${SettleButtonArt} />
-        <${Sprite} k="settle/next_icon" class="settle__nexticon" fallback=${html`<span class="settle__nexticon"><${Icon} name="chevronRight" /></span>`} /><span class="settle__nextlabel">${t('下一步')}</span>
+        <span class="settle__nexticon"><${Icon} name="chevronRight" /></span><span class="settle__nextlabel">${t('下一步')}</span>
       </button>
     </div>
   </section>`;
@@ -523,6 +515,22 @@ function useSeatCard(playerId, self) {
   return self ? mine : seat && typeof seat === 'object' ? seat : null;
 }
 
+/**
+ * What a team card's picture area draws — the 立绘 of the player's 名片干员, the way the room's seat card draws it
+ * (维护者 2026-10-28); the lineup's ace only when that player has no 名片 (an AI teammate, or a client that sent none).
+ * The 名片 itself (the plate below) is decided in TeamCard: an AI wears the default one.
+ * @param {{ card?: any, aceChess?: any, aceSkin?: string|null }} props
+ * @returns {{ chess: any, skin: string|null, look: string }}
+ */
+export function teamCardArt({ card = null, aceChess = null, aceSkin = null } = {}) {
+  const charId = typeof card?.charId === 'string' && card.charId ? card.charId : '';
+  // '' 精二 / 'e1' 精一 — the 立绘 kind ui/seatArt.js lookUrl draws for the same 名片
+  const look = typeof card?.look === 'string' ? card.look : '';
+  return charId
+    ? { chess: { charId }, skin: look || null, look }
+    : { chess: aceChess || null, skin: aceSkin ?? null, look: '' };
+}
+
 function TeamCard({ p, i, gd, self, victory, raw }) {
   const ace = aceOf(p.lineup);
   const v = ace ? unitView(ace, gd) : null;
@@ -530,18 +538,20 @@ function TeamCard({ p, i, gd, self, victory, raw }) {
   const cleared = rowCleared(raw, p, victory);
   const band = p.bandId ? gd.band(p.bandId) : null;
   const card = useSeatCard(p.playerId, self);
+  const art = teamCardArt({ card, aceChess: v?.rec, aceSkin: ace?.skin });
+  const glyph = html`<span class="tcard__glyph">${[...(p.name || '?')][0]}</span>`;
   return html`<article class=${cx('tcard', self && 'is-self', p.alive === false && 'is-dead', p.left && 'is-left', cleared ? 'is-clear' : 'is-fail')} style=${`--i:${i}`}>
     <header class="tcard__head" aria-hidden="true"><i class="tcard__pin"></i><span class="tcard__code"><i></i><i></i><i></i>STRONGHOLD PROTOCOL</span><span class="tcard__seat num">${pad2(p.seat + 1)}</span></header>
     <div class="tcard__art">
-      <${OperatorImage} m=${gd.m} chess=${v?.rec} ownerId=${p.playerId} skin=${ace?.skin} portrait avatarFallback portraitClass="tcard__img is-portrait" avatarClass="tcard__img is-avatar" fallback=${html`<span class="tcard__glyph">${[...(p.name || '?')][0]}</span>`} />
+      <${OperatorImage} m=${gd.m} chess=${art.chess} ownerId=${p.playerId} skin=${art.skin} look=${art.look} illust portrait avatarFallback illustClass="tcard__img is-illust" portraitClass="tcard__img is-portrait" avatarClass="tcard__img is-avatar" fallback=${glyph} />
       ${p.left ? html`<span class="tcard__cut">${t('连接中断')}</span>` : null}
       ${title ? html`<div class="tcard__title" title=${title.text}>
         <${Img} src=${title.icon} class="tcard__ticon" fallback=${html`<${Icon} name="crown" class="tcard__ticon" />`} /><b>${title.name}</b></div>` : null}
       <div class="tcard__rounds"><span>${t('通过回合')}</span><b class="num">${p.roundsPassed}</b></div>
     </div>
-    <div class=${cx('tcard__plate', !p.isBot && card?.bg && 'has-nc')}>
+    <div class=${cx('tcard__plate', (p.isBot || !!card?.bg) && 'has-nc')}>
       <${Sprite} k=${plateArt(p, self)} class="tcard__platebg" />
-      ${p.isBot ? null : html`<${NameCardLayer} card=${card?.bg} />`}
+      <${NameCardLayer} card=${p.isBot ? DEFAULT_NAMECARD : card?.bg} />
       <${PlayerAvatar} player=${p} self=${self} class="tcard__ava" />
       <span class="tcard__who">
         <b class="tcard__name">${p.isBot ? null : html`<${TrophyBadge} count=${Number.isSafeInteger(card?.trophies) ? card.trophies : null} class="tbadge--inline" />`}<span>${p.name}</span>${p.isBot ? html`<span class="tcard__ai">AI</span>` : null}</b>
@@ -573,7 +583,7 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
         ${r.players.length ? r.players.map((p, i) => html`<${TeamCard} key=${p.playerId} p=${p} i=${i} gd=${gd} self=${p.playerId === myId} victory=${r.victory} raw=${rawOf(p.playerId)} />`)
           : html`<p class="steam__none">${t('暂无结算数据')}</p>`}
       </div>
-      <div class="settle__barbg steam__barbg" aria-hidden="true"><${Sprite} k="settle/bottom_bg" /></div>
+      <div class="settle__barbg steam__barbg" aria-hidden="true"></div>
       <div class="steam__outcome">
         <span class="steam__tags"><${ModePill} r=${r} /><${UnofficialMark} room=${content ? { content } : null} /><${VersionTag} version=${version} /><${SettleTestMark} res=${res} /></span>
         <${SettleTitle} as="b" class="steam__title">${r.victory ? t('模拟完成') : t('模拟中断')}</${SettleTitle}>
@@ -584,9 +594,8 @@ function TeamPage({ r, res, gd, myId, at: when, content, backLabel, onBack, onDe
         <span class="steam__row"><${Sprite} k="settle/date_time_bg" class="steam__rowbg" /><${Sprite} k="settle/date_icon" class="steam__ico" />${fmtDate(when)}</span>
       </div>
       <button type="button" class="sbtn sbtn--ghost steam__detail" onClick=${onDetail}>
-        <${SettleButtonArt} ghost=${true} /><${Icon} name="chart" /><span>${t('数据详情')}</span></button>
+        <${Icon} name="chart" /><span>${t('数据详情')}</span></button>
       <button type="button" ref=${backRef} class="sbtn sbtn--primary settle__back" onClick=${onBack}>
-        <${SettleButtonArt} />
         <${Icon} name="exit" class="sbtn__mark" /><span>${backLabel}</span></button>
       <div class="ui-slot steam__slot" data-ui-slot="result.tab" aria-label=${t('界面插件')} dangerouslySetInnerHTML=${{ __html: '' }}></div>
     </div>

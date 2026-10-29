@@ -75,6 +75,25 @@ export function chessPortraitUrl(m, chess, { skin = null } = {}) {
   return (chess?.isGolden ? str(byChar.portraitE2) : null) || str(byChar.portrait);
 }
 
+/**
+ * Illustration (立绘) of a chess record: the picture a room seat card draws behind its operator (room.css
+ * .rseat__art) — the painted elite-2 art, or `illustE1` (the transparent 精一 full body) when `look` is 'e1'.
+ * The settlement's 同盟 card uses it so it shows the same art as the 准备界面 for the same 名片干员.
+ * @param {any} m manifest
+ * @param {any} chess chess record
+ * @param {{ skin?: string|null, look?: string }} [opts]
+ */
+export function chessIllustUrl(m, chess, { skin = null, look = '' } = {}) {
+  const picture = skinPicture(m, chess, skin, 'illust');
+  if (picture) return picture;
+  const chars = obj(obj(m)?.chars);
+  const id = str(chess?.charId) || str(chess?.assets?.illust) || str(chess?.assets?.portrait)?.replace(/_[12]$/, '');
+  const entry = id && chars ? chars[id] : null;
+  if (!entry) return null;
+  if (look === 'e1') return str(entry.illustE1) || str(entry.illust);
+  return str(entry.illustE2) || str(entry.illust);
+}
+
 /** Skill icon of a chess record (manifest `skills[iconId]`, else the empty skill sprite). */
 export function skillIconUrl(m, chess) {
   const skills = obj(obj(m)?.skills);

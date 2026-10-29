@@ -53,6 +53,8 @@ export class MatchLocalReplica {
    * already ran it (it re-shows its own end).
    */
   _localOk(ps, f) {
+    // Stream quota fights: a display replica cannot infer other fields' per-player usage from HP alone.
+    if (this.experimental.bossQuota && POOL_KINDS.has(f?.kind)) return false;
     return !!(this.localReplica && !this.clientCombat && f && f.remote
       && (LOCAL_KINDS.has(f.kind) || (POOL_KINDS.has(f.kind) && typeof this.runner?.extFor === 'function'))
       && ps && !ps.isBot && !ps.left && !ps.spectator && ps.connected && ps.localSim === true

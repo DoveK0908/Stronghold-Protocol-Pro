@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { equippedLineup } from '../../public/dev/settle-fixture.js';
+import { eliteCard } from '../../shared/eliteAi.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 globalThis.fetch = async (url) => {
@@ -154,15 +155,14 @@ test('#745: translated titles fit both dimensions without enlarging a short titl
   assert.equal(S.titleScale(280, 90, 0, 0), 1, 'an empty label never produces Infinity');
 });
 
-test('#745: official buttons supply decoration only through the missing/failed Sprite fallback', () => {
-  for (const ghost of [false, true]) {
-    const v = S.SettleButtonArt({ ghost });
-    assert.equal(v.type.name, 'Sprite');
-    assert.equal(v.props.k, ghost ? 'settle/btn_bg_02' : 'settle/btn_next_bg');
-    assert.equal(v.props.fallback.type, 'span');
-    assert.equal(v.props.fallback.props.class, `settle__btnbg settle__btnbg--${ghost ? 'ghost' : 'primary'}`);
-    assert.equal(v.props.children, undefined, 'the decoration is not an always-visible sibling');
-  }
+test('#745: the buttons are flat faces drawn by CSS, not the stretched extracted sprites', () => {
+  const js = readFileSync(path.join(ROOT, 'public/js/screens/settle.js'), 'utf8');
+  assert.doesNotMatch(js, /btn_next_bg|btn_bg_02|settle__btnbg/, 'the extracted button art no longer stands in for the face');
+  const css = readFileSync(path.join(ROOT, 'public/css/screens/settle.css'), 'utf8');
+  assert.equal(css.match(/linear-gradient\(90deg, #48e8ba, #2fd2a4\)/g)?.length, 2, '下一步 and 返回同盟 share one mint face');
+  assert.match(css, /\.settle__next \{[^}]*clip-path: polygon\(\.12rem 0/);
+  assert.match(css, /\.sbtn--primary \{[^}]*clip-path: polygon\(\.12rem 0/);
+  assert.match(css, /\.sbtn--ghost \{[^}]*background: #2a2f2e/, '数据详情 is the flat dark plate');
 });
 
 function* walk(v) {
@@ -185,4 +185,28 @@ test('#745: equipped settlement rows render two bounded slots, with two/one/no i
   const css = readFileSync(path.join(ROOT, 'public/css/screens/settle.css'), 'utf8');
   assert.match(css, /\.sop__slot \{[^}]*min-width: 0;[^}]*min-height: 0;[^}]*minmax\(0, 1fr\)/);
   assert.match(css, /\.sop__slot img \{[^}]*max-width: 100%;[^}]*max-height: 100%;[^}]*object-fit: contain/);
+});
+
+test('a team card: the 立绘 is the 名片干员 (the ace without one), an AI teammate wears the default 名片', () => {
+  // the picture: an AI has no 名片干员, so its card keeps the lineup ace's 立绘 — normal art, not a placeholder
+  const ai = S.teamCardArt({ aceChess: { charId: 'char_002_amiya' }, aceSkin: 's1' });
+  assert.deepEqual(ai.chess, { charId: 'char_002_amiya' });
+  assert.equal(ai.skin, 's1');
+  // a player: their 名片干员 and its look
+  const mine = S.teamCardArt({ card: { charId: 'char_003_kalts', look: 'e1' }, aceChess: { charId: 'char_002_amiya' } });
+  assert.deepEqual(mine.chess, { charId: 'char_003_kalts' });
+  assert.equal(mine.look, 'e1');
+  assert.equal(S.teamCardArt({}).chess, null, 'an empty seat never throws');
+  // an 精英AI: the room seat carries its own operator card (shared/eliteAi.js eliteCard), so its 立绘 is that operator —
+  // only its 名片 is the default one
+  const elite = S.teamCardArt({ card: eliteCard({ isBot: true, botPersona: 'arturia' }), aceChess: { charId: 'char_002_amiya' } });
+  assert.deepEqual(elite.chess, { charId: 'char_245_cello' });
+  assert.equal(elite.look, '');
+  // the plate: an AI wears the default 名片 (模拟·终极), a player their own (none → no card)
+  const js = readFileSync(path.join(ROOT, 'public/js/screens/settle.js'), 'utf8');
+  assert.match(js, /tcard__plate', \(p\.isBot \|\| !!card\?\.bg\) && 'has-nc'/);
+  assert.match(js, /NameCardLayer} card=\$\{p\.isBot \? DEFAULT_NAMECARD : card\?\.bg\}/);
+  const m = data.get('assets');
+  assert.equal(m.ui['loading/loading_ac_abyss'], '/assets/ui/loading/loading_ac_abyss.png', 'the default 名片底图 exists');
+  assert.match(js, /import \{ NameCardLayer, DEFAULT_NAMECARD \} from '\.\.\/ui\/namecards\.js'/, 'no operator 名片 pick is involved');
 });

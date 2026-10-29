@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { DamageBoard, createDamageBoard } from '../../server/match/damageBoard.js';
 import { operatorDamageKey } from '../../server/sim/damageBoard.js';
 import { S2C } from '../../shared/protocol.js';
+import { MatchExtensions } from '../../server/match/match/extensions.js';
 
 const owners = ['p0', 'p1', 'p2', 'p3'].map((playerId, seat) => ({ playerId, name: `Owner ${seat}`, seat,
   authToken: 'fixture-only-do-not-copy', board: ['private-fixture'], funds: 100 }));
@@ -16,6 +17,36 @@ function put(b, rows, opts = {}) {
     owners: rows, ...opts });
 }
 const sum = (board, playerId = 'p0') => board.packet().owners.find((o) => o.playerId === playerId);
+
+test('client-result DIY identity comes from the trusted owner/UID spec, not submitted charId', () => {
+  const b = createDamageBoard('fixtureMatch');
+  b.startCombat(1, 'boss', owners);
+  const f = { kind: 'boss', fieldId: 'boss', players: ['p0'], spec: { players: [{ playerId: 'p0', units: [
+    { uid: 11, chessId: 'diy_slot', diy: { charId: 'char_4182_oblvns' } },
+  ] }] } };
+  const context = { clientCombat: true, round: 1, damageBoard: b, battlePrefix: 'fixtureMatch',
+    players: new Map(), gd: { chess: () => null } };
+  assert.equal(MatchExtensions.prototype._damageFromResult.call(context, f, { time: 2, perPlayer: { p0: {
+    damageDealt: 30, unitStats: [{ kind: 'op', uid: 11, defId: 'wrong', charId: 'spoofed', dmg: 30 }],
+  } } }), true);
+  assert.equal(sum(b).operators[0].charId, 'char_4182_oblvns');
+  assert.equal(sum(b).operators[0].defId, 'diy_slot');
+});
+
+test('DIY identity survives the ledger and frozen Boss archive without leaking unrelated metadata', () => {
+  const b = createDamageBoard('fixtureMatch');
+  b.startCombat(1, 'boss', owners);
+  const row = score('p0', 90);
+  row.operators[0].charId = 'char_4182_oblvns';
+  row.operators[0].privateData = 'never copy';
+  put(b, [row], { phase: 'boss', final: true });
+  b.freeze();
+  const op = b.bossRounds().boss.owners[0].operators[0];
+  assert.equal(op.charId, 'char_4182_oblvns');
+  assert.equal(op.privateData, undefined);
+  row.operators[0].charId = 'changed';
+  assert.equal(b.bossRounds().boss.owners[0].operators[0].charId, 'char_4182_oblvns');
+});
 
 test('normal finals plus live unite replace absolute values, not replies; same-def pieces stay separate', () => {
   const b = createDamageBoard('fixtureMatch');

@@ -272,12 +272,24 @@ export class WorkerFieldRunner {
     // Replay ordered deltas once, then reconcile the authoritative totals. The main-thread pool is a HUD/stat mirror;
     // no live Battle has access to it. Threshold tickers still observe each hit in the original order.
     for (const effect of out.effects || []) {
-      if (effect.type === 'bossDamage') this.m.bossPool.damage(effect.playerId, effect.amount);
+      if (effect.type === 'bossDamage') {
+        const pool = this.m.bossPool;
+        if (pool.quota) {
+          // Already capped by the worker at its simulation tick; this pool is only a mirror.
+          pool.hp = Math.max(0, pool.hp - effect.amount);
+          pool.byPlayer.set(effect.playerId, (pool.byPlayer.get(effect.playerId) || 0) + effect.amount);
+          pool.onHit?.(effect.playerId, effect.amount);
+        } else pool.damage(effect.playerId, effect.amount);
+      }
       else if (effect.type === 'lpLoss') this.m._teamLpLoss(effect.amount);
     }
     if (out.boss) {
       this.m.bossPool.hp = out.boss.hp;
       this.m.bossPool.byPlayer = new Map(out.boss.byPlayer);
+      if (out.boss.quota && this.m.bossPool.quota) {
+        this.m.bossPool.quota.completed = new Map(out.boss.quota.completed.map((p) => [p.playerId, p.time]));
+        this.m.bossPool.quota.perPlayer = new Map(out.boss.quota.perPlayer.map((p) => [p.playerId, p.damage]));
+      }
       this.m.teamLp = out.boss.teamLp;
       this.m.overtimeApplied = out.boss.overtimeApplied;
       this.m._syncTeamLp();

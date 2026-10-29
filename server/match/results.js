@@ -116,6 +116,8 @@ export function buildResult(m, outcome) {
       name: ps.name,
       ...(ps.tag ? { tag: ps.tag } : {}),
       isBot: ps.isBot,
+      ...(ps.card ? { card: Object.fromEntries(['charId', 'avatar', 'look', 'avatarLook', 'bg', 'trophies', 'avatarImg']
+        .filter((k) => ['string', 'number'].includes(typeof ps.card[k])).map((k) => [k, ps.card[k]])) } : {}),
       ...(Number.isInteger(ps.aiTakeoverRound) ? { aiTakeoverRound: ps.aiTakeoverRound } : {}),
       left: ps.left,
       alive: ps.alive,
@@ -160,6 +162,7 @@ export function buildResult(m, outcome) {
     durationMs: Math.max(0, m.sched.now() - m.startedAt),
     // 项目 4 对局记录: the boss rounds' per-player / per-operator damage (null when neither scope was fought)
     bossDamage: typeof m.damageBoard?.bossRounds === 'function' ? m.damageBoard.bossRounds() : null,
+    ...(m.bossQuotaRounds?.length ? { bossQuota: m.bossQuotaRounds } : {}),
     players: rows,
   };
   // A test match is marked on the settlement the replay stores. The keys are absent otherwise, so a normal

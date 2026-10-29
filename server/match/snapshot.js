@@ -73,7 +73,7 @@ export const MATCH_FIELDS = Object.freeze({
     'draft', 'sp', 'wave', 'bossWaves', 'bossPairs', 'hiddenLayerSum', 'finalAliveCount', 'hiddenReached', 'outcome',
     // the round whose first plan drew bossPairs (bossRounds.js): a restore inside it must keep that draw, and the
     // next round's first plan must re-plan from scratch — saved with the pairs rather than re-drawn on restore
-    'bossPairsRound',
+    'bossPairsRound', 'bossQuotaRounds',
     '_botEmotesSettledRound',
     // 局内投票开启二倍速 (speedVote.js): whether this match already runs at 2× and whether its next battle owes the boost
     'speedBoost', 'speedBoostPending', 'speedBoostOffPending',

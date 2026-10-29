@@ -916,6 +916,10 @@
 .experimental-stage input:checked { border-color: var(--mint-700); background: var(--mint-400); }
 .experimental-stage input:disabled, .experimental-stage input:disabled + span { cursor: not-allowed; }
 .experimental-option input:disabled { opacity: .65; cursor: default; }.experimental-options__note { color: var(--text-dim); font-size: 11px; padding-top: 12px; }.matchmaking__options { padding-block: 8px; }
+/* 首领血量 (experimental `bossHpPercent`): the panel's one numeric rule — a percentage field instead of a switch */
+.experimental-option .experimental-number { display: flex; align-items: center; gap: 6px; color: var(--text-lo); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); }
+.experimental-option .experimental-number input { appearance: auto; flex: none; width: calc(64px * var(--ui)); height: calc(28px * var(--ui)); border-radius: 6px; padding: 0 6px; border: 1px solid var(--line-3); background: var(--bg-3); color: var(--text-hi); font: inherit; text-align: right; cursor: text; }
+.experimental-option .experimental-number input::before { content: none; }
 @media (pointer: coarse) { .server-load-button { min-height: calc(36px * var(--ui)); padding-inline: calc(9px * var(--ui)); }.experimental-option { min-height: 44px; } }
 
 /* ---- difficulty tag ---------------------------------------------------------------------------------- */

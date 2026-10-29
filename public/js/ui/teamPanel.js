@@ -41,8 +41,8 @@ import { MissTag, uniteRemaining } from './hud.js';
 import { localAsset, getBand } from '../data.js';
 import { ReviveAction, RevivalNotice } from './revival.js';
 import { KickAction, KickVoteNotice } from './kickVote.js';
-// 二倍速 (SpeedAction) moved to the top-right HUD on 2026-10-25; the open vote still shows in this notice strip.
-import { SpeedVoteNotice } from './speedVote.js';
+// 二倍速 (SpeedAction) moved to the top-right HUD on 2026-10-25, and the open vote (SpeedVoteNotice) followed it on
+// 2026-10-28: inside this notice strip the vote box sat on top of the 同盟成员 portraits and pushed every row down.
 import { t } from '../../../shared/i18n.js';
 import { uniteRelayKey } from '../battle/observe.js';
 import { PHONE_QUERY, rosterPools, rosterStartsOpen, teamDensity, teamEmoteMode, teamPanelLayout } from './teamLayout.js';
@@ -220,6 +220,16 @@ function RowStatus({ status, meta, offline }) {
   <//>`;
 }
 
+/** A completed quota only: pending/missing samples never become a fabricated zero-second finish. */
+export function BossQuotaTime({ pub, playerId }) {
+  if (!pub?.experimental?.bossQuota || (pub.phase !== PHASE.FINAL_ASSAULT && pub.phase !== PHASE.HIDDEN_CORE)) return null;
+  const time = pub.bossQuota?.players?.find((p) => p.playerId === playerId)?.time;
+  if (!Number.isFinite(time) || time < 0) return null;
+  const value = time.toFixed(2);
+  return html`<small class="team__quota-time num" data-boss-quota-time=${time}
+    title=${t('配额完成时间（游戏秒）：{time}', { time: value })}>${t('配额完成 {time} 秒', { time: value })}</small>`;
+}
+
 /** One seat. `bubble`: its emote beside the row (classic roster), else null. */
 function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, selfLive, cap, uniteLocal, team, frameArt, list, bubble, spMarks = null }) {
   const self = p.playerId === myId;
@@ -239,6 +249,7 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
   const band = p.bandId ? getBand(p.bandId) : null;
   const inTeam = team.has(p.playerId);
   const { click, dblClick } = clicks;
+  const quotaTime = BossQuotaTime({ pub, playerId: p.playerId });
   return html`<div data-seat=${p.seat} class=${cx('team__row', self && 'is-self', inTeam && 'is-team', watched && 'is-watched', p.alive === false && !p.pendingDeath && 'is-dead', p.pendingDeath && 'is-pending', open && 'is-open', offline && 'is-offline')}>
     <button type="button" class="team__btn" onClick=${() => click(p, self)} onDblClick=${(e) => dblClick(e, p, self)} title=${inTeam && !self ? `${title} · ${t('与你在同一战场')}` : title} aria-label=${title} aria-expanded=${observe && !self && !half ? String(open) : undefined}>
       <${PlayerAvatar} player=${p} self=${self} />
@@ -250,7 +261,8 @@ function TeamRow({ p, pub, myId, watching, onWatch, observe, halves, clicks, sel
         : spMarks?.get(p.playerId) === 'turn' ? html`<span class="team__spmark is-turn" title=${t('正在决策…')}><i></i><i></i><i></i></span>` : null}
     </button>
     <div class="team__info">
-      <span class="team__name" title=${label(p.name, p.tag)}>${label(p.name, p.tag)}</span>
+      ${quotaTime ? html`<span class="team__quota-name"><span class="team__name" title=${label(p.name, p.tag)}>${label(p.name, p.tag)}</span>${quotaTime}</span>`
+        : html`<span class="team__name" title=${label(p.name, p.tag)}>${label(p.name, p.tag)}</span>`}
       <div class="team__line">
         <${LpTower} value=${lp.lp} size="sm" tone=${Number.isFinite(lp.lp) && lp.lp - lp.pending <= 5 ? 'danger' : null} pending=${lp.pending}
           tip=${rowLpTip(lp, cap)} />
@@ -340,7 +352,7 @@ export function TeamPanel({ pub, myId, watching, onWatch, roster, emoteTtl = 300
         <${Icon} name="users" /><span>${t('同盟成员')}</span><b class="num">${players.length}</b><${Icon} name="chevronRight" />
       </button>
     </div>
-    <div ref=${noticeRef} class="team__notice"><${RevivalNotice} pub=${pub} /><${SpeedVoteNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /></div>
+    <div ref=${noticeRef} class="team__notice"><${RevivalNotice} pub=${pub} /><${KickVoteNotice} pub=${pub} /></div>
     <div class="team__players" id="team-roster" hidden=${!rosterOpen}>${pools
       ? pools.map((pool) => html`<section key=${pool.id ?? 'rest'} class=${cx('team__pool', pool.mine && 'is-mine')}><${PoolHead} pool=${pool} />${pool.players.map(row)}</section>`)
       : players.map(row)}</div>

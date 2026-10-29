@@ -77,6 +77,7 @@ export class MatchCombat {
       fieldId: `n:${ps.playerId}`,
       enemyOverrides: wave.overrides,
       waveId: wave.templateId,
+      ...(this.experimental?.stateCarry === true ? { stateCarry: true } : {}),
     };
   }
 

@@ -1044,6 +1044,20 @@ export class SkillFx {
   /** b.ev ['fx', kind, x, y, extra]: true when the official layer stands for it (module header: bindings 1–4). */
   simFx(kind, x, y, extra) {
     if (!this.active() || !extra || typeof extra !== 'object' || typeof kind !== 'string') return false;
+    // S2's reserve gift belongs to the landing operator, not that operator's selected skill. Route it before
+    // their own bindings/cover can swallow the generic aoe event; normal Silverash casts already drew their start.
+    if (kind === 'aoe' && extra.skill === 'svash2') {
+      const U = this.units.get(extra.id);
+      const v = U?.v || this.w.view(extra.id);
+      if (!(U?.skillId === 'skchr_svash2_2' && U.startFrame === this.frame)) {
+        if (!v) return false;
+        let drew = false;
+        for (const key of ['svash2_skill_02_start_01', 'svash2_skill_02_range_01']) {
+          if (this.w.playOn(key, v, { loop: false, important: true })) drew = true;
+        }
+        return drew; // Missing/off official assets retain the procedural fallback, never the recipient's own skill.
+      }
+    }
     const now = this.w.ofx.time;
     // a skill start cast with every charge stored (the kit's `charged`: 卡涅利安) — the `[eff_cond]` state (_cond)
     if (extra.charged === true && extra.id != null) { const C = this.units.get(extra.id); if (C) C.charged = true; }

@@ -24,10 +24,9 @@ export class MatchPrep {
       this.dispatch(ps, 'onPrepStart', { round: this.round });
       ps.recompute();
     }
-    // solo / single-human matches: untimed (soloUntimed); 无限休整期 (玩法#04) untimed too, ended by everybody's Ready;
-    // otherwise co-op's round prepTime
-    const untimed = this.soloUntimed || this.experimental?.prepUnlimited === true;
-    const secs = untimed ? null : this.gd.prepTime(this.round);
+    // 无限休整期 keeps the ordinary countdown (including a single-human room), but expiry cannot ready anyone.
+    // Without the option, solo / single-human matches retain their existing untimed behavior.
+    const secs = this.soloUntimed && this.experimental?.prepUnlimited !== true ? null : this.gd.prepTime(this.round);
     this.setDeadline(secs, () => this.prepDeadline());
     let i = 0;
     for (const ps of alive) if (ps.botControlled) this.scheduleBotPrep(ps, i++);
@@ -172,10 +171,11 @@ const sliceCtl = testSlice(this);
           if (job.streamed && !job.inline) {
             // Dedicated workers own their bounded internal slices. Main wakes only for low-frequency progress
             // and completion, never once per 32 ticks. All these callbacks are new asynchronous boundaries.
-            const remaining = this.deadline ? this.deadline - this.sched.now() : 30_000;
+            const deadline = this.experimental?.prepUnlimited === true ? 0 : this.deadline;
+            const remaining = deadline ? deadline - this.sched.now() : 30_000;
             if (remaining <= 0) { work.cancel(); return; }
             const check = () => {
-              if (!valid() || (this.deadline && this.sched.now() >= this.deadline)) { work.cancel(); return false; }
+              if (!valid() || (deadline && this.sched.now() >= deadline)) { work.cancel(); return false; }
               if (!fresh()) { stale(); return false; }
               return true;
             };
@@ -259,7 +259,7 @@ const sliceCtl = testSlice(this);
   }
 
   prepDeadline() {
-    if (this.phase !== PHASE.PREP) return;
+    if (this.phase !== PHASE.PREP || this.experimental?.prepUnlimited === true) return;
     for (const ps of this.alivePlayers()) {
       if (ps.ready) continue;
       this.autoPickPersonalChoice(ps, 'random');

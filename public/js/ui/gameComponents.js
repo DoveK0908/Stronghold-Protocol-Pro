@@ -11,10 +11,10 @@ import { skinsStore, ownerSkin, tokenSkinShown } from './skins.js';
 import { settingsStore } from './settingsStore.js';
 import { MaterialImage } from './materialImage.js';
 import { appearanceRecord } from './skinAssets.js';
-import { useCardAvatar } from './playerCard.js';
+import { useCardAvatar, customAvatarSrc } from './playerCard.js';
 import { cardAvatarUrl } from './seatArt.js';
 import {
-  uiUrl, chessAvatarUrl, chessPortraitUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,
+  uiUrl, chessAvatarUrl, chessPortraitUrl, chessIllustUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl, bondIconUrl, bandIconUrl,
 } from './assetUrls.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
@@ -81,17 +81,21 @@ export function Img({ src, class: cls, alt = '', fallback = null, fallbackSrc = 
  * `ownerId` omitted = local picker; null = unowned catalogue art. Callers resolve stand-ins / DIY first.
  * B6, maintainer option A (2026-10-18); docs/SKINS.md and §35.4. Model outfits retain their models.
  */
-export function OperatorImage({ m, chess, ownerId, skin = null, portrait = false, avatarFallback = false,
-  portraitClass, avatarClass, ...props }) {
+export function OperatorImage({ m, chess, ownerId, skin = null, portrait = false, illust = false, look = '',
+  avatarFallback = false, illustClass, portraitClass, avatarClass, ...props }) {
   useData('assets');
   m = data.get('assets') || m;
   const localSkins = useStore((s) => s.skins, Object.is, skinsStore);
   const otherSkins = useStore((s) => s.otherSkins, Object.is, settingsStore);
   const selected = useStore((s) => ownerSkin(chess?.charId, { ownerId, skin, myId: s.me.playerId,
     players: s.match.public?.players || [], localSkins, otherSkins }));
-  const art = portrait ? chessPortraitUrl(m, chess, { skin: selected }) : null;
-  const src = art || (!portrait || avatarFallback ? chessAvatarUrl(m, chess, { skin: selected }) : null);
-  return html`<${Img} ...${props} src=${src} class=${art ? portraitClass ?? props.class : avatarClass ?? props.class} />`;
+  // `illust` = the 立绘 the room's seat card draws (painted elite-2 art, `_e1` = the transparent 精一 full body);
+  // `look` is the card's card look ('' 精二 / 'e1' 精一), the skin below still wins when it has one.
+  const art = illust ? chessIllustUrl(m, chess, { skin: selected, look }) : null;
+  const half = portrait ? chessPortraitUrl(m, chess, { skin: selected }) : null;
+  const src = art || half || ((!portrait && !illust) || avatarFallback ? chessAvatarUrl(m, chess, { skin: selected }) : null);
+  const cls = art ? illustClass ?? portraitClass ?? props.class : half ? portraitClass ?? props.class : avatarClass ?? props.class;
+  return html`<${Img} ...${props} src=${src} class=${cls} />`;
 }
 
 /** Official UI sprite by 'group/key' with a fallback. */
@@ -345,9 +349,9 @@ export function avatarState(player) {
 /**
  * Seat-coloured player avatar: band icon when a band is picked, else the player's picked 头像, else glyph/robot;
  * `prefer="avatar"` puts the picked 头像 first (a player's own cards: the draft rows, 协议启动, the settlement).
- * @param {{ player: any, size?: 'sm'|'md', self?: boolean, prefer?: 'band'|'avatar', class?: string }} props
+ * @param {{ player: any, size?: 'sm'|'md', self?: boolean, prefer?: 'band'|'avatar', snapshot?: boolean, class?: string }} props
  */
-export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band', class: cls }) {
+export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band', snapshot = false, class: cls }) {
   useData('assets', 'chess');
   const src = player?.bandId ? bandIconUrl(data.get('assets'), player.bandId) : null;
   // 界面#09 follow-up: a human's own 头像 (room.card, carried into the match) always wins over the band icon — draft rows,
@@ -362,7 +366,9 @@ export function PlayerAvatar({ player, size = 'md', self = false, prefer = 'band
   const { pending, dead, left } = avatarState(player);
   const hue = [162, 196, 38, 280][((player?.seat | 0) % 4 + 4) % 4];
   const fallback = player?.isBot ? html`<${Icon} name="robot" class="pavatar__bot" />` : html`<span class="pavatar__glyph">${glyph}</span>`;
-  const face = player?.isBot || player?.playerId == null || !wantAvatar ? html`<${Img} src=${player?.isBot ? ownFace || src : src} fallback=${fallback} />`
+  // History belongs to that match: never consult the viewer's current room or own avatar preference.
+  const face = snapshot ? html`<${Img} src=${customAvatarSrc(player?.card) || then} fallbackSrc=${then} fallback=${fallback} />`
+    : player?.isBot || player?.playerId == null || !wantAvatar ? html`<${Img} src=${player?.isBot ? ownFace || src : src} fallback=${fallback} />`
     : html`<${PickedFace} playerId=${player.playerId} then=${then} fallback=${fallback} />`;
   return html`<span class=${cx('pavatar', `pavatar--${size}`, self && 'is-self', dead && 'is-dead', left && 'is-left', player?.isBot && 'is-bot',
       player?.connected === false && !player?.isBot && 'is-offline', cls)} style=${`--seat-hue:${hue}`}>

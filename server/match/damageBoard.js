@@ -70,7 +70,9 @@ export class DamageBoard {
         if (typeof op?.key !== 'string' || opKeys.has(op.key) || amount(op.damage) == null || healAmount(op.healing) == null
           || (op.uid != null && !Number.isSafeInteger(op.uid)) || (op.defId != null && typeof op.defId !== 'string')) return false;
         opKeys.add(op.key);
-        operators.push({ key: op.key, uid: op.uid ?? null, defId: op.defId ?? null, damage: op.damage, healing: healAmount(op.healing) });
+        operators.push({ key: op.key, uid: op.uid ?? null, defId: op.defId ?? null,
+          ...(typeof op.charId === 'string' && op.charId.length <= 64 ? { charId: op.charId } : {}),
+          damage: op.damage, healing: healAmount(op.healing) });
       }
       rows.push({ playerId: owner.playerId, total: owner.total, healing: healAmount(owner.healing), operators,
         otherDamage: owner.otherDamage, otherHealing: healAmount(owner.otherHealing) });

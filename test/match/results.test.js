@@ -39,6 +39,7 @@ test('titles: each player ≤ 1 title, each title ≤ once, leaders first, 卫�
 test('m.result rows: lineup, bonds, stats, roundsPassed per player, trophies (co-op) and rewards', () => {
   const h = makeMatch({ mode: 'coop', difficulty: 'HARD', humans: 2, seed: 80, fake: true, script: (b) => (b.round !== 2 ? {} : b.kind === 'unite' ? { survivors: { p_1: 10 } } : { leaks: { p_1: 10 } }) }).start();
   const m = h.m;
+  h.ps('p_0').card = { charId: 'char_002_amiya', avatar: 'char_290_vigna', avatarLook: 'e1', avatarImg: '0123456789abcdef', privateData: 'omit' };
   h.toPrep(1);
   h.ps('p_1').lp = 5;
   h.drive(() => m.phase === PHASE.PREP && m.round === 3);
@@ -51,6 +52,9 @@ test('m.result rows: lineup, bonds, stats, roundsPassed per player, trophies (co
   assert.equal(r.reason, 'abandoned');
   assert.equal(r.victory, false);
   const rows = Object.fromEntries(r.players.map((p) => [p.playerId, p]));
+  assert.deepEqual(rows.p_0.card, { charId: 'char_002_amiya', avatar: 'char_290_vigna', avatarLook: 'e1', avatarImg: '0123456789abcdef' });
+  h.ps('p_0').card.avatar = 'char_002_amiya';
+  assert.equal(rows.p_0.card.avatar, 'char_290_vigna', 'detached settlement snapshot');
   assert.equal(rows.p_1.roundsPassed, 1);
   assert.equal(rows.p_1.eliminatedRound, 2);
   assert.equal(rows.p_0.roundsPassed, 2);
