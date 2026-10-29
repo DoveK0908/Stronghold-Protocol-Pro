@@ -330,7 +330,10 @@ test('the prep routine itself (shop, lineup, layout planning) runs in bounded sl
   const whole = run(undefined);
   const sliced = run(1e-6);
   assert.ok(Math.max(...whole.perPrep) <= 1, `unbounded (virtual time): a whole prep in one callback (${whole.perPrep})`);
-  assert.ok(Math.min(...sliced.perPrep) >= 3 && Math.max(...sliced.perPrep) >= 8, `sliced: every prep spread over many callbacks (${sliced.perPrep})`);
+  // 7 rather than 8 since §37.39 stopped the bots' shop-equipment purchases (0.3.4): one prep issues fewer actions,
+  // so this seed's prep now splits into 3–7 callbacks instead of 4–10 (probe: _build/merge-20261029/probe-slices.mjs).
+  // The exact-state equality below is the guard.
+  assert.ok(Math.min(...sliced.perPrep) >= 3 && Math.max(...sliced.perPrep) >= 7, `sliced: every prep spread over many callbacks (${sliced.perPrep})`);
   assert.equal(sliced.state, whole.state, 'same decisions, same boards');
 });
 

@@ -736,3 +736,49 @@ still meet the usual spending condition; advisor plans and explicit policies kee
 elite drivers do not inherit this ordinary-bot target. Four-version Pro match goldens are recomputed locally, not
 copied from upstream; see the Pro follow-up in history 0.3.3.
 
+### Cycle 11: co-op band pick and no shop equipment (upstream §37.39, this tree 37.49)
+
+Upstream dev `71b2363f` continued the co-op 「守家座位」 and spending work. A per-seat diagnosis (upstream handoff
+`diag/seatdiag.mjs`, 40 games) found zero-leak and leaking seats in R7–R9 nearly alike in level, fielded units and
+tier sum; a funds lab (one seat +4 funds a round from R4) reached the Final Assault in 19 → 28 of 40 games and won
+6 → 11, but the rules cannot move funds between teammates and letting teammates yield bond cards to the sturdiest
+seat did not help (−1.55 ± 3.37 co-op 160). What did: (1) co-op 终极 drafts the band with the same cubed LP weight as
+solo 终极 (`(LP − 18)³`) — 歌利亚 (45 LP, no other effect) reaches the Final Assault in 52 % vs 36 % of games and one
+seat gets it in 94 % of games after the change (69 % before); (2) ordinary bots no longer buy shop equipment (merges,
+advisor-requested items, 机变 / reward / strategy grants still buy and equip) — the 2–4 funds a round become
+refreshes: R11–R14 refreshes 5–6 → 6–8 a round, merges 4.6 → 5.4 a game, elites on the board at R14 3.3 → 3.8.
+Upstream paired 终极: co-op 1–320 30.58 → 35.88 % (+5.30 ± 2.70, wins 39 → 46, Final Assault 151 → 169), solo 1–320
+38.68 → 40.36 %, 职业队 9×40 forced 29.0 → 33.4 % (+4.45 ± 1.91); 绝境/标准/险境 solo wins 51 → 57, 66 → 69,
+69 → 75. Withdrawn: merge farming past L5, R4 one round later (solo −2.85), a real R3 upgrade, expected-layer engine
+values, the Grok band-fix bundle, freezing engines, a higher full-board buy floor, buying only tier 4+ equipment
+(the simple version won). 伊奥莱塔 strategy bots keep their own equipment rules. Solo bots would gain about 4 points
+by always taking 歌利亚 (43.0 % vs 34.5 %) — an upstream benchmark note left to the owner, not ported as a rule.
+
+### Cycle 12: co-op play — no healer slot, a bench of 4, the easiest bounty (upstream §37.40, this tree 37.50)
+
+Upstream dev `17155c3c`. A long sweep of economy knobs around §37.39 found nothing for solo (the economy is near a
+local optimum). Three co-op-only signals, each inside the noise alone, together lifted 终极 co-op 1–320 from 35.88 to
+43.68 % (+7.80 ± 2.54 paired, wins 46 → 73, Final Assault 169 → 183): (1) the lineup score no longer credits a healer
+(HEAL_FIRST / HEAL_SECOND stay solo; the buy-time healer bonus is unchanged); (2) the bench keeps at most 4 spare
+units (`COOP_BENCH_BUDGET`, solo still 6); (3) the bounty draft picks the card with the least enemy HP × count (solo
+keeps expected value). Leaving any one out cost 3.36 / 3.72 / 4.33 points. Co-op enemies carry 2–2.5× the solo HP
+from R7 (×3.6–6.7 from R7 in the field tables), so a dealer beats a healer and a bounty enemy at that scale costs the
+seat its perfect (联防) battle as well as LP. Solo loses −2.78 / −0.25 / −0.24 on the three, and adding the no-healer
+term only at the Final Assault does not help either (职业队 −1.21 ± 0.50).
+
+### Cycle 13: elite items, dolls, 9 炎, a solo focus prior (upstream §37.41, this tree 37.51)
+
+Upstream dev `e65b0132`, from the owner's experience (buy little equipment except the 转职 item the plan needs;
+缪尔赛思 converted to 炎 gives 9 炎 with 8 deployed; 精打细算玩偶 early, 见钱眼开玩偶 any time) and community
+research. Most of the dozen literal rules were null or negative for the bots because they cost refreshes (§37.39) or
+a bench slot: 缪尔赛思 valued as a focus member, morphs held for a carrier, bond items for every focus (a held
+维多利亚 hammer cost 哈洛德 15 points), 维多利亚 equipment, 寻呼模块, community secondary bonds per focus. What
+held: (1) the two shop items that make an elite — 博士投影 on a deployed tier-4+ normal operator and 拟态物质 on a
+tier-4+ pair; (2) in solo only, 精打细算玩偶 (≥ 5 rounds left) and 见钱眼开玩偶, plus a focus prior read off the bots'
+own results by final focus (萨尔贡 and 谢拉格 first; each inside the noise, together +4.3); (3) the 9 炎 conversion
+for the one bond whose top tier exceeds the deploy cap — with 炎 the focus, one 炎国短刀 is held from R6 and
+缪尔赛思 wears her 变形同构体 (8 deployed, 9 炎): 杜遥夜 +6.8. Upstream 终极 solo 1–320 40.36 → 46.01 % (+5.7 ± 1.8,
+wins 31 → 44), 职业队 9×80 30.5 → 32.8 % (wins 59 → 79), co-op 43.68 → 45.73 % (+2.1 ± 1.6, wins 73 → 88). Co-op
+bundles that differ only slightly swing 2–4 points even on 320 seeds, so co-op keeps only the changes with a
+consistent sign.
+

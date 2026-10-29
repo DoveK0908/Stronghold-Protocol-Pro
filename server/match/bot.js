@@ -145,7 +145,9 @@ const CORE_HIT = 20;
 /**
  * [ASSUMED] §35.63 sustain floor: from HEAL_FROM the lineup values its first healer at HEAL_FIRST and a second one from R9
  * at HEAL_SECOND (buyScore: the first healer +14, a second from R8 +4). Bots fielded 0.1–0.5 healers in R4–R13 and died
- * to DOT / ELEMENT / SPECIAL rounds; 终极 co-op seats alive at the Final Assault rose with it.
+ * to DOT / ELEMENT / SPECIAL rounds; 终极 co-op seats alive at the Final Assault rose with it. §37.40 [ASSUMED]: solo only
+ * since — co-op enemies carry 2–2.5× the solo HP from R7, and with the bots of §37.37–§37.39 a co-op seat does better
+ * fielding a dealer in that slot (see COOP_BENCH_BUDGET for the whole co-op change).
  */
 const HEAL_FROM = 5;
 const HEAL_FIRST = 16;
@@ -167,6 +169,13 @@ const MAX_PAIRS = 4;
 const MAX_REFRESHES = 16;
 /** Spare bench units kept beyond the lineup at the prep start (pairs first). */
 const BENCH_BUDGET = 6;
+/**
+ * §37.40 [ASSUMED] co-op play: a co-op seat keeps 4 spare bench units (solo 6), fields no healer for its own sake (the
+ * HEAL_FIRST / HEAL_SECOND lineup terms are solo only) and takes the bounty card with the least enemy HP (bountyPick).
+ * 终极 co-op 1–320 against §37.39: 35.9 → 43.7 % pool completion (+7.8 ± 2.5 paired), wins 46 → 73; leaving one of the
+ * three out cost 3.4 / 3.7 / 4.3 points. In solo none of them helped (−2.8 / −0.2 / −0.3).
+ */
+const COOP_BENCH_BUDGET = 4;
 /**
  * Shop level the bot aims for at the start of round r (index = round). §35.63: L5 at R9 and L6 at R11 (were R10 / R12),
  * the community rhythm 3-5-7-9 (BV19UXZBJExQ reply; handoff/round51 RESEARCH §3.2) plus one step: 终极 solo boards
@@ -190,8 +199,11 @@ const DEFAULT_MELEE_RANGE = [[0, 0], [0, 1]];
 
 /**
  * Band pick among the strategies the mode offers (gd.bandIds): weighted by starting LP (sturdier strategies are
- * preferred) — (LP − 18)², cubed on 终极 solo (§37.34 [ASSUMED]: most 终极 solo bots that fell did so in rounds 11–13 with
- * half the LP of those that reached the Final Assault; botbench 80 seeds: Final Assault reached 50 → 56). Alone, a band that withholds the first rounds' funds (老鲤 "资金暂存": no operator in R1–R2, every enemy
+ * preferred) — (LP − 18)², cubed on 终极 (§37.34 [ASSUMED]: most 终极 solo bots that fell did so in rounds 11–13 with
+ * half the LP of those that reached the Final Assault; botbench 80 seeds: Final Assault reached 50 → 56). §37.39
+ * [ASSUMED]: on 终极 co-op too — the team plays on while one seat lives, and the draft gives 歌利亚 (45 LP) to one seat at
+ * most: co-op games with a 歌利亚 seat reached the Final Assault 52 % of the time against 36 % without (320 seeds), and
+ * the cube puts one in 94 % of games instead of 69 %. Alone, a band that withholds the first rounds' funds (老鲤 "资金暂存": no operator in R1–R2, every enemy
  * leaks) is avoided — only 联防 teammates cover that. A band whose mechanic rides on a bond the mode switches off
  * (gd.bandBondIds ∩ gd.modeInactiveBonds — 标准: 潘格尼尼 <拉特兰>, 克莱门莎 <阿戈尔>, 玛恩纳 <卡西米尔>) weighs 0, never taken
  * (DESIGN §21.26). [ASSUMED] A living teammate's opening strategy soft-reserves those bonds before anyone is deployed:
@@ -218,7 +230,7 @@ export function botPickBand(m, ps) {
   const inactive = (id) => gd.bandBondIds(id).some((b) => gd.modeInactiveBonds.has(b));
   const pairs = ids.map((id) => {
     if (inactive(id)) return [id, 0];
-    const w = Math.max(1, (gd.startLp(id) - 18) ** (m.isSolo && m.difficulty === 'ABYSS' ? 3 : 2)) * (m.isSolo && lateFunds(id) ? 0.02 : 1)
+    const w = Math.max(1, (gd.startLp(id) - 18) ** (m.difficulty === 'ABYSS' ? 3 : 2)) * (m.isSolo && lateFunds(id) ? 0.02 : 1)
       * (mates.length && burdensMates(id) ? MATE_BURDEN : 1);
     return [id, gd.bandBondIds(id).some((b) => reserved.has(b)) ? w * SOFT_BAND_RESERVE : w];
   });
@@ -255,7 +267,7 @@ export function botPickCard(m, ps, cards, available) {
     if (!c) continue;
     let s = 0;
     if (c.kind === 'item') s = 8 + (c.tier || 1) * 4 + (canUseItem(m, ps, { id: c.id }) ? 0 : -8);
-    else if (c.kind === 'bounty') s = bountyScore(m, ps, c);
+    else if (c.kind === 'bounty') s = m.isSolo ? bountyScore(m, ps, c) : -bountyHp(m, c) / 1000;
     else if (c.kind === 'tactic') s = tacticScore(m, ps, c);
     s += m.rngBots() * 0.5;
     if (s > bestScore) { bestScore = s; best = i; }
@@ -309,6 +321,15 @@ export function bountyKillChance(m, ps, card) {
 
 /** Exposure (× HP) a bounty enemy needs for a 63 % kill chance (conservative: it fights beside the wave). */
 const BOUNTY_KILL = 2;
+
+/**
+ * §37.40 [ASSUMED]: the HP a bounty card adds to the own battles (its enemy's max HP × count) — a co-op seat takes the card
+ * with the least: the draft is bounty-only at R3 / R9, the enemies fight at the co-op HP scale (×3.6–6.7 from R7), and a
+ * leak costs the seat its perfect battle (联防) besides the LP.
+ */
+function bountyHp(m, c) {
+  return (Number(m.gd.enemy(c.enemyKey)?.stats?.maxHp) || 0) * (Number(c.count) || 1);
+}
 
 /**
  * Expected value of a bounty card: per battle it lasts, P(kill) × coin (kill payout) or P(kill)^n × coin (perfect
@@ -381,7 +402,7 @@ function ownedBonds(m, ps, exclude = null) {
     const c = chessRec(m, p.id, ps);
     for (const b of (c && c.bonds) || []) counts.set(b, (counts.get(b) || 0) + 1);
   }
-  return { counts, bases: seen };
+  return { counts, bases: seen, ps };
 }
 
 /**
@@ -466,6 +487,14 @@ function bandMain(m, ps) {
  * priority) is the focus, owned members or not: the plan's direction leads legacy's procurement instead of competing with
  * it at +6..+30 per member. §37.35: without a plan, a 职业队 strategy's core bond (bandMain) is the focus the same way.
  */
+/**
+ * §37.41 [ASSUMED]: in solo, a prior on the focus core bond from the bots' own 终极 solo results by final focus (17155c3c,
+ * seeds 1–80: 萨尔贡 65.8 %, 谢拉格 60.1, 拉特兰 47.4, 维多利亚 47.0, 卡西米尔 41.4, 阿戈尔 35.9, 叙拉古 34.9, 炎 26.6 of the
+ * leader pool), (share − 45) / 3 points where a member counts 10. Judged on seeds 81–320; in co-op it did not help (the
+ * teammates' claims already spread the bonds).
+ */
+const FOCUS_PRIOR = { sargonShip: 7, kjeragShip: 5, lateranoShip: 0.8, victoriaShip: 0.6, kazimierzShip: -1.2, egirShip: -3, siracusaShip: -3.4, yanShip: -6 };
+
 export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
   const mates = teammateBonds(m, ps);
   // [ASSUMED] Reconsider the focus when a teammate's public main changes, including within the same prep.
@@ -486,7 +515,8 @@ export function bondPlan(m, ps, owned = ownedBonds(m, ps)) {
     if (!k) continue;
     const s = k * 10 + Math.min(4, pool.reach.get(id) || 0) + Math.min(6, (ps.layers[id] || 0) / 10)
       // [ASSUMED] A public teammate claim outweighs commitment plus one member, but not an established large core.
-      + (id === prev ? (k >= 3 ? CORE_LOCK : 6) : 0) - (mates.has(id) ? 30 : 0) + Math.min(0.9, (pool.supply.get(id) || 0) / 100);
+      + (id === prev ? (k >= 3 ? CORE_LOCK : 6) : 0) - (mates.has(id) ? 30 : 0) + Math.min(0.9, (pool.supply.get(id) || 0) / 100)
+      + (m.isSolo ? FOCUS_PRIOR[id] || 0 : 0);
     if (s > bestS) { bestS = s; focus = id; }
   }
   if (main) focus = main;
@@ -727,6 +757,11 @@ function bondValue(m, c, owned, focus, second = null) {
     if (hits) v += 10 * w;
     else if (th.some((t) => t > n + 1 && t - (n + 1) <= 1)) v += 3 * w;
     if (bond.thresholdTemplate === 'count_threshold_downward') v -= n > 0 ? 12 : 0; // 独行 breaks with a second member
+    // §37.41: 调和 (缪尔赛思) with the held bond item of a focus whose top tier needs her: two members (调和 + the conversion)
+    if (bond.activeType === 'MANI' && owned.ps && (owned.counts.get(focus) || 0) >= 1 && topAboveCap(m, owned.ps, focus) && holdsBondItem(m, owned.ps, focus)) {
+      const fn = owned.counts.get(focus) || 0, fth = m.gd.bond(focus).thresholds;
+      v += 28 + 10 + (fth.some((t) => t > fn && t <= fn + 2) ? 14 : 0) + (fn >= 2 && fn < fth[fth.length - 1] ? CORE_MEMBER : 0);
+    }
     if (b === focus) v += 10 + (bond.isCore && n >= 2 && n < th[th.length - 1] ? CORE_MEMBER : 0);
     else if (b === second) v += 4;
     else if (committed && bond.isCore && !hits) v -= 4;
@@ -846,7 +881,7 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
   v -= Math.max(0, Math.min(2, ctx.roles.blockers) - blockers) * 15;
   if (ctx.fly > 0 && ctx.roles.antiAir > 0 && air === 0) v -= 12;
   v -= Math.max(0, healers - 2) * 10;
-  if (m.round >= HEAL_FROM) v += Math.min(healers, 1) * HEAL_FIRST + (healers >= 2 && m.round >= 9 ? HEAL_SECOND : 0);
+  if (m.round >= HEAL_FROM && m.isSolo) v += Math.min(healers, 1) * HEAL_FIRST + (healers >= 2 && m.round >= 9 ? HEAL_SECOND : 0);
   return v;
 }
 
@@ -1554,7 +1589,7 @@ function bossCandidateOpts(m, ps, byUid, plan) {
     if (Array.isArray(ev.spawns)) spawns = ev.spawns;
     if (Array.isArray(ev.routes)) routes = ev.routes;
   }
-  const hp = bossPoolHp(m.gd, bossId, alive.length);
+  const hp = bossPoolHp(m.gd, bossId, alive.length, { hpPercent: m.experimental?.bossHpPercent });
   return {
     seed: faRehearsalSeed(m, ps),
     kind,
@@ -1940,7 +1975,7 @@ export function sellJunk(m, ps, policy = null) {
     for (const p of sales) if (ps.find(p.uid) && !advisorProtected(m, ps, p)) tryDo(() => ps.sell(p.uid));
     return;
   }
-  for (const { p } of all.slice(BENCH_BUDGET)) tryDo(() => ps.sell(p.uid));
+  for (const { p } of all.slice(m.isSolo ? BENCH_BUDGET : COOP_BENCH_BUDGET)) tryDo(() => ps.sell(p.uid));
   for (const { p } of junk.slice(0, 4)) if (m.round >= 5 && ps.find(p.uid)) tryDo(() => ps.sell(p.uid));
 }
 
@@ -2283,6 +2318,7 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
     let bestS = 0;
     let bestPrice = Infinity;
     let bestMerges = false;
+    const wantedSlots = new Set();
     let cur = null;
     ps.shop.slots.forEach((s, i) => {
       if (!s || s.sold) return;
@@ -2334,6 +2370,16 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         if (!boardFull) sc += 8;
       } else {
         if (fillOnly) return;
+        const requested = advisor?.items?.buy?.includes(s.id);
+        // §37.39 [ASSUMED]: shop equipment only when it completes an equipment merge (or an advisor asks for it). Bots used
+        // to buy almost every item the shop showed once a carrier had room (8.4 on the board at R13, 2–4 funds a round from
+        // R10); as refreshes those funds buy more — 5–6 → 6–8 refreshes a round in R11–R14, merges 4.6 → 5.4 a game, board
+        // elites at R14 3.3 → 3.8 (职业队 forced), and more wins on every 终极 bench. Tier ≥ 4 items only was no better.
+        // Equipment from 机变 cards, rewards and strategies is still taken and equipped; a custom policy (伊奥莱塔's
+        // strategy bots) keeps its own equipment rule. §37.41: the elite items, the dolls and the bond item of a focus whose
+        // top tier needs 缪尔赛思 are bought too (shopItemWanted).
+        const wanted = !customPolicy && !advisor && shopItemWanted(m, ps, s.id, ctx);
+        if (!customPolicy && !requested && !wanted && !ps.completesItemMerge(s.id)) return;
         if (!advisorItemAllowed(m, ps, s)) return;
         if (customPolicy && (policy.canLevel(m, ps) || (canRefresh && freeSlot(ps.hand) >= 0
           && policy.searchTargets(m, ps).some(t => ps.funds >= refreshCost
@@ -2342,9 +2388,9 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
         if (freeSlot(ps.hand) < 0) return;
         if (ps.funds - price < reserve && !ps.completesItemMerge(s.id)) return;
         const carriers = [...ps.board.values()].filter((p) => p.kind === 'chess' && slotFree(m, ps, p, gd.item(s.id))).length;
-        const requested = advisor?.items?.buy?.includes(s.id);
         if (!carriers && !requested) return;
-        sc = 6 + (gd.tierOf(s.id) || 1) * 3 - price + (ps.completesItemMerge(s.id) ? 10 : 0) + (requested ? 24 : 0);
+        sc = 6 + (gd.tierOf(s.id) || 1) * 3 - price + (ps.completesItemMerge(s.id) ? 10 : 0) + (requested ? 24 : 0) + (wanted ? WANTED_ITEM : 0);
+        if (wanted) wantedSlots.add(i);
       }
       const merges = s.kind === 'chess' && ps.completesChessMerge(s.id)
         && (!customPolicy || policy.core(m, ps, s.id));
@@ -2357,12 +2403,19 @@ export function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0, polic
     // a full board buys only what improves it (merge progress, a lineup upgrade), and only when it is worth more than
     // the refreshes its price would pay for (each may show the third copy of a held pair, refreshValue)
     let buy = best >= 0 && bestS >= (boardFull ? BUY_FULL_MIN : 3);
-    if (buy && boardFull && canRefresh && !bestMerges) {
+    if (buy && boardFull && canRefresh && !bestMerges && !wantedSlots.has(best)) {
       const price = Math.max(1, ps.priceOf(ps.shop.slots[best]));
       if (bestS < refreshValue(m, ps, ctx) * price / Math.max(1, refreshCost)) buy = false;
     }
     if (buy) {
+      const bought = ps.shop.slots[best];
       if (!buyOffer(m, ps, best)) return;
+      // §37.41: a doll is destroyed at once (equipping consumes it), so it never holds a hand slot through the prep
+      if (bought?.kind === 'item' && dollItem(m, ps, bought.id)) {
+        const piece = [...ps.hand, ...ps.temp].find((p) => p && p.kind === 'item' && p.id === bought.id);
+        const target = piece && itemTarget(m, ps, piece, context(m, ps));
+        if (target) tryDo(() => ps.equip(piece.uid, target.uid));
+      }
       continue;
     }
     // §37.35 [ASSUMED] 职业队: the refreshes the opening strategy rigs toward its core bond (杜遥夜's first two, 佩佩's after a
@@ -3122,6 +3175,104 @@ const itemEffect = (rec) => (rec && Array.isArray(rec.buffs) && rec.buffs[0] && 
 const isMutationCell = (gd, itemId) => itemEffect(gd.item(itemId)) === 'char_chess_transformation_equip';
 
 /**
+ * §37.41 [ASSUMED]: the shop items that make an elite are bought despite §37.39 — ahead of the refreshes (ELITE_ITEM added
+ * to the buy score, no refresh comparison): 博士投影 (5 funds, the wearer turns elite at the next round start: itemTarget's
+ * strongest normal deployed operator) while a deployed normal operator of tier ≥ ELITE_ITEM_TIER can wear it before the
+ * Final Assault prep, and 拟态物质 (4 funds, the third copy of a held pair) while a normal pair of tier ≥ ELITE_ITEM_TIER
+ * still has copies in the pool. The community's 「拟态物质在差一只合成时买」 (handoff/round55 community research 装6).
+ * Paired 终极 results in docs/history/0.3.4.md §37.41.
+ */
+const WANTED_ITEM = 40;
+const ELITE_ITEM_TIER = 4;
+function eliteItem(m, ps, id) {
+  const gd = ps.gd || m.gd;
+  const rec = gd.item(id);
+  switch (itemEffect(rec)) {
+    case 'equip_round_start_upgrade_char':
+      return m.round < gd.bossRound && [...ps.board.values()].some((p) => p.kind === 'chess' && !gd.isGolden(p.id)
+        && gd.tierOf(p.id) >= ELITE_ITEM_TIER && slotFree(m, ps, p, rec));
+    case 'use_equip_reward_char_chess':
+      for (const [base, k] of copyCounts(m, ps)) {
+        if (k + 1 < mergeNeed(m, base) || gd.tierOf(base) < ELITE_ITEM_TIER) continue;
+        if ((typeof ps.poolOf === 'function' ? ps.poolOf(base) : m.pool).left(base) > 0) return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
+/**
+ * §37.41 [ASSUMED] (the maintainer, 2026-10-29: 「前期精打细算玩偶以及全时期的见钱眼开玩偶也都是非常不错的道具」): in solo,
+ * 精打细算玩偶 (3 funds, +1 fund every later round start) while DOLL_ROUNDS_LEFT rounds remain before the Final Assault and
+ * 见钱眼开玩偶 (1 fund, +2 next round) before the Final Assault prep. Bought like the elite items and destroyed at once. Not
+ * in co-op: there the mid-game enemies carry 2–2.5× the solo HP and the funds held back cost seats (history §37.41).
+ */
+const DOLL_ROUNDS_LEFT = 5;
+function dollItem(m, ps, id) {
+  if (!m.isSolo) return false;
+  const key = itemEffect((ps.gd || m.gd).item(id));
+  if (key === 'gain_coin_when_round_start') return m.gd.bossRound - m.round >= DOLL_ROUNDS_LEFT;
+  if (key === 'use_equip_gain_coin_when_next_round_start') return m.round < m.gd.bossRound;
+  return false;
+}
+
+/** A loose piece: a bond item (giveBondId, not a 变形同构体) / a 变形同构体 (canGiveBond). */
+const isBondItem = (gd, p) => !!p && p.kind === 'item' && !!gd.item(p.id)?.giveBondId && !gd.item(p.id)?.canGiveBond;
+const isMorph = (gd, p) => !!p && p.kind === 'item' && !!gd.item(p.id)?.canGiveBond;
+/** The bond's top threshold exceeds the deploy cap (炎 9 > 8): only 调和 plus a conversion reaches it. */
+const topAboveCap = (m, ps, bond) => { const th = bond ? (ps.gd || m.gd).bond(bond)?.thresholds : null; return Array.isArray(th) && th.length > 0 && th[th.length - 1] > ps.deployCap; };
+/** A held (loose) bond item of `bond`. */
+const holdsBondItem = (m, ps, bond) => [...ps.hand, ...ps.temp].some((p) => isBondItem(ps.gd || m.gd, p) && (ps.gd || m.gd).item(p.id).giveBondId === bond);
+
+/**
+ * §37.41 [ASSUMED] 9 炎 (the maintainer: 「大炎盟约缪尔赛斯转炎可以做到8人口9大炎」, 「一般只买自己准备玩的阵容可能需要的转职装备，
+ * 方便后面出缪尔赛斯的时候用转职球引入强力外援」): for a focus whose top tier exceeds the deploy cap, one of its bond items is
+ * bought from NINE_FROM and held; 缪尔赛思 then counts as two of its members (bondValue: 调和 + her conversion) and the
+ * 变形同构体 she brings goes on her with it (morphPlan). Every other bond item goes on as before.
+ */
+const NINE_FROM = 6;
+function nineItem(m, ps, id, ctx) {
+  const gd = ps.gd || m.gd, rec = gd.item(id);
+  if (!rec || rec.canGiveBond || !ctx.focus || rec.giveBondId !== ctx.focus || !topAboveCap(m, ps, ctx.focus)) return false;
+  return m.round >= NINE_FROM && m.round < gd.bossRound && countFree(ps.hand) >= 2 && !holdsBondItem(m, ps, ctx.focus);
+}
+
+/** §37.41: the shop items bought despite §37.39 (ahead of the refreshes, WANTED_ITEM). */
+const shopItemWanted = (m, ps, id, ctx) => eliteItem(m, ps, id) || dollItem(m, ps, id) || nineItem(m, ps, id, ctx);
+
+/**
+ * §37.41 [ASSUMED]: where a 变形同构体 goes (it grants the bond of a bond item worn with it) — the operator of chooseLineup's set
+ * whose granted bond (a worn bond item, or a held one equipped with it) raises lineupScore most beyond the items' own
+ * value; null: none gains (the morph then waits for a focus whose top tier needs it, else takes the usual target).
+ */
+function morphPlan(m, ps, morph, ctx) {
+  const gd = ps.gd || m.gd;
+  const policy = morphSlotPolicy(ruleOption(m?.rules, 'morphPairing'), (it) => !!gd.item(it?.id)?.canGiveBond);
+  const cur = chooseLineup(m, ps, ctx);
+  const base = lineupScore(m, ps, cur.set, ctx);
+  const loose = [...ps.hand, ...ps.temp].filter((p) => isBondItem(gd, p));
+  const morphRec = gd.item(morph.id);
+  let best = null;
+  for (const P of cur.set) {
+    const saved = P.items;
+    const items = saved || [];
+    if (items.some((it) => gd.item(it.id)?.canGiveBond) || !policy.accepts(items, morphRec)) continue;
+    const free = policy.slotCap(gd.equipPerChess) - policy.slotsUsed(items) - (policy.occupies(morphRec) ? 1 : 0);
+    const options = [];
+    if (free >= 0 && items.some((it) => gd.item(it.id)?.giveBondId)) options.push(null);
+    if (free >= 1) for (const X of loose) options.push(X);
+    for (const X of options) {
+      P.items = [...items, { id: morph.id, uid: -1 }, ...(X ? [{ id: X.id, uid: -2 }] : [])];
+      const gain = lineupScore(m, ps, cur.set, ctx) - base - 5 * (X ? 2 : 1); // unitBase counts 5 per worn item
+      P.items = saved;
+      if (gain > (best ? best.gain : 0.5)) best = { P, X, gain };
+    }
+  }
+  return best;
+}
+
+/**
  * Whom the bot injects with 突变细胞 (after the battle its carrier — deployed or on the bench: every owned carrier's item
  * hooks run — is destroyed and a random operator one tier higher joins the bench, PlayerState.transformChess; the next
  * prep's lineup step deploys it like any owned unit, so a deployed carrier only costs a re-placement): the least
@@ -3285,9 +3436,20 @@ function useArt(m, ps, item, ctx) {
   if (key) { const [r, c] = parseKey(key); tryDo(() => ps.useArt(item.uid, r, c)); }
 }
 
-function equipItems(m, ps) {
+export function equipItems(m, ps) {
   const gd = ps?.gd || m.gd;
   const tried = new Set();
+  // §37.41: a 变形同构体 goes where its granted bond gains most (morphPlan, with the bond item the plan names); without such a
+  // carrier it waits for a focus whose top tier needs it (topAboveCap), else the usual target below takes it
+  for (const morph of [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p))) {
+    const mctx = context(m, ps);
+    const plan = morphPlan(m, ps, morph, mctx);
+    if (!plan && !(m.round < gd.bossRound && topAboveCap(m, ps, mctx.focus))) continue;
+    tried.add(morph.uid);
+    if (!plan || (plan.X && !tryDo(() => ps.equip(plan.X.uid, plan.P.uid)))) continue;
+    tryDo(() => ps.equip(morph.uid, plan.P.uid));
+  }
+  let heldNine = false;
   for (let guard = 0; guard < 12; guard++) {
     const item = [...ps.hand, ...ps.temp].find((p) => p && p.kind === 'item' && canUseItem(m, ps, p) && !tried.has(p.uid));
     if (!item) break;
@@ -3296,6 +3458,11 @@ function equipItems(m, ps) {
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
+    // §37.41: one bond item of a focus whose top tier needs 缪尔赛思 waits for her 变形同构体 until the Final Assault prep
+    if (!heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
+      heldNine = true;
+      continue;
+    }
     const target = itemTarget(m, ps, item, ctx);
     if (!target) continue;
     if (!tryDo(() => ps.equip(item.uid, target.uid)) && advisorPlan(m, ps)?.items?.equip?.length) {
