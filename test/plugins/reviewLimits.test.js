@@ -227,11 +227,14 @@ test('named operator, band, hammer, 黑云 and warden loops stop at the official
   const e = { alive: true, s: { atk: 10, maxHp: 100 }, x: 0, y: 0, id: 'w', buffs: [], mem: { ab: { list: [] } }, profile: {}, base: { bat: 1, def: 0 }, form: null, atkCd: 0 };
   let pierces = 0;
   const b = { aliveEnemies: () => [], addBuff() {}, removeBuff() {}, fx() {}, time: 0, dealDamage() { pierces++; } };
-  hooks[1].killed({}, b, e, {});
-  hooks[0].attack({}, b, e);
-  hooks[0].before({}, b);
+  // by capability, not by index: a kit may prepend the inert carryPhase descriptor (enemyCarry.js phaseState, 0.3.4)
+  const killer = hooks.find((h) => typeof h.killed === 'function');
+  const main = hooks.find((h) => typeof h.dealt === 'function');
+  killer.killed({}, b, e, {});
+  main.attack({}, b, e);
+  main.before({}, b);
   const tWard = Date.now();
-  hooks[0].dealt({ target: { alive: true }, dmg: { isAttack: true } }, b, e);
+  main.dealt({ target: { alive: true }, dmg: { isAttack: true } }, b, e);
   assert.equal(pierces, timesCap - 1);
   assert.ok(Date.now() - tWard < 1000, `warden ${Date.now() - tWard}ms`);
 });

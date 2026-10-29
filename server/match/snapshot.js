@@ -99,6 +99,9 @@ export const MATCH_FIELDS = Object.freeze({
   ]),
   transient: Object.freeze([
     '_rehearsalTasks', 'paused', '_pausedAt', '_bossPubTimer', '_bossPubAt', '_bossClockOn', '_damageDirty', '_damageTimer',
+    // who accepts this field's damage rows (extensions.js _beginDamage: browser authority, server, or a quota boss):
+    // recomputed at every field's start, so a restore drops the interrupted field's answer
+    '_damageServerOwned',
     '_damageAt', '_damageSampleAt', '_damageSent', '_progressTimer', '_bossClock', '_lastPoolAt', '_poolTimer', '_lastPoolKey',
     'pacer', 'overtimeAt', '_timers', '_phaseTimer', '_infoAdvanceTimer', 'setupVote', '_lastSetupVoteAt', '_turnTimer',
     '_pubDirty', '_pubTimer', '_lastPubAt', '_lastPubJson', '_privDirty', '_prepEndQueued', 'fields', 'runner', 'watchers',
