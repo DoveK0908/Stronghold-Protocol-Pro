@@ -4,6 +4,22 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 ## 9. Client rendering contract (public/js/render)
 
+**防治倒转区 (Pro, owner 2026-10-28).** The experimental dialog exposes default-off `bossQuota` with a visible
+explanation: Final Assault and Hidden Core independently freeze the living entry count N and initial actual shared
+pool / N quota, cap final-hit overflow in actual HP loss but retain full raw damage/DPS, and unlock the cap when
+overtime life drain starts. Completion ranking only; victory and rewards remain unchanged. `ResultView` data details
+show a table for each supplied `m.result.bossQuota` round (`kind`, `round`, `quota`, `players`), with rank, name and
+quota completion time in game seconds (two decimal places for presentation), explicitly marking null times unfinished.
+Use server rank/seat ordering unchanged, including tied ranks. Without this data no quota section appears, so old
+records retain their existing presentation. Selectors: `#experimental-boss-quota`, `#experimental-boss-quota-help`,
+`[data-testid="result-boss-quota"]`, `[data-quota-kind="boss"]` / `[data-quota-kind="hidden"]`, and `[data-player-id]`.
+
+**常用盟约 (owner 2026-10-28).** The preselected-alliance picker groups core alliances used in three distinct self
+victories ahead of the other alliances. Any difficulty counts, including training. Only active bonds in the self
+settlement row count once per match; defeat, quit, test, gameplay-plugin and AI-takeover records do not count.
+Progress is derived from retained local history for the displayed official version, including old compacted/imported
+records. No extra manual favorite action or server write is needed; clearing/dropping records removes their progress.
+
 **Operator skins (§34.23, [SKINS.md](../SKINS.md)).** [ASSUMED] Retain received skin IDs separately from displayed
 skins so the other-player switch restores loaded units when re-enabled, including boss prep partners. Any-phase
 `room.skins` refreshes owner/private and existing scout views; public seat choices update current battle rendering
@@ -300,6 +316,11 @@ Screens: **Title** (season art backdrop, 开始 → nickname), **Lobby** (laid o
 In narrow desktop windows (width ≤ 900 px, height > 520 px), the hub's simulation descriptions wrap in full; both
 reserve at least two lines to keep the cards aligned ([ASSUMED] layout, §35.60). Phones keep the short descriptions
 specified above.
+
+**Room experimental number drafts (§37.44).** The boss HP field keeps local input text while editing; clock/ping
+re-renders must not replace it with the last `room.state` value. Blur / Enter normalizes and submits once (minimum 25%,
+step 5, no gameplay upper cap). While busy, the draft survives the old echo; after settlement, including refusal, or
+on reopening, it adopts the authoritative percentage. Empty/non-finite input restores that value without a request.
 
 **Data readiness.** `data.js useData` subscribes and starts its loads, then schedules a render to re-read their
 statuses: a warm-up that settles between the initial render and the subscription must not leave a resumed match on

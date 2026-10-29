@@ -18,6 +18,8 @@ LOBBY(room) → INFO_CHECK (co-op 25 s; solo and any single-human match untimed 
                     and the traits' <进入休整期时> effects (META.md §2.3), after the 机变 draft, GitHub #851, DESIGN §35.24 /
                     §35.53; co-op: timer from config, ends when all alive humans+bots ready;
                     solo / single human: untimed, ends on ready;
+                     Pro experimental prepUnlimited: configured countdown also in single-human co-op (solo data without a duration stays untimed), clamps to zero without forced readiness,
+                     auto-picks or temp disposal; only all-alive ready ends PREP (default off; owner 2026-10-29);
                     the own m.private carries 预计叠层 `layerForecast` — the layers the own <休整期结束时> effects add if the prep
                     ended now, random sources left out and flagged: server/match/layerForecast.js, feedback #25, §32.14.46)
      PREP_END      (<休整期结束时> effects; unfrozen shop cleared; Ready is blocked while a personal choice or temp overflow is pending;
@@ -140,6 +142,8 @@ unequippable items must leave two hand slots; explicit requests keep one. Carry 
 Absent/empty plans and AI takeover without an advisor retain legacy behavior (maintainer **2026-10-20**).
 This is **[ASSUMED] AI policy**, not an official economy change. Bounds and sources:
 [EXTERNAL_AI](../EXTERNAL_AI.md#advisor-mode-and-readable-observations-359).
+
+**Expanded bench allocation (owner 2026-10-29).** With `benchExpand`, automatic purchases / grants and temp-to-hand refill fill the original ten slots first (`9..0`), then the three added slots (`12..10`). Each range keeps its right-to-left order. This is an allocation preference, not compaction: already held pieces are not moved, and explicit `stow` preferences / manual moves still choose their target. With the option off, the official ten-slot behavior is unchanged.
 
 **Temp overflow (临时整备区, row 8; user playtest #3 item 3).** Passive gains that find the hand full (merge elites, grants — the operator a 突变细胞 transformation gains included, §21.1 —, battle-result rewards, equipment returned by a merged / sold / transformed carrier) overflow into an expandable queue with five visible temp slots. The first five pieces fill right-to-left; later pieces wait behind them and refill freed slots in order. No passive gain is discarded for exceeding fifteen visible bench slots (owner correction, 2026-10-14, §32.14.21). Hidden pieces participate in merges, stock accounting, reconnect state and deadline resolution; Ready is refused while any is occupied (official "直到溢出情况排除才可开始进行作战"). A temp piece is resolved — a chess sold back to the pool with its summons removed, items destroyed, a summon stack removed (it comes back at the next round start, PRTS "干员所属召唤物会于下一回合返还", §20.1) — only at the deadline of the **first prep in which its player could act on it** (`PlayerState.tempDue(piece)` vs `prepsEnded`; every write into a temp slot goes through `_putTemp`, which records it): a piece that arrived during a prep before Ready is due at that prep's end; one that arrived after Ready or during the `<休整期结束时>` effects, or outside PREP (COMBAT, 联防, SETTLE — battle-result grants, a SETTLE merge's elite, returned equipment —, the next ROUND_START, 机变) is kept, visible and usable (move to a free hand slot, place, equip, use, destroy, sell) through the **next** prep. Un-readying (`setReady(false)`) makes whatever arrived while ready due at the current prep. ROUND_START no longer wipes temp (it used to destroy what SETTLE had put there before the player ever saw it). A merge's elite whose merge consumed a deployed copy takes that copy's tile and facing (§20.11); otherwise it goes to the hand, overflowing into temp (also outside PREP). `server/match/audit.js` (`tools/matchrun.mjs --check`) tracks the arrivals itself and flags any temp piece that outlives its due prep. The UI frames the row on the board with the rule (§17.5).
 
@@ -477,3 +481,39 @@ Official def4f014 / 7a2630b8 adjust only the normal bot's decision weights: low-
 to teammates, small core plans yield to public opening/main bonds, and multi-player 鸭爵 becomes less likely.
 The weights and cache invalidation are documented in META.md. Pro filters card claims by poolFor identity;
 an independent pool cannot reserve another pool's stock. Named elite dispatch stays ahead of normal decisions.
+
+### Pro speed and quota clock contract (2026-10-29)
+
+Luck and Pro select one absolute match `gameSpeed`; they never multiply. The normal raw rate is `GAME_SPEED` (2),
+Pro on selects 4 at the next battle, and Pro off selects 2 at the next battle. An explicit accepted Luck selection,
+even at the same speed, cancels pending Pro changes and its vote. Every tab follows the authoritative private echo;
+remembered client preferences are not replayed over a Pro change. Mid-battle retuning preserves elapsed game time,
+remaining game-time deadlines, pause origin and pending pacing debt; streamed fields retain their network feed.
+
+For `bossQuota`, completion timestamps and the overtime HUD are shown in game seconds (`sim gt / combatTimeScale`),
+not wall seconds. Public live completion rows appear after the ally's name; unfinished seats have no completion badge.
+The match supplies a clock anchor and effective rate so acceleration and pause agree with the simulation's life drain.
+Results retain the same units. Ordinary rooms keep the original rules. Helper selection and side order are unchanged.
+Full enemy runtime inheritance was deferred in that batch. The later scoped option below supersedes that open scope.
+
+### Pro Unite HP/phase and redeployment carry (2026-10-29)
+
+The owner narrowed the original full-runtime request: enemies carry current HP and native phase, while operators keep
+all official HP/SP/skill-reset rules and additionally carry their remaining redeployment time. `stateCarry` is an
+optional room-owned switch, **off by default**. It applies only within normal → Unite → relay; a new round starts fresh.
+Waiting for other fields, and waiting in a scheduled Unite spawn queue, advances neither carried phase timers nor the
+remaining redeployment delay. Zero is a valid remaining delay, not a request for the full timer.
+
+Enemy leaks capture a bounded version-1 data DTO before destructive removal: `{v, hp, maxHp, phases}`. Explicit content
+phase adapters restore data and native phase callbacks in the new field; no function or old Battle reference is sent.
+Wired phase adapters are: low HP, refraction, prisoner, reborn, husk, statue, partner rage, pilot/warden/xi/mace/wolf/
+translator/no-egg, element crawl, flying bomb, barrel reload and blade fan. Dynamic `immune` sets are restored by the
+owning adapter (wolf drops stun immunity in form two, translator clears it once done, statue adds levitate immunity);
+any enemy without a wired adapter enters with its fresh native initial state, so this is **not** a full runtime-graph
+carry. Routine casting, operator-applied buffs/DoT, projectiles and arbitrary lexical state are **not** part of this scope.
+The helper selection/side order, source attribution, bounty and LP rules are unchanged. Unspawned relay entries recover
+the original input snapshot, instead of making a full-HP copy or decrementing waiting time.
+
+The option forces server-authoritative combat from normal battle construction. Existing deterministic Worker/replica
+specs transport the same data; client `b.result` cannot invent an HP/phase snapshot. Ordinary rooms retain the original
+client-combat decision and default spec/result shape. Boss and hidden-core fields never enable this continuation.

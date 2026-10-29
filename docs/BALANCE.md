@@ -16,7 +16,8 @@ kinds / counts and routes must follow the official game; research 08 §6–§7, 
 * leader pool = `bloodPoint[difficulty]` × the players alive when the fight starts — one pool for every boss field; solo
   × 1 (the owner's decision of 2026-10-06, adopting PR #209: it replaces the fixed pool of DESIGN §20.10, co-op
   bloodPoint whatever the count and solo × 0.25 [ASSUMED] — config `bossHpScale.perPlayer: false`, `solo: 0.25` restores
-  it; DESIGN §25.13.4). The bots' solo matches got 4× the leader HP: in the golden corpus 4 of the 6 solo matches that
+  it; DESIGN §25.13.4). A room's experimental 首领血量 (`bossHpPercent`, at least 25%, no gameplay upper cap, in steps of 5, default 100%) scales
+  that pool, floor 1 (2026-10-28). The bots' solo matches got 4× the leader HP: in the golden corpus 4 of the 6 solo matches that
   reached and won the Final Assault now lose it (team LP 0 with 93k–176k of the pool left);
 * leader parts and drones (DESIGN §20.10): a 剑 / 锤 / 碎铳之簧 passes every damage it takes to its leader 1:1 (PRTS "等量的
   无来源生命流失"; until 2026-10-01 half, and a 剑 / 锤 only while grounded — the dive hits [ASSUMED], the handbook says

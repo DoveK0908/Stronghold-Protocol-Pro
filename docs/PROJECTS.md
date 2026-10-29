@@ -31,7 +31,6 @@
 | G02 | 复活 | ✅ |
 | G03 | 地图禁用（玩法#03，`experimental.bannedStages`） | ✅ |
 | G04 | 无限休整期 | ✅ |
-| G05 | 乌尔比安 S3 无位移时技能结束也算【返回】= 原地重新部署 → `59411f41` | ✅ |
 | C01 | 丰川祥子收尾（`mods/sakiko` overlay；S2 只用钢琴 / S1 扇形读 `angle` / `toneReplacesAttack`） | ✅ |
 | C02 | Stronghold-Luck 修复（`mods/luck` L1–L7，未勾选时整局惰性） | ✅ |
 | C03 | 精英 AI 移植（阿尔图罗 `v0.2.4` team28 + 多人围剿；拉维妮娅 `v0.2.0`，2026-10-25 升版） | ✅ |

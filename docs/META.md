@@ -5,6 +5,17 @@ the **UI owner** consuming `m.public` / `m.private` / `m.result`, and anyone dri
 Normative contracts stay in DESIGN.md §6 and §8 ([design/match.md](design/match.md),
 [design/network.md](design/network.md)); this file documents the implementation and every assumption it makes.
 
+The opening's alliance-plan picker automatically groups an alliance as 常用盟约 after three self victories with it
+active at settlement, at any difficulty. `public/js/ui/stats.js` derives the group from retained local records of the
+current official version (not quits, tests, gameplay-plugin or AI-takeover records); `public/js/ui/bondPlan.js` shows
+it first without changing selection permissions or sending a new server intent. See [design/client.md](design/client.md).
+
+Pro clock contract (2026-10-29): Luck's absolute `gameSpeed` and Pro's next-battle on/off select one rate (normal 2,
+Pro on 4, off 2), never multiply. An explicit Luck selection clears Pro promises/votes; all clients follow the match's
+private speed echo, not remembered preferences. Retuning preserves elapsed time, pause origins and pacing debt.
+Quota completion rows in the public view and recorded results use `sim gt / gd.combatTimeScale` game seconds;
+the public boss clock drives the overtime HUD rather than an unscaled wall-clock difference. See [SIM.md](SIM.md).
+
 ```
 server/match/
   Match.js         state machine, timers, round loop, co-op orchestration, views (the lobby⇄match interface is at the top)
@@ -63,6 +74,13 @@ LOBBY → INFO_CHECK (co-op 25 s; solo and single-human matches untimed; all hum
    boss round  → FINAL_ASSAULT (instead of COMBAT/UNITE/SETTLE)   hidden round → HIDDEN_CORE
 → RESULT (m.result to every human, then onEnd once)
 ```
+
+**Pro unlimited preparation (`experimental.prepUnlimited`, default off).** `match/prep.js` still publishes the ordinary
+`gd.prepTime(round)` deadline, including single-human co-op rooms (solo data has no prep duration and stays untimed).
+The UI countdown reaches zero normally;
+`prepDeadline()` then returns without forcing Ready, auto-picking a pending personal choice or disposing temp overflow.
+Normal player / bot actions continue; all alive seats must become ready before PREP ends. With the option off, the
+existing solo / single-human untimed rule and co-op timeout resolution remain unchanged (owner 2026-10-29).
 
 **Deploy field (user playtest #5 item 7).** From the ROUND_START of a boss round (最终攻势 / 隐秘核心) a player deploys on
 its half of the boss field (`Match.deployFieldOf` → `'bossL'`, or `'bossR'` for the second player of a drawn pair — the
@@ -715,7 +733,7 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   rules, no 调度中心 gate, bonds through the player's view; 「自选干员放入后模拟中的补给池随机范围也将被相应扩大」, 0.2.0), and
   信标 never sends one to a teammate [ASSUMED]. `battleInput` carries `diy` (the pick); `m.private.diy` / `diyBanned`; `prepFieldMeta` and
   `m.result` lineups carry the pick (`diy`) so other players' cards compose the operator.
-* **Hand**: 10 slots filled right→left, plus an expandable temp queue for passive overflow (merge results, grants, returned equipment); only its first 5 slots are displayed, with later pieces queued in arrival order;
+* **Hand**: 10 slots filled right→left, plus an expandable temp queue for passive overflow (merge results, grants, returned equipment); only its first 5 slots are displayed, with later pieces queued in arrival order. With `benchExpand`, automatic purchases / grants and temp refill prefer the original slots (`9..0`) before the three added slots (`12..10`), each right→left (owner 2026-10-29); existing pieces and explicit target choices stay put;
   a full hand refuses every buy and reward pick — also one whose copy would complete a merge at once (PRTS
   卫戍协议/帮助 §手牌区 "例如招募/购入等通常情况下会增加手牌的操作"; GitHub #82) — and withdrawals unless the withdrawn
   summoner's own summon stack frees a slot (a deployed summon withdrawn with no stack of its own left to join is a new
