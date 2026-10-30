@@ -45,8 +45,6 @@ node\LICENSE-node.txt    Node 自己的许可证（MIT，与 node.exe 出自同�
 app\                     游戏本体：代码 + 生产依赖 + public（全部素材）+ data，完全离线
 start-windows.bat             app\scripts\launch.mjs --no-setup
 start-windows-sandbox.bat    同上，加 --scripts sandbox（脚本插件在沙箱里运行）
-start-windows-luck.bat       用 Luck 控制台起服（包内 luck\ 已是打过补丁的上游克隆）
-luck\                        Stronghold-Luck 控制台（上游 0.1.5 + mods/luck 的 L2–L7 补丁）
 README-quickstart.md       给玩家看的说明（含非官方 / 严禁盈利 / 素材版权声明）
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 ```
@@ -55,11 +53,12 @@ LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
 素材已经在包里，跳过联网准备，直接起服务器并打开浏览器）。
 卸载＝删除文件夹（不写注册表、不放系统目录）。素材约 330 MB 是硬成本，包因此比较大。
 
-## 2b. 包里的 Luck 控制台
+## 2b. 测试插件
 
-`luck\` 是 **Stronghold-Luck** 的一份拷贝，已经把我们 `mods/luck` 的 6 个补丁（L2–L7）打在上面，
-所以双击 `start-windows-luck.bat` 就能直接用，不需要再 clone 或运行 `apply.mjs`。
-面板是房间级的：房间「实验性选项 → Luck 测试插件」勾了才出现。想回到原版玩法就用 `start-windows.bat`。
+> 2026-10-30 起包内不再附带 Stronghold-Luck 控制台：Luck 的能力已原生重写进本体，成为房间级的「测试插件」。
+
+建房时勾选「实验性选项 → 测试插件」，整备期右下角出现面板。面板只改自己的席位（资金、生命、商店、盟约、地图、波次、倒计时冻结等），
+默认关闭；不勾选时整局不加载相关代码，也不需要再打补丁或另起 launcher。
 
 ## 3. 包里放了什么、没放什么
 

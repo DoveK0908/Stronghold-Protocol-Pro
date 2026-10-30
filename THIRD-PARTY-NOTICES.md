@@ -39,16 +39,17 @@ The Arturia, Lavinia and Zumama integrations retain their upstream `LICENSE` and
 `server/match/arturia/`, `server/match/lavinia/` and `server/match/aiAddons/zumama/`; consult those files for the GPL terms,
 source revisions and file hashes.
 
-**Redistribution hold — Stronghold-Luck:** the local snapshot in `mods/luck/runtime/` comes from
-[RenJiyi163/Stronghold-Luck](https://github.com/RenJiyi163/Stronghold-Luck), v0.1.7,
-commit `c4dcba173689e356b5e7c5f1abf53495cc2797ab`. At inspection on 2026-10-28, that pinned tree had no LICENSE
+**Redistribution hold — Stronghold-Luck (snapshot removed from the tree on 2026-10-30):** the vendored snapshot that
+used to live in `mods/luck/runtime/` came from [RenJiyi163/Stronghold-Luck](https://github.com/RenJiyi163/Stronghold-Luck),
+v0.1.7, commit `c4dcba173689e356b5e7c5f1abf53495cc2797ab`. At inspection on 2026-10-28, that pinned tree had no LICENSE
 file or identified licence grant in its README, package manifest or runtime sources. Public source access does not
-establish redistribution permission, and this project's GPL does not supply a licence for Luck. Local version-control
-retention is not publication clearance: **do not push this snapshot or distribute a bundle containing it** until an
-applicable upstream licence or written author permission is obtained and recorded. Alternatively, remove the vendored
-snapshot from the publishable history and deliver an independently user-installed integration, after verifying its
-licensing and technical boundaries. Merely adding attribution or deleting files in a later commit does not clear the
-existing history for publication.
+establish redistribution permission, and this project's GPL does not supply a licence for Luck. The snapshot has since
+been removed from the working tree and is kept only in the maintainer's local archive; the replacement test plugin was
+written independently against this repository's own native APIs and contains no Luck source. **Git history still
+contains the removed snapshot, and that history is not publication clearance:** do not distribute a bundle built from a
+revision that still contains `mods/luck/` until an applicable upstream licence or written author permission is obtained
+and recorded. Merely adding attribution or deleting files in a later commit does not clear the existing history for
+publication.
 
 ## Fonts
 

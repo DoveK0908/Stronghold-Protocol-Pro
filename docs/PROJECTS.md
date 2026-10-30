@@ -32,7 +32,7 @@
 | G03 | 地图禁用（玩法#03，`experimental.bannedStages`） | ✅ |
 | G04 | 无限休整期 | ✅ |
 | C01 | 丰川祥子收尾（`mods/sakiko` overlay；S2 只用钢琴 / S1 扇形读 `angle` / `toneReplacesAttack`） | ✅ |
-| C02 | Stronghold-Luck 修复（`mods/luck` L1–L7，未勾选时整局惰性） | ✅ |
+| C02 | Luck 能力原生内置为「测试插件」（`mods/luck` 快照已于 2026-10-30 从工作树归档移除） | ✅ |
 | C03 | 精英 AI 移植（阿尔图罗 `v0.2.4` team28 + 多人围剿；拉维妮娅 `v0.2.0`，2026-10-25 升版） | ✅ |
 | C04 | 皮肤美术补齐 276 套（后续 10-23 重提取见下） | ✅ |
 | U01 | 对局记录 | ✅ |

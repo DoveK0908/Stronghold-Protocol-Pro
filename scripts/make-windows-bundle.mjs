@@ -409,9 +409,6 @@ start-windows.bat             app\\scripts\\launch.mjs --no-setup
 start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
 start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
 start-linux-sandbox.sh     同上，并开启插件脚本沙箱
-start-windows-luck.bat       用 Luck 控制台起服（包内 luck\ 已是打过补丁的版本）
-start-linux-luck.sh          同上（Linux / macOS）
-luck\                         Stronghold-Luck 控制台（上游 0.1.5 + mods/luck 的 L2–L7 补丁）
 README-quickstart.md       本文件
 LINUX.md / HTTPS.md        开服（Linux 新手）与 https / 隧道说明
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md`
@@ -420,9 +417,6 @@ start-windows.bat             app\\scripts\\launch.mjs --no-setup
 start-windows-sandbox.bat    同上，并开启插件脚本沙箱（--scripts sandbox）
 start-linux.sh              同上（Linux / macOS / WSL；用系统的 Node 24）
 start-linux-sandbox.sh     同上，并开启插件脚本沙箱
-start-windows-luck.bat       用 Luck 控制台起服（包内 luck\ 已是打过补丁的版本）
-start-linux-luck.sh          同上（Linux / macOS）
-luck\                         Stronghold-Luck 控制台（上游 0.1.5 + mods/luck 的 L2–L7 补丁）
 README-quickstart.md       本文件
 LINUX.md / HTTPS.md        开服（Linux 新手）与 https / 隧道说明
 LICENSE / NOTICE.md / THIRD-PARTY-NOTICES.md
@@ -569,12 +563,11 @@ async function main() {
   console.log(`    完成：${deps.files} 个文件 / ${MB(deps.bytes)}（只含生产依赖）`);
 
   // 4) 便携版 Node（每次都从校验过的 zip 重新解压）
-  let nodeInfo = { version: '（未打包，目标机器需自备 Node 24）', bytes: 0 };
   if (o.node) {
     console.log(`  · 准备便携版 Node ${nodeVersion}…`);
     await fsp.mkdir(nodeDir, { recursive: true });
     const zipPath = await ensureNodeZip(nodeVersion, nodeHash);
-    nodeInfo = await extractPortableNode(nodeDir, nodeVersion, zipPath);
+    const nodeInfo = await extractPortableNode(nodeDir, nodeVersion, zipPath);
     console.log(`    完成：Node ${nodeInfo.version} / ${MB(nodeInfo.bytes)} + LICENSE`);
   }
 
@@ -588,30 +581,12 @@ async function main() {
     await fsp.copyFile(src, path.join(out, f));
   }
 
-  // 4.5) 自带一份 Stronghold-Luck（已打过 mods/luck 的补丁），并给启动脚本
-  const luckSrc = path.join(ROOT, '..', 'source', 'luck');
-  let withLuck = false;
-  if (fs.existsSync(path.join(luckSrc, 'src', 'launcher.mjs'))) {
-    console.log('  · 复制 Stronghold-Luck 控制台（含 mods/luck 的补丁）…');
-    const luckDst = path.join(out, 'luck');
-    await copyTree(luckSrc, luckDst, new Set(['.git', 'node_modules', 'logs', 'test', 'android', '.github']));
-    const luckInfo = await dirSize(luckDst);
-    console.log(`    完成：${luckInfo.files} 个文件 / ${MB(luckInfo.bytes)}`);
-    withLuck = true;
-  } else {
-    console.log('    ! 找不到 source/luck（工作区里的上游克隆），本包不含 Luck 控制台');
-  }
-
   await fsp.writeFile(path.join(out, 'start-windows.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup %*'), 'latin1');
   await fsp.writeFile(path.join(out, 'start-windows-sandbox.bat'), bat('"%NODE%" "%HERE%app\\scripts\\launch.mjs" --no-setup --scripts sandbox %*'), 'latin1');
   await fsp.writeFile(path.join(out, 'start-linux.sh'), sh('--no-setup'), 'utf8');
   await fsp.writeFile(path.join(out, 'start-linux-sandbox.sh'), sh('--no-setup --scripts sandbox'), 'utf8');
-  if (withLuck) {
-    await fsp.writeFile(path.join(out, 'start-windows-luck.bat'), bat('"%NODE%" "%HERE%luck/src/launcher.mjs" --game "%HERE%app" %*'), 'latin1');
-    await fsp.writeFile(path.join(out, 'start-linux-luck.sh'), sh('--game "$HERE/app" --no-open', 'luck/src/launcher.mjs'), 'utf8');
-  }
   if (!IS_WIN) {
-    for (const f of ['start-linux.sh', 'start-linux-sandbox.sh', 'start-linux-luck.sh']) {
+    for (const f of ['start-linux.sh', 'start-linux-sandbox.sh']) {
       const full = path.join(out, f);
       if (fs.existsSync(full)) await fsp.chmod(full, 0o755);
     }
@@ -642,14 +617,3 @@ function isMain() {
 
 if (isMain()) main().then((code) => { process.exitCode = code ?? 0; }, (e) => { console.error(e?.stack || e); process.exitCode = 1; });
 
-/** 递归复制，跳过不该进包的目录（.git / node_modules / logs / test / android）。 */
-async function copyTree(src, dst, skip = new Set()) {
-  await fsp.mkdir(dst, { recursive: true });
-  for (const ent of await fsp.readdir(src, { withFileTypes: true })) {
-    if (skip.has(ent.name)) continue;
-    const from = path.join(src, ent.name);
-    const to = path.join(dst, ent.name);
-    if (ent.isDirectory()) await copyTree(from, to, skip);
-    else if (ent.isFile()) await fsp.copyFile(from, to);
-  }
-}

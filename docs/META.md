@@ -13,10 +13,11 @@ it first without changing selection permissions or sending a new server intent. 
 Native test plugin (2026-10-30): `luckConsole` is now the compatibility wire key for built-in 测试插件.
 It has no speed command or speed UI; only Pro's existing next-battle 二倍速 controls apply (normal 2, on 4).
 See [design/match.md](design/match.md) and [design/network.md](design/network.md) for the first-batch gates and scope.
-The following Luck clock contract concerns only the retained legacy overlay, not the native plugin:
+The following paragraph is the **historical** Luck clock contract. The overlay it came from was archived on
+2026-10-30 (only the native plugin remains), and the native speed controls are unchanged by that removal:
 
-Legacy Pro/Luck clock contract (2026-10-29): Luck's absolute `gameSpeed` and Pro's next-battle on/off select one rate (normal 2,
-Pro on 4, off 2), never multiply. An explicit Luck selection clears Pro promises/votes; all clients follow the match's
+Legacy Pro/Luck clock contract (2026-10-29, historical): Luck's absolute `gameSpeed` and Pro's next-battle on/off selected one rate (normal 2,
+Pro on 4, off 2), never multiply. An explicit Luck selection cleared Pro promises/votes; all clients follow the match's
 private speed echo, not remembered preferences. Retuning preserves elapsed time, pause origins and pacing debt.
 Quota completion rows in the public view and recorded results use `sim gt / gd.combatTimeScale` game seconds;
 the public boss clock drives the overtime HUD rather than an unscaled wall-clock difference. See [SIM.md](SIM.md).

@@ -131,14 +131,19 @@ curl -s -o /dev/null -w '%{http_code}
 systemd 用它时只换 `ExecStart`：
 
 ```ini
-ExecStart=/usr/bin/node /root/Stronghold-Protocol-v0.3.2-pro.3/luck/src/launcher.mjs --game /root/Stronghold-Protocol-v0.3.2-pro.3/app --host 127.0.0.1 --port 3000 --no-open
+WorkingDirectory=/root/Stronghold-Protocol-Pro/app
+Environment=PORT=3000
+Environment=HOST=0.0.0.0
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /root/Stronghold-Protocol-Pro/app/server/index.js
 ```
 
 **要点**
 
-- 面板是**房间级**的：房间「实验性选项 → Luck 测试插件」勾了才出现，普通房间看不到；
-- 想回到不带 Luck 的版本，把 `ExecStart` 换回 `start-linux.sh` 那条；
-- 提示「游戏版本不是 0.3.0」是正常的（上游只认到 0.3.0），只要我们这里 `node mods/luck/apply.mjs --check` 全绿就照常工作。
+- 现在**直接起游戏本体**，外面不再套任何 launcher：Luck 外挂和它的启动脚本已于 2026-10-30 归档，原来的
+  `luck/src/launcher.mjs --game app` 写法失效；
+- 测试面板是**房间级**的：房间「实验性选项 → 测试插件」勾了才出现，普通房间看不到；
+- 面板能力已全部内置于本体，不需要再 `node mods/luck/apply.mjs` 打补丁。
 
 ## 6. 让它一直跑（systemd）
 
