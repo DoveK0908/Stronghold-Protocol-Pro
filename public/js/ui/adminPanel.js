@@ -79,12 +79,6 @@ export function AdminPanel({ onClose }) {
     finally { setKey(''); setBusy(false); }
   };
   const close = () => { if (!busy) onClose(); };
-  const logout = async () => {
-    setBusy(true);
-    try { await client.logout(); setLogged(false); setState({ status: 'idle', items: [], total: 0 }); setSelected([]); }
-    catch (e) { setLogged(false); setState({ status: 'idle', items: [], total: 0 }); setSelected([]); setError(failure(e.code)); }
-    finally { setBusy(false); }
-  };
   const toggle = (id) => setSelected((ids) => ids.includes(id) ? ids.filter((v) => v !== id) : [...ids, id]);
   const rows = state.items.filter((row) => selected.includes(rowId(row, tab)));
   const act = async (action) => {
@@ -139,8 +133,7 @@ export function AdminPanel({ onClose }) {
 
   return html`<${Modal} open=${true} title=${t('后台管理')} micro="SERVER ADMINISTRATION" ariaLabel=${t('后台管理')}
       trapFocus=${true} class="admin-panel lobby-dialog" width="min(1240px, 96vw)" closeOnBackdrop=${false} onClose=${close}
-      actions=${html`${logged ? html`<${Button} variant="ghost" disabled=${busy} onClick=${logout}>${t('退出管理')}<//>` : null}
-        <${Button} disabled=${busy} onClick=${close}>${t('关闭')}<//>`}>
+      actions=${html`<${Button} disabled=${busy} onClick=${close}>${t('关闭')}<//>`}>
     <p class="fb-hint">${t('仅管理本服务器保存的编号、上传图片与反馈；战绩和设置仍在玩家浏览器内。反馈作者保持匿名。')}</p>
     ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
     ${!logged ? html`<form class="admin-login" onSubmit=${(e) => { e.preventDefault(); login(); }}>

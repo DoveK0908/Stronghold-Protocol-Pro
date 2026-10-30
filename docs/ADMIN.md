@@ -22,7 +22,7 @@
 
 仅在 HTTPS 或受信任的本机环境中使用后台。直连按 socket 的实际 HTTP/HTTPS 协议和 Host 严格检查 Origin。若使用 TLS 反向代理，须明确设置 `SP_ADMIN_ORIGIN=https://你的实际域名`，含非默认端口时一并填写；不会信任客户端提供的 Forwarded 协议头来放宽检查。不要为了登录修改为任意来源。
 
-登录生成 10 分钟短时会话，cookie 为 HttpOnly、SameSite=Strict、路径 `/api/admin`；HTTPS 使用 Secure。写请求还须同源 Origin、JSON、会话 CSRF 与明确确认字段。浏览器不把密钥或 CSRF 写入本地存储；关闭面板会尝试退出。权限配置轮换、失效后旧会话被撤销。服务端限流、限制请求体、分页与批量大小，不提供任意文件路径、SQL 或命令执行。
+登录生成 10 分钟短时会话，cookie 为 HttpOnly、SameSite=Strict、路径 `/api/admin`；HTTPS 使用 Secure。写请求还须同源 Origin、JSON、会话 CSRF 与明确确认字段。浏览器不把密钥或 CSRF 写入本地存储；关闭面板即视为结束管理并尝试退出，不另设独立的退出按钮。权限配置轮换、失效后旧会话被撤销。服务端限流、限制请求体、分页与批量大小，不提供任意文件路径、SQL 或命令执行。
 
 `SP_FEEDBACK_PASSWORD` 仅控制旧的反馈板维护者入口；未显式配置时不再使用内置默认密码。统一后台通过服主鉴权直接管理反馈，不依赖这个旧入口。玩家匿名发帖、回复及凭自己的随机 secret 修改／撤回不受影响。
 

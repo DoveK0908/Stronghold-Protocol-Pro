@@ -69,6 +69,13 @@ test('admin panel uses explicit owner login, batch confirmation and text-only fe
   assert.doesNotMatch(panel + api, /localStorage|sessionStorage|savePref|innerHTML|console\./);
 });
 
+test('closing the admin panel also logs out, without a redundant logout button', () => {
+  const panel = source('public/js/ui/adminPanel.js');
+  assert.doesNotMatch(panel, /退出管理|const logout =/);
+  assert.match(panel, /actions=\$\{html`<\$\{Button\} disabled=\$\{busy\} onClick=\$\{close\}>\$\{t\('关闭'\)\}/);
+  assert.match(panel, /useEffect\(\(\) => \(\) => \{ generation\.current\+\+; client\.logout\(\)\.catch/);
+});
+
 test('every admin tab keeps the same bars, so the list never jumps between tabs', () => {
   const panel = source('public/js/ui/adminPanel.js');
   const css = source('public/css/screens/lobby.css');
@@ -87,7 +94,7 @@ test('every admin tab keeps the same bars, so the list never jumps between tabs'
   assert.match(css, /\.modal__box\.admin-panel \{[^}]*--admin-bar-h:\s*max\(\.5rem, 34px\)/s);
   assert.ok((css.match(/height:\s*var\(--admin-bar-h\)/g) || []).length >= 4, 'tabs, note, search/bar/op and pages share --admin-bar-h');
   assert.match(css, /\.admin-list \{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
-  // the body and the footer stay put while only the list scrolls: 退出管理 / 关闭 sit bottom right
+  // the body and the footer stay put while only the list scrolls: 关闭 sits bottom right
   assert.match(css, /\.admin-panel \.modal__body \{[^}]*flex:\s*1 1 auto[^}]*overflow:\s*hidden/s);
   assert.match(css, /\.admin-panel \.modal__actions \{[^}]*justify-content:\s*flex-end/s);
 });
