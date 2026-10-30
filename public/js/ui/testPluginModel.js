@@ -8,7 +8,7 @@ import { MODULE_NONE } from '../../../shared/protocol.js';
 
 /** The floating windows the dock can open, in tab order. `key` is the translated msgid. */
 export const TEST_WINDOWS = Object.freeze([
-  Object.freeze({ id: 'shop', key: t('自选商店') }),
+  Object.freeze({ id: 'shop', key: t('资源和自选商店') }),
   Object.freeze({ id: 'op', key: t('干员修改') }),
   Object.freeze({ id: 'strategy', key: t('策略替换') }),
   Object.freeze({ id: 'filter', key: t('商店盟约过滤') }),
@@ -16,7 +16,6 @@ export const TEST_WINDOWS = Object.freeze([
   Object.freeze({ id: 'map', key: t('地图更改') }),
   Object.freeze({ id: 'enemies', key: t('敌人配置') }),
   Object.freeze({ id: 'boss', key: t('迎战首领') }),
-  Object.freeze({ id: 'res', key: t('资源与商店等级') }),
 ]);
 
 export function testPluginAvailable(pub, mine, myId) {
@@ -146,14 +145,16 @@ export function moduleList(chess) {
   return list.filter((m) => m && m.uniEquipId);
 }
 
-/** The 特质 records (garrisons.json): the operator's own effects, the list `chess.garrisonIds` picks from. */
+/** The 特质 records (garrisons.json): the operator's own effects, the list `chess.garrisonIds` picks from.
+ *  The short label is added on copies: the page's data files are handed to the browser sim as they are and frozen
+ *  there, so writing a display helper back into a record throws (and the game data files are never ours to edit). */
 export function traitRecords() {
-  const list = listOf('garrisons').filter((g) => g && g.garrisonId);
-  for (const g of list) {
-    const text = String(g.desc || '').replace(/<[^>]*>/g, '').trim();
-    g._testLabel = text.length > 18 ? `${text.slice(0, 18)}…` : text || g.garrisonId;
-  }
-  return list;
+  return listOf('garrisons')
+    .filter((g) => g && g.garrisonId)
+    .map((g) => {
+      const text = String(g.desc || '').replace(/<[^>]*>/g, '').trim();
+      return { ...g, _testLabel: text.length > 18 ? `${text.slice(0, 18)}…` : text || g.garrisonId };
+    });
 }
 
 /** Shop chess records a test pick may stock, grouped by tier (diy slots need the seat's own pick, so they are left out). */

@@ -38,8 +38,14 @@ Batch 5 adds the last native reachable tools. `ops` sets one operator (by `charI
 charges funds and never touches a teammate's table. `diyRefresh` sets every entry of the seat's own 自选 stock back to
 its copy cap (`left = cap`), which is exactly the accounting `diyRollEntries` / `diyStockEntries` read; a seat without
 picks answers `BAD_TARGET`. The seat DTO also carries that `diy` stock (`[{id,left,cap}]`).
-Batch 6 (v2) replaces the single form with a draggable entry (right edge centre by default) opening nine windows, and
-changes the command face: `timers` is removed (the owner wanted no countdown freeze, so `infra.setDeadline` lost its
+Batch 6 (v2) replaces the single form with a draggable entry (right edge centre by default) opening eight windows —
+resources (资金 / 目标生命 / 部署上限) and the paid 调度中心 upgrade live in 资源和自选商店, the separate 资源与商店等级 window is
+gone, every window is wider and carries a bottom-right resize grip (per-window minimums; position and size are kept in
+localStorage), 敌人配置 prints each bounty enemy's coin and owns the 悬赏敌人 adder, 地图更改 is a plain list, 商店盟约过滤
+offers 任一匹配 / 同时匹配, and each window has its own render error boundary (a bad dataset shows that window's error and
+a 重试 button instead of blanking the screen). The window also stops mutating data records: the 特质 labels are copies,
+because the browser hands the same `data/*.json` objects to the sim, which deep-freezes them in place.
+It changes the command face: `timers` is removed (the owner wanted no countdown freeze, so `infra.setDeadline` lost its
 plugin hold branch), `shopLevel` is bounded by the real 6-level 调度中心, and four commands are added. `shopSlots`
 replaces the whole current shelf slot by slot without charging (`null` empties a slot; the layout decides each slot's
 kind). `op` overrides one owned operator this seat has on the board / hand / 临时整备区 by chessId: 潜能, 练度, 携带技能

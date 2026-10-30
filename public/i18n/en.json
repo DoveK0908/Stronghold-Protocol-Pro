@@ -3319,7 +3319,6 @@
   "设置调度中心等级": "Set shop level",
   "商店盟约过滤": "Shop alliance filter",
   "槽位": "Slot",
-  "任一盟约": "Any alliance",
   "盟约 ID": "Alliance ID",
   "匹配方式": "Match mode",
   "当前商店过滤": "Active shop filter",
@@ -3760,13 +3759,11 @@
   "第 {r} 回合 · 模式 {mode}": "Round {r} · mode {mode}",
   "第一回合": "Round 1",
   "策略替换": "Strategy swap",
-  "自选商店": "Custom shop",
   "设为下一轮货架": "Set as next shelves",
   "设为该等级": "Set to this level",
   "该模式没有隐匿首领": "This mode has no hidden boss",
   "调度中心等级": "Dispatch center level",
   "费用": "Cost",
-  "资源与商店等级": "Resources & shop level",
   "赏金敌人": "Bounty enemies",
   "跳到该回合": "Jump to this round",
   "跳到隐匿回合": "Jump to hidden round",
@@ -3782,5 +3779,10 @@
   "隐匿回合": "Hidden round",
   "隐匿首领": "Hidden bosses",
   "首领回合": "Boss round",
-  "默认模组": "Default module"
+  "默认模组": "Default module",
+  "任一匹配": "Any match",
+  "同时匹配": "All match",
+  "该窗口渲染出错": "This window failed to render",
+  "调整窗口大小": "Resize window",
+  "资源和自选商店": "Resources & custom shop"
 }

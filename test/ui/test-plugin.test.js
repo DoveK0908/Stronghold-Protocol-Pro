@@ -177,3 +177,17 @@ test('UI uses its own protocol, no speed or clock controls, no hooks, all copy t
   assert.equal(itemOf('__missing__'), null);
   assert.equal(chessOf('__missing__'), null);
 });
+
+test('the 特质 list labels a copy, the frame resizes, and 资源 owns no window of its own', () => {
+  const model = readFileSync(new URL('../../public/js/ui/testPluginModel.js', import.meta.url), 'utf8');
+  // the browser hands these very records to the sim, which deep-freezes them in place: a label must be a copy
+  assert.ok(!model.includes('._testLabel ='), 'never write a label onto a data record');
+  assert.ok(model.includes('_testLabel: '));
+  const win = readFileSync(new URL('../../public/js/ui/testPluginWindows.js', import.meta.url), 'utf8');
+  assert.ok(win.includes('useErrorBoundary'), 'each window keeps its own render boundary');
+  assert.ok(win.includes('tpw__grip'), 'the frame resizes from its bottom-right grip');
+  assert.ok(win.includes('writeFrame('), 'a size is remembered like the position');
+  const map = win.slice(win.indexOf('const WINDOWS = Object.freeze({'), win.indexOf('export function TestPluginWindow'));
+  for (const id of ['shop', 'op', 'strategy', 'filter', 'round', 'map', 'enemies', 'boss']) assert.ok(map.includes(id + ': '), id);
+  assert.ok(!map.includes('res: '), '资源与商店等级 merged into the shop window');
+});

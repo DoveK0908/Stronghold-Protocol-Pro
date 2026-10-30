@@ -2,7 +2,7 @@
 // private view or the game data and calls send(cmd, args) with a payload from testPluginModel.js, which the shared
 // parser and the match then re-validate. One window is one component; the frame (drag, position, close) is shared.
 // No timers, no effects: positions live in localStorage, drags are pointer events on the header.
-import { useRef, useState } from '../../vendor/hooks.module.js';
+import { useErrorBoundary, useRef, useState } from '../../vendor/hooks.module.js';
 import { html } from './components.js';
 import { useData } from '../data.js';
 import { t } from '../../../shared/i18n.js';
@@ -10,29 +10,36 @@ import {
   chessPortraitUrl, itemIconUrl, enemyIconUrl, bondIconUrl, bandIconUrl, skillRecordIconUrl,
 } from './assetUrls.js';
 import {
-  TEST_WINDOWS, chessOf, assetsOf, bondRecords, bandRecords, stageRecords, skillList, moduleList, traitRecords,
+  TEST_WINDOWS, chessOf, itemOf, assetsOf, bondRecords, bandRecords, stageRecords, skillList, moduleList, traitRecords,
   chessRecords, itemRecords, enemyGroups, bossGroups, bossJump, roundMax, ownedOperators, STAT_FIELDS,
   operatorState, enemiesArgs, opArgs, clampShopLevel, slotEntries, withSlot, queueArgs, queuedSlots, MODULE_NONE,
 } from './testPluginModel.js';
 
 export const WIN_POS_KEY = 'sp.testplugin.win';
 
+/** Opening size of each window. The bottom-right grip drags a size, which is remembered like the position. */
 const WIDTH = Object.freeze({
-  shop: 440, op: 700, strategy: 400, filter: 420, round: 340, map: 480, enemies: 580, boss: 580, res: 380,
+  shop: 620, op: 760, strategy: 560, filter: 460, round: 380, map: 560, enemies: 760, boss: 600,
 });
+const MINSIZE = Object.freeze({
+  shop: [460, 300], op: [540, 340], strategy: [400, 280], filter: [340, 240], round: [320, 220],
+  map: [380, 260], enemies: [520, 340], boss: [400, 260],
+});
+const DEFAULT_HEIGHT = 480;
 
-function readPos(key) {
+function readFrame(key) {
   try {
     const v = JSON.parse(window.localStorage.getItem(key) || 'null');
-    return v && Number.isFinite(v.x) && Number.isFinite(v.y) ? { x: v.x, y: v.y } : null;
+    if (!v || !Number.isFinite(v.x) || !Number.isFinite(v.y)) return null;
+    return { x: v.x, y: v.y, w: Number.isFinite(v.w) ? v.w : null, h: Number.isFinite(v.h) ? v.h : null };
   } catch {
     return null;
   }
 }
 
-function writePos(key, pos) {
+function writeFrame(key, box) {
   try {
-    window.localStorage.setItem(key, JSON.stringify(pos));
+    window.localStorage.setItem(key, JSON.stringify(box));
   } catch {
     /* storage can be full or disabled — a position is not worth failing over */
   }
@@ -41,12 +48,18 @@ function writePos(key, pos) {
 const clampX = (x, w, vw) => Math.max(8, Math.min(Math.max(8, vw - w - 8), x));
 const clampY = (y, h, vh) => Math.max(8, Math.min(Math.max(8, vh - h - 8), y));
 
-function defaultPos(index, vw, vh) {
-  const w = 460;
-  return {
-    x: clampX(vw / 2 - w / 2 + index * 22, w, vw),
-    y: clampY(72 + index * 24, 260, vh),
-  };
+const minFor = (id) => MINSIZE[id] || [320, 220];
+
+function defaultBox(id, index, vw, vh) {
+  const w = Math.min(WIDTH[id] || 420, Math.max(240, vw - 16));
+  const h = Math.min(DEFAULT_HEIGHT, Math.max(160, vh - 96));
+  return { x: clampX(vw / 2 - w / 2 + index * 22, w, vw), y: clampY(72 + index * 24, h, vh), w, h };
+}
+
+/** The height the frame currently renders at: the grip starts from it before the first explicit resize. */
+function frameHeight(node) {
+  const rect = node && typeof node.getBoundingClientRect === 'function' ? node.getBoundingClientRect() : null;
+  return rect && Number.isFinite(rect.height) && rect.height > 0 ? rect.height : DEFAULT_HEIGHT;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -54,18 +67,28 @@ function defaultPos(index, vw, vh) {
 // ---------------------------------------------------------------------------------------------------
 
 function Frame({ id, title, z, index, onClose, onFocus, children }) {
-  const width = WIDTH[id] || 420;
   const key = `${WIN_POS_KEY}.${id}`;
-  const [pos, setPos] = useState(() => readPos(key) || defaultPos(index, window.innerWidth, window.innerHeight));
-  const posRef = useRef(pos);
-  posRef.current = pos;
+  const [minW, minH] = minFor(id);
+  const [box, setBox] = useState(() => {
+    const base = readFrame(key) || defaultBox(id, index, window.innerWidth, window.innerHeight);
+    const w = Math.max(minW, Math.min(base.w || WIDTH[id] || 420, window.innerWidth - 16));
+    const h = base.h == null ? null : Math.max(minH, Math.min(base.h, window.innerHeight - 16));
+    return { x: clampX(base.x, w, window.innerWidth), y: clampY(base.y, h || 120, window.innerHeight), w, h };
+  });
+  const boxRef = useRef(box);
+  boxRef.current = box;
   const drag = useRef(null);
+  const grip = useRef(null);
+  const save = () => {
+    const b = boxRef.current;
+    writeFrame(key, { x: b.x, y: b.y, w: b.w, h: b.h });
+  };
   const down = (e) => {
     onFocus();
     if (e.button !== undefined && e.button !== 0) return;
     const tgt = e.target;
     if (tgt && tgt.closest && tgt.closest('button,input,select,textarea,a')) return;
-    drag.current = { x: e.clientX, y: e.clientY, ox: posRef.current.x, oy: posRef.current.y, moved: false, last: null };
+    drag.current = { x: e.clientX, y: e.clientY, ox: boxRef.current.x, oy: boxRef.current.y, moved: false, last: null };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -79,22 +102,53 @@ function Frame({ id, title, z, index, onClose, onFocus, children }) {
     const dy = e.clientY - d.y;
     if (!d.moved && Math.abs(dx) + Math.abs(dy) <= 3) return;
     d.moved = true;
-    const next = { x: clampX(d.ox + dx, width, window.innerWidth), y: clampY(d.oy + dy, 120, window.innerHeight) };
+    const next = {
+      x: clampX(d.ox + dx, boxRef.current.w, window.innerWidth),
+      y: clampY(d.oy + dy, 120, window.innerHeight),
+    };
     d.last = next;
-    setPos(next);
+    setBox({ ...boxRef.current, ...next });
   };
   const up = () => {
     const d = drag.current;
     drag.current = null;
-    if (d && d.moved && d.last) writePos(key, d.last);
+    if (d && d.moved && d.last) save();
   };
-  return html`<section class="tpw" style=${`left:${pos.x}px;top:${pos.y}px;width:${width}px;z-index:${z}`}
-      onPointerDown=${() => onFocus()}>
+  const gripDown = (e) => {
+    onFocus();
+    if (e.button !== undefined && e.button !== 0) return;
+    const section = e.currentTarget && e.currentTarget.parentNode;
+    grip.current = { x: e.clientX, y: e.clientY, ow: boxRef.current.w, oh: frameHeight(section), moved: false, last: null };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* a capture the browser refuses only costs smoothness */
+    }
+    if (e.stopPropagation) e.stopPropagation();
+  };
+  const gripMove = (e) => {
+    const g = grip.current;
+    if (!g) return;
+    const w = Math.max(minW, Math.min(window.innerWidth - boxRef.current.x - 8, g.ow + (e.clientX - g.x)));
+    const h = Math.max(minH, Math.min(window.innerHeight - boxRef.current.y - 8, g.oh + (e.clientY - g.y)));
+    g.moved = true;
+    g.last = { w: Math.round(w), h: Math.round(h) };
+    setBox({ ...boxRef.current, ...g.last });
+  };
+  const gripUp = () => {
+    const g = grip.current;
+    grip.current = null;
+    if (g && g.moved) save();
+  };
+  const style = `left:${box.x}px;top:${box.y}px;width:${box.w}px;${box.h ? `height:${box.h}px;` : ''}z-index:${z}`;
+  return html`<section class="tpw" style=${style} onPointerDown=${() => onFocus()}>
     <header class="tpw__head" onPointerDown=${down} onPointerMove=${move} onPointerUp=${up} onPointerCancel=${up}>
       <span class="tpw__title">${title}</span>
       <button class="tpw__close" type="button" aria-label=${t('关闭')} title=${t('关闭')} onClick=${onClose}>×</button>
     </header>
     <div class="tpw__body">${children}</div>
+    <span class="tpw__grip" title=${t('调整窗口大小')} aria-hidden="true"
+      onPointerDown=${gripDown} onPointerMove=${gripMove} onPointerUp=${gripUp} onPointerCancel=${gripUp}></span>
   </section>`;
 }
 
@@ -166,11 +220,14 @@ function ShopWindow({ mine, send, busy }) {
   const [q, setQ] = useState('');
   const [level, setLevel] = useState(clampShopLevel(mine.shop?.level ?? 1));
   const [free, setFree] = useState(String(mine.shop?.freeRefreshes ?? 0));
+  const [funds, setFunds] = useState(String(mine.funds ?? 0));
+  const [lp, setLp] = useState(String(mine.lp ?? 0));
+  const [cap, setCap] = useState(String(mine.deployCap ?? 0));
   const receipt = mine.testPlugin || {};
   const diy = Array.isArray(receipt.diy) ? receipt.diy : [];
 
   const kindAt = (i) => (i < (layout.chess || 0) ? 'chess' : 'item');
-  const recAt = (entry) => (entry ? (entry.kind === 'chess' ? chessOf(entry.id) : null) : null);
+  const recAt = (entry) => (entry ? (entry.kind === 'chess' ? chessOf(entry.id) : itemOf(entry.id)) : null);
   const pickOptions = picker
     ? (picker.kind === 'chess' ? chessRecords() : itemRecords()).filter((r) => !q || String(r.name || '').toLowerCase().includes(q.toLowerCase()))
     : [];
@@ -194,6 +251,23 @@ function ShopWindow({ mine, send, busy }) {
 
   return html`<div class="tpw__pane">
     <section class="tpw__box">
+      <div class="tpw__row"><span class="tpw__label">${t('资金')}</span>
+        <input class="tpw__input" type="number" min="0" value=${funds} onInput=${(e) => setFunds(e.target.value)} />
+        <button type="button" class="tpw__btn" disabled=${busy}
+          onClick=${() => send('funds', { amount: Math.max(0, Number(funds) || 0) })}>${t('应用')}</button>
+        <span class="tpw__label">${t('目标生命')}</span>
+        <input class="tpw__input" type="number" min="0" value=${lp} onInput=${(e) => setLp(e.target.value)} />
+        <button type="button" class="tpw__btn" disabled=${busy}
+          onClick=${() => send('lp', { value: Math.max(1, Number(lp) || 1) })}>${t('应用')}</button>
+      </div>
+      <div class="tpw__row"><span class="tpw__label">${t('部署上限')}</span>
+        <input class="tpw__input" type="number" min="1" max="12" value=${cap} onInput=${(e) => setCap(e.target.value)} />
+        <button type="button" class="tpw__btn" disabled=${busy}
+          onClick=${() => send('deployCap', { value: Math.max(1, Number(cap) || 1) })}>${t('应用')}</button>
+      </div>
+    </section>
+
+    <section class="tpw__box">
       <div class="tpw__row">
         <span class="tpw__label">${t('调度中心等级')}</span>
         <${Stepper} value=${level} min=${1} max=${clampShopLevel(mine.shop?.maxLevel ?? 6)} busy=${busy}
@@ -202,6 +276,8 @@ function ShopWindow({ mine, send, busy }) {
           onClick=${() => send('shopLevel', { level: clampShopLevel(level) })}>${t('设为该等级')}</button>
         <button type="button" class="tpw__btn" disabled=${busy || (mine.shop?.level ?? 1) >= 6}
           onClick=${() => { setLevel(6); send('shopLevel', { level: 6 }); }}>${t('升到6级')}</button>
+        <button type="button" class="tpw__btn" disabled=${busy || (mine.shop?.level ?? 1) >= 6}
+          onClick=${() => send('level', {})}>${t('升级调度中心')}</button>
       </div>
       <div class="tpw__row">
         <span class="tpw__label">${t('免费刷新次数')}</span>
@@ -285,10 +361,13 @@ function OpWindow({ mine, send, busy }) {
   const [sel, setSel] = useState(rows[0]?.id || null);
   const [draft, setDraft] = useState(null);
   const [q, setQ] = useState('');
-  const cur = sel ? chessOf(sel) : null;
-  const base = cur ? operatorState(mine, cur) : null;
-  const view = base ? (draft && draft.id === sel ? draft : { id: sel, ...base }) : null;
-  const update = (patch) => setDraft({ ...(view || { id: sel }), ...patch });
+  // A row keeps its editor even when the data pack no longer carries that chess record: the overrides are keyed by
+  // chessId, so 潜能 / 练度 / 属性 / 盟约 / 特质 still apply (only the skill and module lists come back empty).
+  const selId = rows.some((r) => r.id === sel) ? sel : (rows[0]?.id ?? null);
+  const cur = selId ? chessOf(selId) : null;
+  const base = selId ? operatorState(mine, cur) : null;
+  const view = base ? (draft && draft.id === selId ? draft : { id: selId, ...base }) : null;
+  const update = (patch) => setDraft({ ...(view || { id: selId }), ...patch });
 
   if (!rows.length) return html`<div class="tpw__pane"><div class="tpw__hint">${t('本局还没有干员')}</div></div>`;
   if (!view) return html`<div class="tpw__pane"><div class="tpw__hint">${t('加载中')}</div></div>`;
@@ -310,7 +389,7 @@ function OpWindow({ mine, send, busy }) {
 
   return html`<div class="tpw__pane tpw__pane--split">
     <aside class="tpw__list">
-      ${rows.map((row) => html`<button type="button" class=${`tpw__oprow${row.id === sel ? ' is-on' : ''}`}
+      ${rows.map((row) => html`<button type="button" class=${`tpw__oprow${row.id === selId ? ' is-on' : ''}`}
           key=${row.id} onClick=${() => { setSel(row.id); setDraft(null); }}>
         <${Portrait} m=${m} chess=${row.chess} size=${26} />
         <span class="tpw__oprow-name">${row.name}</span>
@@ -378,7 +457,7 @@ function OpWindow({ mine, send, busy }) {
 
       <div class="tpw__row tpw__row--end">
         <button type="button" class="tpw__btn" disabled=${busy}
-          onClick=${() => setDraft({ id: sel, ...operatorState(mine, cur) })}>${t('还原')}</button>
+          onClick=${() => setDraft({ id: selId, ...operatorState(mine, cur) })}>${t('还原')}</button>
         <button type="button" class="tpw__btn tpw__btn--primary" disabled=${busy || !dirty}
           onClick=${() => send('op', args)}>${t('应用修改')}</button>
       </div>
@@ -426,8 +505,8 @@ function FilterWindow({ mine, send, busy }) {
   return html`<div class="tpw__pane">
     <div class="tpw__row">
       <span class="tpw__label">${t('过滤方式')}</span>
-      <label class="tpw__radio"><input type="radio" checked=${mode === 'any'} onChange=${() => setMode('any')} />${t('任一盟约')}</label>
-      <label class="tpw__radio"><input type="radio" checked=${mode === 'all'} onChange=${() => setMode('all')} />${t('全部盟约')}</label>
+      <label class="tpw__radio"><input type="radio" checked=${mode === 'any'} onChange=${() => setMode('any')} />${t('任一匹配')}</label>
+      <label class="tpw__radio"><input type="radio" checked=${mode === 'all'} onChange=${() => setMode('all')} />${t('同时匹配')}</label>
     </div>
     <div class="tpw__chips">
       ${all.map((b) => html`<${Chip} key=${b.bondId} active=${bonds.includes(b.bondId)} onClick=${() => toggle(b.bondId)}>
@@ -478,37 +557,17 @@ function RoundWindow({ pub, send, busy }) {
 // 地图更改
 // ---------------------------------------------------------------------------------------------------
 
-const tileKind = (tile) => {
-  if (!tile) return 'void';
-  if (tile.buildable) return 'build';
-  if (tile.passable) return 'pass';
-  return 'wall';
-};
-
-function MiniMap({ stage }) {
-  const rows = Array.isArray(stage.rows) ? stage.rows : [];
-  const tiles = stage.tiles && typeof stage.tiles === 'object' ? stage.tiles : {};
-  const w = rows[0]?.length || 1;
-  const cells = [];
-  for (let r = 0; r < rows.length; r += 1) {
-    const line = rows[r];
-    for (let c = 0; c < line.length; c += 1) {
-      cells.push(html`<span class=${`tpw__tile tpw__tile--${tileKind(tiles[line[c]])}`} key=${`${r}:${c}`}></span>`);
-    }
-  }
-  return html`<div class="tpw__map" style=${`grid-template-columns:repeat(${w},4px)`}>${cells}</div>`;
-}
-
+/** A list is all this window needs: the map name, its size and which one is in play. */
 function MapWindow({ pub, send, busy }) {
   const stages = stageRecords();
   const [sel, setSel] = useState(pub.stageId || null);
   return html`<div class="tpw__pane">
-    <div class="tpw__grid tpw__grid--stages">
-      ${stages.map((s) => html`<button type="button" class=${`tpw__stage${s.id === sel ? ' is-on' : ''}`} key=${s.id}
+    <div class="tpw__list tpw__list--stages">
+      ${stages.map((s) => html`<button type="button" class=${`tpw__stageitem${s.id === sel ? ' is-on' : ''}`} key=${s.id}
           onClick=${() => setSel(s.id)}>
-        <${MiniMap} stage=${s} />
-        <span class="tpw__stage-name">${s.name || s.id}</span>
+        <span class="tpw__stageitem-name">${s.name || s.id}</span>
         <span class="tpw__hint">${Array.isArray(s.size) ? `${s.size[0]}×${s.size[1]}` : ''}</span>
+        ${s.id === pub.stageId ? html`<span class="tpw__tag">${t('当前')}</span>` : null}
       </button>`)}
     </div>
     <div class="tpw__row tpw__row--end">
@@ -528,6 +587,7 @@ function EnemyRow({ m, rec, onAdd, disabled }) {
     <img class="tpw__enemy-img" src=${enemyIconUrl(m, rec.id)} alt="" loading="lazy" />
     <span class="tpw__enemy-name">${rec.name}</span>
     <span class="tpw__hint">${rec.level ? `Lv.${rec.level}` : ''}</span>
+    ${rec.coin != null ? html`<span class="tpw__tag">${t('赏金 {coin}', { coin: rec.coin })}</span>` : null}
   </button>`;
 }
 
@@ -539,6 +599,8 @@ function EnemiesWindow({ pub, send, busy }) {
   const [mode, setMode] = useState('replace');
   const [picks, setPicks] = useState([]);
   const [q, setQ] = useState('');
+  const [bounty, setBounty] = useState('');
+  const bountyList = groups.find((g) => g.id === 'bounty')?.list || [];
   const active = groups.find((g) => g.id === group) || groups[0];
   let list = [];
   if (active?.id === 'special') {
@@ -591,6 +653,15 @@ function EnemiesWindow({ pub, send, busy }) {
       <button type="button" class="tpw__btn tpw__btn--primary" disabled=${busy || !picks.length}
         onClick=${() => send('enemies', enemiesArgs(mode, picks))}>${t('应用敌人配置')}</button>
     </div>
+    <div class="tpw__boxhead"><span class="tpw__label">${t('悬赏敌人')}</span></div>
+    <div class="tpw__row">
+      <select class="tpw__input" value=${bounty} onChange=${(e) => setBounty(e.target.value)}>
+        <option value="">${t('选择敌人')}</option>
+        ${bountyList.map((b) => html`<option value=${b.id} key=${b.id}>${b.name}${b.coin != null ? ` · ${t('赏金 {coin}', { coin: b.coin })}` : ''}</option>`)}
+      </select>
+      <button type="button" class="tpw__btn" disabled=${busy || !bounty}
+        onClick=${() => send('bounty', { id: bounty })}>${t('添加悬赏')}</button>
+    </div>
   </div>`;
 }
 
@@ -622,56 +693,28 @@ function BossWindow({ pub, send, busy }) {
 }
 
 // ---------------------------------------------------------------------------------------------------
-// 资源与商店等级
-// ---------------------------------------------------------------------------------------------------
-
-function ResWindow({ pub, mine, send, busy }) {
-  const [funds, setFunds] = useState(String(mine.funds ?? 0));
-  const [lp, setLp] = useState(String(mine.lp ?? 0));
-  const [cap, setCap] = useState(String(mine.deployCap ?? 0));
-  const [bounty, setBounty] = useState('');
-  const bountyList = (enemyGroups().find((g) => g.id === 'bounty')?.list) || [];
-  return html`<div class="tpw__pane">
-    <div class="tpw__row"><span class="tpw__label">${t('资金')}</span>
-      <input class="tpw__input" type="number" min="0" value=${funds} onInput=${(e) => setFunds(e.target.value)} />
-      <button type="button" class="tpw__btn" disabled=${busy} onClick=${() => send('funds', { amount: Math.max(0, Number(funds) || 0) })}>${t('应用')}</button></div>
-    <div class="tpw__row"><span class="tpw__label">${t('目标生命')}</span>
-      <input class="tpw__input" type="number" min="0" value=${lp} onInput=${(e) => setLp(e.target.value)} />
-      <button type="button" class="tpw__btn" disabled=${busy} onClick=${() => send('lp', { value: Math.max(1, Number(lp) || 1) })}>${t('应用')}</button></div>
-    <div class="tpw__row"><span class="tpw__label">${t('调度中心')}</span>
-      <b>${mine.shop?.level ?? 1}</b>
-      <button type="button" class="tpw__btn" disabled=${busy} onClick=${() => send('level', {})}>${t('升级调度中心')}</button>
-      <button type="button" class="tpw__btn" disabled=${busy || (mine.shop?.level ?? 1) >= 6}
-        onClick=${() => send('shopLevel', { level: 6 })}>${t('升到6级')}</button></div>
-    <div class="tpw__row"><span class="tpw__label">${t('部署上限')}</span>
-      <input class="tpw__input" type="number" min="1" max="12" value=${cap} onInput=${(e) => setCap(e.target.value)} />
-      <button type="button" class="tpw__btn" disabled=${busy} onClick=${() => send('deployCap', { value: Math.max(1, Number(cap) || 1) })}>${t('应用')}</button></div>
-    <div class="tpw__row"><span class="tpw__label">${t('悬赏敌人')}</span>
-      <select class="tpw__input" value=${bounty} onChange=${(e) => setBounty(e.target.value)}>
-        <option value="">${t('选择敌人')}</option>
-        ${bountyList.map((b) => html`<option value=${b.id} key=${b.id}>${b.name}</option>`)}
-      </select>
-      <button type="button" class="tpw__btn" disabled=${busy || !bounty} onClick=${() => send('bounty', { id: bounty })}>${t('添加悬赏')}</button></div>
-    <div class="tpw__hint">${t('第 {r} 回合 · 模式 {mode}', { r: pub.round || 1, mode: pub.modeId || '' })}</div>
-  </div>`;
-}
-
-// ---------------------------------------------------------------------------------------------------
 // window switch
 // ---------------------------------------------------------------------------------------------------
 
 const WINDOWS = Object.freeze({
   shop: ShopWindow, op: OpWindow, strategy: StrategyWindow, filter: FilterWindow,
-  round: RoundWindow, map: MapWindow, enemies: EnemiesWindow, boss: BossWindow, res: ResWindow,
+  round: RoundWindow, map: MapWindow, enemies: EnemiesWindow, boss: BossWindow,
 });
 
 export function TestPluginWindow({ id, z, index, pub, mine, send, busy, onClose, onFocus }) {
   const ready = useData('chess', 'items', 'bonds', 'bands', 'stages', 'enemies', 'bosses', 'garrisons', 'choices', 'factions', 'assets');
+  // A window is a tool, not the game: one window that throws shows its own message instead of taking the screen down.
+  const [error, resetError] = useErrorBoundary((err) => console.error('[ui] test plugin window crashed', id, err));
   const spec = TEST_WINDOWS.find((w) => w.id === id);
   const Body = WINDOWS[id];
   return html`<${Frame} id=${id} title=${spec ? spec.key : id} z=${z} index=${index} onClose=${onClose} onFocus=${onFocus}>
     ${!Body ? html`<div class="tpw__hint">${t('未知窗口')}</div>`
       : !ready ? html`<div class="tpw__hint">${t('加载中')}</div>`
-        : html`<${Body} pub=${pub} mine=${mine} send=${send} busy=${busy} />`}
+        : error ? html`<div class="tpw__error">
+            <div class="tpw__error-title">${t('该窗口渲染出错')}</div>
+            <div class="tpw__error-msg">${String((error && error.message) || error || '')}</div>
+            <button type="button" class="tpw__btn" onClick=${resetError}>${t('重试')}</button>
+          </div>`
+          : html`<${Body} pub=${pub} mine=${mine} send=${send} busy=${busy} />`}
   </${Frame}>`;
 }
