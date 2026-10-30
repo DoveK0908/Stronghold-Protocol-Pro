@@ -2,7 +2,7 @@
 import { html, Button, Modal, Spinner, confirmDialog } from './components.js';
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { t, N_ } from '../../../shared/i18n.js';
-import { FEEDBACK_STATUSES, FEEDBACK_STATUS_LABEL } from '../../../shared/feedback.js';
+import { FEEDBACK_STATUSES, FEEDBACK_STATUS_LABEL, FEEDBACK_LIMITS } from '../../../shared/feedback.js';
 import { createAdminClient } from './adminApi.js';
 
 const TABS = [ ['players', N_('玩家数据')], ['claims', N_('编号独占')], ['avatars', N_('上传头像')],
@@ -52,12 +52,14 @@ export function AdminPanel({ onClose }) {
   const [target, setTarget] = useState('');
   const [status, setStatus] = useState(FEEDBACK_STATUSES[0]);
   const [reply, setReply] = useState('');
+  const [feedbackEdit, setFeedbackEdit] = useState(null);
+  const [feedbackError, setFeedbackError] = useState('');
   const generation = useRef(0);
 
   useEffect(() => () => { generation.current++; client.logout().catch(() => {}); }, [client]);
   useEffect(() => {
     const seq = ++generation.current;
-    setSelected([]); setResult(null); setError('');
+    setSelected([]); setResult(null); setError(''); setFeedbackEdit(null);
     if (!logged) return;
     setState({ status: 'loading', items: [], total: 0 });
     client.read(tab, { offset, q: search }).then((data) => {
@@ -95,7 +97,7 @@ export function AdminPanel({ onClose }) {
     const items = rows.map((row) => tab === 'claims'
       ? { name: row.name, tag: row.tag, expectedOwner: row.owner, expectedAt: row.at, ...(action === 'claims.reassign' ? { targetOwner: target.trim() } : {}) }
       : tab === 'players' ? { owner: row.owner }
-        : { id: row.id, ...(action === 'feedback.status' ? { status } : {}), ...(action === 'feedback.reply' ? { body: reply.trim() } : {}) });
+        : { id: row.id });
     try {
       const data = await client.write(action, items);
       setResult((data.results || []).map((item) => ({ ...item, label: rowId(rows[item.index] || {}, tab) || '' }))); setSelected([]);
@@ -105,6 +107,32 @@ export function AdminPanel({ onClose }) {
     } catch (e) {
       if (e.code === 'UNAUTHORIZED' || e.code === 'CSRF') setLogged(false);
       setError(failure(e.code));
+    } finally { setBusy(false); }
+  };
+  const openFeedback = (row, action) => {
+    if (busy) return;
+    setFeedbackEdit({ row, action }); setStatus(row.status); setReply(''); setFeedbackError('');
+  };
+  const closeFeedback = () => { if (!busy) setFeedbackEdit(null); };
+  const feedbackValid = feedbackEdit?.action === 'feedback.reply'
+    ? !!reply.trim() && reply.trim().length <= FEEDBACK_LIMITS.reply
+    : !!feedbackEdit && FEEDBACK_STATUSES.includes(status) && status !== feedbackEdit.row.status;
+  const saveFeedback = async () => {
+    if (busy || !feedbackValid) return;
+    const { row, action } = feedbackEdit;
+    const item = action === 'feedback.reply' ? { id: row.id, body: reply.trim() } : { id: row.id, status };
+    setBusy(true); setFeedbackError(''); setError(''); setResult(null);
+    try {
+      const data = await client.write(action, [item]);
+      if (!data.results?.[0]?.ok) { setFeedbackError(failure(data.results?.[0]?.error)); return; }
+      setResult(data.results.map((value) => ({ ...value, label: row.id })));
+      // Close before refreshing: a read failure must not offer to send the same reply again.
+      setFeedbackEdit(null); setReply('');
+      const next = await client.read(tab, { offset, q: search });
+      setState({ status: 'ready', items: next.items || [], total: next.total || 0 });
+    } catch (e) {
+      if (e.code === 'UNAUTHORIZED' || e.code === 'CSRF') { setFeedbackEdit(null); setLogged(false); }
+      setFeedbackError(failure(e.code)); setError(failure(e.code));
     } finally { setBusy(false); }
   };
   const switchTab = (value) => { setTab(value); setOffset(0); setQuery(''); setSearch(''); setSelected([]); };
@@ -138,10 +166,7 @@ export function AdminPanel({ onClose }) {
           <span class="admin-count num">${selected.length} / ${state.total}</span>` : html`<span class="admin-count num">${state.total}</span>`}
         ${tab === 'claims' ? html`<${Button} size="sm" disabled=${busy || !rows.length} onClick=${() => act('claims.release')}>${t('释放独占')}<//>`
           : tab === 'players' ? html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act('players.reset')}>${t('重置所选服务器数据')}<//>`
-            : tab === 'feedback' ? html`<select class="fb-input admin-status" aria-label=${t('反馈状态')} value=${status} onChange=${(e) => setStatus(e.currentTarget.value)}>
-              ${FEEDBACK_STATUSES.map((value) => html`<option value=${value}>${t(FEEDBACK_STATUS_LABEL[value])}</option>`)}</select>
-              <${Button} size="sm" disabled=${busy || !rows.length} onClick=${() => act('feedback.status')}>${t('修改状态')}<//>
-              <${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act('feedback.delete')}>${t('删除反馈')}<//>`
+            : tab === 'feedback' ? html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act('feedback.delete')}>${t('删除反馈')}<//>`
               : tab === 'audit' ? null
                 : html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act(`${tab}.delete`)}>${t('删除图片')}<//>`}
       </div>
@@ -149,12 +174,9 @@ export function AdminPanel({ onClose }) {
         ${tab === 'claims' ? html`<input class="fb-input admin-target" aria-label=${t('目标玩家标识')} placeholder=${t('目标玩家标识')}
             value=${target} onInput=${(e) => setTarget(e.currentTarget.value)} />
           <${Button} size="sm" disabled=${busy || !rows.length || !/^[a-f0-9]{32}$/.test(target.trim())} onClick=${() => act('claims.reassign')}>${t('重新分配')}<//>`
-          : tab === 'feedback' ? html`<input class="fb-input admin-reply" maxlength="1000" aria-label=${t('维护者回复')} placeholder=${t('维护者回复')}
-            value=${reply} onInput=${(e) => setReply(e.currentTarget.value)} />
-          <${Button} size="sm" disabled=${busy || !rows.length || !reply.trim()} onClick=${() => act('feedback.reply')}>${t('回复所选反馈')}<//>`
-            : html`<span class="admin-op__note">${selected.length
-              ? t('已选 {n} 项：上面的操作会作用到这些项目。', { n: selected.length })
-              : t('在本页勾选项目后，上面的操作才会作用到它们。')}</span>`}
+          : html`<span class="admin-op__note">${selected.length
+            ? t('已选 {n} 项：上面的操作会作用到这些项目。', { n: selected.length })
+            : t('在本页勾选项目后，上面的操作才会作用到它们。')}</span>`}
       </div>
       <div class="admin-list">
         ${result ? html`<div class="admin-results" role="status">${result.map((r, i) => html`<p key=${i}>${i + 1} · ${r.label} · ${r.partial ? t('部分操作已完成，请检查刷新后的数据。') : ''}${r.ok ? t('操作完成') : failure(r.error)}</p>`)}</div>` : null}
@@ -169,7 +191,11 @@ export function AdminPanel({ onClose }) {
                   : tab === 'avatars' || tab === 'namecards' ? html`<img class=${`admin-preview admin-preview--${tab}`} loading="lazy" alt=${t('上传图片预览')}
                     src=${`/${tab === 'avatars' ? 'avatar' : 'namecard'}/${row.id}`} /><code>${row.id}</code><small>${row.bytes || 0} B · ${(row.owners || []).map(short).join(', ')}</small>`
                     : tab === 'feedback' ? html`<strong>${row.title}</strong><small>${t(FEEDBACK_STATUS_LABEL[row.status] || '')}</small><p>${row.body}</p>
-                      ${(row.replies || []).map((r, j) => html`<p key=${j}>${r.maintainer ? t('维护者') : t('玩家')} · ${r.body}</p>`)}`
+                      ${(row.replies || []).map((r, j) => html`<p key=${j}>${r.maintainer ? t('维护者') : t('玩家')} · ${r.body}</p>`)}
+                      <div class="admin-row__actions">
+                        <${Button} size="sm" disabled=${busy} onClick=${() => openFeedback(row, 'feedback.reply')}>${t('维护者回复')}<//>
+                        <${Button} size="sm" variant="ghost" disabled=${busy} onClick=${() => openFeedback(row, 'feedback.status')}>${t('修改状态')}<//>
+                      </div>`
                       : tab === 'players' ? html`<code title=${row.owner}>${row.owner}</code>
                           <p>${(row.claims || []).map((claim) => `${claim.name}#${claim.tag}`).join(' · ')}</p>
                           ${(row.sessions || []).map((session) => html`<p key=${session.playerId}>${session.name}#${session.tag} · ${session.inRoom ? t('房间内') : session.connected ? t('在线') : t('离线')}</p>`)}
@@ -183,5 +209,22 @@ export function AdminPanel({ onClose }) {
         <${Button} disabled=${busy || offset + 50 >= state.total} onClick=${() => setOffset(offset + 50)}>${t('下一页')}<//></div>
       </div>
     `}
-  <//>`;
+  <//>
+  ${feedbackEdit ? html`<${Modal} open=${true} title=${feedbackEdit.action === 'feedback.reply' ? t('维护者回复') : t('修改状态')}
+      ariaLabel=${feedbackEdit.action === 'feedback.reply' ? t('维护者回复') : t('修改状态')}
+      trapFocus=${true} class="admin-feedback-dialog lobby-dialog" width="min(640px, 94vw)" closeOnBackdrop=${false} onClose=${closeFeedback}
+      actions=${html`<${Button} variant="ghost" disabled=${busy} onClick=${closeFeedback}>${t('取消')}<//>
+        <${Button} disabled=${busy || !feedbackValid} onClick=${saveFeedback}>${t('确认执行')}<//>`}>
+    <div class="admin-feedback-edit">
+      <strong>${feedbackEdit.row.title}</strong>
+      ${feedbackError ? html`<p class="fb-error" role="alert">${feedbackError}</p>` : null}
+      ${feedbackEdit.action === 'feedback.reply' ? html`<label>${t('维护者回复')}
+        <textarea class="fb-input" rows="6" maxlength=${FEEDBACK_LIMITS.reply} value=${reply} disabled=${busy} data-autofocus
+          onInput=${(e) => setReply(e.currentTarget.value)} /></label>`
+        : html`<label>${t('反馈状态')}<select class="fb-input" value=${status} disabled=${busy} data-autofocus
+          onChange=${(e) => setStatus(e.currentTarget.value)}>
+          ${FEEDBACK_STATUSES.map((value) => html`<option key=${value} value=${value}>${t(FEEDBACK_STATUS_LABEL[value])}</option>`)}
+        </select></label>`}
+    </div>
+  <//>` : null}`;
 }
