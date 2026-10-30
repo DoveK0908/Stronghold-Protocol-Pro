@@ -3651,6 +3651,7 @@
   "维护者回复": "Maintainer reply",
   "回复所选反馈": "Reply to selected feedback",
   "操作完成": "Operation completed",
+  "大厅的其他功能不受影响；如果服务器刚更新过，点重试即可。": "The rest of the lobby still works; if the server was just updated, press Retry.",
   "重置会清空该玩家在服务器上的编号独占与独占上传；共享图片与浏览器本地战绩不受影响。": "Resetting clears this player's server-side claims and exclusive uploads; shared images and browser-local records are untouched.",
   "删除会移除图片文件与全部引用；被其他玩家共享的图片请在玩家数据里按玩家处理。": "Deleting removes the image file and every reference; images shared with other players are handled per player under Player data.",
   "反馈作者保持匿名；改状态、回复与删除都会立刻体现在玩家的反馈板上。": "Feedback authors stay anonymous; changes of status, replies and deletions show up on the players' board immediately.",

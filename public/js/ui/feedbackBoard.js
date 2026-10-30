@@ -95,12 +95,17 @@ export function FeedbackBoard({ onClose }) {
   const [password, setPassword] = useState('');
   const [asking, setAsking] = useState(false);
 
-  const load = async () => {
+  // One request can lose a race with a server restart: retry once by ourselves before telling the player it is down.
+  const load = async (attempt = 0) => {
     try {
       const data = await call();
       setState({ status: 'ready', posts: data.posts || [], limits: data.limits || null });
       setError('');
     } catch (e) {
+      if (attempt === 0 && (e.code === 'OFFLINE' || e.code === 'INTERNAL')) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        return load(1);
+      }
       setState((prev) => ({ ...prev, status: 'failed' }));
       setError(message(e.code));
     }
@@ -276,8 +281,8 @@ export function FeedbackBoard({ onClose }) {
     </div>
     ${state.status === 'loading' ? html`<div class="fb-state" role="status"><${Spinner} label="LOADING" /><p>${t('正在读取反馈…')}</p></div>`
       : state.status === 'failed' ? html`<div class="fb-state" role="status">
-        <${Icon} name="warn" /><h3>${t('反馈板暂时打不开')}</h3><p>${t('大厅的其他功能不受影响。')}</p>
-        <${Button} icon="refresh" onClick=${load}>${t('重试')}<//>
+        <${Icon} name="warn" /><h3>${t('反馈板暂时打不开')}</h3><p>${t('大厅的其他功能不受影响；如果服务器刚更新过，点重试即可。')}</p>
+        <${Button} icon="refresh" onClick=${() => load()}>${t('重试')}<//>
       </div>`
         : !total ? html`<div class="fb-state" role="status"><${Icon} name="info" /><h3>${t('还没有人发反馈')}</h3><p>${t('第一条反馈会显示在这里。')}</p></div>`
           : html`<div class="fb-columns">${columns.map((col) => html`<section key=${col.status} class="fb-column">
