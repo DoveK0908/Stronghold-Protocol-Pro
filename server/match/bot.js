@@ -66,8 +66,8 @@ import { isLavinia, BAND as LAVINIA_BAND, pickCard as laviniaPickCard, prepBegin
 //      a tile g.move refuses is skipped for the next best one.
 //   5. items by what they do (itemTarget): equipment on the strongest deployed damage dealers (survival items on
 //      blockers, bond signature items on a member), 信标 on a bench single, 拟态物质 on a pair, 博士投影 (both
-//      qualities) on the strongest normal operator, 突变细胞 on the least valuable normal single below 6阶 (cellTarget:
-//      never an elite or a pair member; the operator its transformation gains joins the bench — the buy loop's bench
+//      qualities) on the strongest normal operator, 突变细胞 on the highest-tier normal single below 6阶 outside the focus
+//      bond (cellTarget: never an elite or a pair member; the operator its transformation gains joins the bench — the buy loop's bench
 //      shed leaves a piece gained since the last prep alone, rememberOwned — and steps 3–4 of the next prep deploy it
 //      like any owned unit), bond items on a focus member; Arts (useArt): 画卷 copies the most valuable
 //      deployed operator, 教鞭 / “神秘顾客” are used after a perfect battle and kept otherwise (consume-on-equip items /
@@ -93,10 +93,11 @@ import { refineFormationSteps } from './botFormationCandidates.js';
 import { ASPD_MIN } from '../sim/constants.js';
 import { rehearsalCap, RehearsalRun } from '../sim/rehearsal.js';
 import { deriveSeed } from '../sim/rng.js';
+// §37.42–§37.45 below retain upstream section numbers; local integration is documented in history §37.55.
 import { freeSlot, countFree, legalTiles, canPlace, positionClass, placeClass, basePositionClass, parseKey, tileKey, FIELD, pieceDir, boardTileOf, BOSS_MIRROR_COL } from './board.js';
 import { rotateOffset, normDir, mirrorDir, oppositeDir } from '../sim/dir.js';
 import { itemKey } from './gamedata.js';
-import { computeBonds } from './bondsMeta.js';
+import { computeBonds, pieceBonds } from './bondsMeta.js';
 import { isFlyKey, bountySpawns } from './waves.js';
 import { previewPlayer } from './preview.js';
 import { bossPoolHp, SharedBossPool } from './finalAssault.js';
@@ -132,6 +133,8 @@ const FOCUS_MEMBER = 4;
  * linear weight never fielded one (boards stayed 3 + 3 + 3) even with 6 distinct members owned.
  */
 const CORE_TOP_TIER = 30;
+/** §37.43: lineup bonus for the top tier of a core bond whose top threshold exceeds the deploy cap (炎 9). */
+const TOP_ABOVE_CAP = 60;
 /** [ASSUMED] §35.62: bench members of a core bond with at least this many distinct owned members are not sold as junk. */
 const CORE_KEEP_OWNED = 4;
 /**
@@ -873,6 +876,9 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
     const bond = gd.bond(id);
     const w = bond && bond.isCore ? 14 : 9;
     v += b.tier * w + Math.min(12, (b.layers || 0) * 0.1) + (id === ctx.focus ? 6 : 0) + (bond?.isCore && b.tier >= 2 ? CORE_TOP_TIER : 0);
+    // §37.43 [ASSUMED]: the top tier of a core bond whose top threshold exceeds the deploy cap (炎 9: two 炎佑, ×1.5 attack,
+    // −90 % damage taken) is worth more than one more tier
+    if (bond?.isCore && Array.isArray(bond.thresholds) && b.tier === bond.thresholds.length && bond.thresholds[bond.thresholds.length - 1] > ps.deployCap) v += TOP_ABOVE_CAP;
   }
   let blockers = 0;
   let air = 0;
@@ -908,6 +914,19 @@ function chooseLineup(m, ps, ctx) {
       if (bases.has(base) || !(chessRec(m, p.id, ps)?.bonds || []).includes(id)) continue;
       bases.add(base);
       members.push(p);
+    }
+    // §37.43: a top tier above the deploy cap (炎 9) also seeds from 调和 (缪尔赛思: +1 to every core bond with a real member,
+    // +1 more when her items grant the bond) plus just enough distinct members — one swap at a time never gets there
+    const top = bond.thresholds[bond.thresholds.length - 1];
+    const mani = top > cap ? seed.find((p) => (chessRec(m, p.id, ps)?.bonds || []).some((b) => gd.bond(b)?.activeType === 'MANI')) : null;
+    const need = mani ? top - 1 - (pieceBonds(gd, mani, m.rules).includes(id) ? 1 : 0) : 0;
+    if (mani && need >= 1 && need + 1 <= cap && members.length >= need) {
+      const pick = [mani, ...members.slice(0, need)];
+      const inPick = new Set(pick.map((p) => p.uid));
+      const start = pick.concat(seed.filter((p) => !inPick.has(p.uid))).slice(0, cap);
+      const used = new Set(start.map((p) => p.uid));
+      const run = climbLineup(m, ps, ctx, start, seed.filter((p) => !used.has(p.uid)));
+      if (run.score > best.score + 0.5) best = run;
     }
     const t = bond.thresholds.filter((x) => x > 3 && x <= Math.min(cap, members.length)).pop();
     if (!t) continue;
@@ -1994,10 +2013,16 @@ function takeOffers(m, ps, policy = null) {
     });
     if (best < 0) break;
     if (freeSlot(ps.hand) < 0) sellWeakestHand(m, ps, { keepPairs: false });
+    const picked = offer.slots[best];
+    const before = picked.kind === 'chess' && sellOnArrival(m, ps, ctx, picked.id) ? new Set(ps.allChess().map((p) => p.uid)) : null;
     if (!tryDo(() => ps.pickReward(best))) {
       // could not take it (sold out / no room): drop the offer
       ps.offers.shift();
       ps.dirty();
+    } else if (before) {
+      // §37.42: 缪尔赛思 outside 炎 is sold at once (her 变形同构体 stays)
+      const fresh = ps.allChess().find((p) => !before.has(p.uid) && p.id === picked.id);
+      if (fresh && !advisorProtected(m, ps, fresh)) tryDo(() => ps.sell(fresh.uid));
     }
   }
 }
@@ -3239,7 +3264,53 @@ function nineItem(m, ps, id, ctx) {
 }
 
 /** §37.41: the shop items bought despite §37.39 (ahead of the refreshes, WANTED_ITEM). */
-const shopItemWanted = (m, ps, id, ctx) => eliteItem(m, ps, id) || dollItem(m, ps, id) || nineItem(m, ps, id, ctx);
+const shopItemWanted = (m, ps, id, ctx) => eliteItem(m, ps, id) || dollItem(m, ps, id) || nineItem(m, ps, id, ctx) || lendItem(m, ps, id, ctx);
+
+/**
+ * §37.44: the item tier up to which the strategy turns the focus bond's top tier into lending a skill-starting member's
+ * equipment to its 8 neighbours (娜仁图亚's 6 萨尔贡: a bond buff with `valid_in_band` and `filter_item_level`), else 0.
+ */
+function lendsEquipment(m, ps, bond) {
+  const rec = bond ? (ps.gd || m.gd).bond(bond) : null;
+  const b = (rec?.buffs || []).find((x) => x?.bbStr?.valid_in_band === ps.bandId && Number(x.bb?.filter_item_level) > 0);
+  return b ? Number(b.bb.filter_item_level) : 0;
+}
+/**
+ * §37.44 [ASSUMED]: with such a strategy and LEND_MEMBERS owned members of the focus, a combat item of tier ≥ LEND_TIER up to
+ * the lent tier is bought for a deployed member with a free slot (§37.39 left that top tier without equipment to lend).
+ */
+const LEND_MEMBERS = 4;
+const LEND_TIER = 3;
+function lendItem(m, ps, id, ctx) {
+  const lent = lendsEquipment(m, ps, ctx.focus);
+  if (!lent || (ctx.owned.counts.get(ctx.focus) || 0) < LEND_MEMBERS) return false;
+  const gd = ps.gd || m.gd, rec = gd.item(id);
+  if (!rec || rec.itemType !== 'EQUIP' || rec.tier < LEND_TIER || rec.tier > lent || rec.giveBondId || rec.canGiveBond) return false;
+  const key = itemEffect(rec);
+  if ((typeof rec.kind === 'string' && rec.kind.startsWith('consume')) || !key || key.startsWith('use_') || key.includes('coin')) return false;
+  return [...ps.board.values()].some((p) => p.kind === 'chess' && (chessRec(m, p.id, ps)?.bonds || []).includes(ctx.focus) && slotFree(m, ps, p, rec));
+}
+
+/**
+ * §37.42 [ASSUMED] (the maintainer, 2026-10-29: 「缪尔赛思除了炎盟约我基本都是到手就卖不留着，这样能提高再次拿到的概率」): a
+ * normal chess whose gain brings a 变形同构体 (缪尔赛思, garrison SERVER_GAIN_EQUIP) is sold as soon as it arrives — the
+ * 变形同构体 stays, the copy goes back to the pool — unless the focus's top tier exceeds the deploy cap (炎: 调和 and her
+ * conversion make 9, §37.41). An advisor's protected piece stays. Upstream paired results are not local benchmarks;
+ * this integration and its validation are documented in docs/history/0.3.4.md §37.55.
+ */
+function bringsMorph(m, ps, id) {
+  const gd = ps?.gd || m.gd;
+  return (chessRec(m, id, ps)?.garrisonIds || []).some((gid) => {
+    const g = gd.garrison(gid);
+    return g?.effectType === 'SERVER_GAIN_EQUIP' && !!gd.item(g.bbStr?.chess)?.canGiveBond;
+  });
+}
+const sellOnArrival = (m, ps, ctx, id) => !(ps.gd || m.gd).isGolden(id) && bringsMorph(m, ps, id) && !(ctx.focus && topAboveCap(m, ps, ctx.focus));
+function sellMorphBringers(m, ps) {
+  if (!ps.allChess().some((p) => bringsMorph(m, ps, p.id))) return;
+  const ctx = context(m, ps);
+  for (const p of ps.allChess()) if (sellOnArrival(m, ps, ctx, p.id) && !advisorProtected(m, ps, p)) tryDo(() => ps.sell(p.uid));
+}
 
 /**
  * §37.41 [ASSUMED]: where a 变形同构体 goes (it grants the bond of a bond item worn with it) — the operator of chooseLineup's set
@@ -3275,9 +3346,11 @@ function morphPlan(m, ps, morph, ctx) {
 /**
  * Whom the bot injects with 突变细胞 (after the battle its carrier — deployed or on the bench: every owned carrier's item
  * hooks run — is destroyed and a random operator one tier higher joins the bench, PlayerState.transformChess; the next
- * prep's lineup step deploys it like any owned unit, so a deployed carrier only costs a re-placement): the least
- * valuable normal operator below 6阶 with a free equip slot — never an elite, never one of a merge pair (the merge
- * progress would be lost), nobody already carrying a cell. null: the cell waits in the hand.
+ * prep's lineup step deploys it like any owned unit, so a deployed carrier only costs a re-placement): a normal operator
+ * below 6阶 with a free equip slot — never an elite, never one of a merge pair (the merge progress would be lost), nobody
+ * already carrying a cell. §37.45 [ASSUMED]: the highest tier first (TIER_POWER grows with the tier, so a 5阶 that becomes
+ * a random 6阶 gains more than a 1阶 that becomes a 2阶; the cell comes back every round, 1 → 6 in five battles), a
+ * member of the focus bond last (its count would drop), then the least valuable. null: the cell waits in the hand.
  */
 export function cellTarget(m, ps, ctx = context(m, ps)) {
   const gd = ps?.gd || m.gd;
@@ -3286,7 +3359,8 @@ export function cellTarget(m, ps, ctx = context(m, ps)) {
   for (const p of ps.allChess()) {
     if (gd.isGolden(p.id) || gd.tierOf(p.id) >= 6 || !slotFree(m, ps, p)) continue;
     if ((p.items || []).some((it) => isMutationCell(gd, it.id)) || (ctx.copies.get(gd.baseIdOf(p.id)) || 0) >= 2) continue;
-    const v = pieceValue(m, ps, p, ctx);
+    const member = !!ctx.focus && (chessRec(m, p.id, ps)?.bonds || []).includes(ctx.focus);
+    const v = (member ? 1000 : 0) - 100 * gd.tierOf(p.id) + pieceValue(m, ps, p, ctx) * 0.01;
     if (v < bestV || (v === bestV && p.uid < best.uid)) { bestV = v; best = p; }
   }
   return best;
@@ -3394,6 +3468,11 @@ export function itemTarget(m, ps, item, ctx = context(m, ps), usePlan = true) {
   let order = rec.category === 'SURVIVAL'
     ? [...list.filter(blocker), ...list.filter((p) => !blocker(p) && dealer(p)), ...list.filter((p) => !blocker(p) && !dealer(p))]
     : [...list.filter(dealer), ...list.filter((p) => !dealer(p))];
+  // §37.44: a strategy that lends the focus members' equipment (娜仁图亚) — they carry first
+  if (lendsEquipment(m, ps, ctx.focus)) {
+    const mem = (p) => (chessRec(m, p.id, ps)?.bonds || []).includes(ctx.focus);
+    order = [...order.filter(mem), ...order.filter((p) => !mem(p))];
+  }
   // §37.37 [ASSUMED] 维多利亚 raises the damage of its members that carry equipment ("携带装备的【维多利亚】干员造成的伤害提升"):
   // with it the active focus, they come first for everything but survival items
   if (ctx.focus === 'victoriaShip' && ps.bonds.victoriaShip?.active && rec.category !== 'SURVIVAL') {
@@ -3438,11 +3517,25 @@ function useArt(m, ps, item, ctx) {
 
 export function equipItems(m, ps) {
   const gd = ps?.gd || m.gd;
+  // §37.42: one that arrived another way (a transformation, a copy, a purchase) is sold here
+  sellMorphBringers(m, ps);
   const tried = new Set();
   // §37.41: a 变形同构体 goes where its granted bond gains most (morphPlan, with the bond item the plan names); without such a
   // carrier it waits for a focus whose top tier needs it (topAboveCap), else the usual target below takes it
   for (const morph of [...ps.hand, ...ps.temp].filter((p) => isMorph(gd, p))) {
     const mctx = context(m, ps);
+    // §37.43 [ASSUMED]: with such a focus 缪尔赛思 takes its bond item and the 变形同构体 wherever she stands (one slot, two
+    // members of the focus) — morphPlan only looks at the current lineup, which she is rarely in before her conversion
+    if (mctx.focus && topAboveCap(m, ps, mctx.focus)) {
+      const her = ps.allChess().find((p) => (chessRec(m, p.id, ps)?.bonds || []).some((b) => gd.bond(b)?.activeType === 'MANI')
+        && !(p.items || []).some((it) => gd.item(it.id)?.canGiveBond));
+      const X = [...ps.hand, ...ps.temp].find((p) => isBondItem(gd, p) && gd.item(p.id).giveBondId === mctx.focus);
+      if (her && X && slotFree(m, ps, her, gd.item(X.id)) && tryDo(() => ps.equip(X.uid, her.uid))) {
+        tried.add(morph.uid);
+        tryDo(() => ps.equip(morph.uid, her.uid));
+        continue;
+      }
+    }
     const plan = morphPlan(m, ps, morph, mctx);
     if (!plan && !(m.round < gd.bossRound && topAboveCap(m, ps, mctx.focus))) continue;
     tried.add(morph.uid);
@@ -3458,6 +3551,11 @@ export function equipItems(m, ps) {
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
+    // §37.42 [ASSUMED]: the 博士投影 that promotes at once (缪尔赛思's strategy item from round 1, an item merge) waits for a
+    // deployed normal operator of tier ≥ ELITE_ITEM_TIER, at the latest until the Final Assault prep — used on round 1 it
+    // promoted a tier-1 piece. Not when an advisor plans the items.
+    if (itemEffect(rec) === 'use_equip_upgrade_char' && m.round < gd.bossRound && !advisorPlan(m, ps)
+      && ![...ps.board.values()].some((p) => p.kind === 'chess' && !gd.isGolden(p.id) && gd.tierOf(p.id) >= ELITE_ITEM_TIER)) continue;
     // §37.41: one bond item of a focus whose top tier needs 缪尔赛思 waits for her 变形同构体 until the Final Assault prep
     if (!heldNine && isBondItem(gd, item) && rec.giveBondId === ctx.focus && m.round < gd.bossRound && topAboveCap(m, ps, ctx.focus)) {
       heldNine = true;

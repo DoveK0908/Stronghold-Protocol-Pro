@@ -782,3 +782,18 @@ wins 31 → 44), 职业队 9×80 30.5 → 32.8 % (wins 59 → 79), co-op 43.68 �
 bundles that differ only slightly swing 2–4 points even on 320 seeds, so co-op keeps only the changes with a
 consistent sign.
 
+### Cycle 14: Muelsyse lineups and item targets (upstream dev `17a075f1`, this tree §37.55)
+
+The four commits after `e65b0132` fix ordinary-bot choices rather than simulation rules: sell Muelsyse outside a Yan
+focus (unless advisor-protected); wait for a normal tier-4+ deployed operator before spending an instant Doctor
+Projection, unless at the Final Assault or following an advisor item plan; account for her converted Yan identity when
+building the eight-unit / nine-Yan lineup; buy eligible loanable equipment for Sargon Narantuya; and prefer the highest-tier
+normal single outside the focus for Mutation Cell (focus members remain a fallback; elites, tier 6 and pairs stay excluded). Pro keeps its own pool scope, three elite dispatches, layout adapter,
+shop level-5 cap and the human-autoplay custom-roster exception. No upstream win-rate claim is promoted to a local result.
+
+Arturia is independently frozen at `arturia-v0.3.0` (`b63ec427`): new policies are selected only for ABYSS co-op with
+exactly two or four seats in the current elite pool scope; solo and other routes retain the previous policies. The full
+release and its separate runtime are imported, not hand-edited; the Pro wrapper and unchanged shared forecast runtime
+remain host-owned. Lavinia 0.3.0 and Zumama 0.2.0 keep their installed policy bytes. The displayed versions now agree with
+these installed release tags. See history §37.56 and the batch validation receipt for local evidence, not natural win rates.
+

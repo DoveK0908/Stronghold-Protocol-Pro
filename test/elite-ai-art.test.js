@@ -27,6 +27,14 @@ test('each elite uses its corresponding E2 avatar and illustration, ignoring sta
   assert.equal(eliteCard({ isBot: false, botPersona: 'zumama' }), null);
 });
 
+test('displayed elite versions match the installed frozen release tags', () => {
+  for (const recruit of ELITE_RECRUITS) {
+    const mount = recruit.id === 'zumama' ? 'aiAddons/zumama' : recruit.id;
+    const metadata = JSON.parse(fs.readFileSync(new URL(`../server/match/${mount}/upstream.json`, import.meta.url)));
+    assert.equal(`${recruit.id}-v${recruit.version}`, metadata.tag, recruit.id);
+  }
+});
+
 test('vendored policy and compatibility bytes retain the released hashes', () => {
   for (const mount of ['arturia', 'lavinia', 'aiAddons/zumama']) {
     const dir = new URL(`../server/match/${mount}/`, import.meta.url);
