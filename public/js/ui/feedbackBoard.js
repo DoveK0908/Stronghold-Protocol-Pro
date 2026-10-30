@@ -258,7 +258,9 @@ export function FeedbackBoard({ onClose }) {
     </article>`;
   };
 
-  return html`<><${Modal} open=${true} title=${t('反馈板')} micro="FEEDBACK BOARD" ariaLabel=${t('大厅反馈板')} trapFocus=${true}
+  // Two dialogs (the board and, while composing, the form) are returned as one array: htm's `<>…</>` would build an
+  // element with an empty tag name, which the DOM rejects (界面发生错误). Keep the array — other UI returns one root.
+  return [html`<${Modal} open=${true} title=${t('反馈板')} micro="FEEDBACK BOARD" ariaLabel=${t('大厅反馈板')} trapFocus=${true}
       class="feedback-board lobby-dialog" width="min(1180px, 96vw)" onClose=${onClose}
       actions=${html`<${Button} icon="close" onClick=${onClose} data-autofocus>${t('关闭反馈板')}<//>`}>
     <div class="fb-top">
@@ -289,8 +291,8 @@ export function FeedbackBoard({ onClose }) {
             <h3 class="fb-column__title">${t(FEEDBACK_STATUS_LABEL[col.status])}<span class="num">${col.posts.length}</span></h3>
             <div class="fb-column__list">${col.posts.map(card)}</div>
           </section>`)}</div>`}
-  <//>
-  ${composeOpen ? html`<${Modal} open=${true} title=${t('提出反馈')} micro="NEW FEEDBACK" trapFocus=${true}
+  <//>`,
+  composeOpen ? html`<${Modal} open=${true} title=${t('提出反馈')} micro="NEW FEEDBACK" trapFocus=${true}
       ariaLabel=${t('提出反馈')} class="feedback-compose-dialog" width="min(680px, 94vw)" closeOnBackdrop=${false}
       onClose=${() => { if (!busy) setComposeOpen(false); }}
       actions=${html`<${Button} variant="ghost" disabled=${busy} onClick=${() => setComposeOpen(false)}>${t('取消')}<//>
@@ -305,5 +307,6 @@ export function FeedbackBoard({ onClose }) {
         placeholder=${t('发生了什么？希望怎么改？（不必填写联系方式）')} aria-label=${t('反馈内容')}
         onInput=${(e) => setDraft((d) => ({ ...d, body: e.currentTarget.value }))} />
     </div>
-  <//>` : null}</>`;
+  <//>` : null,
+  ];
 }
