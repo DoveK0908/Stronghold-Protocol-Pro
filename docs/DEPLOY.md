@@ -377,6 +377,14 @@ volumes:
   WorkingDirectory=/opt/Stronghold-Protocol
   ExecStart=/usr/bin/node server/index.js
   Environment=PORT=3000 HOST=::
+  # 玩家数据（头像/名片/名字标签/反馈板）默认在 `<工作目录>/state/`；用绝对路径钉死，
+  # 换工作目录或改成只跑 app/server/index.js 时不会「丢档」
+  Environment=SP_AVATARS_DIR=/opt/Stronghold-Protocol/state/avatars
+  Environment=SP_AVATARS_INDEX=/opt/Stronghold-Protocol/state/avatars.json
+  Environment=SP_NAMECARDS_DIR=/opt/Stronghold-Protocol/state/namecards
+  Environment=SP_NAMECARDS_INDEX=/opt/Stronghold-Protocol/state/namecards.json
+  Environment=SP_TAGS_FILE=/opt/Stronghold-Protocol/state/name-tags.json
+  Environment=SP_FEEDBACK_FILE=/opt/Stronghold-Protocol/state/feedback-board.json
   Restart=always
   RestartSec=5
   User=stronghold

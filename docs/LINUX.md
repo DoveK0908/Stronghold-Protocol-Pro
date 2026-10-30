@@ -115,33 +115,30 @@ sudo ufw allow 3000/tcp
 
 ---
 
-## 5b. 带 Luck 控制台启动（可选）
+## 5b. 服务端的 `state/` 与直启
 
-包里自带一份 **Stronghold-Luck**（`luck/`，上游 0.1.5 加我们打的 6 个补丁），不需要再 clone 任何东西。
-它和普通启动的区别只是「谁在前台」：Luck 起一个前置服务器，再把游戏挂在它后面。
+`state/` 里放的是玩家自己的东西：头像（`avatars/` + `avatars.json`）、名片（`namecards/` + `namecards.json`）、
+名字标签（`name-tags.json`）、反馈板（`feedback-board.json`）。它属于安装目录而不是包内数据，覆盖 `app/` 更新时不会被带走。
 
-```bash
-cd /root/Stronghold-Protocol-v0.3.2-pro.3
-./start-linux-luck.sh --host 127.0.0.1 --port 3000
-# 冒烟：200 才算注入成功
-curl -s -o /dev/null -w '%{http_code}
-' http://127.0.0.1:3000/mod/overlay.js
-```
-
-systemd 用它时只换 `ExecStart`：
+这些路径默认是 `<工作目录>/state/…`。所以服务端要么让工作目录停在**安装根**（`state/` 与 `app/` 同级），
+要么用环境变量钉死（推荐：换目录、换写法都不会丢）：
 
 ```ini
-WorkingDirectory=/root/Stronghold-Protocol-Pro/app
-Environment=PORT=3000
-Environment=HOST=0.0.0.0
-Environment=NODE_ENV=production
-ExecStart=/usr/bin/node /root/Stronghold-Protocol-Pro/app/server/index.js
+WorkingDirectory=/root/Stronghold-Protocol-Pro
+Environment=SP_AVATARS_DIR=/root/Stronghold-Protocol-Pro/state/avatars
+Environment=SP_AVATARS_INDEX=/root/Stronghold-Protocol-Pro/state/avatars.json
+Environment=SP_NAMECARDS_DIR=/root/Stronghold-Protocol-Pro/state/namecards
+Environment=SP_NAMECARDS_INDEX=/root/Stronghold-Protocol-Pro/state/namecards.json
+Environment=SP_TAGS_FILE=/root/Stronghold-Protocol-Pro/state/name-tags.json
+Environment=SP_FEEDBACK_FILE=/root/Stronghold-Protocol-Pro/state/feedback-board.json
 ```
 
 **要点**
 
 - 现在**直接起游戏本体**，外面不再套任何 launcher：Luck 外挂和它的启动脚本已于 2026-10-30 归档，原来的
   `luck/src/launcher.mjs --game app` 写法失效；
+- 工作目录一改，默认的 `state/` 就换个地方，旧数据看起来会「全部消失」——2026-10-30 线上踩过一次；用上面的
+  `SP_*` 钉死之后不再受工作目录影响；
 - 测试面板是**房间级**的：房间「实验性选项 → 测试插件」勾了才出现，普通房间看不到；
 - 面板能力已全部内置于本体，不需要再 `node mods/luck/apply.mjs` 打补丁。
 
@@ -158,7 +155,15 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# 工作目录停在安装根：state/ 与 app/ 同级；只把服务路径指进 app/
 WorkingDirectory=/opt/stronghold
+# 玩家数据用绝对路径钉死（见 5b），换工作目录也不会「丢档」
+Environment=SP_AVATARS_DIR=/opt/stronghold/state/avatars
+Environment=SP_AVATARS_INDEX=/opt/stronghold/state/avatars.json
+Environment=SP_NAMECARDS_DIR=/opt/stronghold/state/namecards
+Environment=SP_NAMECARDS_INDEX=/opt/stronghold/state/namecards.json
+Environment=SP_TAGS_FILE=/opt/stronghold/state/name-tags.json
+Environment=SP_FEEDBACK_FILE=/opt/stronghold/state/feedback-board.json
 # 两种写法选一个：
 #   A) 直接跑 .sh —— 必须先 chmod +x（见第 4 步），否则 systemd 报 203/EXEC「Permission denied」
 ExecStart=/opt/stronghold/start-linux.sh --no-open --port 3000
