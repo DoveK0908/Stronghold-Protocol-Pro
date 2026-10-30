@@ -161,6 +161,19 @@ export class PlayerRound {
         // 干员调配 settings, 潜能 6 / 精英2 Lv.60 by default and for bots; never a stand-in's nor a prototype pick's)
         const cv = u.standIn ? null : this.cultivationFor(this.gd.chess(piece.id));
         if (cv) { u.potential = cv.potential; u.cultivate = cv.cultivate; }
+        // 测试插件 v2 (`op`): this seat's per-chessId overrides — 技能 / 模组 / 潜能 / 练度 / 特质 / 盟约 / raw stats. A 补位
+        // stand-in and a 自选 pick fight as their composed record, so they never carry the override; `undefined` means no
+        // override while `[]` clears the list (empty traits / bonds are passed on as they are).
+        const ops = !u.diy && !u.standIn && this._testOps ? this._testOps[piece.id] : null;
+        if (ops) {
+          if (ops.skillIndex !== undefined) u.skillIndex = ops.skillIndex;
+          if (ops.moduleId !== undefined) u.moduleId = ops.moduleId;
+          if (ops.potential !== undefined) u.potential = ops.potential;
+          if (ops.cultivate !== undefined) u.cultivate = ops.cultivate;
+          if (ops.traits !== undefined) u.testTraits = [...ops.traits];
+          if (ops.bonds !== undefined) u.testBonds = [...ops.bonds];
+          if (ops.stats !== undefined) u.testStats = { ...ops.stats };
+        }
 
         if (carry && carry.has(piece.uid)) u.carryState = carry.get(piece.uid);
         units.push(u);

@@ -53,12 +53,14 @@ export class MatchViews {
       last: state?.last ? { ...state.last } : null,
       lp: ps.lp,
       filter: ps._testShopFilter ? { bonds: [...ps._testShopFilter.bonds], mode: ps._testShopFilter.mode } : null,
-      timersHeld: this._pluginTimerOff === true,
       // the seat's own 自选 stock (the copies a diyRefresh tops up); empty for a seat without picks
       diy: ps.diyStock && ps.diyStock.entries
         ? [...ps.diyStock.entries].map(([id, e]) => ({ id, left: e.left, cap: e.cap }))
         : [],
       ...(ps._testShopNext ? { shopNext: ps._testShopNext.map(({ kind, id }) => ({ kind, id })) } : {}),
+      // the per-chessId operator overrides of `op` (the panel marks those pieces as changed)
+      ops: ps._testOps ? { ...ps._testOps } : {},
+      bossRaid: this._testBossRaid ? { ...this._testBossRaid } : null,
     };
   }
 

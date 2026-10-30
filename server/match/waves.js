@@ -432,6 +432,52 @@ export function buildBossWave(gd, rng, factions, round, { bossId, solo }) {
   };
 }
 
+/**
+ * Spawn list for the 测试插件's `enemies` tool (v2): a normal round's wave, replaced or appended by chosen enemies.
+ * Deterministic and RNG-free — the round's own draw has already happened and must not move.
+ * @param {object} gd game data
+ * @param {number} round the round whose multipliers the spawns fight at
+ * @param {{ id: string, count: number }[]} list validated enemies (existence is re-checked here)
+ * @param {object[]} [priorSpawns] existing spawns the new ones are appended after (their time / actionIndex continue)
+ * @param {object[]} [routes] the wave's routes (route 0 is the chosen enemies' route; absent ⇒ route 0's preview)
+ * @returns {object[]} spawn specs shaped like `buildNormalWave(...).spawns`
+ */
+export function customSpawns(gd, round, list, priorSpawns = [], routes = []) {
+  const mods = roundMods(scaleFor(gd, round));
+  const prior = Array.isArray(priorSpawns) ? priorSpawns : [];
+  let cursor = 0;
+  let actionIndex = 0;
+  for (const s of prior) {
+    const t = Number(s && s.time);
+    if (Number.isFinite(t) && t > cursor) cursor = t;
+    const a = Number(s && s.actionIndex);
+    if (Number.isFinite(a) && a + 1 > actionIndex) actionIndex = a + 1;
+  }
+  // an append starts after the existing list, leaving the round-start presentation time in between
+  if (prior.length) cursor += 2;
+  const route = Array.isArray(routes) ? routes[0] : undefined;
+  const out = [];
+  for (const item of Array.isArray(list) ? list : []) {
+    const key = item && item.id;
+    const count = Number(item && item.count);
+    if (typeof key !== 'string' || !gd.enemy(key) || !Number.isInteger(count) || count < 1) continue;
+    // more than one of the same enemy walk in one by one (the native template's own step)
+    const step = count > 1 ? 1 : 0;
+    out.push({
+      time: cursor,
+      enemyKey: key,
+      routeIndex: 0,
+      count,
+      interval: step,
+      mods: { ...mods, slot: classOf(gd, key) },
+      actionIndex: actionIndex++,
+      preview: previewInfo(gd, key, route, false),
+    });
+    cursor += Math.max(2, count * step);
+  }
+  return out;
+}
+
 /** Boss-field column that splits the left (L) and the right (R) player's half (the goals are at cols 2–3 / 17). */
 const BOSS_MID_COL = 10;
 

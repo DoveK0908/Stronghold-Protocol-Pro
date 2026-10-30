@@ -35,17 +35,29 @@ test swap never moves the random stream, and boss/hidden rounds — whose field 
 swap is transient (a checkpoint restore re-derives the round's own wave).
 Batch 5 adds the last native reachable tools. `ops` sets one operator (by `charId`) of the seat's 潜能 table — 潜能
 1..6 and/or 练度 0..3, the same fields the 干员 loadout writes — and re-reconciles that seat's own pieces only, never
-charges funds and never touches a teammate's table. `timers` holds or resumes the phase clock: holding cancels the
-pending deadline callback, keeps it in match memory and publishes `deadline: 0` (no countdown) without advancing the
-phase; resuming re-arms the same callback with its original duration. A held clock is a live timer, so it is never
-saved: a checkpoint taken while held restores with the phase re-entering its own clock. It is refused in COMBAT /
-UNITE / 最终攻势 / 隐秘核心, with any live field, and also while a solo pause owns the clock. `diyRefresh` sets every entry of the seat's
-own 自选 stock back to its copy cap (`left = cap`), which is exactly the accounting `diyRollEntries` /
-`diyStockEntries` read; a seat without picks answers `BAD_TARGET`. The seat DTO also carries `timersHeld` and the
-seat's own `diy` stock (`[{id,left,cap}]`).
+charges funds and never touches a teammate's table. `diyRefresh` sets every entry of the seat's own 自选 stock back to
+its copy cap (`left = cap`), which is exactly the accounting `diyRollEntries` / `diyStockEntries` read; a seat without
+picks answers `BAD_TARGET`. The seat DTO also carries that `diy` stock (`[{id,left,cap}]`).
+Batch 6 (v2) replaces the single form with a draggable entry (right edge centre by default) opening nine windows, and
+changes the command face: `timers` is removed (the owner wanted no countdown freeze, so `infra.setDeadline` lost its
+plugin hold branch), `shopLevel` is bounded by the real 6-level 调度中心, and four commands are added. `shopSlots`
+replaces the whole current shelf slot by slot without charging (`null` empties a slot; the layout decides each slot's
+kind). `op` overrides one owned operator this seat has on the board / hand / 临时整备区 by chessId: 潜能, 练度, 携带技能
+and 模组 (validated against `loadoutOptions`; `moduleId: null` returns to the default, `'none'` fights without one),
+盟约 (multi, all 23), 特质 (multi, every garrison record) and the raw 攻击 / 防御 / 生命 / 法抗 / 攻速 / 费用, which are
+overwrites of the target value, not multipliers. `enemies` replaces or appends to the current round's spawn list through
+`customSpawns` (the round's own multipliers and routes; the random stream does not move). `boss` fields a chosen leader
+and jumps to its round. A leader-victory during a `boss` raid clears the raid mark and the leader state and
+`startRound(returnRound)` — `max(1, min(round - 1, bossRound - 1))`, i.e. 第13回合 for both the 14 and the 15 round —
+instead of ending the match; a normal entry into 14/15 still settles as before. The overrides reach the real fight:
+`battleInput` carries `testStats` / `testTraits` / `testBonds` plus the skill / module / 潜能 / 练度 override per unit,
+the sim folds `testStats` into the chess definition (clamped 0..99999), the prep effect pass reads 特质 through
+`PlayerState.garrisonIdsFor`, and 盟约 through `bondsMeta.testBonds`. Every override is per-seat and per-match only.
+Both the per-chessId table and the raid mark are checkpointed (snapshot version 4→5).
 Still out of scope, because the native model has no corresponding primitive: extra strategies (one `bandId` per seat
-drives income and leftovers), round caps (`lastRound`/`bossRound` are mode data), unit stat multipliers (the sim
-computes stats from chess records; `battleInput` carries no multiplier) and automation (client-side convenience).
+drives income and leftovers), round caps (`lastRound`/`bossRound` are mode data), global unit stat multipliers (the
+per-piece `op` overwrite of batch 6 is a test-only field on one seat's units, not a rule multiplier) and automation
+(client-side convenience).
 Source provenance and the existing Luck redistribution hold remain in THIRD-PARTY-NOTICES.md.
 
 ### 6.1 State machine (Match.js)

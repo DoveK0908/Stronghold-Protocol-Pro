@@ -1,13 +1,14 @@
 // Native room opt-in tools: virtual scheduling and FakeBattle only; no HTTP, browser or Worker.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeMatch } from './harness.js';
+import { makeMatch, legalTileFor } from './harness.js';
 import { ERR, PHASE } from '../../shared/constants.js';
+import { OK } from '../../server/match/match/common.js';
 import { EXPERIMENTAL_DEFAULTS } from '../../shared/experimental.js';
-import { validateC2S, cultivationCharIds } from '../../shared/protocol.js';
+import { validateC2S, cultivationCharIds, loadoutOptions, MODULE_NONE } from '../../shared/protocol.js';
 import { CULTIVATE_DEFAULT } from '../../shared/potential.js';
 import { DiyStock } from '../../server/match/player/diy.js';
-import { parseTestPluginArgs, TEST_PLUGIN_COMMANDS, TEST_PLUGIN_RATE_COUNT, TEST_PLUGIN_RATE_WINDOW_MS } from '../../shared/testPlugin.js';
+import { isTestPluginCommand, parseTestPluginArgs, TEST_PLUGIN_COMMANDS, TEST_PLUGIN_RATE_COUNT, TEST_PLUGIN_RATE_WINDOW_MS } from '../../shared/testPlugin.js';
 import { wireOptions } from '../../server/match/host/proxy.js';
 import { MATCH_FIELDS, PLAYER_FIELDS, snapshotMatch, restoreMatch } from '../../server/match/snapshot.js';
 import { createRngFromState } from '../../server/sim/rng.js';
@@ -27,7 +28,7 @@ function slotsFor(ps) {
 }
 
 test('strict catalogue, bounds, extra fields and large payloads fail before IPC', () => {
-  assert.deepEqual(TEST_PLUGIN_COMMANDS, ['funds', 'lp', 'chess', 'item', 'shop', 'pick', 'shopLevel', 'filter', 'map', 'bond', 'strategy', 'level', 'deployCap', 'refreshFree', 'bounty', 'wave', 'ops', 'timers', 'diyRefresh', 'round']);
+  assert.deepEqual(TEST_PLUGIN_COMMANDS, ['funds', 'lp', 'chess', 'item', 'shop', 'shopSlots', 'pick', 'shopLevel', 'filter', 'map', 'bond', 'strategy', 'level', 'deployCap', 'refreshFree', 'bounty', 'wave', 'ops', 'op', 'enemies', 'boss', 'diyRefresh', 'round']);
   for (const cmd of ['speed', 'phase', 'hp', 'teamLp', 'token', 'auto', 'unit', 'diy', 'choice']) {
     assert.equal(parseTestPluginArgs(cmd, {}).error, ERR.BAD_MSG);
     assert.notEqual(validateC2S(request(cmd, {})), null);
@@ -39,8 +40,8 @@ test('strict catalogue, bounds, extra fields and large payloads fail before IPC'
   assert.equal(validateC2S(request('level')), null);
   for (const slot of [0, 11]) assert.equal(validateC2S(request('pick', { slot, id: 'chess_1' })), null);
   for (const slot of [-1, 12, 1.5, '0']) assert.notEqual(validateC2S(request('pick', { slot, id: 'chess_1' })), null);
-  for (const level of [1, 99]) assert.equal(validateC2S(request('shopLevel', { level })), null);
-  for (const level of [0, 100, 2.5]) assert.notEqual(validateC2S(request('shopLevel', { level })), null);
+  for (const level of [1, 6]) assert.equal(validateC2S(request('shopLevel', { level })), null);
+  for (const level of [0, 7, 2.5]) assert.notEqual(validateC2S(request('shopLevel', { level })), null);
   assert.equal(validateC2S(request('filter', { bonds: ['bond_a', 'bond_b'], mode: 'all' })), null);
   assert.equal(validateC2S(request('filter', { bonds: [] })), null);
   for (const bonds of [['bond_a', 'bad bond'], Array.from({ length: 13 }, (_, i) => `b${i}`), ['__proto__'], [1], 'bond_a']) {
@@ -65,9 +66,51 @@ test('strict catalogue, bounds, extra fields and large payloads fail before IPC'
     { id: 'char_a', potential: 0 }, { id: 'char_a', potential: 7 }, { id: 'char_a', potential: 2.5 },
     { id: 'char_a', cultivate: -1 }, { id: 'char_a', cultivate: 4 }, { id: 'char_a', potential: 6, extra: 1 },
   ]) assert.notEqual(validateC2S(request('ops', args)), null, JSON.stringify(args));
-  assert.equal(validateC2S(request('timers', { on: false })), null);
-  assert.equal(validateC2S(request('timers', { on: true })), null);
-  for (const on of ['off', 1, null, undefined]) assert.notEqual(validateC2S(request('timers', { on })), null);
+  // `op`: every field optional but at least one must change; 潜能 1..6 and 练度 0..3 (shared/potential.js), which the
+  // contract's 0..POTENTIAL_MAX / cultivate 60 examples contradict — the native tables decide.
+  assert.equal(validateC2S(request('op', { id: 'chess_1', potential: 1 })), null);
+  assert.equal(validateC2S(request('op', { id: 'chess_1', cultivate: 3 })), null);
+  assert.equal(validateC2S(request('op', {
+    id: 'chess_1', potential: 6, cultivate: 0, skillIndex: 1, moduleId: 'uniequip_2_x',
+    bonds: ['bond_a'], traits: ['g_1'], stats: { atk: 999, def: 0, maxHp: 1, res: 2, aspd: 3, cost: 4 },
+  })), null);
+  assert.equal(validateC2S(request('op', { id: 'chess_1', moduleId: null })), null, 'null clears the module');
+  assert.equal(validateC2S(request('op', { id: 'chess_1', bonds: [] })), null, 'an empty list clears the bonds');
+  assert.equal(validateC2S(request('op', { id: 'chess_1', traits: [] })), null);
+  for (const args of [
+    { id: 'chess_1' }, { potential: 6 }, { id: '', potential: 6 }, { id: '__proto__', potential: 6 },
+    { id: 'chess_1', potential: 0 }, { id: 'chess_1', potential: 7 }, { id: 'chess_1', potential: 2.5 },
+    { id: 'chess_1', cultivate: -1 }, { id: 'chess_1', cultivate: 4 },
+    { id: 'chess_1', skillIndex: -1 }, { id: 'chess_1', skillIndex: 9 }, { id: 'chess_1', skillIndex: 0.5 },
+    { id: 'chess_1', moduleId: 'bad module' }, { id: 'chess_1', moduleId: 1 },
+    { id: 'chess_1', bonds: ['bad bond'] }, { id: 'chess_1', bonds: 'bond_a' },
+    { id: 'chess_1', traits: Array.from({ length: 9 }, (_, i) => `g${i}`) },
+    { id: 'chess_1', stats: {} }, { id: 'chess_1', stats: { hp: 1 } }, { id: 'chess_1', stats: { atk: -1 } },
+    { id: 'chess_1', stats: { atk: 100000 } }, { id: 'chess_1', stats: { atk: 1.5 } }, { id: 'chess_1', stats: { atk: 1, extra: 2 } },
+    { id: 'chess_1', potential: 6, extra: 1 },
+  ]) assert.notEqual(validateC2S(request('op', args)), null, JSON.stringify(args));
+  // `shopSlots` takes one entry per shelf slot; `null` empties it.
+  assert.equal(validateC2S(request('shopSlots', { slots: [{ kind: 'chess', id: 'chess_1' }, null] })), null);
+  assert.equal(validateC2S(request('shopSlots', { slots: [null] })), null);
+  for (const slots of [undefined, [], 'x', [{ kind: 'unit', id: 'chess_1' }], [{ kind: 'chess', id: 'bad id' }],
+    [{ kind: 'chess', id: 'chess_1', extra: 1 }], Array(13).fill(null)]) {
+    assert.notEqual(validateC2S(request('shopSlots', { slots })), null, JSON.stringify(slots));
+  }
+  // `enemies` and `boss`: bounded ids / counts, mode is a closed set.
+  assert.equal(validateC2S(request('enemies', { mode: 'replace', list: [{ id: 'enemy_1', count: 1 }] })), null);
+  assert.equal(validateC2S(request('enemies', { mode: 'append', list: [{ id: 'enemy_1', count: 20 }] })), null);
+  for (const args of [
+    {}, { mode: 'append' }, { mode: 'merge', list: [{ id: 'enemy_1', count: 1 }] },
+    { mode: 'replace', list: [] }, { mode: 'replace', list: Array(13).fill({ id: 'enemy_1', count: 1 }) },
+    { mode: 'replace', list: [{ id: 'enemy_1', count: 0 }] }, { mode: 'replace', list: [{ id: 'enemy_1', count: 21 }] },
+    { mode: 'replace', list: [{ id: 'bad id', count: 1 }] }, { mode: 'replace', list: [{ id: 'enemy_1' }] },
+    { mode: 'replace', list: [{ id: 'enemy_1', count: 1, extra: 1 }] },
+  ]) assert.notEqual(validateC2S(request('enemies', args)), null, JSON.stringify(args));
+  assert.equal(validateC2S(request('boss', { id: 'boss_1' })), null);
+  for (const id of ['', 'bad boss', "a'b", '__proto__', null]) assert.notEqual(validateC2S(request('boss', { id })), null);
+  // the clock tool is gone in v2
+  assert.notEqual(validateC2S(request('timers', { on: false })), null);
+  assert.equal(isTestPluginCommand('timers'), false);
   assert.equal(validateC2S(request('diyRefresh')), null);
   for (const args of [{ all: true }, { slot: 0 }]) assert.notEqual(validateC2S(request('diyRefresh', args)), null);
   for (const body of [
@@ -112,7 +155,7 @@ test('guest uses only own living seat; receipts, queues and two matches stay iso
   assert.equal(a.ps('p_0').funds, otherFunds);
   assert.equal(b.m.testPluginView(b.ps('p_1')).actions, 0);
   assert.equal(Object.hasOwn(b.m, '_testPlugin'), false);
-  assert.deepEqual(a.ps('p_1').privateView().testPlugin, { actions: 1, last: { cmd: 'funds', ok: true }, lp: a.ps('p_1').lp, filter: null, timersHeld: false, diy: [] });
+  assert.deepEqual(a.ps('p_1').privateView().testPlugin, { actions: 1, last: { cmd: 'funds', ok: true }, lp: a.ps('p_1').lp, filter: null, diy: [], ops: {}, bossRaid: null });
   assert.equal(a.ps('p_0').privateView().testPlugin.actions, 0);
   assert.equal(JSON.stringify(a.m.publicView()).includes('testPlugin'), false);
   assert.equal(a.m.handle('p_1', { ...request('funds', { amount: 888 }), actor: 'p_0' }).error, ERR.BAD_MSG);
@@ -451,32 +494,209 @@ test('ops sets 潜能/练度 for one operator without charging funds or touching
   assert.deepEqual(ps.ops[id], { potential: 6, cultivate: 0 });
 });
 
-test('timers holds the running phase clock and re-arms the same callback on resume', () => {
+test('shopSlots rewrites the current shelf slot by slot, allows empty slots and never charges', () => {
+  const h = prep({ mode: 'coop', humans: 2 }); const ps = h.ps('p_0'); const other = h.ps('p_1');
+  const layout = ps.shop.layout;
+  const cid = ps.gd.visibleChess[0];
+  const iid = Object.values(ps.gd.shopItemsByTier).flat()[0];
+  const slots = [
+    ...Array.from({ length: layout.chess }, (_, i) => (i === 0 ? { kind: 'chess', id: cid } : null)),
+    ...Array.from({ length: layout.item }, () => ({ kind: 'item', id: iid })),
+  ];
+  const funds = ps.funds;
+  assert.equal(send(h, 'shopSlots', { slots: slots.slice(1) }).error, ERR.BAD_TARGET, 'one entry per shelf slot');
+  const wrong = slots.slice(); wrong[0] = { kind: 'item', id: iid };
+  assert.equal(send(h, 'shopSlots', { slots: wrong }).error, ERR.BAD_TARGET, 'the slot position decides the kind');
+  assert.equal(send(h, 'shopSlots', { slots: slots.map(() => ({ kind: 'chess', id: 'no_such_chess' })) }).error, ERR.BAD_TARGET);
+  assert.equal(send(h, 'shopSlots', { slots }).ok, true);
+  assert.equal(ps.shop.slots[0].id, cid);
+  assert.equal(ps.shop.slots[0].kind, 'chess');
+  assert.equal(ps.shop.slots[0].basePrice, ps.gd.chessPrice(cid));
+  assert.equal(ps.shop.slots[0].frozen, false);
+  assert.equal(ps.shop.slots[0].sold, false);
+  assert.equal(ps.shop.slots[1], null, 'null empties the slot');
+  if (layout.item > 0) assert.equal(ps.shop.slots[layout.chess].kind, 'item');
+  assert.equal(ps.funds, funds, 'rewriting the shelf charges nothing');
+  assert.deepEqual(ps.shop.layout, { chess: layout.chess, item: layout.item });
+  assert.equal(ps.privateView().testPlugin.actions, 1);
+  assert.equal(other.privateView().testPlugin.actions, 0, 'the teammate is not charged an action');
+  ps.ready = true;
+  assert.equal(send(h, 'shopSlots', { slots }).error, ERR.WRONG_PHASE);
+  ps.ready = false;
+  h.m.phase = PHASE.COMBAT;
+  assert.equal(send(h, 'shopSlots', { slots }).error, ERR.WRONG_PHASE);
+  h.m.phase = PHASE.PREP;
+  // a queued next-roll shelf is untouched: this command writes the shelf players see now
+  const full = slotsFor(ps);
+  assert.equal(send(h, 'shop', { slots: full }).ok, true);
+  assert.deepEqual(ps._testShopNext, full);
+  assert.equal(send(h, 'shopSlots', { slots }).ok, true);
+  assert.deepEqual(ps._testShopNext, full, 'the queue is not consumed');
+  assert.equal(Object.hasOwn(other.privateView().testPlugin, 'shopNext'), false);
+});
+
+test('op overrides one own piece by chessId, merges fields and reaches the battle input', () => {
+  const h = prep({ mode: 'coop', humans: 2 }); const ps = h.ps('p_0'); const other = h.ps('p_1');
+  const cid = ps.gd.visibleChess.find((id) => {
+    const r = ps.gd.chess(id);
+    return r && Array.isArray(r.skills) && r.skills.length > 1;
+  });
+  assert.ok(cid, 'data has an operator with two skills');
+  const rec = ps.gd.chess(cid);
+  assert.equal(send(h, 'op', { id: cid, potential: 1 }).error, ERR.BAD_TARGET, 'the seat must hold the piece');
+  assert.equal(send(h, 'chess', { id: cid }).ok, true);
+  const piece = ps.allChess().find((p) => p.id === cid);
+  assert.ok(piece);
+  const funds = ps.funds;
+  assert.equal(send(h, 'op', { id: cid, potential: 1, cultivate: 0 }).ok, true);
+  assert.deepEqual(ps._testOps[cid], { potential: 1, cultivate: 0 });
+  assert.equal(ps.funds, funds, 'an override charges nothing');
+  if (rec.charId) assert.deepEqual(ps.ops[rec.charId], { potential: 1, cultivate: 0 }, 'the native charId-level 潜能/练度 follows');
+  assert.equal(other._testOps, undefined, 'the teammate keeps its own override table');
+  // the native 干员调配 set (loadoutOptions): the record's skills, and the elite's modules + MODULE_NONE
+  const golden = rec.goldenId ? ps.gd.chess(rec.goldenId) : null;
+  assert.ok(golden, 'a visible operator has an elite record');
+  const opt = loadoutOptions(rec, golden);
+  assert.ok(opt.skills.length > 0);
+  const skillIndex = opt.skills[opt.skills.length - 1];
+  const moduleId = opt.modules.find((id) => id !== MODULE_NONE);
+  assert.ok(moduleId, 'the elite offers a module');
+  const bond = ps.gd.bondIds[0];
+  const garrison = rec.garrisonIds[0];
+  assert.ok(garrison, 'the record has a 特质');
+  assert.equal(send(h, 'op', { id: cid, skillIndex, moduleId, bonds: [bond], traits: [garrison], stats: { atk: 10, def: 20 } }).ok, true);
+  assert.equal(ps._testOps[cid].moduleId, moduleId);
+  assert.deepEqual(ps._testOps[cid], { potential: 1, cultivate: 0, skillIndex, moduleId, bonds: [bond], traits: [garrison], stats: { atk: 10, def: 20 } });
+  assert.equal(send(h, 'op', { id: cid, stats: { atk: 30 } }).ok, true);
+  assert.deepEqual(ps._testOps[cid].stats, { atk: 30, def: 20 }, 'stats merge key by key');
+  assert.deepEqual(ps.garrisonIdsFor(piece), [garrison], 'the trait override drives the prep effect pass');
+  assert.equal(send(h, 'op', { id: cid, traits: [] }).ok, true);
+  assert.deepEqual(ps.garrisonIdsFor(piece), [], 'an empty traits list clears them');
+  assert.equal(send(h, 'op', { id: cid, bonds: [] }).ok, true);
+  // the refusals run in their own match so the per-command rate window stays out of the way
+  const bad = prep();
+  assert.equal(send(bad, 'op', { id: 'no_such_chess', potential: 1 }).error, ERR.BAD_TARGET);
+  assert.equal(send(bad, 'chess', { id: cid }).ok, true);
+  assert.equal(send(bad, 'op', { id: cid, skillIndex: 8 }).error, ERR.BAD_TARGET, 'a skill the loadout does not offer');
+  assert.equal(send(bad, 'op', { id: cid, moduleId: 'no_such_module' }).error, ERR.BAD_TARGET);
+  assert.equal(send(bad, 'op', { id: cid, bonds: ['no_such_bond'] }).error, ERR.BAD_TARGET);
+  assert.equal(send(bad, 'op', { id: cid, traits: ['no_such_garrison'] }).error, ERR.BAD_TARGET);
+  const [row, col] = legalTileFor(h.m, ps, cid);
+  assert.deepEqual(h.m.handle('p_0', { t: 'g.move', uid: piece.uid, to: { area: 'board', row, col } }), OK);
+  const u = ps.battleInput({ side: 'L' }).units.find((x) => x.chessId === cid);
+  assert.ok(u, 'the overridden piece is in the battle input');
+  assert.deepEqual(u.testStats, { atk: 30, def: 20 });
+  assert.deepEqual(u.testTraits, [], 'an empty list is passed on as itself');
+  assert.deepEqual(u.testBonds, []);
+  assert.equal(u.skillIndex, skillIndex);
+  assert.equal(u.moduleId, moduleId, 'the chosen module reaches the battle input');
+  assert.equal(u.potential, 1);
+  assert.equal(u.cultivate, 0);
+  // moduleId semantics: 'none' removes the module (the elite exists), null restores the loadout default
+  assert.equal(send(h, 'op', { id: cid, moduleId: MODULE_NONE }).ok, true);
+  assert.equal(ps._testOps[cid].moduleId, MODULE_NONE, 'none removes the module');
+  assert.equal(send(h, 'op', { id: cid, moduleId: null }).ok, true);
+  assert.equal(ps._testOps[cid].moduleId, null, 'null restores the default module');
+});
+
+test('enemies rewrites or appends the current round wave with this round scale and no random draw', () => {
   const h = prep(); const m = h.m;
-  let fired = 0;
-  m.setDeadline(30, () => { fired += 1; });
-  assert.ok(m.deadline > 0, 'the phase starts with a published countdown');
-  assert.equal(send(h, 'timers', { on: false }).ok, true);
-  assert.equal(m.deadline, 0, 'a held phase publishes no countdown');
-  assert.equal(m.publicView().deadline, 0);
-  assert.equal(h.ps('p_0').privateView().testPlugin.timersHeld, true);
-  assert.equal(send(h, 'timers', { on: false }).ok, true, 'holding twice is a no-op');
-  assert.equal(fired, 0, 'the held callback does not fire while frozen');
-  assert.equal(send(h, 'timers', { on: true }).ok, true);
-  assert.equal(h.ps('p_0').privateView().testPlugin.timersHeld, false);
-  assert.ok(m.deadline > 0, 'resume arms the clock again');
-  assert.equal(m.publicView().deadline, m.deadline);
-  const kept = m.phase;
+  const live = Object.keys(m.gd.raw.enemies).filter((id) => !m.gd.inactiveEnemies.has(id));
+  assert.ok(live.length >= 2, 'data has two live enemies');
+  const cur = m.wave;
+  assert.ok(cur && Array.isArray(cur.spawns), 'the prep round already holds a wave');
+  const templateId = cur.templateId;
+  const rng = m.rngWaves.state();
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: live[0], count: 2 }, { id: live[1], count: 1 }] }).ok, true);
+  assert.equal(m.wave, cur, 'the wave object is rewritten in place');
+  assert.equal(m.wave.templateId, templateId, 'the drawn template id stays');
+  assert.equal(m.wave.spawns.length, 2);
+  const [a, b] = m.wave.spawns;
+  assert.equal(a.enemyKey, live[0]); assert.equal(a.count, 2); assert.equal(a.interval, 1);
+  assert.equal(b.enemyKey, live[1]); assert.equal(b.count, 1); assert.equal(b.interval, 0);
+  assert.ok(b.time > a.time, 'each item starts after the previous one');
+  assert.equal(a.routeIndex, 0);
+  assert.equal(a.actionIndex, 0);
+  assert.equal(b.actionIndex, 1);
+  assert.ok(a.mods && typeof a.mods.hpMul === 'number', 'this round scale rides the spawn');
+  assert.ok(a.preview && typeof a.preview.gate === 'string', 'the client preview is filled');
+  assert.equal(m.rngWaves.state(), rng, 'no random draw');
+  const before = m.wave.spawns.length; const last = Math.max(...m.wave.spawns.map((s) => s.time));
+  assert.equal(send(h, 'enemies', { mode: 'append', list: [{ id: live[0], count: 1 }] }).ok, true);
+  assert.equal(m.wave.spawns.length, before + 1);
+  assert.ok(m.wave.spawns.at(-1).time >= last + 2, 'an append starts two seconds after the last existing spawn');
+  assert.equal(m.wave.spawns.at(-1).actionIndex, 2);
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: 'no_such_enemy', count: 1 }] }).error, ERR.BAD_TARGET);
+  m.gd.inactiveEnemies.add(live[0]);
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: live[0], count: 1 }] }).error, ERR.BAD_TARGET);
+  m.gd.inactiveEnemies.delete(live[0]);
+  const kept = m.wave;
+  m.wave = null;
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: live[0], count: 1 }] }).error, ERR.WRONG_PHASE);
+  m.wave = kept;
+  const round = m.round;
+  m.round = m.gd.bossRound;
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: live[0], count: 1 }] }).error, ERR.WRONG_PHASE, 'a boss round is planned separately');
+  m.round = round;
   m.phase = PHASE.COMBAT;
-  assert.equal(send(h, 'timers', { on: false }).error, ERR.WRONG_PHASE, 'a live battle clock is never held');
-  m.phase = kept;
-  // a held clock is a live timer, not saved: the checkpoint restores the phase with its own clock re-entered
-  assert.equal(send(h, 'timers', { on: false }).ok, true);
-  const doc = JSON.parse(JSON.stringify(snapshotMatch(m)));
+  assert.equal(send(h, 'enemies', { mode: 'replace', list: [{ id: live[0], count: 1 }] }).error, ERR.WRONG_PHASE);
+  m.phase = PHASE.PREP;
+});
+
+test('boss starts a raid on the chosen leader and a victory returns to the round before it', () => {
+  const h = prep(); const m = h.m;
+  const bosses = Object.entries(m.gd.raw.bosses);
+  const normal = bosses.find(([, b]) => b && b.hidden !== true);
+  assert.ok(normal && m.gd.bossRound > 1, 'data has a normal leader and a boss round');
+  assert.equal(send(h, 'boss', { id: 'no_such_boss' }).error, ERR.BAD_TARGET);
+  assert.equal(send(h, 'boss', { id: normal[0] }).ok, true);
+  const bossRound = m.gd.bossRound;
+  assert.deepEqual(m._testBossRaid, { bossId: normal[0], hidden: false, round: bossRound, returnRound: Math.max(1, bossRound - 1) });
+  assert.equal(m.bossId, normal[0]);
+  assert.equal(m.round, bossRound, 'the raid jumps to the leader round');
+  // the victory branch of bossRounds._finishFinal hands the match back instead of finishing it
+  m.phase = PHASE.FINAL_ASSAULT;
+  m.fields = [];
+  m.bossPool = { hp: 0 };
+  m._finalEnding = null;
+  m._finishFinal(false, () => null);
+  assert.equal(m._testBossRaid, null);
+  assert.equal(m.bossId, null);
+  assert.equal(m.round, Math.max(1, bossRound - 1), 'back to the round before the raid');
+  assert.equal(m.ended, false, 'the match is not finished');
+  assert.notEqual(m.phase, PHASE.RESULT);
+  // a mode with a separate hidden core fields the chosen hidden leader there
+  const hiddenBoss = bosses.find(([, b]) => b && b.hidden === true);
+  const hiddenRound = m.gd.hiddenRound;
+  if (hiddenBoss && hiddenRound) {
+    assert.equal(send(h, 'boss', { id: hiddenBoss[0] }).ok, true);
+    assert.deepEqual(m._testBossRaid, { bossId: hiddenBoss[0], hidden: true, round: hiddenRound,
+      returnRound: Math.max(1, Math.min(hiddenRound - 1, m.gd.bossRound - 1)) });
+    assert.equal(m.hiddenBossId, hiddenBoss[0]);
+    assert.equal(m.round, hiddenRound);
+  }
+});
+
+test('checkpoint saves the per-chessId override table and the raid mark', () => {
+  const h = prep(); const ps = h.ps('p_0');
+  const cid = ps.gd.visibleChess[0];
+  assert.equal(send(h, 'chess', { id: cid }).ok, true);
+  assert.equal(send(h, 'op', { id: cid, potential: 1, traits: [] }).ok, true);
+  assert.ok(PLAYER_FIELDS.saved.includes('_testOps'));
+  // the raid mark is taken in the boss round's own PREP, so its checkpoint must bring it back (snapshot.test.js
+  // covers the full round trip and the shape check)
+  assert.ok(MATCH_FIELDS.saved.includes('_testBossRaid'));
+  assert.equal(MATCH_FIELDS.transient.includes('_testBossRaid'), false);
+  const raid = { bossId: 'boss_1', hidden: false, round: 3, returnRound: 2 };
+  h.m._testBossRaid = { ...raid };
+  const doc = JSON.parse(JSON.stringify(snapshotMatch(h.m)));
+  assert.equal(Object.hasOwn(doc.match, '_testBossRaid'), true);
   const r = makeMatch({ mode: doc.mode, difficulty: doc.difficulty, seats: doc.seats, seed: doc.seed, fake: true, experimental: doc.experimental });
   assert.equal(restoreMatch(r.m, doc, { createRngFromState }), true);
-  assert.equal(r.m._pluginTimerOff, false);
-  assert.equal(r.ps('p_0').privateView().testPlugin.timersHeld, false);
+  assert.deepEqual(r.ps('p_0')._testOps[cid], { potential: 1, traits: [] });
+  assert.deepEqual(r.m._testBossRaid, raid);
+  assert.equal(r.ps('p_0').privateView().testPlugin.ops[cid].potential, 1);
+  assert.deepEqual(r.ps('p_0').privateView().testPlugin.bossRaid, raid);
 });
 
 test('diyRefresh refills only the requesting seat 自选 stock', () => {

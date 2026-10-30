@@ -239,6 +239,48 @@ export function loadoutKey(lo) {
   return lo && !lo.isDefault ? `|s${lo.skillIndex}|m${lo.moduleId ?? ''}${lo.potentialIsDefault === false ? `|p${lo.potential}` : ''}` : '';
 }
 
+// 测试插件 v2 (TESTPLUGIN-V2-CONTRACT §4): per-piece `testStats` overrides. The stat keys the plugin may set and their
+// floors — a 0 maxHp / 0 aspd unit would be degenerate, so those two keep a floor of 1. Values are whole numbers in
+// [floor, 99999] (the op command already bounds them; this is the sim-side defence).
+const TEST_STAT_FLOOR = { atk: 0, def: 0, maxHp: 1, res: 0, aspd: 1, cost: 0 };
+
+/** One `testStats` value clamped to its floor..99999, or null when it is not a finite number. */
+function testStat(v, key) {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(99999, Math.max(TEST_STAT_FLOOR[key] ?? 0, n)) : null;
+}
+
+/** The clamped override of a loadout's `testStats` (given, usable keys only), or null. */
+function testStatsOf(loadout) {
+  const ts = loadout && loadout.testStats;
+  if (!ts || typeof ts !== 'object') return null;
+  let out = null;
+  for (const k of Object.keys(TEST_STAT_FLOOR)) {
+    if (ts[k] == null) continue;
+    const v = testStat(ts[k], k);
+    if (v == null) continue;
+    out = out ?? {};
+    out[k] = v;
+  }
+  return out;
+}
+
+/** Cache-key suffix of clamped `testStats` ('' for none) — a fixed key order keeps the key stable. */
+function testStatsKey(ts) {
+  return ts ? `|t${Object.entries(ts).map(([k, v]) => `${k}:${v}`).join(',')}` : '';
+}
+
+/**
+ * Def `d` with `testStats` written over its stats (only keys the stats already have; the default-cache def is never
+ * touched). `d.testStats` keeps the applied override for debugging.
+ */
+function withTestStats(d, ts) {
+  if (!d || !ts) return d;
+  const stats = { ...d.stats };
+  for (const [k, v] of Object.entries(ts)) if (k in stats) stats[k] = v;
+  return { ...d, stats, testStats: Object.freeze({ ...ts }) };
+}
+
 /** Build an immunity Set from an object `{stun:true,…}` or an array `['stun', 'feared']`. */
 export function immuneSet(v, extra = null) {
   const out = new Set();
@@ -612,19 +654,25 @@ export class DataSource {
    * (loadoutRecord; not for a stand-in).
    */
   getChess(id, loadout = null) {
-    if (loadout && loadout.diy && typeof loadout.diy === 'object') return this.getDiy(id, loadout.diy, loadout.potential);
+    // 测试插件 v2: a per-piece `testStats` override (TESTPLUGIN-V2-CONTRACT §4) rides the loadout and is folded into the
+    // def and its cache key, so it never pollutes the default def of that chess (a shared cache entry).
+    const ts = testStatsOf(loadout);
+    if (loadout && loadout.diy && typeof loadout.diy === 'object') {
+      return withTestStats(this.getDiy(id, loadout.diy, loadout.potential), ts);
+    }
     if (loadout && loadout.standIn === true) {
       const sd = this.getStandIn(id);
-      if (sd) return sd;
+      if (sd) return withTestStats(sd, ts);
     }
     if (loadout == null && this._chess.has(id)) return this._chess.get(id);
     const r = this.rawChess(id);
     const lo = r ? resolveLoadout(r, loadout) : null;
-    const key = id + loadoutKey(lo);
+    const key = id + loadoutKey(lo) + testStatsKey(ts);
     if (this._chess.has(key)) return this._chess.get(key);
     let d = null;
     if (r) {
       d = normalizeChess({ chessId: id, ...loadoutRecord(r, lo) });
+      d = withTestStats(d, ts);
       d.loadout = lo;
       freezeDef(d);
     }

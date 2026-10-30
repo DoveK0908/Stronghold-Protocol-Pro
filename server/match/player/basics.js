@@ -201,6 +201,22 @@ export class PlayerBasics {
   }
 
   /**
+   * The 特质 (garrison ids) a chess piece carries: the 测试插件's per-chessId `op` override when it set one, else the
+   * chess record's own `garrisonIds`. The prep effect pass reads this, so an overridden trait list really takes part in
+   * this match's layers and settlements.
+   * @param {{ id: string } | null} piece
+   * @returns {string[]}
+   */
+  garrisonIdsFor(piece) {
+    const id = piece && piece.id;
+    if (typeof id !== 'string') return [];
+    const over = this._testOps && this._testOps[id];
+    if (over && Array.isArray(over.traits)) return over.traits;
+    const rec = this.gd.chess(id);
+    return rec && Array.isArray(rec.garrisonIds) ? rec.garrisonIds : [];
+  }
+
+  /**
    * Replace the not-owned list (0.2.0 补位; the seat's list at the match start — the setting never changes during a
    * match): keeps the droppable chess (checkNotOwned) whose stand-in this match's data has. Bots own every operator.
    * @param {any} list base chess ids

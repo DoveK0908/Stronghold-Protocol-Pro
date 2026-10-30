@@ -417,10 +417,6 @@ export class Match {
      * normal match stays byte-identical.
      */
     this.test = opts.test === true;
-    /** the 测试插件 holds the phase clock (infra.setDeadline); only its `timers` tool raises this */
-    this._pluginTimerOff = false;
-    /** the phase callback a held plugin clock keeps until the plugin resumes it */
-    this._pluginArmed = null;
     if (this.test) {
       /** phase deadlines are armed. false holds the callback (g.test timers) instead of scaling time to 0. */
       this.testTimers = true;
@@ -539,6 +535,9 @@ export class Match {
     this.factions = setup.factions;
     this.bossId = setup.bossId;
     this.hiddenBossId = setup.hiddenBossId;
+    // 迎战首领 (test plugin `boss`): the raid taken from THIS boss round — saved, so a checkpoint inside the raid
+    // still returns to the round before it instead of finishing the match. null in every match that never raided.
+    this._testBossRaid = null;
 
     /** @type {Map<string, PlayerState>} */
     this.players = new Map();

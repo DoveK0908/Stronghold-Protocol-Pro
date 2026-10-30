@@ -158,12 +158,20 @@ export class BattlePlayers {
     if (inp.standIn === true) lo.standIn = true;
     if (inp.diy && typeof inp.diy === 'object') lo.diy = inp.diy;
     if (inp.standIn !== true && isPotential(inp.potential)) lo.potential = inp.potential;
+    // 测试插件 v2 (TESTPLUGIN-V2-CONTRACT §4): a per-piece stat override is part of the loadout (simdata getChess folds
+    // it into the def and its cache key), so it reaches `_makeAlly`'s base stats through the def like every other stat
+    if (inp.testStats && typeof inp.testStats === 'object') lo.testStats = inp.testStats;
     const def = this.data.getChess(inp.chessId, lo);
     if (!def) { this.log(`unknown chess ${inp.chessId}${lo.diy ? ' (illegal 自选 pick)' : ''}`); return null; }
     // a DIY slot has no body of its own (甄选干员): it fights only as a 自选 piece (its `diy` pick)
     if (def.raw?.isDiy && !def.diyFor) { this.log(`自选 slot ${inp.chessId} without a pick`); return null; }
     // 皮肤 (docs/SKINS.md): display only — no rule reads Unit.skin and Battle.result() omits it
     const u = this._makeAlly(ps, def, 'op', r, c, { uid: inp.uid, dir, skin: inp.skin });
+    // 测试插件 v2: the overrides the plugin runtime (public/js/battle/operatorTraits.js) and the bond layer
+    // (server/match/bondsMeta.js) read off the unit — carried, never interpreted here. `undefined` = no override (the
+    // unit keeps the operator's own lists); an array replaces them, so `[]` clears them (the player cleared 特质 / 盟约).
+    if (Array.isArray(inp.testTraits)) u.testTraits = [...inp.testTraits];
+    if (Array.isArray(inp.testBonds)) u.testBonds = [...inp.testBonds];
     u.items = [...(inp.items ?? [])];
     if (inp.itemProgress) u.itemProgress = inp.itemProgress.map(p => ({ ...p }));
     u.carry = inp.carryState ?? null;

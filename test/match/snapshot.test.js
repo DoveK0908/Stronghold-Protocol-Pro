@@ -264,3 +264,21 @@ test('a checkpoint holding what the game data no longer has (another release) is
   const s2 = makeMatch({ seats: doc.seats, seed: doc.seed });
   assert.equal(restoreMatch(s2.m, { ...JSON.parse(JSON.stringify(snapshotMatch(h.m))), match: { ...doc.match, stageId: 'no_such_stage' } }, { createRngFromState }), false);
 });
+
+test('the 迎战首领 raid mark is saved, restored and shape-checked (a malformed one restores as null)', () => {
+  const h = makeMatch({ humans: 1, bots: 1, seed: 31 }).autoHumans();
+  h.start();
+  h.run(() => h.ended != null || (h.m.phase === PHASE.PREP && canSnapshot(h.m)));
+  assert.ok(canSnapshot(h.m), 'a checkpoint in PREP');
+  const raid = { bossId: h.m.gd.bossRound && h.m.gd.raw.bosses ? Object.keys(h.m.gd.raw.bosses)[0] : 'boss_1', hidden: false,
+    round: Math.max(1, h.m.gd.bossRound || 14), returnRound: Math.max(1, (h.m.gd.bossRound || 14) - 1) };
+  h.m._testBossRaid = { ...raid };
+  const doc = JSON.parse(JSON.stringify(snapshotMatch(h.m)));
+  assert.ok(Object.hasOwn(doc.match, '_testBossRaid'), 'the mark is a saved match field');
+  const r = restored(doc);
+  assert.deepEqual(r.m._testBossRaid, raid, 'the raid mark round-trips');
+  const bad = JSON.parse(JSON.stringify(doc));
+  bad.match._testBossRaid = { bossId: 7, hidden: 'yes', round: 0, returnRound: 1.5 };
+  const r2 = restored(bad);
+  assert.equal(r2.m._testBossRaid, null, 'a malformed mark restores as null');
+});

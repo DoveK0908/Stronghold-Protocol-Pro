@@ -37,7 +37,7 @@ import { SPEED_BOOST } from './match/speedVote.js';
  * Checkpoint layout version. A document of another version is refused (the match is dropped, server/persist/).
  * Raise it whenever a saved field is added, removed or changes its meaning, or the restore rules below change.
  */
-export const SNAPSHOT_VERSION = 4;
+export const SNAPSHOT_VERSION = 5;
 
 /** Phases whose state is fully serializable (see the header). */
 export const SNAPSHOT_PHASES = Object.freeze([PHASE.INFO_CHECK, PHASE.BAND_DRAFT, PHASE.SP_DRAFT, PHASE.ROUND_START, PHASE.PREP]);
@@ -77,6 +77,10 @@ export const MATCH_FIELDS = Object.freeze({
     '_botEmotesSettledRound',
     // 局内投票开启二倍速 (speedVote.js): whether this match already runs at 2× and whether its next battle owes the boost
     'speedBoost', 'speedBoostPending', 'speedBoostOffPending',
+    // The 迎战首领 raid mark (test plugin `boss`) is taken in the boss round's own PREP: that checkpoint keeps
+    // `wave` / `bossId` / `hiddenBossId`, so the mark must come back too, or the winning raid would finish the match
+    // instead of returning to the round before it. Shape-checked on restore (a malformed one restores as null).
+    '_testBossRaid',
   ]),
   special: Object.freeze([
     'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'poolGroups', 'playerItemPools',
@@ -119,9 +123,6 @@ export const MATCH_FIELDS = Object.freeze({
     'simPool', 'rehearsalPoolStats', '_rerollStartAt',
     // Native test-plugin receipts, action counts and per-seat rate stamps are session-only; never replay commands.
     '_testPlugin',
-    // The plugin's clock hold and the phase callback it parks: both are live timers, so a checkpoint made while a
-    // clock is held restores with the phase re-entering its own clock (enterPhase), never with a frozen deadline.
-    '_pluginTimerOff', '_pluginArmed', '_phaseArmed',
   ]),
 });
 
@@ -138,6 +139,8 @@ export const PLAYER_FIELDS = Object.freeze({
     '_testShopNext',
     // Own-seat shop bond filter (test plugin `filter`): a plain validated shape that must survive a restore.
     '_testShopFilter',
+    // Per-chessId operator overrides (test plugin `op`): prep effects and the next battle's input read them.
+    '_testOps',
   ]),
   special: Object.freeze(['ready', 'connected', 'loadout', 'ops', 'skins', 'diyStock']),
   derived: Object.freeze([
@@ -436,8 +439,13 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
     _turnTimer: null, _pubTimer: null, _pubDirty: false, _lastPubAt: -Infinity, _lastPubJson: '', _prepEndQueued: false,
     speedVote: null, _turnToken: 0, _progressTimer: null, _bossPubTimer: null, _bossClock: null, _bossClockOn: false, _poolTimer: null,
     pacer: null, runner: null, fields: [], unitePlan: null, teamLp: null, bossPool: null, _botPath: null, lastResultMsg: null,
-    _pluginTimerOff: false, _pluginArmed: null, _phaseArmed: null,
+    _testBossRaid: null,
   });
+  // the 迎战首领 raid mark is a saved field; only the validated shape above may drive the next boss victory
+  const raid = Object.hasOwn(doc.match, '_testBossRaid') ? decodeValue(doc.match._testBossRaid) : null;
+  m._testBossRaid = raid && typeof raid === 'object' && typeof raid.bossId === 'string' && typeof raid.hidden === 'boolean'
+    && Number.isInteger(raid.round) && raid.round >= 1 && Number.isInteger(raid.returnRound) && raid.returnRound >= 1
+    ? { bossId: raid.bossId, hidden: raid.hidden, round: raid.round, returnRound: raid.returnRound } : null;
   delete m._testPlugin;
   m.watchers.clear();
   m.localViews.clear();

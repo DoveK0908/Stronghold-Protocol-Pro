@@ -606,6 +606,20 @@ export class MatchBoss {
     this.overtimeAt = 0;
     this.markPublic();
     this.runner = null;
+    // 迎战首领 raid (测试插件 `boss`): a victory returns to the round before the raid instead of ending the match. The
+    // pool, team LP and the temporary leader choice belong to the raid's own boss round, so they are cleared with it;
+    // a real 14/15 boss round has no raid mark and settles exactly as before.
+    const raid = this._testBossRaid;
+    if (raid && raid.round === this.round && victory) {
+      this._testBossRaid = null;
+      this.bossId = null;
+      this.hiddenBossId = null;
+      this.bossPool = null;
+      this.teamLp = null;
+      this._finalEnding = null;
+      this.startRound(raid.returnRound);
+      return;
+    }
     if (!hidden) {
       const eligible = victory && !!this.hiddenBossId && hiddenEligible(this.gd, { layerSum: this.hiddenLayerSum,
         teamLp: this.teamLp, aliveCount: this.finalAliveCount, experimental: this.capacityExperiment });

@@ -365,9 +365,10 @@ export class EffectDispatcher {
   _garrisons(ps, hook, ev, refreshed = null) {
     const gd = ps.gd || this.m.gd;
     const run = (piece, where) => {
-      const rec = gd.chess(piece.id);
-      if (!rec || !Array.isArray(rec.garrisonIds)) return;
-      for (const gid of rec.garrisonIds) {
+      // the piece's 特质: its record's garrisonIds, or this seat's test-plugin override (PlayerState.garrisonIdsFor)
+      const gids = ps.garrisonIdsFor(piece);
+      if (!gids.length) return;
+      for (const gid of gids) {
         const g = gd.garrison(gid);
         if (!g) continue;
         const key = `garrison:${g.effectKey}`;
@@ -407,13 +408,13 @@ export class EffectDispatcher {
   triggerGarrisons(ps, piece, eventType, { asPiece = null, triggeredBy = null } = {}) {
     const gd = ps.gd || this.m.gd;
     const hook = eventType === 'SERVER_PRICE' ? null : GARRISON_HOOK[eventType];
-    const rec = piece && piece.kind === 'chess' ? gd.chess(piece.id) : null;
-    if (!hook || !rec || !Array.isArray(rec.garrisonIds) || this.depth >= MAX_DEPTH) return 0;
+    const gids = piece && piece.kind === 'chess' ? ps.garrisonIdsFor(piece) : [];
+    if (!hook || !gids.length || this.depth >= MAX_DEPTH) return 0;
     const self = asPiece || piece;
     let n = 0;
     this.depth++;
     try {
-      for (const gid of rec.garrisonIds) {
+      for (const gid of gids) {
         const g = gd.garrison(gid);
         if (!g || g.eventType !== eventType) continue;
         const key = `garrison:${g.effectKey}`;
@@ -602,9 +603,9 @@ export function makeCtx(m, ps, source, hook, ev = null, preview = null) {
     /** 特质 of a chess piece: [{ garrisonId, effectKey, eventType, bb, bbStr, desc }]. */
     garrisonsOf: (uid) => {
       const l = ps.find(uid);
-      const rec = l && l.piece.kind === 'chess' ? gd.chess(l.piece.id) : null;
-      if (!rec || !Array.isArray(rec.garrisonIds)) return [];
-      return rec.garrisonIds.map((gid) => gd.garrison(gid)).filter(Boolean)
+      if (!l || l.piece.kind !== 'chess') return [];
+      const gids = ps.garrisonIdsFor(l.piece);
+      return gids.map((gid) => gd.garrison(gid)).filter(Boolean)
         .map((g) => ({ garrisonId: g.garrisonId, effectKey: g.effectKey, eventType: g.eventType, bb: g.bb || {}, bbStr: g.bbStr || {}, desc: g.desc || '' }));
     },
     stats: () => ({ ...ps.stats }),

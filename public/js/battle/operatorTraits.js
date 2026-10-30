@@ -9,7 +9,8 @@ export async function installOperatorTraits(raw, base = new URL('../../../server
     state = { original: Battle.prototype._setupUnit, table: [] };
     installed.set(Battle, state);
   }
-  state.table = Object.values(raw?.garrisons ?? {}).filter(g => g.operatorTrait);
+  state.byId = new Map(Object.entries(raw?.garrisons ?? {}).filter(([, g]) => g?.operatorTrait));
+  state.table = [...state.byId.values()];
   if (!state.table.length) { Battle.prototype._setupUnit = state.original; return; }
   // Only the optional loader adapter wraps setup; no vanilla engine file or registry is rewritten.
   Battle.prototype._setupUnit = function(unit, ...args) {
@@ -17,10 +18,25 @@ export async function installOperatorTraits(raw, base = new URL('../../../server
     if (this.contentMode !== 'full' || unit.kind !== 'op' || unit.mem.operatorTraitsInstalled) return kit;
     unit.mem.operatorTraitsInstalled = true;
     const rec = unit.def.raw;
+    const done = new Set();
     for (const g of state.table) {
       const tr = g.operatorTrait;
       if (tr.charId !== unit.def.charId || tr.elite !== !!rec.isGolden) continue;
+      done.add(g.garrisonId);
       installTrait(this, unit, tr, vocab, support.unitBonds(unit));
+    }
+    // 测试插件 v2 (TESTPLUGIN-V2-CONTRACT §4): the piece's `testTraits` garrison ids install exactly those traits on top
+    // of (never instead of) the operator's own — the charId is deliberately not required to match, since the test
+    // plugin may field another operator's trait on this chess. The elite gate is the unit's own (a normal chess
+    // installs only a normal trait and an elite one only an elite trait, as for the operator's own trait above).
+    if (Array.isArray(unit.testTraits)) {
+      for (const id of unit.testTraits) {
+        if (done.has(id)) continue;
+        const tr = state.byId.get(id)?.operatorTrait;
+        if (!tr || tr.elite !== !!rec.isGolden) continue;
+        done.add(id);
+        installTrait(this, unit, tr, vocab, support.unitBonds(unit));
+      }
     }
     return kit;
   };

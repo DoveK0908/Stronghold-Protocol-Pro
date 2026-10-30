@@ -1,11 +1,11 @@
 // Native, opt-in room test tools. Reuse match primitives, never enable test mode or install global hooks.
 // Receipts and rate limits are match-local, private and transient; no payload/argument audit is kept.
 import { ERR, PHASE } from '../../../shared/constants.js';
-import { cultivationCharIds } from '../../../shared/protocol.js';
+import { cultivationCharIds, loadoutOptions, MODULE_NONE } from '../../../shared/protocol.js';
 import { CULTIVATE_DEFAULT, POTENTIAL_DEFAULT } from '../../../shared/potential.js';
 import { isTestPluginCommand, parseTestPluginMessage, TEST_PLUGIN_RATE_COUNT, TEST_PLUGIN_RATE_WINDOW_MS } from '../../../shared/testPlugin.js';
 import { stageWithBenchExpand } from '../../../shared/benchExpand.js';
-import { buildNormalWave } from '../waves.js';
+import { buildNormalWave, customSpawns } from '../waves.js';
 import { OK, fail } from './common.js';
 
 export class MatchTestPlugin {
@@ -47,6 +47,7 @@ export class MatchTestPlugin {
       case 'chess': return this._testChess(ps, args.id);
       case 'item': return this._testItem(ps, args.id);
       case 'shop': return this._testShop(ps, args.slots);
+      case 'shopSlots': return this._testPluginShopSlots(ps, args.slots);
       case 'pick': return this._testPluginPick(ps, args.slot, args.id);
       case 'shopLevel': return this._testPluginShopLevel(ps, args.level);
       case 'filter': return this._testPluginFilter(ps, args.bonds, args.mode);
@@ -55,8 +56,10 @@ export class MatchTestPlugin {
       case 'refreshFree': return this._testPluginRefreshFree(ps, args.count);
       case 'bounty': return this._testPluginBounty(ps, args.id);
       case 'wave': return this._testPluginWave(ps, args.id);
+      case 'enemies': return this._testPluginEnemies(ps, args.mode, args.list);
+      case 'boss': return this._testPluginBoss(ps, args.id);
       case 'ops': return this._testPluginOps(ps, args);
-      case 'timers': return this._testPluginTimers(args.on);
+      case 'op': return this._testPluginOp(ps, args);
       case 'diyRefresh': return this._testPluginDiyRefresh(ps);
       case 'bond': return this._testBond(ps, args.id, args.layers, args.count);
       case 'lp':
@@ -102,6 +105,106 @@ export class MatchTestPlugin {
       frozen: !!ps.shop.frozen, sold: false,
     };
     ps.dirty();
+    return OK;
+  }
+
+  /**
+   * Replace the whole current shelf without charging: the caller sends one entry per slot of the current layout
+   * (`null` empties that slot), so the front end can hand back the shelf it shows. Same gate as `pick` (PREP, not
+   * ready); a queued next-roll shop is untouched — this command writes the shelf the players see now.
+   */
+  _testPluginShopSlots(ps, slots) {
+    if (this.phase !== PHASE.PREP || ps.ready) return fail(ERR.WRONG_PHASE);
+    const spec = ps.gd.shopSlots(ps.shop.level);
+    const layout = ps.shop.layout || { chess: spec.chess, item: spec.item };
+    const total = layout.chess + layout.item;
+    if (slots.length !== total) return fail(ERR.BAD_TARGET, `shopSlots|${JSON.stringify({ chess: layout.chess, item: layout.item })}`);
+    const next = [];
+    for (let i = 0; i < total; i++) {
+      const s = slots[i];
+      if (s === null) { next.push(null); continue; }
+      const kind = i < layout.chess ? 'chess' : 'item';
+      if (s.kind !== kind) return fail(ERR.BAD_TARGET, 'shopSlots|kind');
+      const rec = kind === 'chess' ? ps.gd.chess(s.id) : ps.gd.item(s.id);
+      // a 自选 slot sells only as this player's own composed piece, as the native shop does
+      if (!rec || (kind === 'chess' && rec.isDiy && !rec.diyFor)) return fail(ERR.BAD_TARGET, 'shopSlots|id');
+      next.push({
+        kind,
+        id: s.id,
+        basePrice: kind === 'chess' ? ps.gd.chessPrice(s.id) : ps.gd.itemPrice(s.id),
+        frozen: !!ps.shop.frozen,
+        sold: false,
+      });
+    }
+    ps.shop.slots = next;
+    ps.shop.layout = { chess: layout.chess, item: layout.item };
+    ps.dirty();
+    this.markPrivate(ps);
+    return OK;
+  }
+
+  /**
+   * Change one operator this seat owns on the board / hand / 临时整备区, by chessId: 潜能, 练度, 携带技能, 模组, 盟约
+   * (multi), 特质 (multi) and the raw 攻击 / 防御 / 生命 / 法抗 / 攻速 / 费用. Stored per chessId in `ps._testOps` and
+   * read by the battle input and the prep effect pass; 潜能/练度 also write the charId-level `ps.ops` the native
+   * cultivation path reads, so the next battle and the star display agree.
+   */
+  _testPluginOp(ps, { id, potential, cultivate, skillIndex, moduleId, bonds, traits, stats }) {
+    const pieces = [];
+    for (const piece of [...ps.board.values(), ...ps.hand, ...ps.temp]) {
+      if (!piece || piece.kind !== 'chess' || piece.id !== id) continue;
+      const rec = ps.gd.chess(piece.id);
+      // a 补位 stand-in or a prototype 自选 pick is not the operator itself
+      if (!rec || rec.standInFor || rec.diyProto) continue;
+      pieces.push(piece);
+    }
+    if (!pieces.length) return fail(ERR.BAD_TARGET, 'op|id');
+    const rec = ps.gd.chess(id);
+    const next = { ...(ps._testOps && ps._testOps[id] ? ps._testOps[id] : {}) };
+    if (potential !== undefined) next.potential = potential;
+    if (cultivate !== undefined) next.cultivate = cultivate;
+    if (skillIndex !== undefined || moduleId !== undefined) {
+      // The native 干员调配 choice set (shared/protocol.js loadoutOptions): the record's skills at both the normal and
+      // the elite status, and the elite's modules + MODULE_NONE. `moduleId: null` restores the default module, 'none'
+      // removes it, an id selects one; an operator without an elite record cannot be module-less on purpose.
+      const golden = rec.goldenId ? ps.gd.chess(rec.goldenId) || null : null;
+      const opt = loadoutOptions(rec, golden);
+      if (skillIndex !== undefined) {
+        if (!opt.skills.includes(skillIndex)) return fail(ERR.BAD_TARGET, 'op|skill');
+        next.skillIndex = skillIndex;
+      }
+      if (moduleId !== undefined) {
+        if (moduleId === MODULE_NONE) {
+          if (!golden) return fail(ERR.BAD_TARGET, 'op|module');
+        } else if (moduleId !== null && !opt.modules.includes(moduleId)) return fail(ERR.BAD_TARGET, 'op|module');
+        next.moduleId = moduleId;
+      }
+    }
+    if (bonds !== undefined) {
+      for (const b of bonds) if (!ps.gd.bond(b)) return fail(ERR.BAD_TARGET, 'op|bond');
+      next.bonds = [...bonds];
+    }
+    if (traits !== undefined) {
+      const garrisons = ps.gd.raw.garrisons || {};
+      for (const t of traits) if (!Object.hasOwn(garrisons, t) || !garrisons[t]) return fail(ERR.BAD_TARGET, 'op|trait');
+      next.traits = [...traits];
+    }
+    if (stats !== undefined) next.stats = { ...(next.stats || {}), ...stats };
+    ps._testOps = Object.freeze({ ...(ps._testOps || {}), [id]: Object.freeze(next) });
+    // 潜能/练度 are charId-level in the native rules (shared/potential.js cultivationOf)
+    if ((potential !== undefined || cultivate !== undefined) && rec.charId) {
+      const prev = ps.ops && ps.ops[rec.charId] ? ps.ops[rec.charId] : null;
+      const merged = Object.freeze({
+        potential: potential !== undefined ? potential : (prev ? prev.potential : POTENTIAL_DEFAULT),
+        cultivate: cultivate !== undefined ? cultivate : (prev ? prev.cultivate : CULTIVATE_DEFAULT),
+      });
+      ps.ops = Object.freeze({ ...ps.ops, [rec.charId]: merged });
+    }
+    // a summon-owning piece already on the field is reconciled like the native setLoadout path does
+    for (const piece of pieces) ps._reconcileTokensFor(piece);
+    ps.dirty();
+    if (ps.alive) ps.recompute();
+    this.markPrivate(ps);
     return OK;
   }
 
@@ -251,34 +354,55 @@ export class MatchTestPlugin {
   }
 
   /**
-   * Hold or resume the room's phase countdown (the 测试插件's one clock tool — it never shortens or speeds a clock).
-   * While held, infra.setDeadline publishes no deadline and keeps the callback; resuming re-arms it with its original
-   * duration. The battle phases write `deadline` themselves, so they are refused like the native test timers are.
+   * Rewrite (or append to) the current round's enemy list: the same spawn specs the round's own template produced,
+   * with this round's multipliers. RNG-free. Only the prep of a normal round: a boss field's composition is planned by
+   * buildBossWave, and a battle in progress owns its copies of the spawns.
    */
-  _testPluginTimers(on) {
-    if (this.phase === PHASE.COMBAT || this.phase === PHASE.UNITE || this.phase === PHASE.FINAL_ASSAULT
-      || this.phase === PHASE.HIDDEN_CORE || this.fields.some((f) => f && f.live)) {
-      return fail(ERR.WRONG_PHASE, 'timers');
+  _testPluginEnemies(ps, mode, list) {
+    if (this.phase !== PHASE.PREP || !this.wave) return fail(ERR.WRONG_PHASE);
+    if (this.gd.bossRound > 0 && this.round >= this.gd.bossRound) return fail(ERR.WRONG_PHASE);
+    for (const it of list) {
+      if (!this.gd.enemy(it.id) || this.gd.inactiveEnemies.has(it.id)) return fail(ERR.BAD_TARGET, 'enemies');
     }
-    if (this.phase === PHASE.LOBBY || this.phase === PHASE.RESULT) return fail(ERR.WRONG_PHASE);
-    if (on) {
-      if (this._pluginTimerOff !== true) return OK;
-      const held = this._pluginArmed;
-      this._pluginTimerOff = false;
-      this._pluginArmed = null;
-      if (held) this.setDeadline(held.seconds, held.fn, { silent: !!held.silent });
-      else this.deadline = 0;
+    const added = customSpawns(this.gd, this.round, list, mode === 'append' ? this.wave.spawns : [], this.wave.routes);
+    this.wave.spawns = mode === 'replace' ? added : [...this.wave.spawns, ...added];
+    for (const p of this.alivePlayers()) this.markPrivate(p);
+    return OK;
+  }
+
+  /**
+   * Fight a chosen leader now (迎战首领): jump to its boss round with `this.bossId` / `this.hiddenBossId` set, and
+   * remember the raid so its victory returns to the round before it instead of ending the match (bossRounds._finishFinal).
+   */
+  _testPluginBoss(ps, id) {
+    if (this.ended) return fail(ERR.WRONG_PHASE);
+    if (this.phase === PHASE.INFO_CHECK || this.phase === PHASE.BAND_DRAFT || !ps.bandId) return fail(ERR.WRONG_PHASE);
+    const bosses = this.gd.raw.bosses;
+    if (!bosses || !Object.hasOwn(bosses, id) || !bosses[id]) return fail(ERR.BAD_TARGET, 'boss');
+    const bossRound = this.gd.bossRound;
+    if (!(bossRound > 0)) return fail(ERR.WRONG_PHASE);
+    const hiddenRound = this.gd.hiddenRound;
+    const hidden = bosses[id].hidden === true;
+    const target = hidden ? (hiddenRound || bossRound) : bossRound;
+    // a win hands the match back to the round before the leader phase: the owner's answer to 迎战首领 is "回到第13回合",
+    // so a hidden raid at 15 returns to 13 too, not to the boss round 14 it would replay.
+    const returnRound = Math.max(1, Math.min(target - 1, bossRound - 1));
+    this._testBossRaid = { bossId: id, hidden, round: target, returnRound };
+    if (hidden) {
+      this.hiddenBossId = id;
+      // a mode without a separate hidden-core round fields its leader on the boss round, whose plan reads `bossId`
+      if (!hiddenRound || hiddenRound === bossRound) this.bossId = id;
     } else {
-      if (this._pluginTimerOff === true) return OK;
-      this._pluginTimerOff = true;
-      this._pluginArmed = this._phaseArmed || null;
-      this.cancel(this._phaseTimer);
-      this._phaseTimer = null;
-      this._phaseArmed = null;
-      this.deadline = 0;
+      this.bossId = id;
     }
-    if (this.phase === PHASE.BAND_DRAFT && this.draft) this.draft.turnDeadline = this.deadline;
-    this.markPublic();
+    this.eliminateBroken();
+    if (!this.alivePlayers().length) { this.finish({ victory: false, reason: 'eliminated' }); return OK; }
+    this.setDeadline(0);
+    this.cancel(this._turnTimer);
+    this._turnToken++;
+    this.startRound(target, () => {
+      if (hidden && hiddenRound && hiddenRound !== bossRound && this.round === hiddenRound && this.teamLp == null) this._openTeamLp();
+    });
     return OK;
   }
 

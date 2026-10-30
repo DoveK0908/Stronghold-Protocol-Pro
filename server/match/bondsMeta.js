@@ -48,10 +48,28 @@ export function pieceBonds(gd, piece, rules = null) {
 }
 
 /**
+ * 测试插件 v2 (TESTPLUGIN-V2-CONTRACT §4): the bonds one piece counts with. `ps._testOps[piece.id].bonds` replaces the
+ * piece's bonds entirely (an empty list = a piece with no bond at all); it belongs to that piece alone, so no other seat
+ * or piece changes. Null = no override (the piece's own bonds and its 变形同构体 grants, pieceBonds).
+ * @param {{ id: string }} piece
+ * @param {Record<string, { bonds?: string[] }>} [ops] `ps._testOps`
+ * @param {import('./gamedata.js').GameData} gd
+ * @returns {string[]|null}
+ */
+function testBonds(piece, ops, gd) {
+  const b = ops?.[piece.id]?.bonds;
+  if (!Array.isArray(b)) return null;
+  const out = [];
+  for (const id of b) if (gd.bond(id) && !out.includes(id)) out.push(id);
+  return out;
+}
+
+/**
  * Who carries which bond (computeBonds' and offBondCounts' shared first step): bondId → Set(baseId) on the board / in
  * the hand (the 5 temporary slots never count), bondId → Set(baseId|golden) on the board, and the elite chess on the board.
+ * `bondsOf(piece)` → string[]|null supplies a per-piece bond list (the test plugin's overrides) in place of pieceBonds.
  */
-function membership(gd, ps) {
+function membership(gd, ps, bondsOf = null) {
   const boardChess = [];
   for (const p of ps.board.values()) if (p && p.kind === 'chess') boardChess.push(p);
   const handChess = ps.hand.filter((p) => p && p.kind === 'chess');
@@ -59,14 +77,15 @@ function membership(gd, ps) {
   const onBoardVariant = new Map();
   const inHand = new Map();
   const add = (m, bond, key) => { let s = m.get(bond); if (!s) m.set(bond, (s = new Set())); s.add(key); };
+  const bondsFor = (p) => (bondsOf ? bondsOf(p) : null) ?? pieceBonds(gd, p, ps.m?.rules);
   for (const p of boardChess) {
     const base = gd.baseIdOf(p.id);
     const golden = gd.isGolden(p.id);
-    for (const b of pieceBonds(gd, p, ps.m?.rules)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
+    for (const b of bondsFor(p)) { add(onBoard, b, base); add(onBoardVariant, b, `${base}|${golden ? 1 : 0}`); }
   }
   for (const p of handChess) {
     const base = gd.baseIdOf(p.id);
-    for (const b of pieceBonds(gd, p, ps.m?.rules)) add(inHand, b, base);
+    for (const b of bondsFor(p)) add(inHand, b, base);
   }
   return { onBoard, onBoardVariant, inHand, goldenOnBoard: boardChess.filter((p) => gd.isGolden(p.id)).length };
 }
@@ -99,7 +118,10 @@ const layersIn = (ps, id) => {
  * @returns {Record<string, { count: number, active: boolean, tier: number, layers: number, harmony?: number }>}
  */
 export function computeBonds(gd, ps) {
-  const mem = membership(gd, ps);
+  // 测试插件 v2 (TESTPLUGIN-V2-CONTRACT §4): the per-piece bond overrides of `ps._testOps` apply here only — the 本局禁用
+  // strip (offBondCounts) keeps counting the real bonds, so a test override never rewrites what the mode switches off.
+  const ops = ps._testOps;
+  const mem = membership(gd, ps, ops ? (p) => testBonds(p, ops, gd) : null);
   const { onBoard, onBoardVariant } = mem;
 
   /** @type {Record<string, { count: number, active: boolean, tier: number, layers: number, harmony?: number }>} */

@@ -25,18 +25,18 @@ selection/stamp rules live in design/client.md. In-flight protection requires th
 
 Pro native test plugin: `g.testPlugin {cmd,args}` uses `shared/testPlugin.js`'s strict bounded whitelist:
 `funds {amount}`, `lp {value}`, `chess|item|strategy|map {id}`, `shop {slots:[{kind,id}]}`, `pick {slot,id}`,
-`shopLevel {level}`, `filter {bonds,mode?}`, `bond {id,layers,count?}`, `level {}`, `deployCap {value}`,
-`refreshFree {count}`, `bounty {id}`, `wave {id}`, `ops {id,potential?,cultivate?}`, `timers {on}`,
-`diyRefresh {}`, `round {round}`.
+`shopSlots {slots:[{kind,id}|null…]}`, `shopLevel {level 1..6}`, `filter {bonds,mode?}`,
+`bond {id,layers,count?}`, `level {}`, `deployCap {value}`, `refreshFree {count}`, `bounty {id}`, `wave {id}`,
+`ops {id,potential?,cultivate?}`, `op {id,potential?,cultivate?,skillIndex?,moduleId?,bonds?,traits?,stats?}`,
+`enemies {mode:'replace'|'append',list:[{id,count 1..20}]}`, `boss {id}`, `diyRefresh {}`, `round {round}`.
 No target player/room or speed command is accepted.
 The room's `experimental.luckConsole === true` and a living own human seat are required; quiet phase and
 normal operation-specific gates still apply. Attempts are bounded to 8 per command per seat per 10 seconds.
-Only the owner's `m.private.testPlugin` contains `{actions,last:{cmd,ok,code?}|null,lp,shopNext?,filter?,timersHeld,diy}`;
+Only the owner's `m.private.testPlugin` contains `{actions,last:{cmd,ok,code?}|null,lp,shopNext?,filter?,diy,ops,bossRaid}`;
 ordinary rooms omit the field and allocate no plugin receipt/rate state. The worker-host option whitelist
 explicitly forwards only this plugin switch plus the two mandatory default booleans (not arbitrary experimental options).
-Gate-off worker packets are unchanged. `timers {on:false}` holds the pending phase deadline in match memory
-(published `deadline: 0`, no callback while held) and `{on:true}` re-arms the same callback with its original duration;
-it is refused during COMBAT / UNITE / 最终攻势 / 隐秘核心 and with any live field. `g.test` stays separate and host-only.
+Gate-off worker packets are unchanged. There is no clock command: the plugin never holds, shortens or speeds up a
+deadline (the former `timers` tool is gone with its `infra.setDeadline` branch). `g.test` stays separate and host-only.
 
 C→S (all carry `rid`): `g.infoReady {setupRevision?}` · `g.band {bandId}` · `g.bandSkip` · `g.bandFocus {bandId?}` (the strategy highlighted in the draft screen — what a timed-out turn takes; absent / null clears it; `WRONG_PHASE` outside BAND_DRAFT, `ALREADY` after the pick, `BAD_TARGET` for a band not allowed; §18.2) · `g.buy {slot}` · `g.refresh` · `g.freeze` · `g.levelUp` · `g.sell {uid}` · `g.move {uid, to:{area:'board', row, col}|{area:'hand', idx}, dir?}` · `g.equip {itemUid, targetUid, replaceUid?}` (`replaceUid`: which equipped item a third one replaces, §6.2) · `g.art {itemUid, row, col, dir?}` (`dir` ∈ UP|RIGHT|DOWN|LEFT from the deploy wheel, §3; absent ⇒ `to.dir`, then RIGHT; `g.move` onto the piece's own tile re-orients it; board pieces in `m.private` / `m.field {prep:true}` carry `dir`) · `g.destroy {uid}` (hand / temp items only; equipped items are locked, §6.2) · `g.reward {idx}` · `g.choice {idx, choiceId?}` (with an ID: the recipient's PREP personal choice; without one: the public SP_DRAFT; stale or wrong IDs never fall through to the public draft) · `g.ready {ready}` · `g.emote {id}` · `g.watch {fieldId, playerId?}` (`playerId`: the player tapped — a shared 联防 / boss pair field shows two; what an eliminated viewer follows, §25) · `g.autoplay {on}` · `g.pause {on}` (solo battles only, §14 Solo pause) · `g.unitStats {seq?}` (ROUND_START / SP_DRAFT / PREP, else `WRONG_PHASE`; eliminated: `ELIMINATED`) → push `m.unitStats` (§18.5) · `g.leave` · `g.test {cmd, args?}` (the current host of a test match only, DESIGN §34.8; a normal match answers `TEST_FORBIDDEN`, a guest `NOT_HOST`, a spectator `SPECTATOR`; `args` omitted is `{}`)
 S→C:
