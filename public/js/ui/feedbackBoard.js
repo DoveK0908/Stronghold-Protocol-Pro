@@ -1,5 +1,5 @@
-// The lobby's anonymous feedback board (public/js/ui/…): players post feedback without a name, discuss each other's
-// posts, and the maintainer — after typing the board password — replies and moves a post between the four columns.
+// The lobby's anonymous feedback board (public/js/ui/…): players post feedback without a name and discuss each other's
+// posts; the maintainer answers and moves a post between the four columns from the admin panel (后台管理), not here.
 //
 // The board is server state (server/feedbackBoard.js, /api/feedback). This module only draws it: nothing here is part of
 // game readiness, and a board that cannot be reached leaves every other lobby control usable.
@@ -46,8 +46,6 @@ function message(code) {
     case 'RATE_LIMIT': return t('操作太频繁，请等一分钟再试。');
     case 'BOARD_FULL': return t('反馈板已满，请联系维护者清理。');
     case 'NOT_YOURS': return t('只有发布者本人可以修改或撤回这条反馈。');
-    case 'BAD_PASSWORD': return t('密码不正确。');
-    case 'NOT_MAINTAINER': return t('维护者身份已过期，请重新输入密码。');
     case 'TOO_LARGE': return t('内容太大了。');
     case 'INTERNAL': return t('服务器出错了，请稍后再试。');
     default: return t('操作没有完成，请稍后再试。');
@@ -88,12 +86,6 @@ export function FeedbackBoard({ onClose }) {
   // the post this browser is rewriting (`{ id, title, body }`), or null: only the author may open it
   const [editing, setEditing] = useState(null);
   const [secrets, setSecrets] = useState(loadSecrets);
-  const [maintainer, setMaintainer] = useState(() => {
-    const token = loadPref('feedback.token', '');
-    return typeof token === 'string' && token ? { token, ready: 'checking' } : { token: '', ready: 'no' };
-  });
-  const [password, setPassword] = useState('');
-  const [asking, setAsking] = useState(false);
 
   // One request can lose a race with a server restart: retry once by ourselves before telling the player it is down.
   const load = async (attempt = 0) => {
@@ -112,15 +104,6 @@ export function FeedbackBoard({ onClose }) {
   };
 
   useEffect(() => { load(); }, []);
-  // a stored maintainer token may have expired: ask the board rather than promising a toolbar that will be refused
-  useEffect(() => {
-    if (maintainer.ready !== 'checking') return;
-    let live = true;
-    call({ action: 'session', token: maintainer.token })
-      .then((data) => { if (live) setMaintainer((m) => ({ ...m, ready: data.maintainer ? 'yes' : 'no' })); })
-      .catch(() => { if (live) setMaintainer((m) => ({ ...m, ready: 'no' })); });
-    return () => { live = false; };
-  }, [maintainer.ready]);
 
   /** Run one write, then refresh the board; refusals land in the panel's error line. @param {() => Promise<any>} run */
   const write = async (run) => {
@@ -132,7 +115,6 @@ export function FeedbackBoard({ onClose }) {
       await load();
       return true;
     } catch (e) {
-      if (e.code === 'NOT_MAINTAINER') { setMaintainer({ token: '', ready: 'no' }); savePref('feedback.token', ''); }
       setError(message(e.code));
       return false;
     } finally {
@@ -158,14 +140,13 @@ export function FeedbackBoard({ onClose }) {
     }
   };
 
+  /** A discussion entry under a post — anonymous, like the post itself (server/feedbackBoard.js reply). */
   const reply = async (id) => {
     const text = replyDraft.trim();
     if (!text) return;
-    const done = await write(() => call({ action: 'reply', id, body: text, token: maintainer.token }));
+    const done = await write(() => call({ action: 'reply', id, body: text }));
     if (done) setReplyDraft('');
   };
-
-  const setStatus = (id, status) => write(() => call({ action: 'status', id, status, token: maintainer.token }));
 
   /** Rewrite one's own post: the same secret that withdraws it proves the edit. */
   const saveEdit = () => {
@@ -180,8 +161,8 @@ export function FeedbackBoard({ onClose }) {
 
   const withdraw = async (id) => {
     const secret = secrets[id];
-    if (!secret && maintainer.ready !== 'yes') return;
-    // destructive and irreversible: the post and its whole thread go, so ask first (the author and the maintainer alike)
+    if (!secret) return;
+    // destructive and irreversible: the post and its whole thread go, so ask first
     const ok = await confirmDialog({
       title: t('撤回这条反馈'),
       text: t('撤回后这条反馈和它的讨论都会消失，无法恢复。确定撤回吗？'),
@@ -191,25 +172,12 @@ export function FeedbackBoard({ onClose }) {
     });
     if (!ok) return;
     return write(async () => {
-      await call({ action: 'withdraw', id, secret, token: maintainer.token });
+      await call({ action: 'withdraw', id, secret });
       const next = { ...secrets };
       delete next[id];
       setSecrets(next);
       saveSecrets(next);
     });
-  };
-
-  const login = () => write(async () => {
-    const data = await call({ action: 'login', password });
-    setMaintainer({ token: data.token, ready: 'yes' });
-    savePref('feedback.token', data.token);
-    setPassword('');
-    setAsking(false);
-  });
-
-  const logout = () => {
-    setMaintainer({ token: '', ready: 'no' });
-    savePref('feedback.token', '');
   };
 
   const columns = FEEDBACK_STATUSES.map((status) => ({ status, posts: state.posts.filter((p) => p.status === status) }));
@@ -245,13 +213,9 @@ export function FeedbackBoard({ onClose }) {
             placeholder=${t('补充说明或讨论…')} onInput=${(e) => setReplyDraft(e.currentTarget.value)} />
           <${Button} size="sm" disabled=${busy || !replyDraft.trim()} onClick=${() => reply(p.id)}>${t('发送')}<//>
         </div>
-        ${maintainer.ready === 'yes' ? html`<div class="fb-manage">
-          ${FEEDBACK_STATUSES.map((status) => html`<${Button} key=${status} size="sm" variant=${p.status === status ? 'primary' : 'ghost'}
-            disabled=${busy || p.status === status} onClick=${() => setStatus(p.id, status)}>${t(FEEDBACK_STATUS_LABEL[status])}<//>`)}
-        </div>` : null}
-        ${mine(p) || maintainer.ready === 'yes' ? html`<div class="fb-manage">
-          ${mine(p) ? html`<${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
-            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>` : null}
+        ${mine(p) ? html`<div class="fb-manage">
+          <${Button} size="sm" variant="ghost" icon="edit" disabled=${busy}
+            onClick=${() => { setOpenId(p.id); setEditing({ id: p.id, title: p.title, body: p.body }); }}>${t('编辑')}<//>
           <${Button} size="sm" variant="ghost" icon="minus" disabled=${busy} onClick=${() => withdraw(p.id)}>${t('撤回这条反馈')}<//>
         </div>` : null}
       </div>` : null}
@@ -263,24 +227,12 @@ export function FeedbackBoard({ onClose }) {
   return [html`<${Modal} open=${true} title=${t('反馈板')} micro="FEEDBACK BOARD" ariaLabel=${t('大厅反馈板')} trapFocus=${true}
       class="feedback-board lobby-dialog" width="min(1180px, 96vw)" onClose=${onClose}
       actions=${html`<${Button} icon="close" onClick=${onClose} data-autofocus>${t('关闭反馈板')}<//>`}>
-    <div class="fb-top">
-      <p class="fb-hint">${t('这里不需要登录：发帖不记录任何身份。维护者会在这里回复，并把采纳的反馈移到对应分栏。')}</p>
-      ${maintainer.ready === 'yes'
-        ? html`<span class="fb-badge"><${Icon} name="check" />${t('维护者模式')}<button type="button" class="fb-link" onClick=${logout}>${t('退出')}</button></span>`
-        : asking
-          ? html`<div class="fb-login">
-            <input class="fb-input" type="password" value=${password} placeholder=${t('维护者密码')} aria-label=${t('维护者密码')}
-              onInput=${(e) => setPassword(e.currentTarget.value)} onKeyDown=${(e) => { if (e.key === 'Enter') login(); }} />
-            <${Button} size="sm" disabled=${busy || !password} onClick=${login}>${t('确认')}<//>
-            <${Button} size="sm" variant="ghost" onClick=${() => { setAsking(false); setPassword(''); }}>${t('取消')}<//>
-          </div>`
-          : html`<button type="button" class="fb-link" onClick=${() => setAsking(true)}>${t('维护者入口')}</button>`}
-    </div>
-    ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
     <div class="fb-toolbar">
-      <span class="fb-hint">${t('共 {n} 条反馈', { n: total })}</span>
+      <p class="fb-hint">${t('这里不需要登录：发帖不记录任何身份。维护者的回复会显示在帖子下，采纳的反馈会移到对应分栏。')}</p>
+      <span class="fb-count num">${t('共 {n} 条反馈', { n: total })}</span>
       <${Button} icon="edit" disabled=${busy || state.status !== 'ready'} onClick=${() => { setError(''); setComposeOpen(true); }}>${t('提出反馈')}<//>
     </div>
+    ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
     ${state.status === 'loading' ? html`<div class="fb-state" role="status"><${Spinner} label="LOADING" /><p>${t('正在读取反馈…')}</p></div>`
       : state.status === 'failed' ? html`<div class="fb-state" role="status">
         <${Icon} name="warn" /><h3>${t('反馈板暂时打不开')}</h3><p>${t('大厅的其他功能不受影响；如果服务器刚更新过，点重试即可。')}</p>
@@ -297,7 +249,7 @@ export function FeedbackBoard({ onClose }) {
       onClose=${() => { if (!busy) setComposeOpen(false); }}
       actions=${html`<${Button} variant="ghost" disabled=${busy} onClick=${() => setComposeOpen(false)}>${t('取消')}<//>
         <${Button} disabled=${busy || !draft.title.trim() || !draft.body.trim()} onClick=${post}>${t('发布反馈')}<//>`}>
-    <p class="fb-hint">${t('这里不需要登录：发帖不记录任何身份。维护者会在这里回复，并把采纳的反馈移到对应分栏。')}</p>
+    <p class="fb-hint">${t('这里不需要登录：发帖不记录任何身份。维护者的回复会显示在帖子下，采纳的反馈会移到对应分栏。')}</p>
     ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
     <div class="fb-compose fb-compose--new">
       <input class="fb-input" type="text" maxlength=${state.limits?.title || 80} value=${draft.title}

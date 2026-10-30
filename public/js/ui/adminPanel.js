@@ -124,13 +124,13 @@ export function AdminPanel({ onClose }) {
       <nav class="admin-tabs" aria-label=${t('管理分类')}>${TABS.map(([id, label]) => html`<${Button} key=${id} size="sm"
         variant=${tab === id ? 'primary' : 'ghost'} disabled=${busy} onClick=${() => switchTab(id)} aria-pressed=${tab === id}>${t(label)}<//>`)}</nav>
       <div class="admin-shell">
-      <p class="admin-note">${t(NOTES[tab])}</p>
       <form class="admin-search" onSubmit=${(e) => { e.preventDefault(); if (busy) return; setOffset(0); setSearch(query.trim()); setRevision((v) => v + 1); }}>
         <input class="fb-input" type="search" aria-label=${t('搜索管理数据')} placeholder=${t('搜索管理数据')} value=${query}
           onInput=${(e) => setQuery(e.currentTarget.value)} />
         <${Button} type="submit" disabled=${busy}>${t('搜索')}<//>
         <${Button} variant="ghost" disabled=${busy} onClick=${() => setRevision((v) => v + 1)}>${t('刷新')}<//>
       </form>
+      <p class="admin-note">${t(NOTES[tab])}</p>
       <div class="admin-bar">
         ${tab !== 'audit' ? html`<label class="admin-check"><input type="checkbox" disabled=${busy || !state.items.length}
           checked=${!!state.items.length && selected.length === state.items.length}
@@ -153,8 +153,8 @@ export function AdminPanel({ onClose }) {
             value=${reply} onInput=${(e) => setReply(e.currentTarget.value)} />
           <${Button} size="sm" disabled=${busy || !rows.length || !reply.trim()} onClick=${() => act('feedback.reply')}>${t('回复所选反馈')}<//>`
             : html`<span class="admin-op__note">${selected.length
-              ? t('已选 {n} 项：右上操作会作用到这些项目。', { n: selected.length })
-              : t('在本页勾选项目后，右上操作才会作用到它们。')}</span>`}
+              ? t('已选 {n} 项：上面的操作会作用到这些项目。', { n: selected.length })
+              : t('在本页勾选项目后，上面的操作才会作用到它们。')}</span>`}
       </div>
       <div class="admin-list">
         ${result ? html`<div class="admin-results" role="status">${result.map((r, i) => html`<p key=${i}>${i + 1} · ${r.label} · ${r.partial ? t('部分操作已完成，请检查刷新后的数据。') : ''}${r.ok ? t('操作完成') : failure(r.error)}</p>`)}</div>` : null}

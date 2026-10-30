@@ -78,11 +78,18 @@ test('every admin tab keeps the same bars, so the list never jumps between tabs'
   // the tab-specific pieces live in the fixed rows, never in their own extra block
   assert.doesNotMatch(panel, /admin-bulk/);
   assert.match(panel, /const NOTES = \{/);
-  // every row has one height and the list is the only growing/scrolling part
-  assert.match(css, /\.admin-note[^}]*height:\s*2\.9em/s);
-  assert.match(css, /\.admin-search, \.admin-bar, \.admin-op \{[^}]*height:\s*2\.9rem/s);
+  // the tabs are pinned with the search directly beneath them, then the tab's note and the two action rows
+  const order = ['admin-tabs', 'admin-search', 'admin-note', 'admin-bar', 'admin-op', 'admin-list', 'admin-pagination']
+    .map((slot) => [slot, panel.indexOf(`class="${slot}"`)]);
+  for (let i = 1; i < order.length; i++) assert.ok(order[i - 1][1] >= 0 && order[i - 1][1] < order[i][1], `${order[i - 1][0]} before ${order[i][0]}`);
+  // every row has one height (the same variable: .5rem of the scaled design, never below 34px) and the list is the only
+  // growing/scrolling part
+  assert.match(css, /\.modal__box\.admin-panel \{[^}]*--admin-bar-h:\s*max\(\.5rem, 34px\)/s);
+  assert.ok((css.match(/height:\s*var\(--admin-bar-h\)/g) || []).length >= 4, 'tabs, note, search/bar/op and pages share --admin-bar-h');
   assert.match(css, /\.admin-list \{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
-  assert.match(css, /\.admin-pagination \{[^}]*height:\s*2\.9rem/s);
+  // the body and the footer stay put while only the list scrolls: 退出管理 / 关闭 sit bottom right
+  assert.match(css, /\.admin-panel \.modal__body \{[^}]*flex:\s*1 1 auto[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.admin-panel \.modal__actions \{[^}]*justify-content:\s*flex-end/s);
 });
 
 test('feedback list owns the board space and composing is a separate native modal', () => {
@@ -94,7 +101,12 @@ test('feedback list owns the board space and composing is a separate native moda
   assert.match(board, /class="feedback-compose/);
   assert.match(board, /rows="8"/);
   assert.match(board, /setComposeOpen\(false\)/);
-  assert.match(css, /\.fb-columns[^}]*flex:\s*1/s);
-  assert.match(css, /\.fb-column__list[^}]*max-height:\s*min\(60vh, 680px\)/s);
+  // the toolbar is pinned, the four columns scroll inside; the footer keeps 关闭反馈板 bottom right
+  assert.match(css, /\.feedback-board \.modal__body \{[^}]*flex:\s*1 1 auto[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.feedback-board \.modal__actions \{[^}]*justify-content:\s*flex-end/s);
+  assert.match(css, /\.fb-columns[^}]*flex:\s*1 1 auto/s);
+  assert.match(css, /\.fb-column__list \{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
   assert.match(css, /@media \(max-width: 860px\)/);
+  // moderation lives in the admin panel now: no maintainer login or board-side status buttons
+  assert.doesNotMatch(board, /维护者入口|维护者密码|维护者模式|feedback\.token|NOT_MAINTAINER|'status'/);
 });
