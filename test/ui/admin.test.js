@@ -69,6 +69,22 @@ test('admin panel uses explicit owner login, batch confirmation and text-only fe
   assert.doesNotMatch(panel + api, /localStorage|sessionStorage|savePref|innerHTML|console\./);
 });
 
+test('every admin tab keeps the same bars, so the list never jumps between tabs', () => {
+  const panel = source('public/js/ui/adminPanel.js');
+  const css = source('public/css/screens/lobby.css');
+  for (const slot of ['admin-tabs', 'admin-shell', 'admin-note', 'admin-search', 'admin-bar', 'admin-op', 'admin-list', 'admin-pagination']) {
+    assert.match(panel, new RegExp(`class="${slot}"`), slot);
+  }
+  // the tab-specific pieces live in the fixed rows, never in their own extra block
+  assert.doesNotMatch(panel, /admin-bulk/);
+  assert.match(panel, /const NOTES = \{/);
+  // every row has one height and the list is the only growing/scrolling part
+  assert.match(css, /\.admin-note[^}]*height:\s*2\.9em/s);
+  assert.match(css, /\.admin-search, \.admin-bar, \.admin-op \{[^}]*height:\s*2\.9rem/s);
+  assert.match(css, /\.admin-list \{[^}]*flex:\s*1 1 auto[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.admin-pagination \{[^}]*height:\s*2\.9rem/s);
+});
+
 test('feedback list owns the board space and composing is a separate native modal', () => {
   const board = source('public/js/ui/feedbackBoard.js');
   const css = source('public/css/screens/lobby.css');

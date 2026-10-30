@@ -7,6 +7,16 @@ import { createAdminClient } from './adminApi.js';
 
 const TABS = [ ['players', N_('玩家数据')], ['claims', N_('编号独占')], ['avatars', N_('上传头像')],
   ['namecards', N_('上传名片')], ['feedback', N_('反馈管理')], ['audit', N_('操作记录')] ];
+// One sentence per tab, in the same slot: the tab bar, the note, the search row, the action row and the operation row
+// keep their height on every tab, so the list always starts and ends in the same place.
+const NOTES = {
+  players: N_('重置会清空该玩家在服务器上的编号独占与独占上传；共享图片与浏览器本地战绩不受影响。'),
+  claims: N_('重新分配会替换目标玩家原有的编号独占；受影响玩家重新连接后生效。'),
+  avatars: N_('删除会移除图片文件与全部引用；被其他玩家共享的图片请在玩家数据里按玩家处理。'),
+  namecards: N_('删除会移除图片文件与全部引用；被其他玩家共享的图片请在玩家数据里按玩家处理。'),
+  feedback: N_('反馈作者保持匿名；改状态、回复与删除都会立刻体现在玩家的反馈板上。'),
+  audit: N_('只读：最近的管理操作，最多保留 500 条。'),
+};
 const rowId = (row, resource) => resource === 'claims' ? `${row.name}#${row.tag}` : row.id || row.owner;
 const short = (value) => String(value || '').slice(0, 12);
 
@@ -113,35 +123,44 @@ export function AdminPanel({ onClose }) {
     </form>` : html`
       <nav class="admin-tabs" aria-label=${t('管理分类')}>${TABS.map(([id, label]) => html`<${Button} key=${id} size="sm"
         variant=${tab === id ? 'primary' : 'ghost'} disabled=${busy} onClick=${() => switchTab(id)} aria-pressed=${tab === id}>${t(label)}<//>`)}</nav>
-      ${tab === 'claims' ? html`<p class="fb-hint">${t('重新分配会替换目标玩家原有的编号独占；受影响玩家重新连接后生效。')}</p>` : null}
+      <div class="admin-shell">
+      <p class="admin-note">${t(NOTES[tab])}</p>
       <form class="admin-search" onSubmit=${(e) => { e.preventDefault(); if (busy) return; setOffset(0); setSearch(query.trim()); setRevision((v) => v + 1); }}>
         <input class="fb-input" type="search" aria-label=${t('搜索管理数据')} placeholder=${t('搜索管理数据')} value=${query}
           onInput=${(e) => setQuery(e.currentTarget.value)} />
         <${Button} type="submit" disabled=${busy}>${t('搜索')}<//>
         <${Button} variant="ghost" disabled=${busy} onClick=${() => setRevision((v) => v + 1)}>${t('刷新')}<//>
       </form>
-      ${tab !== 'audit' && state.items.length ? html`<div class="admin-bulk">
-        <label><input type="checkbox" disabled=${busy} checked=${selected.length === state.items.length}
+      <div class="admin-bar">
+        ${tab !== 'audit' ? html`<label class="admin-check"><input type="checkbox" disabled=${busy || !state.items.length}
+          checked=${!!state.items.length && selected.length === state.items.length}
           onChange=${(e) => setSelected(e.currentTarget.checked ? state.items.map((row) => rowId(row, tab)) : [])} />${t('选择本页')}</label>
-        <span class="num">${selected.length} / ${state.total}</span>
-        ${tab === 'claims' ? html`<${Button} size="sm" disabled=${busy || !rows.length} onClick=${() => act('claims.release')}>${t('释放独占')}<//>
-          <input class="fb-input admin-target" aria-label=${t('目标玩家标识')} placeholder=${t('目标玩家标识')} value=${target}
-            onInput=${(e) => setTarget(e.currentTarget.value)} />
-          <${Button} size="sm" disabled=${busy || !rows.length || !/^[a-f0-9]{32}$/.test(target.trim())} onClick=${() => act('claims.reassign')}>${t('重新分配')}<//>`
+          <span class="admin-count num">${selected.length} / ${state.total}</span>` : html`<span class="admin-count num">${state.total}</span>`}
+        ${tab === 'claims' ? html`<${Button} size="sm" disabled=${busy || !rows.length} onClick=${() => act('claims.release')}>${t('释放独占')}<//>`
           : tab === 'players' ? html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act('players.reset')}>${t('重置所选服务器数据')}<//>`
             : tab === 'feedback' ? html`<select class="fb-input admin-status" aria-label=${t('反馈状态')} value=${status} onChange=${(e) => setStatus(e.currentTarget.value)}>
               ${FEEDBACK_STATUSES.map((value) => html`<option value=${value}>${t(FEEDBACK_STATUS_LABEL[value])}</option>`)}</select>
               <${Button} size="sm" disabled=${busy || !rows.length} onClick=${() => act('feedback.status')}>${t('修改状态')}<//>
               <${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act('feedback.delete')}>${t('删除反馈')}<//>`
-              : html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act(`${tab}.delete`)}>${t('删除图片')}<//>`}
-      </div>` : null}
-      ${tab === 'feedback' ? html`<div class="admin-search"><textarea class="fb-input" rows="2" maxlength="1000" aria-label=${t('维护者回复')}
-        placeholder=${t('维护者回复')} value=${reply} onInput=${(e) => setReply(e.currentTarget.value)} />
-        <${Button} disabled=${busy || !rows.length || !reply.trim()} onClick=${() => act('feedback.reply')}>${t('回复所选反馈')}<//></div>` : null}
-      ${result ? html`<div class="admin-results" role="status">${result.map((r, i) => html`<p key=${i}>${i + 1} · ${r.label} · ${r.partial ? t('部分操作已完成，请检查刷新后的数据。') : ''}${r.ok ? t('操作完成') : failure(r.error)}</p>`)}</div>` : null}
-      ${state.status === 'loading' ? html`<${Spinner} label="LOADING" />`
-        : state.status === 'failed' ? html`<${Button} onClick=${() => setRevision((v) => v + 1)}>${t('重试')}<//>`
-          : html`<div class="admin-list">${!state.items.length ? html`<p class="fb-hint">${t('暂无数据')}</p>` : null}
+              : tab === 'audit' ? null
+                : html`<${Button} size="sm" variant="danger" disabled=${busy || !rows.length} onClick=${() => act(`${tab}.delete`)}>${t('删除图片')}<//>`}
+      </div>
+      <div class="admin-op">
+        ${tab === 'claims' ? html`<input class="fb-input admin-target" aria-label=${t('目标玩家标识')} placeholder=${t('目标玩家标识')}
+            value=${target} onInput=${(e) => setTarget(e.currentTarget.value)} />
+          <${Button} size="sm" disabled=${busy || !rows.length || !/^[a-f0-9]{32}$/.test(target.trim())} onClick=${() => act('claims.reassign')}>${t('重新分配')}<//>`
+          : tab === 'feedback' ? html`<input class="fb-input admin-reply" maxlength="1000" aria-label=${t('维护者回复')} placeholder=${t('维护者回复')}
+            value=${reply} onInput=${(e) => setReply(e.currentTarget.value)} />
+          <${Button} size="sm" disabled=${busy || !rows.length || !reply.trim()} onClick=${() => act('feedback.reply')}>${t('回复所选反馈')}<//>`
+            : html`<span class="admin-op__note">${selected.length
+              ? t('已选 {n} 项：右上操作会作用到这些项目。', { n: selected.length })
+              : t('在本页勾选项目后，右上操作才会作用到它们。')}</span>`}
+      </div>
+      <div class="admin-list">
+        ${result ? html`<div class="admin-results" role="status">${result.map((r, i) => html`<p key=${i}>${i + 1} · ${r.label} · ${r.partial ? t('部分操作已完成，请检查刷新后的数据。') : ''}${r.ok ? t('操作完成') : failure(r.error)}</p>`)}</div>` : null}
+        ${state.status === 'loading' ? html`<div class="admin-state" role="status"><${Spinner} label="LOADING" /></div>`
+          : state.status === 'failed' ? html`<div class="admin-state" role="status"><${Button} onClick=${() => setRevision((v) => v + 1)}>${t('重试')}<//></div>`
+            : html`${!state.items.length ? html`<p class="fb-hint">${t('暂无数据')}</p>` : null}
             ${state.items.map((row, i) => html`<article class="admin-row" key=${rowId(row, tab) || i}>
               ${tab !== 'audit' ? html`<input type="checkbox" aria-label=${t('选择此项')} checked=${selected.includes(rowId(row, tab))}
                 disabled=${busy} onChange=${() => toggle(rowId(row, tab))} />` : null}
@@ -157,11 +176,12 @@ export function AdminPanel({ onClose }) {
                           <small>${t('头像')} · ${row.avatar || '—'} / ${t('名片')} · ${row.namecard || '—'}</small>`
                         : html`<strong>${row.action}</strong><small>${row.at ? new Date(row.at).toLocaleString() : ''}</small><p>${row.count || 0}</p>`}
               </div>
-            </article>`)}
-          </div>`}
+            </article>`)}`}
+      </div>
       <div class="admin-pagination"><${Button} disabled=${busy || offset === 0} onClick=${() => setOffset(Math.max(0, offset - 50))}>${t('上一页')}<//>
         <span class="num">${state.total ? offset + 1 : 0}–${Math.min(offset + 50, state.total)} / ${state.total}</span>
         <${Button} disabled=${busy || offset + 50 >= state.total} onClick=${() => setOffset(offset + 50)}>${t('下一页')}<//></div>
+      </div>
     `}
   <//>`;
 }
