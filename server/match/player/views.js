@@ -105,6 +105,7 @@ export class PlayerViews {
       revivalUnavailableReason: this.revivalUnavailableReason,
       lp: this.lp,
       funds: this.funds,
+      ...(this.m.experimental.luckConsole === true ? { testPlugin: this.m.testPluginView(this) } : {}),
       // 查看下回合资金 (experimental, off by default; shared/experimental.js): what the next round start credits —
       // gd.income(m.round + 1) — plus the pending funds this seat carries right now. A prediction: an onIncome handler
       // (老鲤 withholds R1–R2) can still rewrite the real credit, and rewards granted later in this prep join the carry.

@@ -51,7 +51,17 @@ export class MatchInfra {
   setDeadline(seconds, fn, { silent = false } = {}) {
     this.cancel(this._phaseTimer);
     this._phaseTimer = null;
+    this._phaseArmed = null;
     if (this.test === true) { this._testHeld = null; this._testArmed = null; }
+    // The opt-in 测试插件 may hold a phase clock (its `timers` tool): the deadline is published as 0 (no countdown)
+    // and the callback is kept until it resumes. Only an enabled room with the plugin open can raise the flag, and a
+    // held clock never advances the phase — the same trade the test-mode hold makes below.
+    if (this.test !== true && this.experimental?.luckConsole === true && this._pluginTimerOff === true
+      && seconds > 0 && typeof fn === 'function') {
+      this.deadline = 0;
+      this._pluginArmed = { seconds, fn, silent: !!silent };
+      return;
+    }
     // Test matches can hold the callback (g.test timers off). A normal match never enters this branch:
     // scaling the delay to 0 would fire it at once, and cancelling it without keeping fn would stick
     // a phase whose only advance is this timer (BATTLE_CHECK → startRound). [ASSUMED] re-arm uses the
@@ -70,6 +80,7 @@ export class MatchInfra {
     }
     const ms = this.scaled(seconds * 1000);
     this.deadline = silent ? 0 : this.sched.now() + ms;
+    this._phaseArmed = { seconds, fn, silent: !!silent };
     this._phaseTimer = this.later(ms, () => { this._phaseTimer = null; if (this.test === true) { this._testArmed = null; this._testHeld = null; } fn(); });
     if (this.test === true) this._testArmed = { seconds, fn, silent: !!silent };
   }

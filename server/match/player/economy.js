@@ -66,9 +66,27 @@ export class PlayerEconomy {
     return Number.isFinite(p) ? Math.max(0, Math.round(p)) : slot.basePrice;
   }
 
+  /**
+   * Own-seat bond filter for random chess rolls (the test plugin's `filter`). `filter` is handed to the pool's weighted
+   * draw, so the spread of the allowed bonds keeps its copy weights; a roll with no candidate leaves the slot empty,
+   * as an official roll with an exhausted pool does. Absent on ordinary matches: `{}` and today's rng are unchanged.
+   */
+  _shopRollOpts() {
+    const f = this._testShopFilter;
+    if (!f || !Array.isArray(f.bonds) || !f.bonds.length) return {};
+    const want = f.bonds;
+    const all = f.mode === 'all';
+    const filter = (id) => {
+      const rec = this.gd.chess(id);
+      const bs = rec && Array.isArray(rec.bonds) ? rec.bonds : [];
+      return all ? want.every((b) => bs.includes(b)) : want.some((b) => bs.includes(b));
+    };
+    return { filter };
+  }
+
   _rollChessSlot() {
     // the slotted 自选 pieces join the draw once the 调度中心 reaches their slot's level (player/diy.js diyRollEntries)
-    const id = this.m.pool.roll(this.m.rngShop, { maxTier: this.shop.level, extra: this.diyRollEntries() });
+    const id = this.m.pool.roll(this.m.rngShop, { maxTier: this.shop.level, extra: this.diyRollEntries(), ...this._shopRollOpts() });
     return id ? { kind: 'chess', id, basePrice: this.gd.chessPrice(id), frozen: false, sold: false } : null;
   }
 
@@ -109,14 +127,14 @@ export class PlayerEconomy {
   }
 
   /**
-   * A test match's queued next shop (g.test shop) replaces this roll once and draws no rng. Queued layouts are validated by the command; level upgrades stay blocked until the roll consumes the queue.
+   * A test room's or enabled test plugin's queued next shop replaces this roll once and draws no rng. Queued layouts are validated by the command; level upgrades stay blocked until the roll consumes the queue.
    * The defensive fallback handles only corrupted internal state.
    * [ASSUMED] The queue replaces frozen slots too. Absent on a normal match, so this returns false immediately.
    * @returns {boolean} true when the queue was applied
    */
   _consumeTestShop() {
     const queued = this._testShopNext;
-    if (this.m.test !== true || !queued) return false;
+    if ((this.m.test !== true && this.m.experimental.luckConsole !== true) || !queued) return false;
     this._testShopNext = null;
     const { chess: nChess, item: nItem } = this.gd.shopSlots(this.shop.level);
     const ok = Array.isArray(queued) && queued.length === nChess + nItem && queued.every((s, i) => {
@@ -237,7 +255,7 @@ export class PlayerEconomy {
   }
 
   levelUp() {
-    if (this.m.test === true && this._testShopNext) return fail(ERR.WRONG_PHASE);
+    if ((this.m.test === true || this.m.experimental.luckConsole === true) && this._testShopNext) return fail(ERR.WRONG_PHASE);
     const g = this._gate(); if (g) return g;
     if (this.shop.level >= this.gd.maxShopLevel) return fail(ERR.MAX_LEVEL);
     const price = Math.max(0, this.shop.upgradePrice);

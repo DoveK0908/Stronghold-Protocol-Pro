@@ -7,7 +7,7 @@ export const EXPERIMENTAL_DEFAULTS = Object.freeze({ revivalEnabled: false, disa
 // Optional rules with their own defaults: a room that never mentions one keeps the ordinary two-flag wire shape
 // (legacy DTOs, matchmaking offers and stored rooms are unaffected). Mostly presentation/runtime switches, plus one
 // combat rule the owner asked to keep explicit:
-//   luckConsole             the Luck test console stays dormant unless the room asked for it (off by default)
+//   luckConsole             native 测试插件 (legacy wire key): own-seat tools, off by default; no clock controls
 //   bossHitSoftCap          限伤 caps a boss hit at BOSS_HIT_LIMIT − 1 (299999) instead of cancelling it (项目 5,
 //                           off by default: the official rule stays the default)
 //   bossQuota               防治倒转区: per-player boss pool quota and completion ranking (off by default)

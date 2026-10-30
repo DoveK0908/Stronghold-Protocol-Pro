@@ -14,6 +14,7 @@ import { cultivatedStats, isPotential, isCultivate, POTENTIAL_DEFAULT, CULTIVATE
 import { isContentHash } from './plugins/identity.js';
 import { isPluginId } from './plugins/manifest.js';
 import { isTestCommand } from './testMode.js';
+import { isTestPluginCommand, parseTestPluginMessage } from './testPlugin.js';
 import { PLUGIN_OFFER_SLOTS } from './plugins/limits.js';
 
 // ---- tiny validators -------------------------------------------------------
@@ -739,6 +740,8 @@ export const C2S = {
   // host test commands (DESIGN §34.8 phase 2). The server applies them only in a test match. `args` is checked
   // again by shared/testMode.js parseTestArgs (ids, bounds). Unknown keys inside args fail there, not here.
   'g.test': { cmd: isTestCommand, args: (v) => v === undefined || (isPlain(v) && Object.keys(v).length <= 8), $optional: ['args'] },
+  // Native room-gated own-seat tools, not the local test room/host console.
+  'g.testPlugin': { cmd: isTestPluginCommand, args: (v) => v === undefined || isPlain(v), $optional: ['args'] },
 
   // client-side combat (DESIGN §14): the authoritative client of a field reports its battle; a 联防 field adds
   // `left` = { [leakerId]: its enemies still standing (unspawned, alive, or through again) } (server/sim/spec.js
@@ -856,6 +859,10 @@ export function validateC2S(msg) {
   if (!spec) return `unknown type ${String(msg.t).slice(0, 32)}`;
   if (msg.t === 'p2p.signal' && (msg.description !== undefined) === (msg.candidate !== undefined)) return 'exactly one signal required';
   if (msg.rid != null && !isInt(msg.rid, 0, 2 ** 31)) return 'bad rid';
+  if (msg.t === 'g.testPlugin') {
+    const parsed = parseTestPluginMessage(msg);
+    if ('error' in parsed) return parsed.error;
+  }
   const optional = spec.$optional || [];
   for (const [k, check] of Object.entries(spec)) {
     if (k === '$optional') continue;

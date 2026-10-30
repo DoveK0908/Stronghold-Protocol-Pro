@@ -45,6 +45,23 @@ function cultivationInfo(lo) {
 }
 
 export class MatchViews {
+  /** Own-seat receipt only: never included in public or scout views, and reads do not allocate state. */
+  testPluginView(ps) {
+    const state = this._testPlugin?.get(ps.playerId);
+    return {
+      actions: state?.actions || 0,
+      last: state?.last ? { ...state.last } : null,
+      lp: ps.lp,
+      filter: ps._testShopFilter ? { bonds: [...ps._testShopFilter.bonds], mode: ps._testShopFilter.mode } : null,
+      timersHeld: this._pluginTimerOff === true,
+      // the seat's own 自选 stock (the copies a diyRefresh tops up); empty for a seat without picks
+      diy: ps.diyStock && ps.diyStock.entries
+        ? [...ps.diyStock.entries].map(([id, e]) => ({ id, left: e.left, cap: e.cap }))
+        : [],
+      ...(ps._testShopNext ? { shopNext: ps._testShopNext.map(({ kind, id }) => ({ kind, id })) } : {}),
+    };
+  }
+
   statusOf(ps) {
     if (ps.left) return 'left';
     if (!ps.alive) return 'dead';

@@ -23,6 +23,7 @@
 // REQUEST_TIMEOUT_MS is answered INTERNAL too (a living worker never takes that long: the watchdog acts first).
 
 import { ERR } from '../../../shared/constants.js';
+import { EXPERIMENTAL_DEFAULTS } from '../../../shared/experimental.js';
 import { msg, wireMessage } from '../../../shared/i18n.js';
 import { validHostMessage } from './ipc.js';
 
@@ -57,6 +58,9 @@ export function wireOptions(opts) {
     out.test = true;
     if (typeof opts.hostId === 'string') out.hostId = opts.hostId;
   }
+  // This native tool's gate is the only new experimental option forwarded to a host.
+  // Do not copy arbitrary experimental values (callbacks/cycles/other switches) across IPC.
+  if (opts.experimental?.luckConsole === true) out.experimental = { ...EXPERIMENTAL_DEFAULTS, luckConsole: true };
   // Rule switches ride with the content set. A room that declares none keeps today's worker payload.
   if (opts.rules && typeof opts.rules === 'object' && !Array.isArray(opts.rules)) out.rules = opts.rules;
   return out;

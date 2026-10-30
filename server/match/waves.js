@@ -373,16 +373,20 @@ function entriesView(gd, pick) {
  * Shared composition of a normal round.
  * @param {string[]|object} factions setupMatchWaves().factions (carries the schedule), the setup object, or a plain
  *   factions array (the round's type is then drawn with `rng`)
+ * @param {{ templateId?: string, pick?: object|null }} [opts] test tooling only: force the template of the round and/or
+ *   reuse the pick already drawn this round (no extra `rng` draw)
  * @returns {{ templateId: string|null, spawns: object[], routes: object[], extraRoutes: object[], timeLimit: number,
  *   overrides: object, pick: object|null, entries: { ground: object|null, fly: object|null }, actions: object[] }}
  */
-export function buildNormalWave(gd, rng, factions, round) {
+export function buildNormalWave(gd, rng, factions, round, opts = {}) {
   const rc = gd.roundCfg(round);
-  const templateId = rc && typeof rc.template === 'string' ? rc.template : null;
+  const own = typeof opts?.templateId === 'string' && opts.templateId ? opts.templateId : null;
+  const templateId = own || (rc && typeof rc.template === 'string' ? rc.template : null);
   const tpl = templateId ? gd.wave(templateId) : null;
   const timeLimit = gd.combatTimeLimit(round);
   if (!tpl) return { templateId, spawns: [], routes: [], extraRoutes: [], timeLimit, overrides: {}, pick: null, entries: { ground: null, fly: null }, actions: [] };
-  const pick = roundPick(gd, rng, factions, round);
+  // opts.pick reuses a pick already drawn this round (a test-tool template swap must not move the random stream)
+  const pick = Object.hasOwn(opts || {}, 'pick') ? opts.pick : roundPick(gd, rng, factions, round);
   const { spawns, actions } = templateSpawns(gd, tpl, round, pick);
   return {
     templateId,

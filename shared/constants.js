@@ -6,8 +6,10 @@ export const PROTOCOL_VERSION = 1;
 /** Public matchmaking capability/data contract; bump when queued clients cannot share a match. */
 export const MATCHMAKING_VERSION = 'alliance-2';
 /** Release version shown to players (the lobby's footer, server banner, /healthz). Kept equal to package.json "version"
- * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number. */
-export const APP_VERSION = '0.3.3-pro.2';
+ * (test/version.test.js); PROTOCOL_VERSION above is the separate wire-format number.
+ * Pro scheme (owner 2026-10-30): the official upstream version followed by `pro`, with no patch counter of our own —
+ * upstream 0.3.3 reads `0.3.3pro` here, and the next upstream release 0.3.4 becomes `0.3.4pro`. */
+export const APP_VERSION = '0.3.3pro';
 /** A development build (the public `dev` branch): the title screen, the lobby's footer, the boot banner and the README say so, and
  * tools/package.mjs refuses to build a release zip from it without --allow-dev. */
 export const DEV_BUILD = /-dev$/.test(APP_VERSION);

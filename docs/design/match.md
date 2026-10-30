@@ -4,6 +4,50 @@ Part of [DESIGN.md](../DESIGN.md) (the index; section numbers are global).
 
 ## 6. Match & meta (server/match)
 
+### Native 测试插件 (Pro, local first batch)
+
+The room's existing `experimental.luckConsole` key enables the built-in **测试插件**, off by default.
+It is independent of local host-only test rooms (`g.test`); enabling it never sets `match.test`.
+Each living human can modify only their own seat. The shared command schema, actor routing and per-match
+private receipts/rate limit are native, not Luck runtime hooks. All operations require quiet/no-live-field phases;
+LP is 1..99999, never revives, never changes shared team LP, and is refused during boss combat/rescue.
+Funds, chess/item grants, next-roll shop, add-only alliance stacks/count, single-strategy replacement with LP
+preserved, normally paid one-level upgrades and safe native round jumps form the first batch. Round jumps affect
+the whole match and are refused while any teammate awaits rescue. Shop layouts must exactly match the current
+level; a queued shop is consumed once and blocks upgrades until then. Queue state is checkpointed; private
+receipts/rate buckets are transient. Snapshot format is v4; older v3 checkpoints fail closed.
+There are no plugin speed controls: use the existing native next-battle 二倍速 vote, without multiplying rates.
+Batch 2 adds four native convenience commands. `pick` puts a chosen card into one unsold slot of the current
+layout without buying it (PREP only, before ready; sold slots are refused, no funds move). `shopLevel` sets the
+调度中心 level for free, recomputing the normal upgrade price and opening/closing slots by level; pending queued
+shops must be consumed first. `filter` applies an own-seat alliance filter (`any`/`all` ids) to that seat's random
+chess rolls only — cards already on offer and frozen slots stay, an empty list clears it. `map` switches the room
+stage: every seat's deploy map is invalidated and pieces that cannot stand on the new terrain return to the prep
+area; it is refused in boss final rounds. The filter is checkpointed.
+Batch 3 adds three own-seat commands. `deployCap` raises — never lowers — that seat's deploy-cap floor up to 12, the
+same field the native setDeployCapAtLeast effect writes; it places and removes no piece, and the normal placement
+rules still gate the board. `refreshFree` sets the seat's free-refresh counter, which the ordinary refresh spends
+first at no cost before the normal price applies. `bounty` adds one native bounty on a live enemy of the current
+mode, through the same `addBounty` path the strategy-draft bounty card uses. Batch 4 adds `wave`: it rebuilds the wave of
+the round in progress from another normal template id (data `waves.json`; solo/co-op templates follow the `_s` twin rule
+of `buildBossWave`) and refreshes every living seat's next-enemies preview. The pick drawn for the round is reused, so a
+test swap never moves the random stream, and boss/hidden rounds — whose field `buildBossWave` composes — are refused. The
+swap is transient (a checkpoint restore re-derives the round's own wave).
+Batch 5 adds the last native reachable tools. `ops` sets one operator (by `charId`) of the seat's 潜能 table — 潜能
+1..6 and/or 练度 0..3, the same fields the 干员 loadout writes — and re-reconciles that seat's own pieces only, never
+charges funds and never touches a teammate's table. `timers` holds or resumes the phase clock: holding cancels the
+pending deadline callback, keeps it in match memory and publishes `deadline: 0` (no countdown) without advancing the
+phase; resuming re-arms the same callback with its original duration. A held clock is a live timer, so it is never
+saved: a checkpoint taken while held restores with the phase re-entering its own clock. It is refused in COMBAT /
+UNITE / 最终攻势 / 隐秘核心, with any live field, and also while a solo pause owns the clock. `diyRefresh` sets every entry of the seat's
+own 自选 stock back to its copy cap (`left = cap`), which is exactly the accounting `diyRollEntries` /
+`diyStockEntries` read; a seat without picks answers `BAD_TARGET`. The seat DTO also carries `timersHeld` and the
+seat's own `diy` stock (`[{id,left,cap}]`).
+Still out of scope, because the native model has no corresponding primitive: extra strategies (one `bandId` per seat
+drives income and leftovers), round caps (`lastRound`/`bossRound` are mode data), unit stat multipliers (the sim
+computes stats from chess records; `battleInput` carries no multiplier) and automation (client-side convenience).
+Source provenance and the existing Luck redistribution hold remain in THIRD-PARTY-NOTICES.md.
+
 ### 6.1 State machine (Match.js)
 
 ```

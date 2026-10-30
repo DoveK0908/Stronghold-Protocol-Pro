@@ -298,6 +298,7 @@ import { AFK_REMOVE_ROUNDS } from './match/common.js';
 import { benchExpandable, stageWithBenchExpand } from '../../shared/benchExpand.js';
 import { installTestTrace } from './testTrace.js';
 import { MatchTestCommands } from './match/testCommands.js';
+import { MatchTestPlugin } from './match/testPlugin.js';
 import { MatchOffers } from './match/offers.js';
 import { createExternalAI } from './llmGate.js';
 
@@ -416,6 +417,10 @@ export class Match {
      * normal match stays byte-identical.
      */
     this.test = opts.test === true;
+    /** the 测试插件 holds the phase clock (infra.setDeadline); only its `timers` tool raises this */
+    this._pluginTimerOff = false;
+    /** the phase callback a held plugin clock keeps until the plugin resumes it */
+    this._pluginArmed = null;
     if (this.test) {
       /** phase deadlines are armed. false holds the callback (g.test timers) instead of scaling time to 0. */
       this.testTimers = true;
@@ -697,7 +702,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchOffers, MatchExtensions]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchTestCommands, MatchTestPlugin, MatchOffers, MatchExtensions]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

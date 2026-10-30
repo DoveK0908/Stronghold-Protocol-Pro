@@ -37,7 +37,7 @@ import { SPEED_BOOST } from './match/speedVote.js';
  * Checkpoint layout version. A document of another version is refused (the match is dropped, server/persist/).
  * Raise it whenever a saved field is added, removed or changes its meaning, or the restore rules below change.
  */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
 /** Phases whose state is fully serializable (see the header). */
 export const SNAPSHOT_PHASES = Object.freeze([PHASE.INFO_CHECK, PHASE.BAND_DRAFT, PHASE.SP_DRAFT, PHASE.ROUND_START, PHASE.PREP]);
@@ -117,6 +117,11 @@ export const MATCH_FIELDS = Object.freeze({
     // the trial-worker pool and its stats (simPool, rehearsalPoolStats) are handles to live threads, and the reroll
     // window (`_rerollStartAt`) is a wall-clock rate limit: none of them survives a restore
     'simPool', 'rehearsalPoolStats', '_rerollStartAt',
+    // Native test-plugin receipts, action counts and per-seat rate stamps are session-only; never replay commands.
+    '_testPlugin',
+    // The plugin's clock hold and the phase callback it parks: both are live timers, so a checkpoint made while a
+    // clock is held restores with the phase re-entering its own clock (enterPhase), never with a frozen deadline.
+    '_pluginTimerOff', '_pluginArmed', '_phaseArmed',
   ]),
 });
 
@@ -129,6 +134,10 @@ export const PLAYER_FIELDS = Object.freeze({
     'bondCountBonus', 'effects', 'bounties', 'personalChoice', 'counters', 'round', 'deployCapBonus', 'deployCapMin',
     'deviceOverrides', 'tileOverrides', 'stats', 'eliminatedRound', 'creditedKills', 'lpAtFinal', 'lastResult',
     '_botFocus', '_botFocusId', '_botSeenUids', '_deferItemMerge',
+    // Already validated one-shot shop override: restore the queue, not the command that produced it.
+    '_testShopNext',
+    // Own-seat shop bond filter (test plugin `filter`): a plain validated shape that must survive a restore.
+    '_testShopFilter',
   ]),
   special: Object.freeze(['ready', 'connected', 'loadout', 'ops', 'skins', 'diyStock']),
   derived: Object.freeze([
@@ -427,7 +436,9 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
     _turnTimer: null, _pubTimer: null, _pubDirty: false, _lastPubAt: -Infinity, _lastPubJson: '', _prepEndQueued: false,
     speedVote: null, _turnToken: 0, _progressTimer: null, _bossPubTimer: null, _bossClock: null, _bossClockOn: false, _poolTimer: null,
     pacer: null, runner: null, fields: [], unitePlan: null, teamLp: null, bossPool: null, _botPath: null, lastResultMsg: null,
+    _pluginTimerOff: false, _pluginArmed: null, _phaseArmed: null,
   });
+  delete m._testPlugin;
   m.watchers.clear();
   m.localViews.clear();
   m._privDirty.clear();

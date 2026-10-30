@@ -152,6 +152,7 @@ import { contentSet } from '../content.js';
 import { DEFAULT_VERSION, shownVersion } from '../versions.js';
 import { VersionVote } from '../ui/versionVote.js';
 import { TestConsole } from '../ui/testConsole.js';
+import { TestPlugin } from '../ui/testPlugin.js';
 
 // 作战统计 is opt-in (settings `combatMetrics`, default off). The runner does not import the settings store;
 // this screen pushes the switch. Outside a browser battleRunner is null, so this is a no-op.
@@ -229,7 +230,7 @@ export function GameScreen() {
     ${voteRoom && (hasResult || mode === 'result') ? html`<${VersionVote} room=${voteRoom} class="vervote--float" />` : null}
     ${(away || autoplay) && !hasResult && mode !== 'result' && !ended ? html`<${AwayOverlay} />` : null}
     ${ended && !hasResult && mode !== 'result' ? html`<${MatchEnded} />` : null}
-    ${!hasResult && mode !== 'result' ? html`<${TestConsole} />` : null}`;
+    ${!hasResult && mode !== 'result' ? html`<${TestConsole} /><${TestPlugin} />` : null}`;
 }
 
 // ---- match screen ----------------------------------------------------------------------------------------

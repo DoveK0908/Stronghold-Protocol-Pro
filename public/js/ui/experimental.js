@@ -37,7 +37,7 @@ export function experimentalCopy(key) {
   if (key === 'disableSharedPool') return [t('禁用共享卡池'), t('每位博士使用独立卡池，不再争抢同一批干员。')];
   if (key === 'playerCapacity') return [t('扩展同盟人数'), t('开启后可开 8／12／16／20 人局；全员需刷新页面，人数越多等待与演算越久。')];
   if (key === 'disableDuckLord') return [t('禁用鸭爵策略'), t('本局不能选择鸭爵策略，其他策略不受影响。')];
-  if (key === 'luckConsole') return [t('Luck 测试插件'), t('开局后可打开测试面板，修改资金、回合、地图与盟约层数；不勾选则完全不加载。')];
+  if (key === 'luckConsole') return [t('测试插件'), t('局内调整自己的资金、生命、商店与盟约；跳回合影响全局，仅限非战斗阶段。')];
   if (key === 'bossHitSoftCap') return [t('限伤改为封顶'), t('本会被限伤吃掉的那一下改为按 299999 结算，不再掉 0。')];
   if (key === 'bossQuota') return [t('防治倒转区'), t('每人配额为初始共享血池 ÷ 入场存活人数；超出配额不扣血，但伤害与 DPS 照常统计。只记录完成配额的用时与排名，两轮独立、同秒并列；不影响胜负与奖励，超时扣血阶段解除限伤。')];
   if (key === 'stateCarry') return [t('联防状态继承'), t('敌人保留生命值与阶段，退场干员保留剩余再部署时间；等待时暂停计时，仅本回合联防生效')];
