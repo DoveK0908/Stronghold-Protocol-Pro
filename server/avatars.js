@@ -8,8 +8,8 @@
 // 写文件与索引都是懒写 + rename（同 tags.js），失败只记一次日志、内存态继续可用。
 
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, existsSync, lstatSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 /** One upload's decoded size cap (a 256px square webp is ~30KB; this leaves room for PNG). */
 export const MAX_BYTES = 200 * 1024;
@@ -145,6 +145,31 @@ export function createAvatarStore({ dir = defaultDir(), indexFile = defaultIndex
       if (!isAvatarId(id)) return null;
       const it = items.get(id);
       return it ? { id, ...it, path: fileOf(id, it.ext) } : null;
+    },
+    /** Admin metadata excludes disk paths; include all references to deduplicated content. */
+    adminList() {
+      return [...items].map(([id, it]) => ({ id, ext: it.ext, bytes: it.bytes, at: it.at,
+        owners: [...byOwner].filter(([, held]) => held === id).map(([owner]) => owner) }));
+    },
+    adminDelete(id) {
+      if (!isAvatarId(id)) return { ok: false, error: 'BAD_ID' };
+      const it = items.get(id);
+      if (!it) return { ok: false, error: 'NOT_FOUND' };
+      // Only validated indexed uploads, never caller paths, material files or other content hashes.
+      try {
+        const root = lstatSync(dir);
+        if (!root.isDirectory() || root.isSymbolicLink() || realpathSync(dir) !== resolve(dir)) throw new Error('unsafe upload root');
+        const file = fileOf(id, it.ext);
+        let stat;
+        try { stat = lstatSync(file); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+        if (stat && (!stat.isFile() || stat.isSymbolicLink())) throw new Error('unsafe upload file');
+        if (stat) rmSync(file);
+      } catch { return { ok: false, error: 'DELETE_FAILED' }; }
+      const owners = [];
+      for (const [owner, held] of byOwner) if (held === id) { owners.push(owner); byOwner.delete(owner); }
+      items.delete(id);
+      schedule();
+      return { ok: true, owners };
     },
     /** @param {string} owner */
     idOf(owner) { return byOwner.get(owner) || null; },

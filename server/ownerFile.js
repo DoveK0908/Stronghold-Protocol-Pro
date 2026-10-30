@@ -46,12 +46,15 @@ export function parseOwnerFile(doc) {
 /**
  * @param {{ file?: string | null, pollMs?: number, log?: { info: Function, warn: Function } }} [opts]
  * @returns {{ verify: (key: unknown) => boolean, reserved: (name: unknown) => boolean, active: () => boolean,
- *   refresh: () => Promise<boolean>, close: () => void }}
+ *   generation: () => symbol, refresh: () => Promise<boolean>, close: () => void }}
  *   verify: the key is the owner's · reserved: a name only the owner may use · active: a valid file is loaded
  */
 export function createOwnerFile({ file = null, pollMs = 5000, log = { info() {}, warn() {} } } = {}) {
   let state = null, stamp = null, warned = null, timer = null, closed = false;
+  let generation = Symbol('owner-generation');
   const set = (next) => {
+    // Capabilities bind this opaque epoch, not the plaintext key. Any observed reload revokes old sessions.
+    generation = Symbol('owner-generation');
     if (next) log.info(`[owner] owner file loaded: ${next.names.size} names`);
     else if (state) log.info('[owner] owner file gone: owner mark off');
     state = next;
@@ -73,10 +76,11 @@ export function createOwnerFile({ file = null, pollMs = 5000, log = { info() {},
       try { parsed = parseOwnerFile(JSON.parse(await fs.readFile(file, 'utf8'))); } catch { parsed = null; }
       if (parsed) { warned = null; set(parsed); }
       else {
-        state = null;
+        set(null);
         if (warned !== next) { warned = next; log.warn('[owner] owner file invalid: owner mark off'); }
       }
     } catch (e) {
+      if (stamp !== 'error' || state) { stamp = 'error'; set(null); }
       if (warned !== 'error') { warned = 'error'; log.warn(`[owner] cannot read the owner file: ${e?.code || 'error'}`); }
     }
     return !!state;
@@ -94,6 +98,6 @@ export function createOwnerFile({ file = null, pollMs = 5000, log = { info() {},
     return timingSafeEqual(createHash('sha256').update(key, 'utf8').digest(), state.hash);
   };
   const reserved = (name) => !!state && state.names.has(ownerNameKey(name));
-  return { verify, reserved, active: () => !!state, refresh,
+  return { verify, reserved, active: () => !!state, generation: () => generation, refresh,
     close: () => { closed = true; if (timer) clearInterval(timer); timer = null; } };
 }

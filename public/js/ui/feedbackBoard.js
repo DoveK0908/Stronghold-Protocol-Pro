@@ -81,6 +81,7 @@ export function FeedbackBoard({ onClose }) {
   const [state, setState] = useState({ status: 'loading', posts: [], limits: null });
   const [error, setError] = useState('');
   const [draft, setDraft] = useState({ title: '', body: '' });
+  const [composeOpen, setComposeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [replyDraft, setReplyDraft] = useState('');
@@ -143,6 +144,8 @@ export function FeedbackBoard({ onClose }) {
     });
     if (!done || !created) return;
     setDraft({ title: '', body: '' });
+    setComposeOpen(false);
+    setOpenId(created.post?.id || null);
     if (created.secret && created.post?.id) {
       const next = { ...secrets, [created.post.id]: created.secret };
       setSecrets(next);
@@ -250,7 +253,7 @@ export function FeedbackBoard({ onClose }) {
     </article>`;
   };
 
-  return html`<${Modal} open=${true} title=${t('反馈板')} micro="FEEDBACK BOARD" ariaLabel=${t('大厅反馈板')} trapFocus=${true}
+  return html`<><${Modal} open=${true} title=${t('反馈板')} micro="FEEDBACK BOARD" ariaLabel=${t('大厅反馈板')} trapFocus=${true}
       class="feedback-board lobby-dialog" width="min(1180px, 96vw)" onClose=${onClose}
       actions=${html`<${Button} icon="close" onClick=${onClose} data-autofocus>${t('关闭反馈板')}<//>`}>
     <div class="fb-top">
@@ -267,14 +270,9 @@ export function FeedbackBoard({ onClose }) {
           : html`<button type="button" class="fb-link" onClick=${() => setAsking(true)}>${t('维护者入口')}</button>`}
     </div>
     ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
-    <div class="fb-compose fb-compose--new">
-      <input class="fb-input" type="text" maxlength=${state.limits?.title || 80} value=${draft.title}
-        placeholder=${t('一句话标题')} aria-label=${t('反馈标题')}
-        onInput=${(e) => setDraft((d) => ({ ...d, title: e.currentTarget.value }))} />
-      <textarea class="fb-input" rows="3" maxlength=${state.limits?.body || 2000} value=${draft.body}
-        placeholder=${t('发生了什么？希望怎么改？（不必填写联系方式）')} aria-label=${t('反馈内容')}
-        onInput=${(e) => setDraft((d) => ({ ...d, body: e.currentTarget.value }))} />
-      <${Button} disabled=${busy || !draft.title.trim() || !draft.body.trim()} onClick=${post}>${t('发布反馈')}<//>
+    <div class="fb-toolbar">
+      <span class="fb-hint">${t('共 {n} 条反馈', { n: total })}</span>
+      <${Button} icon="edit" disabled=${busy || state.status !== 'ready'} onClick=${() => { setError(''); setComposeOpen(true); }}>${t('提出反馈')}<//>
     </div>
     ${state.status === 'loading' ? html`<div class="fb-state" role="status"><${Spinner} label="LOADING" /><p>${t('正在读取反馈…')}</p></div>`
       : state.status === 'failed' ? html`<div class="fb-state" role="status">
@@ -286,5 +284,21 @@ export function FeedbackBoard({ onClose }) {
             <h3 class="fb-column__title">${t(FEEDBACK_STATUS_LABEL[col.status])}<span class="num">${col.posts.length}</span></h3>
             <div class="fb-column__list">${col.posts.map(card)}</div>
           </section>`)}</div>`}
-  <//>`;
+  <//>
+  ${composeOpen ? html`<${Modal} open=${true} title=${t('提出反馈')} micro="NEW FEEDBACK" trapFocus=${true}
+      ariaLabel=${t('提出反馈')} class="feedback-compose-dialog" width="min(680px, 94vw)" closeOnBackdrop=${false}
+      onClose=${() => { if (!busy) setComposeOpen(false); }}
+      actions=${html`<${Button} variant="ghost" disabled=${busy} onClick=${() => setComposeOpen(false)}>${t('取消')}<//>
+        <${Button} disabled=${busy || !draft.title.trim() || !draft.body.trim()} onClick=${post}>${t('发布反馈')}<//>`}>
+    <p class="fb-hint">${t('这里不需要登录：发帖不记录任何身份。维护者会在这里回复，并把采纳的反馈移到对应分栏。')}</p>
+    ${error ? html`<p class="fb-error" role="alert">${error}</p>` : null}
+    <div class="fb-compose fb-compose--new">
+      <input class="fb-input" type="text" maxlength=${state.limits?.title || 80} value=${draft.title}
+        placeholder=${t('一句话标题')} aria-label=${t('反馈标题')} data-autofocus
+        onInput=${(e) => setDraft((d) => ({ ...d, title: e.currentTarget.value }))} />
+      <textarea class="fb-input" rows="8" maxlength=${state.limits?.body || 2000} value=${draft.body}
+        placeholder=${t('发生了什么？希望怎么改？（不必填写联系方式）')} aria-label=${t('反馈内容')}
+        onInput=${(e) => setDraft((d) => ({ ...d, body: e.currentTarget.value }))} />
+    </div>
+  <//>` : null}</>`;
 }

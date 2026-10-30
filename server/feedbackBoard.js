@@ -11,7 +11,7 @@
 // withdraw it later; nothing in the public payload can be traced back to a player.
 //
 // The maintainer password is checked HERE and never ships to the client: the client sends what was typed, this module
-// compares it to `SP_FEEDBACK_PASSWORD` (default 09081314) and returns an in-memory session token, which expires.
+// compares it to explicitly configured `SP_FEEDBACK_PASSWORD` and returns an expiring in-memory session token.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -27,9 +27,9 @@ export function defaultFile() {
   return env || join(process.cwd(), 'state', 'feedback-board.json');
 }
 
-/** `SP_FEEDBACK_PASSWORD`, or the maintainer's password of 2026-10-26. */
+/** No implicit moderator credential: public posting and author secrets remain independent. */
 export function defaultPassword() {
-  return process.env.SP_FEEDBACK_PASSWORD || '09081314';
+  return process.env.SP_FEEDBACK_PASSWORD || null;
 }
 
 /** A refusal the HTTP layer turns into `{ ok: false, error, detail }` with `status`. */
@@ -150,8 +150,11 @@ export function createFeedbackBoard({ file = defaultFile(), log = console, now =
     if (writes.size > 512) for (const [k, v] of writes) if (!v.some((at) => t - at < FEEDBACK_LIMITS.writeWindowMs)) writes.delete(k);
   };
 
+  // An unforgeable local capability used only by the authenticated admin service, never serialized.
+  const adminCapability = {};
   /** The sessions prune themselves on use: a token past its expiry is a refusal, not a memory leak. */
   const sessionLive = (token) => {
+    if (token === adminCapability) return true;
     const t = now();
     const until = sessions.get(String(token));
     if (!until || t >= until) { if (until) sessions.delete(String(token)); return false; }
@@ -186,7 +189,7 @@ export function createFeedbackBoard({ file = defaultFile(), log = console, now =
      * @param {string} id @param {{ body?: unknown, secret?: string, token?: string }} input @param {string} ip
      */
     reply(id, input, ip) {
-      spend(ip);
+      if (input?.token !== adminCapability) spend(ip);
       const post = find(id);
       if (!post) throw new FeedbackError('NOT_FOUND', 404, {});
       const body = text(input?.body, FEEDBACK_LIMITS.reply);
@@ -240,6 +243,13 @@ export function createFeedbackBoard({ file = defaultFile(), log = console, now =
     /** Does this session still hold? (the panel asks on open, so a stale tab shows the player view again) */
     session(token) {
       return { ok: true, maintainer: sessionLive(token) };
+    },
+    /** Owner-authenticated HTTP admin calls this whitelist, never exposes authorship hashes. */
+    adminModerate(action, { id, status, body }) {
+      if (action === 'status') return board.setStatus(id, status, { token: adminCapability });
+      if (action === 'reply') return board.reply(id, { body, token: adminCapability }, 'admin');
+      if (action === 'delete') return board.withdraw(id, { token: adminCapability });
+      throw new FeedbackError('BAD_ACTION', 400);
     },
     /** Write now (tests, shutdown). */
     flush,

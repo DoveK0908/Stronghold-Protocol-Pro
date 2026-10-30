@@ -2526,6 +2526,32 @@ export class Lobby {
     return this._applyAvatar(session, res.id);
   }
 
+  /** Revoke deleted upload references in every live session/seat, including shared content owners. */
+  adminClearMedia(kind, id) {
+    for (const session of this.registry.all()) {
+      const card = { ...(session.card || {}) };
+      let changed = false;
+      if (kind === 'avatars' && (session.avatarImg === id || card.avatarImg === id)) {
+        session.avatarImg = '';
+        delete card.avatarImg;
+        changed = true;
+        sendSession(session, { t: 'me.avatar', id: '' });
+      }
+      if (kind === 'namecards' && (session.namecard === id || card.bg === `custom:${id}`)) {
+        session.namecard = '';
+        if (card.bg === `custom:${id}`) delete card.bg;
+        changed = true;
+        sendSession(session, { t: 'me.namecard', id: '' });
+      }
+      if (!changed) continue;
+      session.card = Object.freeze(card);
+      const room = this.roomOf(session);
+      const seat = room?.seatOf(session.playerId);
+      if (seat) seat.card = session.card;
+      if (room) this.broadcastState(room);
+    }
+  }
+
   /** 把 session 的自传头像写进 display card（房内其他人在 room.state 的 seats[].card.avatarImg 里看到）。 */
   _applyAvatar(session, id) {
     const card = Object.freeze({ ...(session.card || {}), avatarImg: id });

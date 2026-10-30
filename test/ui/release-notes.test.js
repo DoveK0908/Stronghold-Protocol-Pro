@@ -1,26 +1,41 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { APP_VERSION } from '../../shared/constants.js';
-import { releaseSections, releaseLink } from '../../public/js/ui/releaseNotesModel.js';
+import { parseAnnouncements, announcementRevision } from '../../public/js/ui/announcements.js';
+import { seedReleaseRead } from '../helpers/releaseNotes.js';
 
-test('release sections start at the running version, excluding future notes and code headings', () => {
-  const log = '## 0.3.4 — 未发布\nFuture\n## 0.3.3 — today\n### Fixes\n- a\n```\n## 1.0.0 — example\n```\n## 0.3.2 — yesterday\nOld';
-  const sections = releaseSections(log, '0.3.3');
-  assert.deepEqual(sections.map((s) => s.version), ['0.3.3', '0.3.2']);
-  assert.match(sections[0].body, /## 1.0.0/);
-  assert.deepEqual(releaseSections(log, '9.0.0'), []);
-  assert.equal(releaseSections(readFileSync('CHANGELOG.md', 'utf8'), APP_VERSION)[0].version, APP_VERSION);
+const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const entries = () => parseAnnouncements(JSON.parse(source('../../data/announcements.json')));
+
+test('announcements stay cleared until the maintainer supplies new copy', () => {
+  assert.deepEqual(entries(), []);
 });
 
-test('release links reject active content and resolve repository docs', () => {
-  for (const url of ['javascript:alert(1)', 'data:text/html,x', '//evil.test', '#anchor']) assert.equal(releaseLink(url), null);
-  assert.equal(releaseLink('https://prts.wiki/w/机制'), 'https://prts.wiki/w/%E6%9C%BA%E5%88%B6');
-  assert.equal(releaseLink('docs/PLAYING.md'), 'https://github.com/sganggs/Stronghold-Protocol/blob/master/docs/PLAYING.md');
+test('release notes share the existing lobby board rather than a second global dialog', () => {
+  const main = source('../../public/js/main.js');
+  const title = source('../../public/js/screens/title.js');
+  const lobby = source('../../public/js/screens/lobby.js');
+  assert.doesNotMatch(main, /ReleaseNotesHost|ui\/releaseNotes\.js/);
+  assert.doesNotMatch(title, /ReleaseNotesButton|ui\/releaseNotes\.js/);
+  assert.match(lobby, /<\$\{NoticeCard\}/);
+  assert.match(lobby, /overlay === 'announcements' \? html`<\$\{LobbyAnnouncements\}/);
 });
 
-test('Pro prereleases retain their exact identity and skip newer fork releases', () => {
-  const log = '## 0.3.3-pro.3 — future\nNew\n## 0.3.3-pro.2 — current\nCurrent\n## 0.3.3 — upstream\nOld';
-  assert.deepEqual(releaseSections(log, '0.3.3-pro.2').map(s => s.version), ['0.3.3-pro.2', '0.3.3']);
-  assert.equal(releaseSections('## 0.3.4-dev — dev\nTest', '0.3.4-dev')[0].version, '0.3.4');
+test('unrelated browser flows seed the same announcement revision as the lobby', async () => {
+  const calls = [];
+  await seedReleaseRead({ evaluateOnNewDocument: (callback, revision) => { calls.push({ callback, revision }); } });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].revision, await announcementRevision(entries()));
+  const previous = globalThis.localStorage;
+  const previousWindow = globalThis.window;
+  const saved = new Map();
+  try {
+    globalThis.localStorage = { setItem: (key, value) => saved.set(key, value) };
+    globalThis.window = {}; globalThis.window.top = globalThis.window;
+    calls[0].callback(calls[0].revision);
+    assert.equal(saved.get('sp.pref.announcements.dismissed'), JSON.stringify(calls[0].revision));
+  } finally {
+    if (previous === undefined) delete globalThis.localStorage; else globalThis.localStorage = previous;
+    if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow;
+  }
 });

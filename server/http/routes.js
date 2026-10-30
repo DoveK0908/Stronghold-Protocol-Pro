@@ -108,12 +108,16 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none; feedback: the lobby's feedback board (server/feedbackBoard.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, feedback = null, uploads = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, feedback = null, admin = null, uploads = null, csp = null, trustedRuntime = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    if (admin && admin.handles(parts.rawPath)) {
+      await admin.handle(req, res, parts.rawPath, parts.query, clientAddress(req, trustProxy).ip);
+      return;
+    }
     if (trustedRuntime && parts.rawPath.startsWith('/x/') && await trustedRuntime.route(req,res,parts.rawPath)) return;
     if (studio && studio.handles(parts.rawPath)) { await studio.handle(req, res, parts.rawPath, parts.query); return; }
     // the lobby's anonymous feedback board (server/feedbackBoard.js): the one other POST-capable path, and the only one a

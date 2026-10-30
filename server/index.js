@@ -76,6 +76,7 @@ import { createTrustedRuntime } from './plugins/trustedRuntime.js';
 import { trustedHostAllowed } from './plugins/trusted.js';
 import { createStudio } from './studio/index.js';
 import { createFeedbackApi, createFeedbackBoard } from './feedbackBoard.js';
+import { createAdminApi } from './admin.js';
 import { MIME, COMPRESSIBLE, acceptsGzip, pickEncoding, parseRange } from './http/files.js';
 import { BUILD_INPUTS, computeBuildTag, buildTag, resetBuildTag } from './http/buildTag.js';
 import { createRequestHandler } from './http/routes.js';
@@ -204,7 +205,7 @@ export async function startServer(opts = {}) {
   const scriptMode = process.env.SP_PLUGIN_SCRIPTS;
   let registry, lobby, network, packs, serveStatic, browserBuild, assetIndex = null, views = null, uploadTickets = null, uploads = null;
   let content = null, visual = null, contents = null, hosts = null, studio = null, trustedRuntime = null, persistence = null;
-  let feedbackBoard = null, feedback = null;
+  let feedbackBoard = null, feedback = null, admin = null;
   let versions = null, versionHosts = null, simPool = null, eventLoop = null;
   const startedAt = Date.now();
   // The online cap and the lobby's room / AI caps (server/onlineLimit.js): a JSON file re-read while the server runs; none = no cap.
@@ -288,6 +289,8 @@ export async function startServer(opts = {}) {
     // the lobby's anonymous feedback board (server/feedbackBoard.js): state/feedback-board.json, or SP_FEEDBACK_FILE
     feedbackBoard = createFeedbackBoard({ log });
     feedback = createFeedbackApi({ board: feedbackBoard, log });
+    admin = createAdminApi({ ownerFile, tags: network.tags, avatars: lobby.avatars, namecards: lobby.namecards,
+      board: feedbackBoard, registry, lobby });
     // The tag is per process (see buildTag): read the browser runtime once, here, not on every /healthz.
     resetBuildTag();
     browserBuild = buildTag(ROOT, { publicDir, servedVersionDirs: versions.servedDirs() });
@@ -305,6 +308,7 @@ export async function startServer(opts = {}) {
     await trustedRuntime?.close();
     onlineLimit.close();
     ownerFile.close();
+    admin?.close();
     assetIndex?.close();
     await closePools();
     throw e;
@@ -314,7 +318,7 @@ export async function startServer(opts = {}) {
     getHealthMetrics: () => healthMetrics, traffic, assetIndex, views, trusted: trustedRuntime?.health,
     persistence: persistence ? () => persistence.snapshot() : null, versions, versionHosts };
   const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health, log,
-    trustProxy: network.opts.trustProxy, studio, feedback, uploads, trustedRuntime }));
+    trustProxy: network.opts.trustProxy, studio, feedback, admin, uploads, trustedRuntime }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, wsCompression, traffic });
 
@@ -364,6 +368,7 @@ export async function startServer(opts = {}) {
     lobby.shutdown('boot-failed');
     onlineLimit.close();
     ownerFile.close();
+    admin?.close();
     assetIndex?.close();
     try { hosts?.close(); } catch { /* boot already failed */ }
     try { versionHosts?.close(); } catch { /* boot already failed */ }
@@ -409,6 +414,7 @@ export async function startServer(opts = {}) {
       network.close();
       onlineLimit.close();
       ownerFile.close();
+      admin?.close();
       assetIndex?.close();
       studio?.close();
       await trustedRuntime?.close();

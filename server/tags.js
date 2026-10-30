@@ -128,6 +128,27 @@ export function createTagRegistry({ file = defaultFile(), log = console, now = D
       }
       return null;
     },
+    /** Admin-only service surface; never accepts a filesystem path or a raw browser uid. */
+    adminList() {
+      return [...claims].map(([pair, val]) => {
+        const split = pair.lastIndexOf('#');
+        return { name: pair.slice(0, split), tag: pair.slice(split + 1), owner: val.u, at: val.t };
+      });
+    },
+    adminRelease(name, tag) {
+      const removed = claims.delete(pairKey(name, tag));
+      if (removed) schedule();
+      return removed;
+    },
+    adminReassign(name, tag, owner) {
+      if (typeof name !== 'string' || !name.trim() || name.length > 12 || !isTag(tag)
+        || typeof owner !== 'string' || !/^[0-9a-f]{32}$/.test(owner)) return false;
+      // Preserve the single pair per browser rule, not a globally unique four-digit number.
+      for (const [key, val] of claims) if (val.u === owner) claims.delete(key);
+      claims.set(pairKey(name, tag), { u: owner, t: now() });
+      schedule();
+      return true;
+    },
     /** Write now (tests, shutdown). */
     flush,
     /** How many claims are held (tests). */
