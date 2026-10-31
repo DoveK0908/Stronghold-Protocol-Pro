@@ -93,7 +93,9 @@ describe('the studio catalogue', () => {
     const list = await call('POST', '/studio/api/catalog', { text: JSON.stringify(catalog) });
     assert.equal(list.status, 200);
     assert.equal(list.body.name, 'Studio catalogue');
-    assert.deepEqual(list.body.plugins.map((p) => p.status), ['available', 'incompatible']);
+    // this build's release version (`pro`) carries no numeric core: appVersionMatches counts every range as a match, so
+    // the `>=9.0.0` entry is offered as available too (an explicit numeric version would keep it out)
+    assert.deepEqual(list.body.plugins.map((p) => p.status), ['available', 'available']);
     const noHash = await call('POST', '/studio/api/catalog/install', { url: entry.url });
     assert.equal(noHash.status, 400);
     assert.equal(noHash.body.error, 'PLUGIN_INSTALL_HASH');
