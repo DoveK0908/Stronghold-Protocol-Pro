@@ -52,6 +52,35 @@ export function runArgs(env = process.env, root = ROOT) {
   return ['--test', ...GUARD_FLAGS, ...reporters, ...shardsOf(root).files[Number(shard)]];
 }
 
+/**
+ * The GitHub check annotations a spec-reporter log implies.
+ *
+ * A red shard job reports only "Process completed with exit code 1", and the job log needs admin rights on the repo (a
+ * fork's `/actions/jobs/<id>/logs` answers 403 without a token), while `/check-runs/<id>/annotations` is public. GitHub
+ * turns a `::error file=…,line=…::message` stdout line into one annotation, so the failing test names travel the one
+ * channel that stays readable. The spec reporter pairs `test at <file>:<line>:<col>` with the `✖ <name> (12ms)` line.
+ * @param {string} out captured spec-reporter output
+ * @returns {string[]} the workflow-command lines
+ */
+export function annotationsFor(out) {
+  /** @type {string[]} */
+  const lines = [];
+  const rows = out.split('\n');
+  for (let i = 0; i < rows.length; i++) {
+    const at = /^test at (.+?):(\d+):\d+$/.exec(rows[i]);
+    if (!at) continue;
+    for (let j = i + 1; j < Math.min(i + 4, rows.length); j++) {
+      const hit = /^✖ (.+?) \(\d+(?:\.\d+)?ms\)$/.exec(rows[j]);
+      if (!hit) continue;
+      const file = at[1].trim().replace(/%/g, '%25').replace(/,/g, '%2C');
+      const msg = hit[1].replace(/%/g, '%25').replace(/\r?\n/g, ' ');
+      lines.push(`::error file=${file},line=${at[2]}::${msg}`);
+      break;
+    }
+  }
+  return lines;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const shard = process.env.SHARD;
   const isShard = shard !== undefined && shard !== '';
@@ -68,6 +97,18 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   if (process.env.JUNIT && Number(process.versions.node.split('.')[0]) < 24) {
     console.error(`JUNIT=${process.env.JUNIT}: node ${process.versions.node}'s JUnit reporter writes no file attribute, so tools/test-timings.mjs cannot weigh this report (node 24 does)`);
   }
-  const r = spawnSync(process.execPath, runArgs(), { cwd: ROOT, stdio: 'inherit' });
+  // CI keeps the child's stdout so a red shard can be annotated (see annotationsFor); everywhere else the runner owns
+  // the terminal, as it always has.
+  const ci = Boolean(process.env.CI);
+  const r = spawnSync(process.execPath, runArgs(), {
+    cwd: ROOT,
+    stdio: ci ? ['inherit', 'pipe', 'inherit'] : 'inherit',
+    encoding: 'utf8',
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  if (ci && typeof r.stdout === 'string') {
+    process.stdout.write(r.stdout);
+    for (const line of annotationsFor(r.stdout)) process.stdout.write(`${line}\n`);
+  }
   process.exit(r.status ?? 1);
 }
