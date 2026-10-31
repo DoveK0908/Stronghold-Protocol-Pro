@@ -385,31 +385,22 @@ function opsCharIds(data) {
   return ids;
 }
 
-/** The operators a display card may show (room.card charId / avatar): every chess record's charId and the 自选 owned pool. */
+/**
+ * The operators a display card may show (room.card charId / avatar): the visible, non-自选 chess records' charIds
+ * and the version's 自选 owned pool (#877). A hidden preset, a stand-in prototype or an id outside both is refused.
+ */
 const CARD_IDS = new WeakMap();
 function cardCharIds(data) {
   if (!data || typeof data !== 'object') return new Set();
   let ids = CARD_IDS.get(data);
   if (!ids) {
     ids = new Set();
-    for (const c of Object.values(data.chess && typeof data.chess === 'object' ? data.chess : {})) if (typeof c?.charId === 'string') ids.add(c.charId);
+    for (const c of Object.values(data.chess && typeof data.chess === 'object' ? data.chess : {})) {
+      if (typeof c?.charId !== 'string' || c.isDiy || c.visible === false) continue;
+      ids.add(c.charId);
+    }
     for (const id of Array.isArray(data.backups?.diy?.ownedPool) ? data.backups.diy.ownedPool : []) if (typeof id === 'string') ids.add(id);
     CARD_IDS.set(data, ids);
-  }
-  return ids;
-}
-
-/** The operator charIds of a data object's chess.json that a player can see (room.card's whitelist, the client's picker
- * list: no hidden preset, no stand-in or 自选-only body). */
-const CHESS_IDS = new WeakMap();
-function chessCharIds(data) {
-  const chess = data && typeof data.chess === 'object' ? data.chess : null;
-  if (!chess) return new Set();
-  let ids = CHESS_IDS.get(chess);
-  if (!ids) {
-    ids = new Set();
-    for (const c of Object.values(chess)) if (c && !c.isDiy && c.visible !== false && typeof c.charId === 'string') ids.add(c.charId);
-    CHESS_IDS.set(chess, ids);
   }
   return ids;
 }
@@ -2052,7 +2043,8 @@ export class Lobby {
     room.pluginNoticeKeys = {};
     room.replay = null;
     const data = this.dataFor(room);
-    const operators = chessCharIds(data);
+    // the card whitelist (visible chess records + 自选 owned pool, #877): a pool operator's card survives the switch
+    const operators = cardCharIds(data);
     for (const s of [...room.seats, ...room.spectators]) {
       if (!s || /** @type {any} */ (s).isBot) continue;
       const seat = /** @type {Seat} */ (s);

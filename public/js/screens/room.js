@@ -589,12 +589,14 @@ export function RoomScreen() {
   const inFlight = useRef(false); // synchronous guard against double clicks (state updates are async)
   const [, tick] = useState(0);
   useEffect(() => { const id = setInterval(() => tick((x) => x + 1), 1000); return () => { clearInterval(id); alive.current = false; }; }, []);
-  useData('chess', 'assets', 'config');
+  useData('chess', 'assets', 'config', 'backups');
   const m = data.get('assets');
   // 名片干员: the pickable operators, the default pool (5★/6★ by charId, the same order on every client), one's pick
   const chess = data.get('chess');
-  const cardList = useMemo(() => cardOperators(data.list('chess')), [chess]);
-  const cards = useMemo(() => cardContext(cardList), [cardList]);
+  const backups = data.get('backups');
+  // the room version's chess records and 自选编队 pool (ui/seatArt.js cardOperators — the server's cardCharIds)
+  const cardList = useMemo(() => cardOperators(data.list('chess'), backups), [chess, backups]);
+  const cards = useMemo(() => cardContext(cardList, { pending: !backups }), [cardList, backups]);
   const myCard = useMyCard();
   const [picking, setPicking] = useState(null); // 'op' | 'avatar' | 'bg'
   const localSkins = useStore((s) => s[SKINS_KEY], Object.is, skinsStore);

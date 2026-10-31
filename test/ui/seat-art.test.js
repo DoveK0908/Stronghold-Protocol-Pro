@@ -16,6 +16,7 @@ import { chessPortraitUrl } from '../../public/js/ui/assetUrls.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CHESS = Object.values(JSON.parse(readFileSync(path.join(ROOT, 'data/chess.json'), 'utf8')));
+const BACKUPS = JSON.parse(readFileSync(path.join(ROOT, 'data/backups.json'), 'utf8'));
 
 test('the pickable operators: one per visible, non-自选 charId, the elite form, 6★ first', () => {
   const list = cardOperators(CHESS);
@@ -239,4 +240,42 @@ test('an AI teammate\'s name split for the plate: 「AI·」 + the rest; a numbe
   assert.equal(botNameParts({ isBot: false, name: 'AI·x' }), null, 'a doctor named 「AI·x」 keeps the whole name');
   assert.equal(botNameParts({ name: 'AI·x' }), null);
   assert.equal(botNameParts(null), null);
+});
+
+// ---- #877 (review of PR #894): the 自选编队 pool is part of the card list -----------------------------------
+test('the 自选编队 pool joins the pickable list once: named and rated from backups.diy.operators (#877)', () => {
+  const list = cardOperators(CHESS, BACKUPS);
+  const ids = list.map((c) => c.charId);
+  assert.equal(new Set(ids).size, ids.length, 'one record per charId');
+  const visible = new Set(CHESS.filter((c) => !c.isDiy && c.visible !== false && typeof c.charId === 'string').map((c) => c.charId));
+  const poolOnly = [...new Set(BACKUPS.diy.ownedPool)].filter((id) => !visible.has(id));
+  assert.ok(poolOnly.length > 0, 'the fixture has pool-only operators');
+  for (const id of poolOnly) assert.ok(ids.includes(id), id);
+  for (const id of poolOnly) {
+    const entry = list.find((c) => c.charId === id);
+    const rec = BACKUPS.diy.operators[id];
+    if (rec) {
+      assert.equal(entry.name, rec.name, id);
+      assert.equal(entry.rarity, rec.rarity ?? 0, id);
+    } else {
+      assert.equal(entry.name, id, 'no record: the id stands in');
+      assert.equal(entry.rarity, 0);
+    }
+  }
+  for (let i = 1; i < list.length; i++) assert.ok((list[i - 1].rarity ?? 0) >= (list[i].rarity ?? 0), 'rarity descending');
+  assert.deepEqual(cardOperators(CHESS, null), cardOperators(CHESS), 'no backups: exactly the chess list');
+  assert.deepEqual(cardOperators(CHESS, { diy: { ownedPool: ['char_498_inside'] } }).map((c) => c.charId), cardOperators(CHESS).map((c) => c.charId), 'a pool id already on chess is not duplicated');
+});
+
+test('a pool pick waits for backups.json instead of flashing the default; a chess pick does not (#877)', () => {
+  assert.ok(BACKUPS.diy.ownedPool.includes('char_003_kalts'));
+  const pending = cardContext(cardOperators(CHESS), { pending: true });
+  const me = { playerId: 'p_me', name: 'Me', isBot: false, card: 'char_003_kalts' };
+  assert.equal(seatOperator(me, pending, { myId: 'p_me', myCard: 'char_003_kalts' }), null, 'held until the pool is known');
+  assert.equal(seatOperator(me, pending, { myId: 'p_me', myCard: 'char_498_inside' }).picked, true, 'a chess pick shows at once');
+  const noPick = seatOperator({ playerId: 'p_x', isBot: false }, pending, {});
+  assert.equal(noPick.picked, false, 'no pick: the default, never held');
+  assert.ok(noPick.chess);
+  const ready = cardContext(cardOperators(CHESS, BACKUPS));
+  assert.equal(seatOperator(me, ready, { myId: 'p_me', myCard: 'char_003_kalts' }).chess.charId, 'char_003_kalts', 'and resolves once loaded');
 });

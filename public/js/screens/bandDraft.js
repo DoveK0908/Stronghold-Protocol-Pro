@@ -282,7 +282,7 @@ export function BandDraftScreen({ held = false } = {}) {
   // art (their pick, else one chosen from the player id) — the same sources the room's seat cards use
   const roomSeats = useStore((st) => st.room?.seats);
   const myCard = useMyCard();
-  const cardList = useMemo(() => cardOperators(gd.list('chess')), [gd.ready]);
+  const cardList = useMemo(() => cardOperators(gd.list('chess'), gd.backups), [gd.ready, gd.backups]);
   const portraits = useMemo(() => ({
     pool: cardList.filter((c) => (c.rarity ?? 0) >= 5).sort((a, b) => (a.charId < b.charId ? -1 : 1)),
     byChar: new Map(cardList.map((c) => [c.charId, c])), m: data.get('assets'), myId, myCard: myCard.charId, myLook: myCard.look,

@@ -177,6 +177,19 @@ test('a lone human switches at once — solo, and co-op with AI teammates: versi
   }
 });
 
+test('a version switch keeps a 自选编队 operator card (#877): the card whitelist is chess plus the pool', () => {
+  const h = harness();
+  const p = h.player('Solo');
+  ok(h.lobby.create(p, { mode: 'solo', difficulty: 'NORMAL' }));
+  const pool = getVersionData('act1autochess').backups?.diy?.ownedPool || [];
+  assert.ok(pool.length > 0);
+  // char_003_kalts has only a 自选 pool entry, no chess record in either version: the switch used to clear it
+  ok(h.lobby.setCard(p, { charId: 'char_003_kalts' }));
+  ok(h.lobby.proposeVersion(p, { version: 'act1autochess' }));
+  assert.equal(h.last(p).seats[0].card.charId, 'char_003_kalts', 'the pool operator stays on the seat card');
+  h.lobby.shutdown();
+});
+
 test('unanimous agreement switches; one decline cancels with a toast to all, then the 5 s guard', () => {
   const h = harness();
   const { people: [a, b, c], room } = coop(h, 3);
