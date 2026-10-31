@@ -129,10 +129,11 @@ test('终极 Final Assault vs 假想敌：胄 (seeded bot match): both players\'
   // with 4 alive (14 400 000)
   // the bots' boards follow every draw of the match (the elite-to-board merge, DESIGN §20.11, moved seed 7 to 12; the
   // 战术决策 drawn with replacement moved 12 on; #121's teammate-bond yielding of 0.3.4 left 4, 6, 14 and 16 of seeds 1–32
-  // pairing two 奥术 players): the first of these seeds whose bots pair two 奥术 players
+  // pairing two 奥术 players; the measured band strength (§37.46) re-weighted the bots' band picks and left 1, 26, 41 and
+  // 42 of seeds 1–48): the first of these seeds whose bots pair two 奥术 players
   const pairOf = (m) => m.fields.filter((f) => f.battle).find((f) => f.players.length === 2 && f.players.every((pid) => f.battle.getPlayer(pid).bonds.arcaneShip?.active));
   let h = null;
-  for (const seed of [4, 6, 14, 16]) {
+  for (const seed of [1, 26, 41, 42]) {
     h = toFinalAssault({ difficulty: 'ABYSS', seed, bossId: 'boss_1' });
     if (pairOf(h.m)) break;
     h.m.dispose();
