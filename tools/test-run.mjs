@@ -11,6 +11,8 @@
 // of files and not a glob. SHARD unset (or empty) means the full run: that is what `npm run ci` and a local `npm test` do.
 
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, TEST_FILES } from './ci.mjs';
@@ -99,16 +101,23 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   // CI keeps the child's stdout so a red shard can be annotated (see annotationsFor); everywhere else the runner owns
   // the terminal, as it always has.
+  //
+  // A pipe is not enough to keep it: --test-force-exit calls process.exit with the reporter's writes still queued on
+  // the pipe, and the tail (the failing test block and the summary) is lost — 2026-10-31, shard 0 logged 637 lines that
+  // stopped mid-test and no annotation was possible. A regular file's writes are synchronous on POSIX, so the child
+  // writes the whole log to a temp file, and this process reads it back after exit to print and annotate.
   const ci = Boolean(process.env.CI);
-  const r = spawnSync(process.execPath, runArgs(), {
-    cwd: ROOT,
-    stdio: ci ? ['inherit', 'pipe', 'inherit'] : 'inherit',
-    encoding: 'utf8',
-    maxBuffer: 256 * 1024 * 1024,
-  });
-  if (ci && typeof r.stdout === 'string') {
-    process.stdout.write(r.stdout);
-    for (const line of annotationsFor(r.stdout)) process.stdout.write(`${line}\n`);
+  const outPath = ci ? path.join(os.tmpdir(), `test-run-${process.pid}.log`) : null;
+  const outFd = outPath ? fs.openSync(outPath, 'w') : null;
+  const r = spawnSync(process.execPath, runArgs(), ci
+    ? { cwd: ROOT, stdio: ['inherit', outFd, 'inherit'] }
+    : { cwd: ROOT, stdio: 'inherit' });
+  if (outPath) {
+    fs.closeSync(outFd);
+    const out = fs.readFileSync(outPath, 'utf8');
+    fs.unlinkSync(outPath);
+    process.stdout.write(out);
+    for (const line of annotationsFor(out)) process.stdout.write(`${line}\n`);
   }
   process.exit(r.status ?? 1);
 }
