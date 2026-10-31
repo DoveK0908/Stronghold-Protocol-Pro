@@ -227,8 +227,10 @@ export class MatchTestPlugin {
     if (spec.chess >= old.chess && spec.item >= old.item) ps._openLevelSlots();
     else {
       const chess = oldChess.slice(0, spec.chess);
+      // loop-cap: at most the level's (<= TEST_SHOP_SLOTS_MAX) chess slots
       while (chess.length < spec.chess) chess.push(null);
       const items = oldItems.slice(0, spec.item);
+      // loop-cap: at most the level's (<= TEST_SHOP_SLOTS_MAX) item slots
       while (items.length < spec.item) items.push(null);
       ps.shop.slots = [...chess, ...items];
       ps.shop.layout = { chess: spec.chess, item: spec.item };

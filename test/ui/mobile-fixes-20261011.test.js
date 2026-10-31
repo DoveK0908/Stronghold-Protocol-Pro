@@ -28,8 +28,11 @@ test('the hub keeps the join key, 公告, the feedback group and the queue', () 
   assert.match(lobby, /<\$\{HubTile\} icon="key" label=\$\{t\('密钥加入'\)\}/);
   assert.match(lobby, /<\$\{NoticeCard\} value=\$\{noticeValue\}/);
   // The fork's feedback group opens its own panel (onOpen), so the row's first entry carries props; the order — the
-  // feedback group and the site boards on one row, then the design credit and the foot — is what this pin keeps.
-  assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\}[\s\S]*?\/><\$\{SiteBoards\} \/><\/div><\$\{DesignCredit\} \/><\$\{HubFoot\} \/><\/div>/);
+  // feedback group and the site boards on one row, then the design credit and the foot — is what this pin keeps. The
+  // fork's 后台管理 entry (admin-entry) is the last thing in that column, after the foot.
+  assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\}[\s\S]*?\/><\$\{SiteBoards\} \/><\/div><\$\{DesignCredit\} \/><\$\{HubFoot\} \/>[\s\S]*?<\/div>/);
+  assert.match(lobby, /class="fb-link admin-entry"/);
+  assert.match(lobby, /<div class="hub-contact">[\s\S]*?admin-entry[\s\S]*?<\/div>/);
   assert.match(lobby, /<\$\{LobbyFeedback\} onOpen=\$\{/);
   assert.match(lobby, /net\.request\('queue\.join', \{ difficulty \}\)/);
   assert.match(lobby, /<\$\{QueueFlow\} queue=\$\{queue\}/);

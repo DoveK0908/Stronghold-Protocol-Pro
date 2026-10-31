@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateC2S, C2S } from '../../shared/protocol.js';
+import { TEST_PLUGIN_COMMANDS } from '../../shared/testPlugin.js';
 import { ERR, EMOTES, MAX_SEATS } from '../../shared/constants.js';
 import { createRng } from '../../server/sim/rng.js';
 import { DATA, makeMatch, checkInvariants } from './harness.js';
@@ -29,6 +30,13 @@ function randomIntent(rng, m, ps) {
   const to = () => (rng() < 0.6 ? { area: 'board', row: rng() < 0.8 ? 9 + rng.int(4) : rng.int(19), col: rng() < 0.8 ? 2 + rng.int(9) : rng.int(21) } : { area: 'hand', idx: rng.int(10) });
   switch (t) {
     case 'g.test': return { t, cmd: 'funds', args: { amount: rng.int(100000) } };
+    // the native room-gated test plugin (shared/testPlugin.js): a real command, sometimes with args. No test room of
+    // a fuzz match is ever gated open, so a well-shaped command is a refusal, which is exactly what the fuzz run
+    // checks; the C2S check parses the payload completely (parseTestPluginMessage), so an invalid shape is discarded
+    case 'g.testPlugin': {
+      const msg = { t, cmd: rng.pick(TEST_PLUGIN_COMMANDS), args: rng() < 0.5 ? undefined : { id: 'r1' } };
+      return validateC2S(msg) === null ? msg : { t, cmd: 'diyRefresh' };
+    }
     case 'g.infoReady': return { t, setupRevision: m.setupRevision ?? 0 };
     case 'g.rerollVote': return { t, voteId: m.setupVote?.id ?? 1 + rng.int(10), agree: rng() < 0.5 };
     // the shape-only pass calls this with `m = {}`: the player list is optional there

@@ -313,7 +313,6 @@
     "test/local-extract-scenes.test.js": 349,
     "test/local-extract.test.js": 1121,
     "test/local-token-models.test.js": 121,
-    "test/luck-gate.test.js": 8,
     "test/maintenance.test.js": 1058,
     "test/match/abyss-advisor.test.js": 217,
     "test/match/advisor-economy.test.js": 905,

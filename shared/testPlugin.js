@@ -32,6 +32,12 @@ const isInt = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 // same id shape as shared/testMode.js: ASCII only, bounded, never a prototype key
 const isId = (v) => typeof v === 'string' && v.length > 0 && v.length <= 64
   && !['__proto__', 'prototype', 'constructor'].includes(v) && /^[A-Za-z0-9_\-.:]+$/.test(v);
+/**
+ * Narrow the raw args object to the allowed keys; a refusal is always BAD_MSG.
+ * @param {any} args
+ * @param {string[]} keys
+ * @returns {{ error: 'BAD_MSG' } | { args: Record<string, any> }}
+ */
 const exact = (args, keys) => {
   const a = args === undefined ? {} : args;
   if (!plain(a)) return { error: 'BAD_MSG' };
@@ -54,19 +60,19 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'pick') {
     const r = exact(args, ['slot', 'id']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isInt(r.args.slot, 0, TEST_SHOP_SLOTS_MAX - 1) || !isId(r.args.id)) return { error: 'BAD_TARGET' };
     return { args: { slot: r.args.slot, id: r.args.id } };
   }
   if (cmd === 'shopLevel') {
     const r = exact(args, ['level']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isInt(r.args.level, 1, TEST_PLUGIN_SHOP_LEVEL_MAX)) return { error: 'BAD_TARGET' };
     return { args: { level: r.args.level } };
   }
   if (cmd === 'filter') {
     const r = exact(args, ['bonds', 'mode']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     const bonds = r.args.bonds;
     if (!Array.isArray(bonds) || bonds.length > TEST_PLUGIN_FILTER_MAX || !bonds.every(isId)) return { error: 'BAD_TARGET' };
     const mode = r.args.mode === undefined ? 'any' : r.args.mode;
@@ -75,32 +81,32 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'map' || cmd === 'bounty' || cmd === 'wave') {
     const r = exact(args, ['id']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isId(r.args.id)) return { error: 'BAD_TARGET' };
     return { args: { id: r.args.id } };
   }
   if (cmd === 'deployCap') {
     const r = exact(args, ['value']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isInt(r.args.value, 1, TEST_PLUGIN_DEPLOY_CAP_MAX)) return { error: 'BAD_TARGET' };
     return { args: { value: r.args.value } };
   }
   if (cmd === 'refreshFree') {
     const r = exact(args, ['count']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isInt(r.args.count, 0, TEST_PLUGIN_REFRESH_FREE_MAX)) return { error: 'BAD_TARGET' };
     return { args: { count: r.args.count } };
   }
   if (cmd === 'shopSlots') {
     const r = exact(args, ['slots']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     const slots = r.args.slots;
     if (!Array.isArray(slots) || slots.length < 1 || slots.length > TEST_SHOP_SLOTS_MAX) return { error: 'BAD_TARGET' };
     const out = [];
     for (const s of slots) {
       if (s === null) { out.push(null); continue; }
       const e = exact(s, ['kind', 'id']);
-      if (e.error) return e;
+      if (!('args' in e)) return e;
       if ((e.args.kind !== 'chess' && e.args.kind !== 'item') || !isId(e.args.id)) return { error: 'BAD_TARGET' };
       out.push({ kind: e.args.kind, id: e.args.id });
     }
@@ -108,7 +114,7 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'op') {
     const r = exact(args, ['id', 'potential', 'cultivate', 'skillIndex', 'moduleId', 'bonds', 'traits', 'stats']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isId(r.args.id)) return { error: 'BAD_TARGET' };
     const out = { id: r.args.id };
     let changing = false;
@@ -158,14 +164,14 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'enemies') {
     const r = exact(args, ['mode', 'list']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (r.args.mode !== 'replace' && r.args.mode !== 'append') return { error: 'BAD_TARGET' };
     const list = r.args.list;
     if (!Array.isArray(list) || list.length < 1 || list.length > TEST_PLUGIN_ENEMY_LIST_MAX) return { error: 'BAD_TARGET' };
     const out = [];
     for (const it of list) {
       const e = exact(it, ['id', 'count']);
-      if (e.error) return e;
+      if (!('args' in e)) return e;
       if (!isId(e.args.id) || !isInt(e.args.count, 1, TEST_PLUGIN_ENEMY_COUNT_MAX)) return { error: 'BAD_TARGET' };
       out.push({ id: e.args.id, count: e.args.count });
     }
@@ -173,13 +179,13 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'boss') {
     const r = exact(args, ['id']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isId(r.args.id)) return { error: 'BAD_TARGET' };
     return { args: { id: r.args.id } };
   }
   if (cmd === 'ops') {
     const r = exact(args, ['id', 'potential', 'cultivate']);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     if (!isId(r.args.id)) return { error: 'BAD_TARGET' };
     const out = { id: r.args.id };
     if (r.args.potential !== undefined) {
@@ -195,7 +201,7 @@ export function parseTestPluginArgs(cmd, args) {
   }
   if (cmd === 'diyRefresh') {
     const r = exact(args, []);
-    if (r.error) return r;
+    if (!('args' in r)) return r;
     return { args: {} };
   }
   if (cmd === 'strategy' && (!plain(args) || Object.keys(args).some((k) => k !== 'id'))) return { error: 'BAD_MSG' };

@@ -58,7 +58,8 @@ test('missing and malformed budget values never create misleading budget text', 
 test('budget layout uses an explicit authority-derived class, not unsupported relational CSS selectors', () => {
   const css = readFileSync(new URL('../../public/css/screens/game.css', import.meta.url), 'utf8');
   const screen = readFileSync(new URL('../../public/js/screens/game.js', import.meta.url), 'utf8');
-  assert.doesNotMatch(css, /:has\(/);
+  // a comment that names :has() is not a selector: strip comments before the ban (the test-plugin CSS note mentions it)
+  assert.doesNotMatch(css.replace(/\/\*[\s\S]*?\*\//g, ''), /:has\(/);
   assert.match(css, /\.gm--expanded\.gm--unite-budget \.gtop/);
   assert.match(screen, /uniteBudgetInfo\(pub\) && 'gm--unite-budget'/);
 });
