@@ -116,12 +116,21 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     fs.closeSync(outFd);
     const out = fs.readFileSync(outPath, 'utf8');
     fs.unlinkSync(outPath);
-    process.stdout.write(out);
-    for (const line of annotationsFor(out)) process.stdout.write(`${line}\n`);
+    // process.stdout.write is asynchronous: dumping a whole run into the step's pipe and then calling
+    // process.exit drops everything past the pipe buffer (2026-10-31: shard 3 went red with only the first
+    // ~64KB of log and no failing test named, because the top of the output survived and the tail did not).
+    // Write synchronously, looping over partial pipe writes, so the log, its annotations and the diagnostic all
+    // reach the runner before exit.
+    const writeAll = (text) => {
+      const buf = Buffer.from(text, 'utf8');
+      for (let off = 0; off < buf.length;) off += fs.writeSync(1, buf, off, buf.length - off);
+    };
+    writeAll(out);
+    for (const line of annotationsFor(out)) writeAll(`${line}\n`);
     // A child that dies without a summary leaves a red job with nothing to read: name the signal (SIGKILL is the
     // runner's out-of-memory kill) as an annotation, so the next red shard explains itself.
     if (r.status === null || r.signal) {
-      process.stdout.write(`::error::node --test ended without a status (signal ${r.signal ?? 'none'}, ${out.length} bytes captured)\n`);
+      writeAll(`::error::node --test ended without a status (signal ${r.signal ?? 'none'}, ${out.length} bytes captured)\n`);
     }
   }
   process.exit(r.status ?? 1);
