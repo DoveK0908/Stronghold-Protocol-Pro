@@ -118,6 +118,11 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     fs.unlinkSync(outPath);
     process.stdout.write(out);
     for (const line of annotationsFor(out)) process.stdout.write(`${line}\n`);
+    // A child that dies without a summary leaves a red job with nothing to read: name the signal (SIGKILL is the
+    // runner's out-of-memory kill) as an annotation, so the next red shard explains itself.
+    if (r.status === null || r.signal) {
+      process.stdout.write(`::error::node --test ended without a status (signal ${r.signal ?? 'none'}, ${out.length} bytes captured)\n`);
+    }
   }
   process.exit(r.status ?? 1);
 }
