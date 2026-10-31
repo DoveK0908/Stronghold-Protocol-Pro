@@ -38,6 +38,9 @@
 //                                               model to that clip set (render/units.js FORMS)
 //   view.setLocalFeed({ on, speed })            frames come from the local sim every frame (client-side combat):
 //                                               ~2-frame buffer at the battle's game speed
+//   view.cueDelay(ev) → seconds                 how long a battle cue of `ev`'s batch must wait to sound on the
+//                                               frame that draws it (0 outside a battle); hand it to
+//                                               audio.handleBattleEvents(ev, lead) so a hit is heard when it is drawn
 //   view.highlightTiles(tiles, style)           [[r,c]] | [{row,col}]; style 'legal'|'illegal'|'range'|'rangeStand'|
 //                                               'hover'|'target'|{color,fill,line,group}; highlightTiles(null) clears all
 //   view.on(name, fn) → unsubscribe ; view.off(name, fn)
@@ -58,18 +61,21 @@
 // body; a huge boss also anywhere on its hit area — data/enemies.json `hitArea`, user playtest #5). A dragged piece
 // drops on the tile under the pointer (render/drag.js). A dragged unit follows the pointer smoothly, never snapped to a
 // tile (the free deploy drag, 2026-10-15) — its drawn feet DRAG_HOLD_TILES below a finger, DRAG_HOLD_MOUSE_TILES below
-// a mouse — and glides onto its tile when dropped; an item plate stays centred on the pointer. An item dropped on a
-// unit's tile equips that unit.
+// a mouse — and glides onto its tile when dropped; 设置「拖动吸附」 = 强制吸附 instead puts back the official deploy drag,
+// the model standing on the legal tile under the pointer (dragStandTile). An item plate stays centred on the pointer.
+// An item dropped on a unit's tile equips that unit.
 //   Direction step (ui/facingWheel.js, research 09 §1.2):
 //   view.tileScreen(row, col) → { x, y, s, poly: [[x,y]×4] } (client px: tile-top centre, px per tile, corners) | null
 //   view.holdPiece(uid, {row,col} | null)       keep a dropped prep piece standing on a tile while its direction is
 //                                               chosen / the move is in flight (null releases; setPrep then settles it)
 //   view.setPieceDir(uid, dir)                  show a prep piece facing UP|RIGHT|DOWN|LEFT (wheel preview / stored dir)
-//   view.setSettings({ damageNumbers, officialDamageNumbers, ammoEnergyCount, officialFx, quality: 'high'|'medium'|'low' }) ; view.resize() ; view.destroy()
+//   view.setSettings({ damageNumbers, officialDamageNumbers, ammoEnergyCount, officialFx, quality: 'high'|'medium'|'low', dragSnap: 'smooth'|'forced' }) ; view.resize() ; view.destroy()
 //                                               (ammoEnergyCount: 设置「显示弹药与能量数量」, the count under an ammo skill's bar and a
 //                                                秘术师's stored/cap — PR #552 + PR #636 merged in §34.3, DESIGN §34.3;
 //                                                officialFx: 设置「官方特效」 'auto'|'off'|'lite'|'full', the official battle
-//                                                effects on the 3D board — render/vfx, DESIGN §9 "Official battle effects")
+//                                                effects on the 3D board — render/vfx, DESIGN §9 "Official battle effects";
+//                                                dragSnap: 设置「拖动吸附」 — 'smooth' follows the pointer (the Pro drag),
+//                                                'forced' stands the model on the legal tile as the official drag does)
 //   view.stats() → { fps, frameMs, cpuMs, renderMs, units, particles, impostor, impostorAtlas, boardArt, pen, penHidden, … }
 //                                               (dev / perf; pen = the pen's figures, penHidden = the camera hides them)
 //
@@ -145,13 +151,13 @@ import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } 
 import { SnapshotBuffer, frameTime } from './interp.js';
 import { BattlePresentation } from './battlePresentation.js';
 import { TileField } from './tiles.js';
-import { UnitView, ItemView, DeviceView, FORMS, syncView } from './units.js';
+import { UnitView, ItemView, DeviceView, FORMS, syncView, dismissEnemies } from './units.js';
 import { FxSystem, ensureDamageFonts, projSpeed } from './fx.js';
 import { OfficialFx } from './vfx/system.js';
 import { FxWiring } from './vfx/wiring.js';
 import { PluginFxPlayer } from './vfx/pluginPlayer.js';
 import { resolveOfficialFx } from './vfx/tier.js';
-import { createDragController, pieceTile } from './drag.js';
+import { createDragController, pieceTile, dragStandTile } from './drag.js';
 import { backdropTextures, shadowTexture, refreshTierChips, refreshDownLabels, silhouetteTexture } from './textures.js';
 import { TILE_H, TIER_COLORS, COLORS } from './style.js';
 import { loadBoardArt } from './boardArt.js';
@@ -164,7 +170,7 @@ import { IDENTITY, bossPrepField, tilesToDisp, leaderStand } from './prepfield.j
 import { pickOnTile, pickBattle, hitTiles } from './pick.js';
 import { promotionsOf } from './promote.js';
 import { ensurePixi } from './app/pixi.js';
-import { advanceEffectClock } from './app/playback.js';
+import { tickEffectClock, cueLead } from './app/playback.js';
 import { createWindUpLookahead } from './app/windup.js';
 import { pieceDirOf, pickUnitOf } from './app/pick.js';
 import { CAMERA_MS, BOARD3D_STABLE_MS, BOARD3D_RETRY_MS, PEN_CAMERA_MS, RANGE_GROUPS, LEADER_HIT_STYLE, DRAG_HOLD_TILES, DRAG_HOLD_MOUSE_TILES, DRAG_FOLLOW_RATE, CHAIN_KINDS, DROP_PENDING_MS, DEPLOY_REPLAY_MS } from './app/tune.js';
@@ -177,6 +183,8 @@ export { ensurePixi } from './app/pixi.js';
 
 /** fx.damage / fx.heal option: the official effect drew the hit (no procedural spark, slash or glow; numbers stay). */
 const NO_SPARK = Object.freeze({ noSpark: true });
+/** Cap of `cueDelay` (real seconds) — audio.js clamps a battle cue's lead at the same value (CUE_MAX_LEAD_S). */
+const CUE_MAX_LEAD_S = 0.5;
 export { PEN_CAMERA_MS, LEADER_HIT_STYLE, DRAG_HOLD_TILES, DRAG_HOLD_MOUSE_TILES, DEPLOY_REPLAY_MS } from './app/tune.js';
 export { viewKind, boardArea, bandFor, fieldRows, penShown, showsPen, leaderShown, restView, flightView, boardPreference, switchableBox } from './app/view.js';
 export { FORCED_EXIT, showsDeathFx, renderInfo } from './app/info.js';
@@ -201,7 +209,7 @@ export async function createFieldView(host, options = {}) {
   signal?.throwIfAborted();
   const assets = resolveAssets(opts.assets);
   const data = makeData(opts.data);
-  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, quality: 'high', officialFx: 'auto', ...(opts.settings || {}) };
+  const settings = { damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, quality: 'high', officialFx: 'auto', dragSnap: 'smooth', ...(opts.settings || {}) };
   settings.otherSkins = settings.otherSkins !== false;   // 显示其他玩家的皮肤 is on unless turned off (docs/SKINS.md)
   // the 3D board (three.js + the official art) loads in parallel with everything else
   const boardPref = boardPreference(opts.board);
@@ -333,6 +341,13 @@ export async function createFieldView(host, options = {}) {
   const woundUp = new WeakSet(); // atk event tuples whose attack wind-up already started
   // streamed fields (a spectator seat, a replica that went back to the stream): the delay follows the network's jitter
   const interp = new SnapshotBuffer({ delay: 0.1, rate: 2, adaptive: true });
+  // The finish plays out (render/battlePresentation.js `settleWindow`): once a field is decided its feed stops growing and
+  // the extrapolation guard would stop the render clock ~0.12 s past the last snapshot, freezing the picture on the final
+  // frame — so the last swing, the deaths it causes and their cues never reached the screen (reported 2026-10-30 at 2×:
+  // 「击杀最后一个怪的前几秒钟，声音和动作会突然停止」). The guard opens to the presentation's own settle window (game
+  // seconds, converted at the running rate) plus a frame of margin, and closes again afterwards; ordinary play keeps the
+  // 0.12 s bound.
+  const BASE_EXTRAPOLATE = interp.maxExtrapolate;
   let streamDelay = interp.delay;
   // upstream 0.3.2 (#664/#821): the battle's presentation clock — idle poses after the last event, and the cleanup of
   // the effects a finished battle leaves behind
@@ -1343,23 +1358,36 @@ export async function createFieldView(host, options = {}) {
     if (!dragState) return;
     const v = dragState.view;
     const item = v instanceof ItemView;
-    // held under the pointer, never snapped to a tile (the free deploy drag, 2026-10-15; the target below stays the
-    // pointer's tile): a unit with its drawn (lifted) feet DRAG_HOLD_TILES (a finger) / DRAG_HOLD_MOUSE_TILES (a mouse,
-    // a pen) of its own px per tile below it (the scale at the pointer's ground, refined once at the feet), an item plate
-    // centred on it. The point is a float world point the view follows each frame (_follow, the frame loop); the first
-    // move puts it there at once.
-    const g = cam.unproject(p.x, p.y, 0);
-    const hold = item ? 0 : p.pointerType === 'touch' ? DRAG_HOLD_TILES : DRAG_HOLD_MOUSE_TILES;
-    const s0 = g ? cam.scaleAt(g.x, g.y, 0) : cam.scale;
-    const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels);
-    const z = t ? heightAt(t.row, t.col) : 0;
-    const up = item ? z : z + (v.lift || 0) + (v.hover || 0);
-    let w = cam.unproject(p.x, p.y + hold * s0, up);
-    if (w && hold) w = cam.unproject(p.x, p.y + hold * cam.scaleAt(w.x, w.y, up), up) || w;
-    if (w) {
-      const f = { x: Math.max(-1, Math.min(21, w.x)), y: Math.max(-1, Math.min(19, w.y)), z };
-      if (!v._follow) { v.x = f.x; v.y = f.y; v.z = f.z; }
-      v._follow = f;
+    // 设置「拖动吸附」= 强制吸附 puts back the official deploy drag: a unit stands on the legal tile under the pointer
+    // (the tile the drop lands on, dragStandTile) — the world point the drop tween goes to (boardWorld), set at once,
+    // no follow, so the model snaps from tile to tile — and is held under the pointer elsewhere
+    const stand = item ? null : settings.dragSnap === 'forced' ? dragStandTile(p) : null;
+    if (stand) {
+      const w = boardWorld(stand.row, stand.col, stand.bench);
+      v._follow = null; v._tween = null;
+      if (w) { v.x = w.x; v.y = w.y; v.z = w.z; }
+    } else {
+      // held under the pointer, never snapped to a tile (the free deploy drag, 2026-10-15; the target below stays the
+      // pointer's tile): a unit with its drawn (lifted) feet DRAG_HOLD_TILES (a finger) / DRAG_HOLD_MOUSE_TILES (a mouse,
+      // a pen) of its own px per tile below it (the scale at the pointer's ground, refined once at the feet), an item plate
+      // centred on it. The point is a float world point the view follows each frame (_follow, the frame loop); the first
+      // move puts it there at once. 强制吸附 moves the model there at once every frame instead (the official holding).
+      const g = cam.unproject(p.x, p.y, 0);
+      const hold = item ? 0 : settings.dragSnap === 'forced' || p.pointerType === 'touch' ? DRAG_HOLD_TILES : DRAG_HOLD_MOUSE_TILES;
+      const s0 = g ? cam.scaleAt(g.x, g.y, 0) : cam.scale;
+      const t = pickTile(cam, p.x, p.y + hold * s0, heightAt, tiles.levels);
+      const z = t ? heightAt(t.row, t.col) : 0;
+      const up = item ? z : z + (v.lift || 0) + (v.hover || 0);
+      let w = cam.unproject(p.x, p.y + hold * s0, up);
+      if (w && hold) w = cam.unproject(p.x, p.y + hold * cam.scaleAt(w.x, w.y, up), up) || w;
+      if (w) {
+        const f = { x: Math.max(-1, Math.min(21, w.x)), y: Math.max(-1, Math.min(19, w.y)), z };
+        if (settings.dragSnap === 'forced') { v._follow = null; v._tween = null; v.x = f.x; v.y = f.y; v.z = f.z; }
+        else {
+          if (!v._follow) { v.x = f.x; v.y = f.y; v.z = f.z; }
+          v._follow = f;
+        }
+      }
     }
     // the drop target (p.target, highlighted) is the tile under the pointer
     if (p.target && p.target.area !== 'temp') {
@@ -1956,6 +1984,9 @@ export async function createFieldView(host, options = {}) {
     }
   }
   let downSeq = 0;             // syncBattle pass counter: a view still marked down after a pass left the `down` list
+  /** The unit's side, as the battle feed declared it ('enemy' fades once the field is decided). */
+  const isEnemyId = (id) => (infos.get(id)?.side ?? null) === 'enemy';
+
   function syncBattle(renderT) {
     if (renderT0Battle == null) renderT0Battle = renderT;
     // A push / pull's slide starts as soon as the interval sampled below ends on the snapshot that carries the
@@ -1965,7 +1996,13 @@ export async function createFieldView(host, options = {}) {
     slideAt = interp.nextSnapT(renderT);
     if (slideAt > renderT) interp.forEachUpcoming(renderT, slideAt, startSlide);
     interp.sample(renderT, sample);
+    // The field's battle is decided: nothing of the enemy side is drawn any more, even if the feed keeps repeating the
+    // last state (a client-combat field stays subscribed while the round waits for the other players, and that repeat
+    // would otherwise resurrect the enemies `dismissEnemies` faded — reported 2026-10-30: 「我已经打完了，时间还没有结束，
+    // 但是怪还留在场上，就像卡在最后打怪的这一下」).
+    const decided = presentation.ended;
     for (const [id, s] of sample) {
+      if (decided && isEnemyId(id)) continue;
       let v = views.get(id);
       if (!v && gone.has(id)) {
         if (s.anim === ANIM.DIE || !(s.hp > 0)) continue; // the tail of its DIE window: stays gone
@@ -2001,7 +2038,7 @@ export async function createFieldView(host, options = {}) {
     const now = performance.now();
     for (const [id, v] of views) {
       if (v.down && v._downSeq !== downSeq) v.setDown(null, renderT);
-      if (sample.has(id) || v.down) continue;
+      if (!(decided && v.isEnemy) && (sample.has(id) || v.down)) continue;
       if (v._seen) {
         // left the snapshot: removed (leaked / hidden / died and its DIE window passed)
         if (v.alive) { v.alive = false; v.dying = 0.25; v.dieDur = 0.25; }
@@ -2103,10 +2140,16 @@ export async function createFieldView(host, options = {}) {
       tiles.project(cam);
       updateBackdrop(clock);
       if (mode === 'battle') {
+        // a decided field plays its finish out: the clock may cross the last snapshot until the presentation ends (see
+        // BASE_EXTRAPOLATE), then the ordinary 0.12 s guard is back
+        interp.maxExtrapolate = presentation.requested && !presentation.ended
+          ? Math.max(BASE_EXTRAPOLATE, presentation.settleWindow(interp.rate) + 0.05) : BASE_EXTRAPOLATE;
         const renderT = interp.update(now / 1000);
         if (Number.isFinite(renderT)) {
           processEvents(renderT);
-          const justEnded = presentation.update(renderT, interp.newestT, dt);
+          // `delay × rate` is how far behind the newest snapshot the clock settles by design: the settle may not end the
+          // picture while the clock is further back than that (a 2× catch-up burst leaves it seconds behind).
+          const justEnded = presentation.update(renderT, interp.newestT, dt, interp.rate, interp.delay * interp.rate);
           syncBattle(renderT);
           if (!presentation.ended) windUpAttacks(renderT);
           // content-owned projectiles (丰川祥子's notes) have no 'atk' event: they are drawn from the snapshot's
@@ -2116,18 +2159,29 @@ export async function createFieldView(host, options = {}) {
           // skill effects' per-frame part reads the views' fresh sample (render/vfx/skillfx.js sync)
           const gdt = presentation.ended ? dt : ofxPrevT == null ? 0 : Math.min(opts.playbackTime ? Infinity : 0.25, Math.max(0, renderT - ofxPrevT));
           ofxPrevT = renderT;
-          if (justEnded) { wiring.clear(); ofx.finish(); pluginFx.finish(); }
+          if (justEnded) {
+            wiring.clear(); ofx.finish(); pluginFx.finish();
+            // The round is decided. Any enemy still on the board — a split child or a summon the count never included
+            // (§14), or a wave the last tick ended on — has nothing left to play and no snapshot left to remove it, so
+            // it would stand there through the whole settle (reported 2026-10-30: 「我先把怪打完了，但是怪还在场上」).
+            dismissEnemies(views, (id) => infos.get(id)?.side ?? null);
+          }
           pluginFx.update(gdt);
           if (!presentation.ended) { pluginFx.sync(views.values()); wiring.sync(views.values()); }
           // [ASSUMED] Bound long-lived one-shots to two presentation seconds after completion.
           if (presentation.ended && presentation.tail >= 2) { ofx.clear(); pluginFx.clear(); fx.clear(); }
           if (ofx.active) {
             if (!presentation.ended) wiring.tick();
-            if (opts.playbackTime) advanceEffectClock(ofx, gdt); else ofx.update(gdt);
+            tickEffectClock(ofx, gdt, !!opts.playbackTime);
           }
         }
         if (beamQ.length) pumpBeams(dt);
       } else if (mode === 'prep') {
+        // The official layer runs on its own clock, and its clock is what plays a prefab out and expires it. A birth
+        // flash spawned here (wiring.arrive: an operator bought, or one swapped into the bench by 巫恋's 替身娃娃) used
+        // to freeze on its first frame and stay on screen until the next enterBattle/enterPrepMode cleared the layer
+        // (reported 2026-10-30: 「卖出干员触发策略效果时，休整期有特效残留」).
+        tickEffectClock(ofx, dt, !!opts.playbackTime);
         for (const [key, pd] of pending) {
           if (now - pd.t > DROP_PENDING_MS) {
             pending.delete(key);
@@ -2237,6 +2291,19 @@ export async function createFieldView(host, options = {}) {
     setPen(list) { if (destroyed) return false; setPenList(Array.isArray(list) ? list : null); return true; },
     enterBattle,
     finishBattle() { if (!destroyed && mode === 'battle') presentation.finish(); },
+    /**
+     * How long (real seconds) a battle cue of `ev`'s batch has to wait to sound on the frame that renders it: the
+     * render clock trails the newest snapshot by the jitter buffer's delay, so a cue played on arrival leads its own
+     * swing / hit (screens/game.js hands this to `audio.handleBattleEvents`; report 2026-10-30: 「二倍速下音效和小人
+     * 的动作不同步」). `ev` is the wire frame (`{ ev, gt }`) or a game time; 0 outside a battle, and 0 while the clock
+     * has nothing better to say (a paused or rewinding stream must not delay a cue for long).
+     */
+    cueDelay(ev) {
+      if (destroyed || mode !== 'battle') return 0;
+      const t = ev && !Array.isArray(ev) && typeof ev === 'object' ? frameTime(ev) : Number(ev);
+      if (!Number.isFinite(t)) return 0;
+      return cueLead(t, interp.renderT, interp.rate, CUE_MAX_LEAD_S);
+    },
     pushSnapshot,
     pushEvents,
     /**
@@ -2348,6 +2415,7 @@ export async function createFieldView(host, options = {}) {
       if (typeof s.damageNumbers === 'boolean') settings.damageNumbers = s.damageNumbers;
       if (typeof s.officialDamageNumbers === 'boolean') settings.officialDamageNumbers = s.officialDamageNumbers;
       if (typeof s.ammoEnergyCount === 'boolean') settings.ammoEnergyCount = s.ammoEnergyCount;   // the units read it every frame (ctx.settings)
+      if (s.dragSnap === 'forced' || s.dragSnap === 'smooth') settings.dragSnap = s.dragSnap;   // 设置「拖动吸附」; the next move reads it
       if (s.quality === 'high' || s.quality === 'medium' || s.quality === 'low') settings.quality = s.quality;
       if (typeof s.officialFx === 'string' && s.officialFx !== settings.officialFx) { settings.officialFx = s.officialFx; syncOfficialFx(); }
       if (typeof s.otherSkins === 'boolean' && s.otherSkins !== settings.otherSkins) { settings.otherSkins = s.otherSkins; refreshSkins(); }

@@ -12,7 +12,7 @@
 
 ## 分片契约
 
-`ci-shards.json` 保存四片的计权输入：`shards: 4`、859 条 `measured` 文件耗时、新增文件按 `defaultMs: 800` 计权；`tools/ci-shards.mjs` 读取与 `tools/ci.mjs` 相同的 `TEST_FILES`，按权重降序依次放入最轻的一片，同权重按文件名、同负载按片号裁决。
+`ci-shards.json` 保存四片的计权输入：`shards: 4`、1252 条 `measured` 文件耗时、新增文件按 `defaultMs: 800` 计权；`tools/ci-shards.mjs` 读取与 `tools/ci.mjs` 相同的 `TEST_FILES`，按权重降序依次放入最轻的一片，同权重按文件名、同负载按片号裁决。
 
 1. 每个测试文件恰好出现一次，新增文件按 `defaultMs` 计权。
 2. 最大与最小估计负载之比不超过 `MAX_IMBALANCE = 1.3`。

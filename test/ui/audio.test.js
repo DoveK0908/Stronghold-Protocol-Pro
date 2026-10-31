@@ -676,11 +676,11 @@ describe('operator battle voice', () => {
 
 function fakeWindow() {
   const listeners = new Map();
-  const made = { sources: 0, started: 0, stopped: 0 };
+  const made = { sources: 0, started: 0, stopped: 0, starts: [] };
   class Param { constructor() { this.value = 1; } setValueAtTime(v) { this.value = v; } linearRampToValueAtTime(v) { this.value = v; } setTargetAtTime(v) { this.value = v; } cancelScheduledValues() {} }
   class Node { connect() {} disconnect() {} }
   class Gain extends Node { constructor() { super(); this.gain = new Param(); } }
-  class Src extends Node { constructor() { super(); this.playbackRate = new Param(); made.sources++; } start() { made.started++; } stop() { made.stopped++; } }
+  class Src extends Node { constructor() { super(); this.playbackRate = new Param(); made.sources++; } start(at) { made.started++; made.starts.push(Number.isFinite(at) ? at : null); } stop() { made.stopped++; } }
   class Ctx {
     constructor() { this.currentTime = 0; this.state = 'running'; this.destination = new Node(); }
     createGain() { return new Gain(); }
@@ -2226,5 +2226,88 @@ describe('field lifetime: sounds still loading at the end of a field never sound
     await new Promise((r) => setTimeout(r, 5));
     assert.equal(fw.made.started, before, '旧战场的声音不会在之后响起');
     assert.equal(a.limiter.active, 0, '为它预留的声道也还回去了');
+  });
+});
+
+describe('battle cue lead: a battle sound waits for the frame that draws it', () => {
+  // 2026-10-30 报告「二倍速下音效和小人的动作不同步」（攻击/命中音，声音先响、动作后到）。声音在消息到达那一刻就播
+  // （screens/game.js 的 onEv → handleBattleEvents），画面却落后渲染时钟一个 jitter 缓冲的延迟：本地战斗 0.034 s，
+  // 观战 0.1 s 起。于是 game.js 把 view.cueDelay(msg) 当 lead 传进来，这一批的每个源用 WebAudio 的 `start(at)`
+  // 排到「画面画到它的那一帧」。这里只验排期本身（真机听感归维护者）。
+  const setup = () => {
+    const fw = fakeWindow();
+    const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.install();
+    fw.fire('pointerdown');
+    return { fw, a };
+  };
+
+  test('a cue waits its lead before the source starts (the safety ender waits too)', async () => {
+    const { fw, a } = setup();
+    assert.ok(a.ctx, '前提：已安装（有 AudioContext）');
+    let land;
+    a._buffer = () => new Promise((r) => { land = r; });
+    const before = fw.made.started;
+    a._play('/cue/hit.mp3', { limited: true, pri: SFX_PRI.event, cueAt: a.ctx.currentTime + 0.24 });
+    land({ duration: 0.5 });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fw.made.started, before + 1, '照常出手，只是排在之后');
+    assert.equal(fw.made.starts.at(-1), 0.24, '源在 lead 之后启动，不是现在就响');
+  });
+
+  test('a lead of 0 (休整期 / 已追上的帧) starts at once, and the batch clamps to CUE_MAX_LEAD_S', async () => {
+    const { fw, a } = setup();
+    let land;
+    a._buffer = () => new Promise((r) => { land = r; });
+    a._play('/cue/hit.mp3', { limited: true, pri: SFX_PRI.event });   // 没有 lead：立刻响（旧的到达即播）
+    land({ duration: 0.5 });
+    await new Promise((r) => setTimeout(r, 5));
+    assert.equal(fw.made.starts.at(-1), null, '没有排期时调用的是 start()，不是 start(t)');
+    // 一整批共用同一个时刻；卡住/回退的流最多挂 CUE_MAX_LEAD_S
+    const seen = [];
+    a.unit = () => { seen.push(a._cueAt); return true; };
+    a._track({ id: 1, side: 'ally', spine: 'char_a' });   // 'atk' 只对已登记的干员出声
+    a.handleBattleEvents([['atk', 1, 2, 'arrow']], 5);
+    assert.equal(seen[0], a.ctx.currentTime + 0.5, '批内统一排期，且夹在上限内');
+    assert.equal(a._cueAt, 0, '批后复位：UI 音、下一批不继承这个延迟');
+    a.handleBattleEvents([['atk', 1, 2, 'arrow']], 0);
+    assert.equal(seen.at(-1), 0, '没有 lead 的批次立即播');
+    assert.equal(a._cueAt, 0);
+  });
+});
+
+describe('a decided field rings out instead of being cut', () => {
+  // 2026-10-30 报告「动画是对了，但是最后结束后所有的声音也立即停止了」：结算那一刻 game.js 调 stopFieldSounds /
+  // stopAllLoops，而池里的攻击/命中音原来是 src.stop() 硬切（技能循环同理 fadeS: 0），加上 cue lead 把最后几下排到
+  // 之后，切点正好落在它们身上。现在结算路径带 0.5 s 淡出；换场仍是硬停。
+  const setup = () => {
+    const fw = fakeWindow();
+    const a = new AudioManager({ win: fw.win, getManifest: () => manifest });
+    a.install();
+    fw.fire('pointerdown');
+    return { fw, a };
+  };
+
+  test('the pool voice is not cut in the frame the field ends, and is gone after the fade', async () => {
+    const { fw, a } = setup();
+    const pool = { id: 'testPool', maxSoundAllowed: 0, popOldest: true, sounds: { 'hit.mp3': { delay: 0 } } };
+    a._buffer = () => Promise.resolve({ duration: 1.5 });
+    a._playPool('/assets/audio/sfx/hit.mp3', { volume: 1, unitKey: 'u1', again: null, pool });
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(fw.made.started, 1, '前提：这一下已经在响');
+    a.stopFieldSounds({ fadeS: 0.3 });
+    assert.equal(fw.made.stopped, 0, '结束的那一帧不硬切');
+    await new Promise((r) => setTimeout(r, 400));
+    assert.equal(fw.made.stopped, 1, '淡出结束才真正停');
+  });
+
+  test('a field replacement still cuts at once (no fade by default)', async () => {
+    const { fw, a } = setup();
+    const pool = { id: 'testPool', maxSoundAllowed: 0, popOldest: true, sounds: { 'hit.mp3': { delay: 0 } } };
+    a._buffer = () => Promise.resolve({ duration: 1.5 });
+    a._playPool('/assets/audio/sfx/hit.mp3', { volume: 1, unitKey: 'u1', again: null, pool });
+    await new Promise((r) => setTimeout(r, 10));
+    a.stopPoolSounds();
+    assert.equal(fw.made.stopped, 1, '换场：立刻停，不留尾巴');
   });
 });

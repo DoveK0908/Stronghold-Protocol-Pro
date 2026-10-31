@@ -24,7 +24,7 @@ import { renderInfo } from '../../public/js/render/app/info.js';
 import { scenarioText } from '../../public/studio/js/console/problems.js';
 import { checkInvariants } from '../helpers/battleHarness.js';
 import { OfficialFx } from '../../public/js/render/vfx/system.js';
-import { advanceEffectClock } from '../../public/js/render/app/playback.js';
+import { advanceEffectClock, cueLead } from '../../public/js/render/app/playback.js';
 
 const raw = readStudioData(path.resolve('data'));
 setSimData(raw); setGameData(raw);
@@ -360,6 +360,17 @@ test('one-second stepping and fast playback advance the real official effect clo
   advanceEffectClock(fx, 1); assert.equal(fx.time, 1);
   advanceEffectClock(fx, 1.6); assert.equal(fx.time, 2.6);
   advanceEffectClock(fx, 0); assert.equal(fx.time, 2.6);
+});
+
+test('cue lead: a battle sound waits exactly as long as its frame is still ahead of the drawn one', () => {
+  // 2026-10-30「二倍速下音效和小人的动作不同步」: the cue is batched with events that are `lead` real seconds away
+  assert.equal(cueLead(10, 9.5, 1), 0.5, 'a plain 1× clock: the frame is 0.5 s ahead');
+  assert.equal(cueLead(10, 9.5, 2), 0.25, 'the same game-time gap at 2× is half a real second');
+  assert.equal(cueLead(10, 10, 2), 0, 'a frame already drawn does not delay its sound');
+  assert.equal(cueLead(10, 11, 2), 0, 'never negative on a rewinding / caught-up stream');
+  assert.equal(cueLead(10, 0, 1), 0.5, 'capped: a stalled stream cannot park a cue for seconds');
+  assert.equal(cueLead(NaN, 9, 1), 0);
+  assert.equal(cueLead(10, 9, 0), 0.5, 'rate 0 falls back to 1 rather than dividing by zero');
 });
 
 test('combat observation records capped healing after hooks and leaves regen rules unchanged', () => {

@@ -31,7 +31,7 @@ cloudflared --version
 
 ### 1.2 启动顺序
 
-1. 先开游戏服务器（双击 `start-pro-luck.cmd`，或 `start-windows.bat`，默认 3000 端口）；
+1. 先开游戏服务器（双击 `start-pro.cmd`，或主树 `scripts/start-windows.bat`，默认 3000 端口）；
 2. 另开一个终端，跑：
 
 ```powershell

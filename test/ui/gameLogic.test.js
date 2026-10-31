@@ -227,6 +227,14 @@ describe('countdown', () => {
     // the strategy draft: one countdown, the turn's (m.public.draft.turnSeconds; user playtest #4 item 4)
     assert.equal(phaseTotalSeconds({ phase: PHASE.BAND_DRAFT, draft: { turnSeconds: 30 } }, config), 30);
     assert.equal(phaseTotalSeconds({ phase: PHASE.BAND_DRAFT }, config), config.timers.bandTurn);
+    // combat: the data value counts real seconds of the forced-2× battle, so a speed-voted field's gauge is shorter —
+    // the deadline divides the same limit by gameSpeed (report 2026-10-30: the ring was half full when the battle ended)
+    const combat = { phase: PHASE.COMBAT, modeId: 'mode_multi_hard', round: 4 };
+    const limit = config.modes.mode_multi_hard.rounds['4'].combatTimeLimit;
+    assert.equal(phaseTotalSeconds(combat, config), limit, 'untouched at the forced 2× speed');
+    assert.equal(phaseTotalSeconds(combat, config, null, 2), limit);
+    assert.equal(phaseTotalSeconds(combat, config, null, 4), limit / 2);
+    assert.equal(phaseTotalSeconds({ phase: PHASE.COMBAT, modeId: 'mode_multi_hard', round: 99 }, config), null);
   });
 });
 
@@ -744,8 +752,13 @@ describe('keyboard & settings', () => {
   test('sanitizeSettings', () => {
     assert.deepEqual(sanitizeSettings(null), { ...DEFAULT_SETTINGS });
     assert.deepEqual(sanitizeSettings({ bgm: 3, sfx: -1, voice: 2, muted: 'yes', damageNumbers: false, quality: 'ultra' }),
-      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true, lobbyMusicPos: null },
+      { bgm: 1, sfx: 0, voice: 1, voiceLang: 'cn', voiceNative: false, voiceOverrides: {}, muted: false, damageNumbers: false, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, dragSnap: 'smooth', quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: { ...DEFAULT_SETTINGS.keys }, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true, lobbyMusicPos: null },
       'a saved profile without `keys` (before 0.2.0) gets the default key map (test/ui/feedback5-hotkeys.test.js)');
+    // 拖动吸附 (设置「拖动吸附」): 平滑吸附 by default — the released feel of 2026-10-15; 强制吸附 is the official drag
+    assert.equal(DEFAULT_SETTINGS.dragSnap, 'smooth');
+    assert.equal(sanitizeSettings({ bgm: 0.5 }).dragSnap, 'smooth', 'a profile saved before the switch keeps the smooth drag');
+    assert.equal(sanitizeSettings({ dragSnap: 'forced' }).dragSnap, 'forced');
+    assert.equal(sanitizeSettings({ dragSnap: 'snap' }).dragSnap, 'smooth', 'junk falls back to smooth');
     assert.equal(sanitizeSettings({ bgm: 0.5 }).voice, DEFAULT_SETTINGS.voice, 'a saved profile without `voice` gets the default');
     // 语音语言: 中文 by default. en / kr are dubs (0.3.0); anything else, including the per-operator 'native', stays 中文.
     assert.equal(DEFAULT_SETTINGS.voiceLang, 'cn');

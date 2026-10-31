@@ -3784,5 +3784,9 @@
   "同时匹配": "All match",
   "该窗口渲染出错": "This window failed to render",
   "调整窗口大小": "Resize window",
-  "资源和自选商店": "Resources & custom shop"
+  "资源和自选商店": "Resources & custom shop",
+  "拖动吸附": "Drag snapping",
+  "平滑吸附": "Smooth",
+  "强制吸附": "Snap",
+  "平滑吸附：干员模型跟着指针 / 手指平滑移动，不吸附到格子上，松手后滑到落点。强制吸附：与官方原版一致，指针停在可以放置的格子上时，干员立刻站到那一格。": "Smooth: the model follows the pointer or your finger and glides onto the tile when you let go. Snap: as in the official game, the model stands on the tile under the pointer as soon as it can be placed there."
 }

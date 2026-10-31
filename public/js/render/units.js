@@ -147,6 +147,27 @@ export function syncView(v, s, t) {
   else if (v.dying > 0) { if (typeof v.followSample === 'function') v.followSample(s, t); else { v.x = s.x; v.y = s.y; } }
   else if (s.anim !== ANIM.DIE && s.hp > 0) { v.revive?.(); v.sync(s, t); }
 }
+/**
+ * The battle is decided: an enemy still drawn now — a split child or a summon the round's count never included (§14),
+ * or a wave the last tick ended on — has nothing left to play, and no snapshot will ever come to remove it. Left alone
+ * it stands in its idle pose for the whole settle (reported 2026-10-30: 「我先把怪打完了，但是怪还在场上」). Fade every
+ * one out with the presentation; the allies stay, the settle shows the player's own board.
+ * @param {Map<number, any>} views battle unit views
+ * @param {(id: number) => string|null} sideOf the unit's side ('enemy' fades)
+ * @returns {number} how many were dismissed
+ */
+export function dismissEnemies(views, sideOf) {
+  let n = 0;
+  for (const [id, v] of views) {
+    if (!v || !v.alive || sideOf(id) !== 'enemy') continue;
+    v.alive = false;
+    v.dying = 0.25;
+    v.dieDur = 0.25;
+    n++;
+  }
+  return n;
+}
+
 /** World step (x = col, y = row) of a direction. */
 export const DIR_STEP = Object.freeze({ UP: [0, 1], RIGHT: [1, 0], DOWN: [0, -1], LEFT: [-1, 0] });
 const nowMs = () => (globalThis.performance ? globalThis.performance.now() : Date.now());

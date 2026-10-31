@@ -12,7 +12,9 @@
 // Everything is judged at the pointer (user playtest #4 item 1: the ground is drawn as tiles): a press / hover is on the
 // piece standing on the tile under it (`hitPiece`, render/pick.js), and while dragging the target, `tileHover` and the
 // legality are that tile — an item dropped on a unit's tile goes to that unit. app.js draws a dragged unit following
-// the pointer smoothly, never snapped to a tile (the free deploy drag, 2026-10-15), and an item plate on the pointer.
+// the pointer smoothly, never snapped to a tile (the free deploy drag, 2026-10-15; 设置「拖动吸附」 smooth, the default)
+// or, with 设置「拖动吸附」 = 强制吸附, standing on the legal tile under the pointer as the official drag does
+// (`dragStandTile`) — an item plate stays on the pointer in both modes.
 // A release over DOM UI covering the canvas (the shop bar) is 'outside' (mouse and touch alike).
 //
 // Events emitted through `emit(name, payload)`:
@@ -92,6 +94,26 @@ export function isLegal(canPlace, piece, slot) {
   if (typeof canPlace !== 'function') return true;
   const tile = slot.area === 'board' ? { row: slot.row, col: slot.col } : handSlot(slot.idx);
   try { return canPlace(piece, tile.row, tile.col, slot) !== false; } catch { return false; }
+}
+
+/**
+ * The tile a dragged UNIT is drawn standing on when 设置「拖动吸附」 is 强制吸附 — the official deploy drag (the owner's
+ * recording of 2026-10-09, PR #403's report): the drop target under the pointer while it is legal, a board tile or the
+ * bench slot's own tile (handSlot: the official ten on row 7, 整备区扩容's extra slots on row 8), as
+ * `{ row, col, bench }` in board space; null otherwise (no target, an illegal tile, a temp slot, the pointer over DOM
+ * UI such as the shop bar), and the unit is then held under the pointer as in the smooth drag. app.js never snaps an
+ * item plate (in either mode). The tile is the drag target itself, so the pick, tileHover, the highlight and the drop
+ * stay the pointer's tile; moving within one tile leaves the model where it is.
+ */
+export function dragStandTile(move) {
+  const t = move && move.legal === true ? move.target : null;
+  if (!t) return null;
+  if (t.area === 'board' && Number.isInteger(t.row) && Number.isInteger(t.col)) return { row: t.row, col: t.col, bench: false };
+  if (t.area === 'hand' && Number.isInteger(t.idx) && t.idx >= 0 && t.idx < HAND_MAX) {
+    const s = handSlot(t.idx);
+    return s ? { row: s.row, col: s.col, bench: true } : null;
+  }
+  return null;
 }
 
 const DEFAULTS = { threshold: 6, touchThreshold: 10, longPressMs: 480 };

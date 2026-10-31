@@ -74,11 +74,19 @@ export function uiScaleStep(uiScale, phone) {
  *  while the page is in fullscreen and a match is running). Off by default, a pure client preference.
  *  showTag: 设置「显示名字后面的编号」 (the owner's request of 2026-10-24), ON by default — the four digits a session was
  *  given are drawn after the name (`名字#1234`; ui/myInfo.js playerLabel). Off prints the bare 代号 only. Every display
- *  that reads it through usePlayerLabel follows the switch live. A pure client preference, never sent either. */
-export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true, lobbyMusicPos: null });
+ *  that reads it through usePlayerLabel follows the switch live. A pure client preference, never sent either.
+ *  dragSnap: 设置「拖动吸附」 — 'smooth' (the default, what this fork ships) is the free deploy drag of 2026-10-15: a
+ *  dragged unit follows the pointer smoothly and glides onto its tile when dropped (render/app.js moveDragVisual,
+ *  DRAG_FOLLOW_RATE); 'forced' is the official deploy drag: the unit stands on the legal tile under the pointer
+ *  (render/drag.js dragStandTile) and is held under the pointer elsewhere. The default is 'smooth' because that is the
+ *  behaviour already shipped — an upgrade must not change the feel under the player's hand; 强制吸附 is the way back to
+ *  the official presentation. A pure client preference, never sent. */
+export const DEFAULT_SETTINGS = Object.freeze({ bgm: 0.6, sfx: 0.8, voice: 0.8, voiceLang: 'cn', voiceNative: false, voiceOverrides: Object.freeze({}), muted: false, damageNumbers: true, officialDamageNumbers: false, ammoEnergyCount: false, fullscreenWakeLock: false, bondTimers: false, combatMetrics: false, prepDeployFold: false, dragSnap: 'smooth', quality: 'high', officialFx: 'full', otherSkins: true, showTag: true, textSize: 'sm', uiScale: 'auto', keys: DEFAULT_HOTKEYS, bgmPrep: 'official', bgmCombat: 'official', lobbyTrack: 'official', lobbyCustomId: '', lobbyShuffle: false, lobbyVolume: 1, lobbyMusicOpen: true, lobbyMusicPos: null });
 const QUALITIES = ['high', 'medium', 'low'];
 /** The values of 设置「官方特效」 (render/vfx/tier.js OFFICIAL_FX). */
 export const OFFICIAL_FX_MODES = Object.freeze(['auto', 'off', 'lite', 'full']);
+/** The values of 设置「拖动吸附」: 'smooth' the free deploy drag (this fork's default), 'forced' the official snap. */
+export const DRAG_SNAPS = Object.freeze(['smooth', 'forced']);
 
 /**
  * The merged 显示弹药与能量数量 switch. A stored boolean wins. Otherwise on when either retired key was the boolean
@@ -94,7 +102,7 @@ function ammoEnergyCountOf(r) {
 /**
  * Sanitize persisted settings.
  * @param {any} raw
- * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean|'partial', quality: 'high'|'medium'|'low',
+ * @returns {{ bgm: number, sfx: number, voice: number, voiceLang: 'cn'|'jp'|'en'|'kr', voiceNative: boolean, voiceOverrides: Record<string, string>, muted: boolean, damageNumbers: boolean, officialDamageNumbers: boolean, ammoEnergyCount: boolean, fullscreenWakeLock: boolean, bondTimers: boolean, combatMetrics: boolean, prepDeployFold: boolean|'partial', dragSnap: 'smooth'|'forced', quality: 'high'|'medium'|'low',
  *   officialFx: 'auto'|'off'|'lite'|'full', otherSkins: boolean, showTag: boolean,
  *   textSize: 'sm'|'md'|'lg'|'xl', uiScale: string, keys: Record<'buy'|'refresh'|'freeze'|'levelUp'|'retreat'|'sell'|'ready', string>, bgmPrep: string, bgmCombat: string, lobbyTrack: string, lobbyCustomId: string, lobbyShuffle: boolean, lobbyVolume: number, lobbyMusicOpen: boolean, lobbyMusicPos: { x: number, y: number }|null }}
  */
@@ -114,6 +122,7 @@ export function sanitizeSettings(raw) {
     ammoEnergyCount: ammoEnergyCountOf(r),
     bondTimers: r.bondTimers === true,
     prepDeployFold: r.prepDeployFold === 'partial' ? 'partial' : r.prepDeployFold === true,
+    dragSnap: DRAG_SNAPS.includes(r.dragSnap) ? r.dragSnap : DEFAULT_SETTINGS.dragSnap,
     combatMetrics: typeof r.combatMetrics === 'boolean' ? r.combatMetrics : DEFAULT_SETTINGS.combatMetrics,
     fullscreenWakeLock: typeof r.fullscreenWakeLock === 'boolean' ? r.fullscreenWakeLock : DEFAULT_SETTINGS.fullscreenWakeLock,
     quality: QUALITIES.includes(r.quality) ? r.quality : DEFAULT_SETTINGS.quality,

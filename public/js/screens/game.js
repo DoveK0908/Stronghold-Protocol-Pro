@@ -367,7 +367,7 @@ function MatchScreen() {
   const showShop = !!priv && alive && (phase === PHASE.PREP || phase === PHASE.SP_DRAFT || phase === PHASE.ROUND_START) && !watchingOther;
   const layersDisabled = phase === PHASE.UNITE || isBossPhase(phase);
   const sp = phase === PHASE.SP_DRAFT ? normalizeSp(pub?.sp, players) : null;
-  const total = phaseTotalSeconds(pub, gd.config, myId);
+  const total = phaseTotalSeconds(pub, gd.config, myId, field?.speed);
   // solo pause: offered in the own battle; while m.public.paused every HUD clock stops at the pause moment
   const paused = isPaused(pub);
   const pauseSeenRef = useRef(null);
@@ -714,8 +714,14 @@ function MatchScreen() {
     // half) is framed by the boss-field prep camera of that half — the leader standing at its spawn (item 55)
     const side = field.prep && (field.side === 'L' || field.side === 'R') ? field.side
       : sides && sides[myId] ? sides[myId] : members.length > 1 && members.indexOf(myId) === 1 ? 'R' : 'L';
-    // local simulation (client-side combat) feeds a frame per animation frame: no network jitter buffer
-    view.raw?.setLocalFeed?.({ on: !!field.local, speed: field.speed });
+    // local simulation (client-side combat) feeds a frame per animation frame: no network jitter buffer. The field's
+    // game speed is the rate the local sim runs at (1×: 2 game s per real s, 2×: 4, server/match/match/clientCombat.js
+    // `b.start.speed`) — `m.field` does not carry it, so without the runner's entry the clock ran at 1× and a 2× battle
+    // outran its own picture (jumps, then a freeze-look at the end: 2026-10-30 「击杀最后一个怪的前几秒钟，声音和动作会突然
+    // 停止」).
+    const feedSpeed = (battleState && field.local && battleState.fieldId === field.fieldId ? battleState.speed : 0)
+      || field.speed;
+    view.raw?.setLocalFeed?.({ on: !!field.local, speed: feedSpeed });
     // a lone 联防 helper starts on its own half with the ‹ › pill on that half (全景 stays one press away)
     const helperHalf = field.prep ? null : loneHalf(field);
     if (!rescout) {
@@ -749,7 +755,7 @@ function MatchScreen() {
       hudRef.current = snapHud(earlySnap);
       setHud(hudRef.current);
     }
-  }, [view, showPrep, priv, editable, field, combat, mode, watchingOther, watching, holdSeq, relayKey, relayFieldReady]);
+  }, [view, showPrep, priv, editable, field, combat, mode, watchingOther, watching, holdSeq, relayKey, relayFieldReady, battleState?.fieldId, battleState?.speed]);
 
   // A finished field has a cosmetic tail; a paused/stalled field retains its combat pose.
   useEffect(() => {
@@ -758,8 +764,12 @@ function MatchScreen() {
     const done = field.local ? battleState?.fieldId === field.fieldId && battleState.done : pf?.live === false;
     if (done || field.live === false) {
       view.finishBattle?.();
-      audio.stopFieldSounds();
-      audio.stopAllLoops();
+      // a decided field rings out (the pool's last hits and a skill's loop ease to silence) instead of being cut in one
+      // frame; `stopPoolSounds` without a fade stays the field-replacement path (audio.js). `drain` leaves the cues that
+      // are still waiting for their rendered frame in flight — dropping them silenced exactly the last swings and hits
+      // the fade was meant to keep (reported 2026-10-30 at 2×: 「击杀最后一个怪的前几秒钟，声音和动作会突然停止」).
+      audio.stopFieldSounds({ fadeS: 1.8, drain: true });
+      audio.stopAllLoops({ fadeS: 1.8 });
     }
   }, [view, showPrep, field, battleState?.fieldId, battleState?.done, pub?.fields]);
 
@@ -829,7 +839,8 @@ function MatchScreen() {
       view?.pushEvents(msg);
       noteDeviceUnits(deviceUnitsRef.current, { events: msg.ev });
       pieceUnitsRef.current = notePieceUnits(pieceUnitsRef.current, { events: msg.ev });
-      audio.handleBattleEvents(msg.ev);
+      // the picture trails this batch by the render clock's buffer: sound it on the frame that draws it, not on arrival
+      audio.handleBattleEvents(msg.ev, view?.cueDelay?.(msg) ?? 0);
     };
     // 干员语音 (结算): the own battle's result just came in — the operator's line depends on how it went
     // (完美作战 ⇒ 3星结束行动, 绝境 / 终极 ⇒ 完成高难行动, 有漏怪 ⇒ 非3星结束行动, 一个没杀 ⇒ 行动失败)

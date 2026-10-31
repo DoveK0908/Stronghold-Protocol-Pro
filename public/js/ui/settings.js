@@ -149,6 +149,12 @@ function Toggle({ label, micro, value, onChange }) {
 }
 
 const DEPLOY_FOLD = [[false, N_('关闭')], ['partial', N_('适度缩小')], [true, N_('完全收起')]];
+/**
+ * 拖动吸附 (ui/gameLogic/settings.js dragSnap): 平滑吸附, this fork's free deploy drag of 2026-10-15 and the default —
+ * the model follows the pointer and glides onto the tile — / 强制吸附, the official deploy drag: the model stands on the
+ * legal tile under the pointer. Display order only; the stored values stay 'smooth' | 'forced' (DRAG_SNAPS).
+ */
+const DRAG_SNAP = [['smooth', N_('平滑吸附')], ['forced', N_('强制吸附')]];
 /** Display order only: 低 / 中 / 高, the same direction as 官方特效 关 / 精简 / 完整. Stored values stay high | medium | low. */
 const QUALITY = [['low', N_('低')], ['medium', N_('中')], ['high', N_('高')]];
 /**
@@ -526,6 +532,14 @@ export function SettingsModal({ open, onClose }) {
         </div>
       </div>
       <p class="set-hint">${t('拖动及选择朝向时：关闭保持原视角；适度缩小保留七成大小的商店，镜头适度放大；完全收起使用原有放大视角。结束后恢复原状。')}</p>
+      <div class="set-row" data-testid="drag-snap">
+        <span class="set-row__label">${t('拖动吸附')}<${MicroLabel}>DRAG SNAP<//></span>
+        <div class="set-seg" role="radiogroup" aria-label=${t('拖动吸附')}>
+          ${DRAG_SNAP.map(([id, label]) => html`<button key=${id} type="button" role="radio" aria-checked=${s.dragSnap === id ? 'true' : 'false'}
+            class=${s.dragSnap === id ? 'is-on' : ''} onClick=${() => updateSettings({ dragSnap: id })}>${t(label)}</button>`)}
+        </div>
+      </div>
+      <p class="set-hint" data-testid="drag-snap-hint">${t('平滑吸附：干员模型跟着指针 / 手指平滑移动，不吸附到格子上，松手后滑到落点。强制吸附：与官方原版一致，指针停在可以放置的格子上时，干员立刻站到那一格。')}</p>
       <${Toggle} label=${t('全屏时保持屏幕常亮')} micro="SCREEN WAKE LOCK" value=${s.fullscreenWakeLock} onChange=${(v) => updateSettings({ fullscreenWakeLock: v })} />
       <p class="set-hint" data-testid="wake-lock-hint">${tParts(isIOS()
         ? N_('全屏期间始终保持屏幕常亮（{support}）；iOS低电量模式下可能不生效。')

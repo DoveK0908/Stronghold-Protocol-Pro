@@ -251,8 +251,9 @@ export function uniteBudgetInfo(pub) {
  * @param {any} pub m.public
  * @param {any} config data/config.json
  * @param {string|null} [myId]
+ * @param {number|null} [speed] game seconds per real second of the running field (m.fields[].speed), COMBAT only
  */
-export function phaseTotalSeconds(pub, config, myId = null) {
+export function phaseTotalSeconds(pub, config, myId = null, speed = null) {
   if (!isObj(pub)) return null;
   const timers = isObj(config?.timers) ? config.timers : {};
   const mode = isObj(config?.modes) ? config.modes[pub.modeId] : null;
@@ -269,7 +270,17 @@ export function phaseTotalSeconds(pub, config, myId = null) {
       return first ? (num(timers.spFirst) ?? 30) : (num(timers.spTurn) ?? 16);
     }
     case PHASE.PREP: return num(mode?.rounds?.[String(pub.round)]?.prepTime);
-    case PHASE.COMBAT: return num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+    // data counts REAL seconds of the forced-2× battle (gamedata.js combatTimeLimit = the data value × combatTimeScale),
+    // so a field running faster spends its game-time limit in proportionally fewer real seconds: the server divides the
+    // same limit by gameSpeed for its deadline (match/combat.js). Without this the gauge of a 二倍速 battle is twice the
+    // real countdown and stays half full when the battle ends (report 2026-10-30: 「最后几秒还没结束战斗就结束了」).
+    case PHASE.COMBAT: {
+      const limit = num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);
+      if (!limit) return null;
+      const forced = num(config?.combatTimeScale) ?? 2;
+      const run = num(speed) ?? forced;
+      return (limit * forced) / run;
+    }
     case PHASE.UNITE: {
       const limit = num(pub.unite?.timeLimit), speed = num(pub.unite?.gameSpeed);
       return limit && speed ? limit / speed : num(mode?.rounds?.[String(pub.round)]?.combatTimeLimit);

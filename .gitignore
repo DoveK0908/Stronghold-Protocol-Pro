@@ -21,6 +21,8 @@ data/local-fx.json
 .cache/
 # server-side runtime state (server/tags.js 名字#四位 claims, unless SP_TAGS_FILE points elsewhere)
 /state
+# local scratch: handoff notes, probes and compare output (never product files)
+/_build/
 # a worktree that links these folders instead of holding them: git sees a symlink as a file, which the patterns
 # above (trailing slash: directories only) do not match
 /node_modules

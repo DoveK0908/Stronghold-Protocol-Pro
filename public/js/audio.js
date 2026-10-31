@@ -134,6 +134,13 @@ const CHAIN_KINDS = new Set(['chain', 'chainHeal']);
 const IMPACT_TYPES = new Set(['phys', 'arts', 'true']);
 /** A 'dmg' later than this (real ms) after the attack aimed at the target is not that attack's impact. */
 const IMPACT_WINDOW_MS = 2500;
+/**
+ * Battle cues are scheduled on the frame that renders their events, not on arrival: the picture trails the newest
+ * snapshot by the jitter buffer's delay (render/interp.js), so a cue played on arrival leads the swing it belongs to.
+ * The lead comes in as `handleBattleEvents(ev, lead)` (render/app.js `cueDelay`), and this is its cap — a stalled or
+ * rewinding stream must not park a cue for seconds.
+ */
+const CUE_MAX_LEAD_S = 0.5;
 /** Casts held for a unit that is not tracked yet (`pendingSkill`): a hold per unit of a field, never more than this. */
 const PENDING_SKILL_MAX = 64;
 /**
@@ -796,6 +803,9 @@ export class AudioManager {
     this.voiceNative = false; // settings 本土语言: an operator with an own-language dub speaks it unless their own pick wins
     this.startVoiceDone = false; // 行动出发 of this field (the first operator deployed says it)
     this.uiVoices = 0;
+    // absolute AudioContext time a cue of the batch being handled sounds at (0 = right away): set by
+    // `handleBattleEvents`, read once by each play entry point, so a decode that lands later still starts at that time.
+    this._cueAt = 0;
     this.wantBgm = null;      // desired key (kept while locked)
     this.lastBgmKey = null;   // the key the screen asked for last (refreshBgm)
     this.bgm = null;          // { key, loopUrl, nodes: [{src, gain}], gain }
@@ -1450,9 +1460,11 @@ export class AudioManager {
    *   again: the sound's URL picked from the manifest again — played instead once when this one was a cosmetic plugin's
    *   file that would not load (its entry fell back: see the header)
    */
-  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, again = null, pri = SFX_PRI.event, pool = null } = {}) {
+  _play(url, { volume = 1, rate = 1, limited = false, unitKey = null, again = null, pri = SFX_PRI.event, pool = null, cueAt = 0 } = {}) {
     if (!this.ctx || !url || this.volumes.muted || this.volumes.sfx <= 0) return;
-    if (limited && pool) { this._playPool(url, { volume, unitKey, again, pool }); return; }
+    // the batch's cue time when this call came from `handleBattleEvents`, else a caller-supplied one (a fallback file)
+    const at = Number(cueAt) > 0 ? Number(cueAt) : (this._cueAt || 0);
+    if (limited && pool) { this._playPool(url, { volume, unitKey, again, pool, wait: at > this.ctx.currentTime ? at - this.ctx.currentTime : 0 }); return; }
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     let token = 0;
     if (limited) {
@@ -1476,7 +1488,7 @@ export class AudioManager {
       if (!buf && again && this.fellBack.has(url)) {
         release(); forget();
         const next = again();
-        if (typeof next === 'string' && next !== url) this._play(next, { volume, rate, limited, unitKey, pri });
+        if (typeof next === 'string' && next !== url) this._play(next, { volume, rate, limited, unitKey, pri, cueAt: at });
         return;
       }
       if (!buf || !this.ctx || (limited && !this.limiter.alive(token))) { release(); forget(); return; }
@@ -1500,8 +1512,10 @@ export class AudioManager {
         if (limited && !this.limiter.alive(token)) { end(); return; }
         if (limited) this.voiceEnd.set(token, end);
         s.onended = end;
-        setTimeout(end, (buf.duration / rate) * 1000 + 250); // safety if onended never fires
-        s.start();
+        // the safety ender must clear the cue wait too, or a scheduled sound is cut short before it even starts
+        const waitS = at > this.ctx.currentTime ? at - this.ctx.currentTime : 0;
+        setTimeout(end, (buf.duration / rate + waitS) * 1000 + 250); // safety if onended never fires
+        if (waitS > 0) s.start(at); else s.start();
       } catch { release(); forget(); }
     }, () => { release(); forget(); });
   }
@@ -1530,6 +1544,8 @@ export class AudioManager {
       const token = ++this.loopToken;
       const rec = { src: null, gain: null, token, timer: null };
       this.loops.set(key, rec);
+      // a loop started by a battle cue waits for that cue's frame like every other sound of the batch
+      const at = this._cueAt || 0;
       const maxS = Number.isFinite(o.maxS) ? o.maxS : SKILL_LOOP_MAX_S;
       rec.timer = setTimeout(() => this.stopLoop(key), maxS * 1000);   // safety: an end event we never see
       this._buffer(url).then((buf) => {
@@ -1543,7 +1559,7 @@ export class AudioManager {
           const g = this.ctx.createGain();
           g.gain.value = Math.max(0, Math.min(1.5, Number.isFinite(o.volume) ? o.volume : 0.7));
           s.connect(g); g.connect(this.sfxGain);
-          s.start();
+          if (at > this.ctx.currentTime) s.start(at); else s.start();
           cur.src = s; cur.gain = g;
         } catch { this.stopLoop(key); }
       }, () => this.stopLoop(key));
@@ -1579,8 +1595,8 @@ export class AudioManager {
   }
 
   /** Every loop of the current field (a new field, or a battle whose events stopped arriving). */
-  stopAllLoops() {
-    for (const key of [...this.loops.keys()]) this.stopLoop(key, { fadeS: 0 });
+  stopAllLoops({ fadeS = 0 } = {}) {
+    for (const key of [...this.loops.keys()]) this.stopLoop(key, { fadeS });
   }
 
   /**
@@ -1589,14 +1605,15 @@ export class AudioManager {
    * replacing sources before any start. [ASSUMED] Pending caps/coalescing/expiry, audio-clock due admission and
    * field-owned cancellation are web-client scheduling guards (review #680).
    */
-  _playPool(url, { volume, unitKey, again, pool }) {
+  _playPool(url, { volume, unitKey, again, pool, wait = 0 }) {
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
     let load = this.poolLoads.get(url);
     const key = `${pool.id}:${unitKey ?? ''}`;
     const previous = load?.get(key);
     if (previous) { this._dropPoolRequest(previous); load.delete(key); }
     if (this.poolRequests.size >= POOL_PENDING_MAX || (!load && this.poolLoads.size >= POOL_PENDING_MAX)) return;
-    const req = { url, volume, unitKey, again, pool, ctx: this.ctx, token: this.poolFieldToken, at: now, timer: null };
+    // `wait`: the batch's cue lead (CUE_MAX_LEAD_S) — `_poolDecoded` adds it to the file's own delay, on the audio clock
+    const req = { url, volume, unitKey, again, pool, wait: Math.max(0, Math.min(CUE_MAX_LEAD_S, Number(wait) || 0)), ctx: this.ctx, token: this.poolFieldToken, at: now, timer: null };
     this.poolRequests.add(req);
     if (load) { load.set(key, req); return; }
     load = new Map([[key, req]]);
@@ -1630,7 +1647,7 @@ export class AudioManager {
       const path = unhashedUrl(url).replace(/^\/assets\/audio\/sfx\//, '');
       const sound = req.pool.sounds?.[path];
       const delay = Math.max(0, sound?.delay || 0);
-      const due = req.ctx.currentTime + delay;
+      const due = req.ctx.currentTime + delay + (req.wait || 0);
       const ready = () => {
         if (!this._poolRequestCurrent(req)) { this._dropPoolRequest(req); return; }
         // Wall timers also run while AudioContext is suspended. Keep the file's delay on the audio clock.
@@ -1673,7 +1690,20 @@ export class AudioManager {
       }
       try { src?.disconnect(); gain?.disconnect(); } catch { /* ignore */ }
     };
-    const voice = { stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); } };
+    const voice = {
+      stop: () => { try { src?.stop(); } catch { /* already ended */ } end(); },
+      /** Ease this one out instead of cutting it: a field's end must not click and fall silent all at once. */
+      fade: (seconds) => {
+        if (!(seconds > 0) || !gain || !ctx) { voice.stop(); return; }
+        try {
+          const t0 = ctx.currentTime;
+          gain.gain.cancelScheduledValues(t0);
+          gain.gain.setValueAtTime(gain.gain.value, t0);
+          gain.gain.linearRampToValueAtTime(0, t0 + seconds);
+          setTimeout(() => { try { src?.stop(); } catch { /* already ended */ } end(); }, (seconds + 0.05) * 1000);
+        } catch { voice.stop(); }
+      },
+    };
     try {
       src = ctx.createBufferSource(); gain = ctx.createGain();
       src.buffer = buf; src.playbackRate.value = rate;
@@ -1689,22 +1719,39 @@ export class AudioManager {
     } catch { end(); }
   }
 
-  /** Field replacement, battle exit and screen cleanup invalidate downloads/delays and stop every playing pool source. */
-  stopPoolSounds() {
-    this.poolFieldToken++;
-    for (const req of this.poolRequests) this._dropPoolRequest(req);
-    // Keep empty loads subscribed: clearing this map would attach more handlers to the same stalled promise next field.
-    for (const load of this.poolLoads.values()) load.clear();
-    for (const voices of this.poolVoices.values()) for (const voice of [...voices]) voice.stop();
+  /**
+   * Field replacement, battle exit and screen cleanup invalidate downloads/delays and stop every playing pool source.
+   * `fadeS` > 0 eases them out instead (a decided battle: a hard stop cuts the last hits mid-sample and silences the
+   * whole field in one frame, reported 2026-10-30: 「最后结束后所有的声音也立即停止了」).
+   * `drain` keeps the pool's pending cues alive: a battle cue is scheduled for the frame that renders it (`CUE_MAX_LEAD_S`
+   * in `handleBattleEvents`), so a decided field still has the last swings' cues in flight — dropping them is the same
+   * silence one layer down (reported 2026-10-30 at 2×: 「击杀最后一个怪的前几秒钟，声音和动作会突然停止」).
+   */
+  stopPoolSounds({ fadeS = 0, drain = false } = {}) {
+    if (!drain) {
+      this.poolFieldToken++;
+      for (const req of this.poolRequests) this._dropPoolRequest(req);
+      // Keep empty loads subscribed: clearing this map would attach more handlers to the same stalled promise next field.
+      for (const load of this.poolLoads.values()) load.clear();
+    }
+    for (const voices of this.poolVoices.values()) {
+      for (const voice of [...voices]) {
+        if (fadeS > 0) voice.fade(fadeS);
+        else voice.stop();
+      }
+    }
   }
 
   /**
    * Everything that belongs to one battle: the pools (generic cues, loads still in flight), the operator lines and the
    * prep landings, playing or still loading. UI cues, BGM and bond cues are separate lifetimes and keep going.
-   * The screen calls this where a field ends or is replaced; skills' own loops are `stopAllLoops`.
+   * The screen calls this where a field ends or is replaced; skills' own loops are `stopAllLoops`. `fadeS` > 0 is the
+   * cosmetic tail of a decided battle — the field's last hits ring out instead of being cut; `drain` also leaves the pool
+   * cues and the operator's line in flight, so the finish's own sounds still arrive (the field-replacement path skips it).
    */
-  stopFieldSounds() {
-    this.stopPoolSounds();
+  stopFieldSounds({ fadeS = 0, drain = false } = {}) {
+    this.stopPoolSounds({ fadeS, drain });
+    if (drain) return;
     for (const v of [...this.landVoices]) this._stopLanding(v);
     try { this._stopVoice(); } catch { /* no ctx */ }
   }
@@ -1868,6 +1915,8 @@ export class AudioManager {
     // `_stopVoice` (takeover / stop) and `setFieldUnits` released the gate themselves. An unconditional release here let
     // a stale callback free the channel the NEW line had just taken, and the next line walked in on top of it (review
     // on #73).
+    // a cast's line belongs to the cast's frame: `handleBattleEvents` sets the batch's cue time (0 outside a batch)
+    const at = this._cueAt || 0;
     const failed = () => {
       if (token !== this.voiceToken) return;   // taken over / stopped meanwhile: not ours to release
       const next = again && this.fellBack.has(url) ? again() : null;
@@ -1899,8 +1948,9 @@ export class AudioManager {
           try { gain.disconnect(); } catch { /* ignore */ }
         };
         src.onended = end;
-        setTimeout(end, (buf.duration + 0.3) * 1000); // safety if onended never fires
-        src.start();
+        const waitS = at > this.ctx.currentTime ? at - this.ctx.currentTime : 0;
+        setTimeout(end, (buf.duration + 0.3 + waitS) * 1000); // safety if onended never fires
+        if (waitS > 0) src.start(at); else src.start();
         this.voiceNode = node;
       } catch (err) {
         this._warn('voice-play', err);
@@ -2066,8 +2116,13 @@ export class AudioManager {
    * React to `b.ev` tuples (DESIGN §8.2).
    * @param {any[]} ev
    */
-  handleBattleEvents(ev) {
+  handleBattleEvents(ev, lead = 0) {
     if (!this.ctx || !Array.isArray(ev)) return;
+    // one cue time for the batch (see CUE_MAX_LEAD_S): the frame that renders these events is `lead` real seconds away,
+    // so every sound this batch starts waits for it. Restored afterwards — UI cues are on the listener's own clock.
+    const prevCue = this._cueAt;
+    const wait = Math.max(0, Math.min(CUE_MAX_LEAD_S, Number(lead) || 0));
+    if (wait > 0) this._cueAt = this.ctx.currentTime + wait;
     try {
       const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
       for (const e of ev) {
@@ -2194,7 +2249,7 @@ export class AudioManager {
           this.battle('killCoin', { unitKey: 'coin' });
         }
       }
-    } catch (err) { this._warn('events', err); }
+    } catch (err) { this._warn('events', err); } finally { this._cueAt = prevCue; }
   }
 }
 

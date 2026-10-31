@@ -437,7 +437,16 @@ export function createFallbackView(host, opts = {}) {
     const ghost = d?.moved ? (() => {
       const hr = root.getBoundingClientRect();
       const src = pieceArt(d.piece);
-      return html`<div class=${cx('ff-ghost', d.piece.golden && 'is-golden')} style=${`left:${d.x - hr.left - L.tile / 2}px;top:${d.y - hr.top - L.tile / 2}px;width:${L.tile}px;height:${L.tile}px`}>
+      // 设置「拖动吸附」 = 强制吸附 (the official drag): the ghost stands on the legal tile under the pointer, like the 3D
+      // board's dragStandTile; 平滑吸附 (the default) keeps it under the pointer. The board is drawn inside .ff-board at
+      // (L.left, L.top) and the ghost is a root child, so a stood ghost is offset by the board's own position.
+      const t = st.settings.dragSnap === 'forced' ? st.hoverTarget : null;
+      const pos = t && (t.area === 'board' || t.area === 'hand') && dropState(t) === 'legal'
+        ? (t.area === 'board' ? tilePos(L, t.row, t.col) : handPos(L, t.idx))
+        : null;
+      const left = pos ? L.left + pos.x : d.x - hr.left - L.tile / 2;
+      const top = pos ? L.top + pos.y : d.y - hr.top - L.tile / 2;
+      return html`<div class=${cx('ff-ghost', d.piece.golden && 'is-golden')} style=${`left:${left}px;top:${top}px;width:${L.tile}px;height:${L.tile}px`}>
         ${src ? html`<${MaterialImage} src=${src} alt="" />` : null}</div>`;
     })() : null;
     if (st.camera === 'pen') { render(html`${penView()}<div class="ff-badge">SIMPLIFIED VIEW</div>`, root); return; }

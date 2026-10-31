@@ -40,7 +40,7 @@ export { normalizeDraft, normalizeSp, normalizePersonalChoice, draftMyTurn, held
 export { groupEnemies, PEN, penZoneTiles, penPlacement, previewEnemyKey, factionTypes } from './gameLogic/enemies.js';
 export { snapHud, bossFrac, bossPctText, hasFlag, UF, attackInterval, fmtNum, rangeGridBox } from './gameLogic/format.js';
 export { shortcutFor, selectionShortcutAllowed, pieceSpot, staleHotkeySale, closesOnFieldPress, shortcutBlocked, prepShortcutsSuspended, HOTKEY_ACTIONS, DEFAULT_HOTKEYS, isBindableCode, hotkeyLabel, sanitizeHotkeys, rebindHotkey, isDefaultHotkeys, hotkeyOf, actionForKey, captureHotkey, facingSwallows, facingEnter } from './gameLogic/shortcuts.js';
-export { DEFAULT_SETTINGS, VOICE_LANGS, TEXT_SIZES, UI_SCALES, uiScaleStep, sanitizeSettings } from './gameLogic/settings.js';
+export { DEFAULT_SETTINGS, VOICE_LANGS, TEXT_SIZES, UI_SCALES, DRAG_SNAPS, uiScaleStep, sanitizeSettings } from './gameLogic/settings.js';
 export { normalizeResult } from './gameLogic/result.js';
 export { chessLoadout, unitLoadout, unitCultivation } from './gameLogic/loadout.js';
 export { standInIds, fieldsStandIn, standInOf, ownStandIn, cardStandIn, memberStandIn, standInGetter, standInLoadout, deployedRecord, deployedModuleId, standInLabel, standInForText, standInTip } from './gameLogic/standIn.js';

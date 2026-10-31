@@ -85,7 +85,7 @@ view.on('pieceDragStart'|'pieceDrop'|'pieceDragEnd'|'pieceClick'|'pieceHover'|'t
    // area 'outside' lets the DOM UI decide: released off the grid or over DOM covering the canvas (the shop bar), mouse
    //   and touch alike — there is no drag-to-sell, the piece goes back
    // the drop target, its highlight and tileHover while dragging = the tile under the POINTER; an item dropped on a
-   //   tile equips the unit standing on it (§18.1); a dragged unit follows the pointer smoothly and is never snapped to a tile (the free deploy drag, 2026-10-15, in place of §27.62's standing drag), an item plate on the pointer
+   //   tile equips the unit standing on it (§18.1); a dragged unit follows the pointer smoothly and is never snapped to a tile by default (the free deploy drag, 2026-10-15, in place of §27.62's standing drag); 设置「拖动吸附」 = 强制吸附 (`dragSnap: 'forced'`) puts the standing drag back — the model stands on the legal tile under the pointer (the tile the drop lands on) and is held under the pointer elsewhere ([0.3.4](../history/0.3.4.md) §37.59); an item plate stays on the pointer in both modes
 view.pieceScreenRect(uid)                    // the drawn body's rect { left, top, right, bottom, width, height, x, y } (tooltips / overlays)
 view.tileScreen(row, col)                    // { x, y, s, poly } client px of a tile top (direction wheel geometry)
 view.holdPiece(uid, {row,col}|null)          // keep a dropped piece on a tile while its direction is chosen
@@ -486,8 +486,10 @@ Settings persist `textSize` (sm/md/lg/xl; default sm), `voiceLang` (cn/jp/en/kr;
 本土语言 switch; default false), `voiceOverrides` (charId → cn/jp/en/kr/native; default empty), `prepDeployFold`
 (部署时收起商店; **this fork defaults it to false** — a fresh browser picks pieces up without folding the shop
 or moving the camera; explicit `true` fully folds it, while `'partial'` keeps the shop at 70% with intermediate
-camera framing through the drag and facing wheel; official 0.3.1 defaults it on) and `ammoEnergyCount`
-(显示弹药与能量数量; default false). A saved `ammoCount` or `mysticEnergy` of `true` migrates into `ammoEnergyCount`
+camera framing through the drag and facing wheel; official 0.3.1 defaults it on), `ammoEnergyCount`
+(显示弹药与能量数量; default false) and `dragSnap` (拖动吸附; default `'smooth'` — the model follows the pointer, the
+released free drag of 2026-10-15; `'forced'` — the official deploy drag, the model standing on the legal tile under the
+pointer, §37.59). A saved `ammoCount` or `mysticEnergy` of `true` migrates into `ammoEnergyCount`
 on read and is not written back. CSS text uses `--t`;
 the layout rem, camera and board geometry stay unchanged. Larger text and translated controls wrap within the settings
 modal. The normal roster detail and chosen DIY cards expose each operator's voice preference, shared across that
@@ -1078,6 +1080,12 @@ Art/audio templates ship original CC0 sample media; the studio fills the target'
 
 The field view receives an explicit completion signal (`finishBattle`): the local runner's `done`, or the server's public field `live: false`. Missing snapshots and solo pause never imply completion. After rendering the final buffered snapshot/events, surviving units return to idle with temporary crowd-control and skill pose flags cleared for presentation only, retaining flight, stealth-driven forms and other persistent flags; knocked-out/dead poses remain. Official and plugin persistent effects stop, while one-shot effects advance on the presentation clock and are removed after at most two presentation seconds [ASSUMED]. Studio playback continues to use its external clock, including zero-time paused frames. This does not tick the simulation, delay results, or change golden outcomes.
 
+The official layer's clock runs in the prep too (`render/app/playback.js tickEffectClock`, the same call in both branches of the frame): prep owns a layer — `wiring.arrive` plays an operator's birth flash for a bought piece and for one swapped into the bench by 巫恋's 替身娃娃 — and a clock that only advances in a battle left that flash frozen on its first frame, with nothing to expire it until the next `enterBattle`/`enterPrepMode` cleared the layer (reported 2026-10-30: 「卖出干员触发策略效果时，休整期有特效残留」). A seekable (studio) clock keeps the whole delta; a live frame keeps the layer's own 0.25 s cap.
+
+Enemies still drawn at completion fade out (`render/units.js dismissEnemies`, called once when the presentation ends): the round's enemy count never included a split child or a summon (§14), and a wave the last tick ended on is still in its `DIE_ANIM_TIME` window, so in both cases views outlived the final snapshot with nothing left to remove them and stood in their idle pose through the whole settle (reported 2026-10-30: 「我先把怪打完了，但是怪还在场上」). The players' own units stay — the settle shows their board; a death already falling keeps its own timing. Once the presentation has ended, `syncBattle` also stops drawing the enemy side outright, so a feed that keeps repeating the last state (a client-combat field stays subscribed while the round waits for the other players) cannot bring those views back.
+
+The presentation also ends on a feed that stopped growing: `BattlePresentation` requires the caller's `finishBattle` signal, and then plays the finish out for **1.2 game seconds** without a newer snapshot (`settleWindow(rate)`, clamped to 0.6–1.6 real seconds), so the settle covers 1.2 s of animation at 1× and the same 1.2 s of animation — 0.6 s real — at 2×. Measuring the window in game seconds is the point: the tail belongs to the battle (the last swing, the deaths it triggers, their cues), and a real-second window halves at 2× and cuts exactly the moment it was meant to keep (reported 2026-10-30 at 2×: 「击杀最后一个怪的前几秒钟，声音和动作会突然停止」). The render clock settles `delay × rate` seconds behind the newest snapshot (`render/interp.js`), so the end can never be the clock reaching it: a decided field's feed stops growing within a frame of its last tick, and once the extrapolation guard opens for the settle (`render/app.js`, `settleWindow(interp.rate) + 0.05`, closing again once the presentation ends) that test would fire immediately and cut the finish instead of drawing it. Before the settle window existed, the last frame held its attack pose and the frozen official effects never resumed until the phase changed and cleared the view (reported 2026-10-30: 「我已经打完了，时间还没有结束，但是怪还留在场上，就像卡在最后打怪的这一下」). The official mode ends a battle on its own last tick too (docs/design/engine.md §end) and shows the finish before the result panel; this window is presentation only, it never ticks the simulation, delays a result or moves a golden. [ASSUMED] 1.2 game seconds is a taste value sized to outlast a swing plus a death animation — the official finish's own length cannot be measured from the data.
+
 The four-star Theresa mote ring follows the game clock (including pause and speed), converts its y-up offsets to
 Spine display coordinates, and is recreated on model swaps. Its S2 radius of 2 tiles is [ASSUMED] from outside_radius;
 the hidden five-star orbit is unchanged (PR #576).
@@ -1098,6 +1106,28 @@ Attack pacing (PR #729): UnitInfo carries the actual attack interval in game sec
 phase and before projectiles carries changes; its baseline is seeded by birth info. The renderer looks ahead through
 the attack tick, including a rate later in that tick, without borrowing a later tick’s value. Its 0.2–6 second display
 window is [ASSUMED]; damage, attack timing and targeting are unchanged.
+
+Battle sound follows the drawn frame (2026-10-30). A battle cue used to sound the moment its message arrived, while the
+picture trails the newest snapshot by the jitter buffer's delay — 0.034 s in a client-simulated battle, from 0.1 s on a
+watched field — so a swing or hit was heard before it was drawn, and at 2× the same real second covers two seconds of
+the animation (reported 2026-10-30: 「对局中的音效和小人的动作不同步」 / 「二倍速下音效先响、动作后到」). `screens/game.js`
+now hands `audio.handleBattleEvents` the lead from `view.cueDelay(msg)` (`render/app/playback.js cueLead`, computed on the
+render clock) and every source of that batch starts on the WebAudio clock at that time (`start(when)`; a pool request
+adds it to its own `delay`); the lead is capped at 0.5 s in both files so a stalled or rewinding stream cannot park a
+sound for seconds, and a batch inside a single frame (already drawn, or outside a battle) is heard at once as before.
+Cue ordering, volumes and the impact pairing window are unchanged. [ASSUMED] The lead is the render clock's own lag, not
+a measured A/V offset; a device whose audio output adds latency is not compensated.
+
+A decided field rings out (2026-10-30). Settling a field used to cut every attack/hit voice and skill loop at once —
+`stopPoolSounds` called `src.stop()` and `stopAllLoops` passed `fadeS: 0` — and the cue lead above had just parked the last
+swings and hits on the WebAudio clock, so the cut landed exactly on them (reported 2026-10-30: 「最后结束后所有的声音也立即
+停止了」). `screens/game.js` now settles with `stopFieldSounds({ fadeS: 1.8 })` and `stopAllLoops({ fadeS: 1.8 })`; the pool
+voice grew a `fade(seconds)` that ramps its gain to 0 (and stops the source after the ramp) and both stops take an optional
+`fadeS`, default 0. Field replacement and teardown keep the hard stop, voices and landing sounds keep their own crossfades —
+only the settle path rings out. [ASSUMED] 1.8 s is a taste value sized to outlast the presentation's own settle window
+(`settleWindow`, at most 1.6 s real) plus the capped cue lead: the finish's cues are only handed to the audio once the render
+clock crosses them, so a ramp shorter than that window silenced exactly the last swings and hits it was meant to keep
+(reported 2026-10-30 at 2×: 「击杀最后一个怪的前几秒钟，声音和动作会突然停止」).
 
 Skill model fallback (#786, §35.90): when facing up, a skill with an authored Front clip and only an attack fallback
 on Back uses Front through the skill clip and ending. Back-authored skills keep Back. [ASSUMED] This model choice

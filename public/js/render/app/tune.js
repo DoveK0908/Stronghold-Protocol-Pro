@@ -34,10 +34,12 @@ const DROP_PENDING_MS = 1300;
 
 /**
  * A dragged unit is held with its drawn feet this many tiles below a finger — the finger on its body, the model under
- * it (user playtest #4 item 1: as in v2.1) — and DRAG_HOLD_MOUSE_TILES below a mouse or pen, which hides nothing. It is
- * never snapped to a tile (the free deploy drag, 2026-10-15): it follows the pointer, closing the gap at
- * DRAG_FOLLOW_RATE per second (1 − e^(−rate·dt) a frame, the same feel at 60 and 120 Hz). An item plate is centred on
- * the pointer.
+ * it (user playtest #4 item 1: as in v2.1) — and DRAG_HOLD_MOUSE_TILES below a mouse or pen, which hides nothing. With
+ * 设置「拖动吸附」 smooth (the default) it is never snapped to a tile (the free deploy drag, 2026-10-15): it follows the
+ * pointer, closing the gap at DRAG_FOLLOW_RATE per second (1 − e^(−rate·dt) a frame, the same feel at 60 and 120 Hz).
+ * With 强制吸附 (render/app.js moveDragVisual, drag.js dragStandTile) it stands on the legal tile under the pointer and
+ * is held DRAG_HOLD_TILES below the pointer elsewhere, as the official drag does (a mouse too: there is no snap without
+ * a target). An item plate is centred on the pointer in both modes.
  */
 export const DRAG_HOLD_TILES = 0.45;
 export const DRAG_HOLD_MOUSE_TILES = 0.12;
