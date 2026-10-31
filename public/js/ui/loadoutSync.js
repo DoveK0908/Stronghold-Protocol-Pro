@@ -46,7 +46,7 @@ import { POTENTIAL_DEFAULT, CULTIVATE_DEFAULT } from '../../../shared/potential.
 import { ruleOption } from '../../../shared/plugins/rules.js';
 import { OWNERSHIP_PREF, parseStoredOwnership, parseStoredOwnershipChars, toStoredOwnership, toStoredOwnershipV1, cleanIds, sanitizeNotOwned,
   notOwnedView, rebaseChars } from './ownershipModel.js';
-import { DIY_PREF, parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey } from './diyModel.js';
+import { parseStoredDiy, toStoredDiy, cleanPicks, sanitizeDiyPicks, diyPrefKey } from './diyModel.js';
 import { cardStore, CARD_KEY, CARD_SYNC_KEY, cardOperators } from './seatArt.js';
 import { needsContent, serverDefaultVersion } from '../versions.js';
 import { DEFAULT_VERSION } from '../../../shared/versions.js';
@@ -72,18 +72,22 @@ function readStoredDiy(version = DEFAULT_VERSION) {
   try { return parseStoredDiy(loadPref(diyPrefKey(version), null)); } catch { return {}; }
 }
 
-/** Validate all included sections, then publish one local change; existing ordered sync engines retain their locks. */
+/**
+ * Validate all included sections, then publish one local change; existing ordered sync engines retain their locks.
+ * The store keeps the settings by operator and shows them as views (`byChar` / `entries`, `notOwnedChars` /
+ * `notOwned`): every sync's prepare calls refreshViews, which rebuilds the views from the by-operator settings — so the
+ * import publishes BOTH, or it is reverted a moment later (feedback 2026-10-31).
+ */
 export function applyOperatorPreset(parsed, deps, { target = loadoutStore, persist = savePref } = {}) {
   const result = prepareOperatorPreset(parsed, deps);
   if (!result.ok) return result;
-  const formats = {
-    notOwned: [OWNERSHIP_PREF, toStoredOwnership], diy: [DIY_PREF, toStoredDiy],
-  };
   const current = target.get?.() || {};
+  const patch = { ...result.patch };
+  // 皮肤 (docs/SKINS.md) live in their own store (ui/skins.js), never in this one: the loadout's sync engine keeps
+  // that store current, exactly as it keeps the loadout's
+  delete patch.skins;
   let loadoutSaved = false;
   for (const [key, value] of Object.entries(result.patch)) {
-    // 皮肤 (docs/SKINS.md) live in their own store (ui/skins.js), never in this one: the loadout's sync engine keeps
-    // that store current, exactly as it keeps the loadout's
     if (key === 'skins') {
       try { persist(SKINS_KEY, serializeSkins(value)); } catch { /* blocked storage: the in-memory store still takes it */ }
       setSkinChoices(value);
@@ -99,15 +103,25 @@ export function applyOperatorPreset(parsed, deps, { target = loadoutStore, persi
       const nextOps = result.patch.ops ?? current.ops ?? {};
       const map = viewMaps.get(current.entries) || (current.entries === loadoutStore.get().entries ? shownCharMap() : null);
       const byChar = rebaseByChar(current.byChar || {}, current.entries || {}, nextEntries, charOfFor(map, deps.lookup));
+      if (map) viewMaps.set(nextEntries, map);
       try { persist(LOADOUT_PREF, toStored(byChar, nextOps, nextEntries)); }
       catch { /* blocked storage: keep the coherent in-memory preset */ }
+      // a v2 store reads its views from byChar (a v1 store still waiting for its migration keeps its by-chess ids)
+      if (current.byChar != null) patch.byChar = byChar;
       continue;
     }
-    const [pref, format] = formats[key];
-    try { persist(pref, format(value)); } catch { /* blocked storage: keep the coherent in-memory preset */ }
+    if (key === 'notOwned') {
+      const map = viewMaps.get(current.notOwned) || (current.notOwned === loadoutStore.get().notOwned ? shownCharMap() : null);
+      const chars = rebaseChars(current.notOwnedChars || [], current.notOwned || [], value, charOfFor(map, deps.lookup));
+      if (map) viewMaps.set(value, map);
+      try { persist(OWNERSHIP_PREF, toStoredOwnership(chars)); } catch { /* blocked storage: keep the coherent in-memory preset */ }
+      if (current.notOwnedChars != null) patch.notOwnedChars = chars;
+      continue;
+    }
+    // 自选编队: the picks of the version on screen live under that version's own key (setDiyPicks, diyModel.js diyPrefKey)
+    try { persist(diyPrefKey(current.diyVersion), toStoredDiy(value)); } catch { /* blocked storage: keep the coherent in-memory preset */ }
   }
-  const { skins: _skins, ...rest } = result.patch;
-  target.set(rest);
+  target.set(patch);
   return result;
 }
 
