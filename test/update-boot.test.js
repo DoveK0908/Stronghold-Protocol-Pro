@@ -55,6 +55,10 @@ test('refusal rules: traversal, absolute and drive paths, backslashes, per-machi
   // a dependency's own .env.example can be verified (MANIFEST.json) but an update never deletes it
   const m = parseManifest(JSON.stringify({ format: 1, app: '0.2.1', files: { 'node_modules/x/.env.example': dg('x') } }));
   assert.deepEqual([...m.files.keys()], ['node_modules/x/.env.example']);
+  // the Pro scheme appends `pro` to the official version (0.3.3pro): a manifest this tree writes must read back
+  const pro = parseManifest(JSON.stringify({ format: 1, app: '0.3.3pro', files: {} }));
+  assert.equal(pro.app, '0.3.3pro');
+  assert.equal(parseUpdate(JSON.stringify({ format: 1, app: '0.3.3pro', from: ['0.3.2pro'], count: 0, bytes: 0, files: {} , removed: [] })).app, '0.3.3pro');
 });
 
 const H = sha('x');
