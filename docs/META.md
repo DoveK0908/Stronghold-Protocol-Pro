@@ -287,7 +287,8 @@ still uses the legacy prep adapter; a trusted strategy must explicitly select th
 
 
 **Strategy** (`botPickBand`): weighted by starting LP among the offered bands (alone, 老鲤's withheld first-round funds
-× 0.02); a band whose mechanic rides on a bond the mode switches off weighs 0 — `GameData.bandBondIds` (bands.json
+× 0.02); on 终极 also by the bots' own completion with each band (`bandStrength`, shrunk toward the mean and
+raised to the sixth power, §37.60); a band whose mechanic rides on a bond the mode switches off weighs 0 — `GameData.bandBondIds` (bands.json
 `bondIds`, built by shared/bandBonds.js: the bond names in <…> of its text, the bond ids / bond pools of its blackboards)
 ∩ `modeInactiveBonds`: 标准's 潘格尼尼, 克莱门莎, 玛恩纳 — and with every offered band excluded it takes the default band;
 one rng draw per pick (DESIGN §21.26). The strategy draft marks the same bands 本局禁用 for humans (still selectable).
@@ -305,7 +306,8 @@ progress or a lineup upgrade **and** be worth more than the refreshes its price 
 Σ over the held pairs of P(the refresh shows the third copy) × the value of an elite (the shop's copy-weighted odds
 over the remaining pool; an elite also brings the merge's free pick of the next tier, so any pair is worth completing)
 — otherwise it refreshes. Up to 4 pairs wait on the bench (6 spare units, pairs first); a third copy it cannot afford
-freezes the shop for the next round (freeze is free). Purchase scores: merge progress > bond thresholds > role needs
+freezes the shop for the next round (freeze is free). A layer trade — buying a 获得时 layer unit and selling it again —
+needs `tradeMin(m)` layers per fund: 3 in co-op, 4 alone (§37.60). Purchase scores: merge progress > bond thresholds > role needs
 (2 blockers, anti-air when the wave flies, ≤ 2 healers) > tier, the 特质 that keep adding layers, and armour fit (the
 share of a dealer's damage that gets through the round's DEF / RES — `mitigate` of the sim per hit, HP-weighted over
 the wave; an attack on every enemy in range counts ×2 — 阵法术师 / 轰击术师, `rangeAoe` since 0.1.1 —, a splash ×1.3, a
@@ -354,7 +356,7 @@ After placing the whole formation, the planner checks isolated self-range guards
 dealer covering both the tile and the preceding contact, with different allies allowed per route. Within each group,
 the exposure model ranks positions. Boss rounds place wider healing ranges first; on equal exposure scores, medics
 prefer allied estimated DPS not already covered by another placed medic, then tile noise (#315).
-**Rehearsal:** with `opts.botRehearsal = N` (default 3) the bot simulates the N best
+**Rehearsal:** with `opts.botRehearsal = N` (default 6, §37.60) the bot simulates the N best
 distinct layout variants once each with the real `Battle` and `Match._normalOpts`, including `onBattleStart`, enemy
 replacements, teammate effects and in-battle layer gains. [ASSUMED] Every candidate uses the normal field seed (#315)
 and its own clone of the current meta RNG. A boss round (`m.wave` null, `bossGroupOf` already planned) rehearses the

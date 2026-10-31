@@ -9,7 +9,7 @@ commands to regenerate them under `.cache/`).
 | Base | 0.3.2 dev (`218647c6`, after the Wild Mane push §35.10 and the advisor execution changes §35.13–35.15) + this PR's strategies |
 | Measured on | the same base and head |
 | Strategies | `legacy` (default), `ioleta`, `adaptive` (placement only), `ioleta-adaptive` (Russell procurement + adaptive placement) |
-| Rehearsal | Match default (3 candidates; adaptive extends to at most 8) |
+| Rehearsal | Match default (3 candidates when measured; 6 since §37.60; adaptive extends to at most 8) |
 | Host | Windows 11, Node 24.15.0 |
 
 ## Default behavior is unchanged

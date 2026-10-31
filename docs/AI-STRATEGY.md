@@ -797,3 +797,16 @@ release and its separate runtime are imported, not hand-edited; the Pro wrapper 
 remain host-owned. Lavinia 0.3.0 and Zumama 0.2.0 keep their installed policy bytes. The displayed versions now agree with
 these installed release tags. See history §37.56 and the batch validation receipt for local evidence, not natural win rates.
 
+### Cycle 15: 终极 band strength, six-layout rehearsal and solo layer trades (upstream dev `9f94adb3`, this tree §37.60)
+
+Upstream measured all 40 bands with 80 forced 终极 solo games each: passive combat buffs lead (阿米娅 ×1.5 over the
+LP-only pick; 杜宾 / 梓兰 ×0.45; 克莱门莎 ×0.03), and the table is shrunk 0.7 toward the mean by its 80-seed noise
+(SE ≈ 4 points against a spread of ≈ 7) before the sixth power. Against the LP weight alone: solo pool completion
++1.9 ± 1.5 on 1–320, +4.9 ± 2.2 on fresh 481–640, wins 65 → 77; co-op about even (wins 113 → 111), so only 终极 picks
+scale. The default rehearsal became six candidates (the positional plan plus the five variants): 终极 solo +2.19 ± 0.90,
+co-op +5.60 ± 1.65 (wins 73 → 92) for about a third more rehearsal CPU; eight repeated the same games. Alone, a layer
+trade must pay four layers per fund (3 stays in co-op): solo +1.75 ± 1.04 on 1–320 and +3.15 ± 1.33 on 481–640, wins
+63 → 75. These are upstream diagnostics on the official bot and are not local win-rate claims: Pro keeps its pool
+scope, elite dispatch, layout adapter and shop cap. Local evidence is in history §37.60 (targeted tests and the
+default matches golden moves).
+
