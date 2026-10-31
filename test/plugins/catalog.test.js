@@ -117,16 +117,13 @@ test('entry status: incompatible wins, then updatable, installed, available; a m
   assert.deepEqual(entryStatus(e, '1.0.0'), { status: 'updatable', installedVersion: '1.0.0' });
   assert.deepEqual(entryStatus(e, null), { status: 'installed', installedVersion: null });
   const old = entry({ id: 'demo-old', app: '>=9.0.0' });
-  // this build's release version (`pro`) carries no numeric core, so appVersionMatches counts every range as a match —
-  // the documented "an unreadable version compares equal" convention; an explicit numeric version exercises the range.
-  assert.equal(entryStatus(old, '0.9.0', APP_VERSION).status, 'updatable');
-  assert.equal(entryStatus(old, '1.0.0', '1.0.0').status, 'incompatible');
-  assert.equal(entryStatus(old, '1.0.0', '1.0.0').installedVersion, '1.0.0');
+  assert.equal(entryStatus(old, '1.0.0', APP_VERSION).status, 'incompatible');
+  assert.equal(entryStatus(old, '1.0.0', APP_VERSION).installedVersion, '1.0.0');
   assert.equal(entryStatus(entry({ app: '' }), undefined).status, 'incompatible');
   assert.equal(entryStatus(entry({ app: '   ' }), undefined).status, 'incompatible');
   assert.equal(entryStatus(entry({ app: 'latest' }), undefined).status, 'incompatible');
   assert.equal(entryStatus(entry(), undefined).status, 'available');
-  const rows = annotateCatalog(readCatalog(doc([e, old])).catalog, (id) => (id === 'demo-skin' ? '1.0.0' : undefined), '1.0.0');
+  const rows = annotateCatalog(readCatalog(doc([e, old])).catalog, (id) => (id === 'demo-skin' ? '1.0.0' : undefined));
   assert.deepEqual(rows.map((r) => r.status), ['updatable', 'incompatible']);
 });
 

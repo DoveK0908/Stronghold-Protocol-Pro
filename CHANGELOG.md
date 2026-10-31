@@ -1,17 +1,3 @@
-## pro — 2026-10-31
-
-### 版本号只保留 `pro`（owner 2026-10-31）
-
-- 发版版本号改为单纯的 `pro`：不再带官方版本前缀，也不再有自定的小版本号。`shared/constants.js` 的 `APP_VERSION`、`package.json`、`package-lock.json`（根与 `packages[""]`）、README 徽章、本文件首节标题、`docs/PROJECTS.md` 的「当前版本号」一起改为 `pro`。
-- 历史保留：`0.3.3pro` 与更早的 `x.y.z-pro.N` 是已发布过的版本，继续留在本文件与 `docs/history/` 里；`server/update.js` 的版本校验同时接受 `pro` 和这些数字形式，旧发放出的 `MANIFEST.json`/`UPDATE.json` 仍可读。
-- 插件 `app` 版本范围：版本号不含数字后，`appVersionMatches` 按既有约定「读不出的版本视为匹配」处理，`app` 范围只作建议；`tools/i18n.mjs` 的 `appRange()` 在没有数字核心时写 `*` 而不是 `>=0.0.0`。判定逻辑本身没改，相关测试改为显式传入数字版本以保留原意。
-- 本批仍不打包、不发版；本地 tag 未推。
-
-### 修复：导入干员预设后不再被同步视图回退（2026-10-31）
-
-- `public/js/ui/loadoutSync.js` 的 `applyOperatorPreset` 原先只写 localStorage，没有写回 `byChar`/`notOwnedChars`，因此每个同步周期（`SYNC_DEBOUNCE_MS` 500 ms）的 `refreshViews()` 都会用旧视图把刚导入的预设覆盖回去。现在把 `result.patch` 写进 `set()` 的目标，并跳过 `skins`（外形由名片系统自己同步）；自选 key 也从固定的 `DIY_PREF` 改为随版本走的 `diyPrefKey(diyVersion)`。
-- 新增 `test/ui/operator-preset-views.test.js`（3 条：导入后视图保持、自选 key 随版本、刷新不覆盖导入）。
-
 ## 0.3.3pro — 2026-10-30
 
 ### 普通人机：跟进官方 dev 三项人机决策（2026-10-31）

@@ -112,9 +112,9 @@ export function removalProblem(rel) {
 }
 
 const HEX64 = /^[0-9a-f]{64}$/;
-// The Pro release version is just `pro` (shared/constants.js, owner 2026-10-31), so a manifest written by this tree names
-// that; the numeric forms earlier releases named stay accepted, because those releases are history.
-const VERSION = /^(?:pro|\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+|pro)?)$/;
+// The Pro scheme is the official version followed by `pro`, with no patch counter of our own (shared/constants.js):
+// upstream 0.3.3 reads 0.3.3pro here, so an update manifest written by this tree must accept it as a version.
+const VERSION = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+|pro)?$/;
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const isCount = (v) => Number.isSafeInteger(v) && v >= 0;
 

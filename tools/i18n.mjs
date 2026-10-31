@@ -750,12 +750,8 @@ async function cmdCheck(flags) {
 /** A positional argument of `check` that names a language (a code that is not a path of the checkout). */
 const isLangArg = (a) => !!canonicalLang(a) && !existsSync(path.resolve(ROOT, a));
 
-/** The `app` range a new pack targets: this release and later ('>=0.2.0' on 0.2.0-dev), or '*' when the release version
- * carries no numeric core (`pro`, owner 2026-10-31) — `appVersionMatches` treats such a build as matching every range. */
-const appRange = () => {
-  const core = /^\d+\.\d+\.\d+/.exec(APP_VERSION);
-  return core ? `>=${core[0]}` : '*';
-};
+/** The `app` range a new pack targets: this release and later ('>=0.2.0' on 0.2.0-dev). */
+const appRange = () => `>=${(/^\d+\.\d+\.\d+/.exec(APP_VERSION) || ['0.0.0'])[0]}`;
 
 /**
  * A pack skeleton (or an existing pack with the msgids it lacks added, empty): the `_meta` manifest first, then every
